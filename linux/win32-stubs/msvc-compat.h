@@ -429,6 +429,45 @@ static inline void _makepath(char* path,
 #endif
 #endif // _WWLIB_MAKEPATH_DEFINED
 
+// TIM-91: _splitpath inert shim. MSVC CRT path decomposer; glibc has no
+// equivalent. Three engine call sites: LOADDLG.CPP:760 (reads ext after,
+// `atoi(ext + 1)`), MIXFILE.CPP:320 (reads name + ext), STARTUP.CPP:342
+// (reads drive + path/dir). All callers pass NULL for fields they don't
+// want. Inert no-op zero-terminates each non-NULL output buffer so any
+// caller doing strlen / strcat / atoi sees an empty string rather than
+// uninitialised stack — same safety contract as the _makepath shim,
+// without doing any real path decomposition (the parser only needs the
+// declaration; the runtime path universe is dormant under the stub).
+#ifndef _WWLIB_SPLITPATH_DEFINED
+#define _WWLIB_SPLITPATH_DEFINED
+#ifdef __cplusplus
+static inline void _splitpath(const char* /*path*/,
+                              char* drive,
+                              char* dir,
+                              char* fname,
+                              char* ext)
+{
+    if (drive) drive[0] = '\0';
+    if (dir)   dir[0]   = '\0';
+    if (fname) fname[0] = '\0';
+    if (ext)   ext[0]   = '\0';
+}
+#else
+static inline void _splitpath(const char* path,
+                              char* drive,
+                              char* dir,
+                              char* fname,
+                              char* ext)
+{
+    (void)path;
+    if (drive) drive[0] = '\0';
+    if (dir)   dir[0]   = '\0';
+    if (fname) fname[0] = '\0';
+    if (ext)   ext[0]   = '\0';
+}
+#endif
+#endif // _WWLIB_SPLITPATH_DEFINED
+
 #endif // !_MSC_VER
 
 // TIM-9: pull in the Win32 type taxonomy stub for every TU. Several
