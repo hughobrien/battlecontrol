@@ -606,4 +606,106 @@ static inline int MessageBoxA(HWND, LPCSTR, LPCSTR, UINT) { return IDOK; }
  * defined by the engine's own KEY.H, not here. */
 static inline SHORT GetKeyState(int) { return 0; }
 
+/* TIM-71: Win32 input + message-pump cluster. KEY.CPP / KEYBOARD.CPP
+ * (WWKeyboardClass::To_ASCII / Down / Fill_Buffer_From_System /
+ * Message_Handler) call MapVirtualKey/GetAsyncKeyState/ToAscii to
+ * translate physical scancodes and PeekMessage/GetMessage/Translate
+ * Message/DispatchMessage to pump the OS event loop. The Linux input
+ * pipeline is dormant under the stub (SDL_PollEvent + scancode
+ * translation lands in a later port), so everything here is inert:
+ * PeekMessage returns FALSE so the pump loop exits immediately,
+ * Translate/Dispatch never run, ToAscii/MapVirtualKey return 0
+ * (engine code already gates "no key produced" branches downstream),
+ * GetAsyncKeyState reports no key held.
+ *
+ * MSG / LPMSG / WPARAM / LPARAM exist only to give &msg arguments a
+ * complete type. WPARAM/LPARAM are pointer-sized integer typedefs to
+ * match the Win32 SDK ABI on LP64 (UINT_PTR / LONG_PTR). The MSG layout
+ * matches the SDK so any sizeof / pointer-cast through engine code stays
+ * well-defined; no field is read on the dormant code path. POINT and
+ * BOOL/HWND/UINT/DWORD/WORD are already defined above.
+ *
+ * VK_* constants live in the engine's own KEY.H. WM_* / PM_* / LOWORD /
+ * HIWORD live here. PBYTE is the natural twin of the existing LPBYTE
+ * typedef; it surfaces only now because the (PBYTE)KeyState casts at
+ * KEY.CPP:321 / KEYBOARD.CPP:264 land once ToAscii is declared. */
+
+typedef BYTE*              PBYTE;
+typedef uintptr_t          WPARAM;
+typedef intptr_t           LPARAM;
+
+typedef struct tagMSG {
+    HWND    hwnd;
+    UINT    message;
+    WPARAM  wParam;
+    LPARAM  lParam;
+    DWORD   time;
+    POINT   pt;
+} MSG, *LPMSG;
+
+#ifndef PM_NOREMOVE
+#define PM_NOREMOVE 0x0000
+#endif
+#ifndef PM_REMOVE
+#define PM_REMOVE   0x0001
+#endif
+
+#ifndef WM_KEYDOWN
+#define WM_KEYDOWN          0x0100
+#endif
+#ifndef WM_KEYUP
+#define WM_KEYUP            0x0101
+#endif
+#ifndef WM_SYSKEYDOWN
+#define WM_SYSKEYDOWN       0x0104
+#endif
+#ifndef WM_SYSKEYUP
+#define WM_SYSKEYUP         0x0105
+#endif
+#ifndef WM_MOUSEMOVE
+#define WM_MOUSEMOVE        0x0200
+#endif
+#ifndef WM_LBUTTONDOWN
+#define WM_LBUTTONDOWN      0x0201
+#endif
+#ifndef WM_LBUTTONUP
+#define WM_LBUTTONUP        0x0202
+#endif
+#ifndef WM_LBUTTONDBLCLK
+#define WM_LBUTTONDBLCLK    0x0203
+#endif
+#ifndef WM_RBUTTONDOWN
+#define WM_RBUTTONDOWN      0x0204
+#endif
+#ifndef WM_RBUTTONUP
+#define WM_RBUTTONUP        0x0205
+#endif
+#ifndef WM_RBUTTONDBLCLK
+#define WM_RBUTTONDBLCLK    0x0206
+#endif
+#ifndef WM_MBUTTONDOWN
+#define WM_MBUTTONDOWN      0x0207
+#endif
+#ifndef WM_MBUTTONUP
+#define WM_MBUTTONUP        0x0208
+#endif
+#ifndef WM_MBUTTONDBLCLK
+#define WM_MBUTTONDBLCLK    0x0209
+#endif
+
+#ifndef LOWORD
+#define LOWORD(l) ((WORD)((DWORD)(l) & 0xFFFF))
+#endif
+#ifndef HIWORD
+#define HIWORD(l) ((WORD)(((DWORD)(l) >> 16) & 0xFFFF))
+#endif
+
+static inline UINT  MapVirtualKey(UINT, UINT)                      { return 0; }
+static inline SHORT GetAsyncKeyState(int)                          { return 0; }
+static inline int   ToAscii(UINT, UINT, const BYTE*, LPWORD, UINT) { return 0; }
+static inline BOOL  PeekMessage(LPMSG, HWND, UINT, UINT, UINT)     { return FALSE; }
+static inline BOOL  GetMessage(LPMSG, HWND, UINT, UINT)            { return FALSE; }
+static inline BOOL  TranslateMessage(const MSG*)                   { return FALSE; }
+static inline LONG  DispatchMessage(const MSG*)                    { return 0; }
+
 #endif /* LINUX_STUBS_WINDOWS_H */
