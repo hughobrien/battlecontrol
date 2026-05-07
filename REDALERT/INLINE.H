@@ -903,6 +903,9 @@ inline FacingType Dir_To_8(DirType facing)
 }
 
 
+extern char *Extract_String(void const *data, int string);
+
+
 /***********************************************************************************************
  * Text_String -- Convert a text number into a text pointer.                                   *
  *                                                                                             *
