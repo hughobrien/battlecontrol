@@ -82,6 +82,14 @@ B<A> test;
 
 
 
+// TIM-68: language define is normally injected by the original
+// makefile. CONQUER.CPP:2398 uses TEXT_MAP_ERROR/TEXT_STOP/TEXT_CONTINUE
+// from LANGUAGE.H, which gates them on `#ifdef ENGLISH` (etc.). Pin
+// ENGLISH for this TU so the language-table macros expand.
+#ifndef ENGLISH
+#define ENGLISH 1
+#endif
+
 #include	"function.h"
 #ifdef WIN32
 #ifdef WINSOCK_IPX
@@ -4689,7 +4697,7 @@ bool Force_CD_Available( int cd_desired )				//	ajw
 			if( cd_desired == CD_DVD )
 			{
 				#ifdef FRENCH
-			   	sprintf(buffer, "InsŠrez le %s",  _cd_name[4]);
+			   	sprintf(buffer, "Insï¿½rez le %s",  _cd_name[4]);
 				#else
 				#ifdef GERMAN
 				sprintf(buffer, "Bitte %s",  _cd_name[4]);
@@ -4701,7 +4709,7 @@ bool Force_CD_Available( int cd_desired )				//	ajw
 			else if( cd_desired == CD_COUNTERSTRIKE || cd_desired == CD_AFTERMATH )
 			{
 				#ifdef FRENCH
-			   	sprintf(buffer, "InsŠrez le %s",  _cd_name[cd_desired]);
+			   	sprintf(buffer, "Insï¿½rez le %s",  _cd_name[cd_desired]);
 				#else
 				#ifdef GERMAN
 				sprintf(buffer, "Bitte %s",  _cd_name[cd_desired]);
@@ -5085,7 +5093,7 @@ bool Force_CD_Available(int cd)
 			#endif
 
 				#ifdef FRENCH
-			   	sprintf(buffer, "InsŠrez le %s",  _cd_name[cd]);
+			   	sprintf(buffer, "Insï¿½rez le %s",  _cd_name[cd]);
 				#else
 				#ifdef GERMAN
 				sprintf(buffer, "Bitte %s",  _cd_name[cd]);
@@ -5098,7 +5106,7 @@ bool Force_CD_Available(int cd)
 				{
 				#ifdef DVD
 				#ifdef FRENCH
-			   	sprintf(buffer, "InsŠrez le %s", _cd_name[4]);
+			   	sprintf(buffer, "Insï¿½rez le %s", _cd_name[4]);
 				#else
 				#ifdef GERMAN 
 				sprintf(buffer, "Bitte %s", _cd_name[4]);

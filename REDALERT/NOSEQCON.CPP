@@ -67,10 +67,14 @@
  * HISTORY:                                                                *
  *   12/20/1994 BR : Created.                                              *
  *=========================================================================*/
-NonSequencedConnClass::NonSequencedConnClass (int numsend, int numreceive, 
+NonSequencedConnClass::NonSequencedConnClass (int numsend, int numreceive,
 	int maxlen, unsigned short magicnum, unsigned long retry_delta,
 	unsigned long max_retries, unsigned long timeout) :
-	ConnectionClass (maxlen, magicnum, retry_delta, max_retries, timeout)
+	// TIM-68: REDALERT/CONNECT.H:147 added (numsend, numrecieve) to the
+	// front of ConnectionClass's constructor signature. TIBERIANDAWN's
+	// 5-arg constructor was the original; the call site here was never
+	// updated when RA grew the queue-sizing params. Pass through.
+	ConnectionClass (numsend, numreceive, maxlen, magicnum, retry_delta, max_retries, timeout)
 {
 	/*------------------------------------------------------------------------
 	Allocate the packet Queue.  This will store incoming packets (which will

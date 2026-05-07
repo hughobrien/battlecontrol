@@ -333,6 +333,17 @@ typedef struct _RTL_CRITICAL_SECTION {
     ULONG* SpinCount;
 } CRITICAL_SECTION, *LPCRITICAL_SECTION, *PCRITICAL_SECTION;
 
+/* TIM-68: Initialize/Enter/Leave/DeleteCriticalSection -- inert
+ * stubs. WIN32LIB/MOUSEWW.CPP:78,113,142,150 are the first call
+ * sites that actually invoke these (prior TUs only declared a
+ * CRITICAL_SECTION member). The whole mouse/audio threading path is
+ * dormant on the Linux port; these no-ops just let MOUSEWW.CPP parse.
+ * Pthread-backed implementations land later. */
+static inline void InitializeCriticalSection(LPCRITICAL_SECTION) {}
+static inline void DeleteCriticalSection(LPCRITICAL_SECTION) {}
+static inline void EnterCriticalSection(LPCRITICAL_SECTION) {}
+static inline void LeaveCriticalSection(LPCRITICAL_SECTION) {}
+
 /* TIM-55: PALETTEENTRY -- Win32 GDI palette entry. REDALERT/WIN32LIB/
  * DDRAW.CPP:55 declares `PALETTEENTRY PaletteEntries[256]` and writes
  * .peRed/.peGreen/.peBlue/.peFlags fields at lines 739-741. Layout

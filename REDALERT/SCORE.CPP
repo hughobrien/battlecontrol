@@ -44,10 +44,10 @@
  *   ScoreClass::Pulse_Bar_Graph -- Pulses the bargraph color.                                 *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-#ifndef WIN32
-extern short StreamLowImpact;
-#endif
-
+// TIM-68: dropped local `extern short StreamLowImpact;` (was under
+// `#ifndef WIN32`). Conflicts with `extern int StreamLowImpact;` from
+// WIN32LIB/AUDIO.H, which is now always pulled in via function.h after
+// the TIM-67 shim fix.
 #include	"function.h"
 
 #define SCORETEXT_X		184
@@ -68,9 +68,8 @@ extern short StreamLowImpact;
 #define NUMFAMENAMES				7
 #define MAX_FAMENAME_LENGTH	11
 
-#ifndef WIN32
-extern short StreamLowImpact;
-#endif  //WIN32
+// TIM-68: dropped second `extern short StreamLowImpact;` decl, same
+// reason as above.
 
 GraphicBufferClass *PseudoSeenBuff;
 
