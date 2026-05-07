@@ -40,6 +40,35 @@
 #include "slider.h"
 #include <algorithm>		// TIM-40: std::max in template body (list.h:263)
 
+// TIM-42: Forward declarations to satisfy phase-1 (definition-time)
+// lookup of non-dependent names referenced inside TListClass<T>
+// template bodies. The canonical declarations live in FUNCTION.H,
+// WIN32LIB/MOUSE.H, and EXTERNS.H, but those headers are reached
+// AFTER LIST.H in the include chain driven by FUNCTION.H (FUNCTION.H
+// includes list.h at line 333; mouse.h at 353; externs.h at 421;
+// the Draw_Box prototype lives at 600), so the names below would
+// otherwise be undeclared at the point the template bodies are
+// parsed and trip the "no arguments depend on a template parameter,
+// so a declaration must be available" error.
+//
+// Fancy_Text_Print is intentionally NOT forward-declared here: the
+// call at the constructor body passes `TBLACK` (a `ColorType` enum)
+// where the canonical signature expects `RemapControlType *`, which
+// fails type-check under C++17 even though it compiled under MSVC.
+// Forward-declaring it would simply relocate the gate from a phase-1
+// lookup error to a no-matching-function error at the same line set,
+// without any OK delta; the real fix is upstream (call site, signature
+// overload, or a compat shim) and is out of scope for this ticket.
+extern void Conditional_Hide_Mouse(int x1, int y1, int x2, int y2);
+extern void Conditional_Show_Mouse(void);
+extern void Draw_Box(int x, int y, int w, int h, BoxStyleEnum up, bool filled);
+#ifdef WIN32
+extern GraphicViewPortClass	SeenBuff;
+#else
+class GraphicBufferClass;
+extern GraphicBufferClass	SeenBuff;
+#endif
+
 
 /***************************************************************************
  * ListClass -- Like a Windows ListBox structure									*
@@ -264,7 +293,7 @@ TListClass<T>::TListClass(int id, int x, int y, int w, int h, TextPrintType flag
 	ScrollGadget.X -= std::max(UpGadget.Width, DownGadget.Width);
 	ScrollGadget.Y = Y+UpGadget.Height;
 	ScrollGadget.Height -= UpGadget.Height + DownGadget.Height;
-	ScrollGadget.Width = max(UpGadget.Width, DownGadget.Width);
+	ScrollGadget.Width = std::max(UpGadget.Width, DownGadget.Width);
 
 	/*
 	**	Set the list box to a default state.
@@ -301,10 +330,10 @@ void TListClass<T>::Set_Position(int x, int y)
 	UpGadget.Y = y;
 	DownGadget.X = x + Width - DownGadget.Width;
 	DownGadget.Y = y + Height - DownGadget.Height;
-	ScrollGadget.X = x + Width - max(UpGadget.Width, DownGadget.Width);
+	ScrollGadget.X = x + Width - std::max(UpGadget.Width, DownGadget.Width);
 	ScrollGadget.Y = y + UpGadget.Height;
 	ScrollGadget.Height = Height - (UpGadget.Height + DownGadget.Height);
-	ScrollGadget.Width = max(UpGadget.Width, DownGadget.Width);
+	ScrollGadget.Width = std::max(UpGadget.Width, DownGadget.Width);
 }
 
 template<class T>
@@ -445,7 +474,7 @@ int TListClass<T>::Action(unsigned flags, KeyNumType & key)
 			int index = Get_Mouse_Y() - (Y+1);
 			index = index / LineHeight;
 			SelectedIndex = CurrentTopIndex + index;
-			SelectedIndex = min(SelectedIndex, List.Count()-1);
+			SelectedIndex = std::min(SelectedIndex, List.Count()-1);
 		}
 	}
 	return(ControlClass::Action(flags, key));
@@ -521,7 +550,7 @@ void TListClass<T>::Step(int up)
 template<class T>
 T TListClass<T>::Get_Item(int index) const
 {
-	index = min(index, List.Count());
+	index = std::min(index, List.Count());
 	return(List[index]);
 }
 #endif
