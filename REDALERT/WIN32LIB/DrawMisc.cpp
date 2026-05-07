@@ -4633,8 +4633,8 @@ extern "C" int __cdecl Clip_Rect ( int * x , int * y , int * w , int * h , int w
 		;it is probably the most commontly implemented algorithm both in software
 		;and hardware for clipping lines, rectangles, and convex polygons against
 		;a rectagular clipping window. For reference see
-		;"COMPUTER GRAPHICS principles and practice by Foley, Vandam, Feiner, Hughes
-		; pages 113 to 177".
+		;COMPUTER GRAPHICS principles and practice by Foley, Vandam, Feiner, Hughes
+		; pages 113 to 177.
 		; Briefly consist in computing the Sutherland code for both end point of
 		; the rectangle to find out if the rectangle is:
 		; - trivially accepted (no further clipping test, return the oroginal data)
@@ -4695,7 +4695,7 @@ extern "C" int __cdecl Clip_Rect ( int * x , int * y , int * w , int * h , int w
 			; now perform the aceptance test
 			xor	eax,eax		; set return code to true
 			or	bl,dl		; if all pair of bits in code0 and code1 are reset
-			jz	clip_out	; then rectangle is insize the window.								      '
+			jz	clip_out	; then rectangle is insize the window.
 
 			; we need to clip the rectangle iteratively
 			mov	eax,-1		; set return code to false
