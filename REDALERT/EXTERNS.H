@@ -112,6 +112,14 @@ extern int NameIDOverride[25];
 #endif
 
 #ifdef WIN32
+// TIM-49: Forward-decl WWMouseClass so externs.h parses without requiring
+// WIN32LIB/MOUSE.H. The case-folding include shim resolves both <mouse.h>
+// and "mouse.h" to REDALERT/MOUSE.H (the in-game MouseClass), so the
+// wwlib32 WWMouseClass declaration in WIN32LIB/MOUSE.H is unreachable from
+// the FUNCTION.H -> wwlib32.h cascade. Pointer-only use here, so a fwd
+// decl is sufficient. Same shape as TIM-22's WinTimerClass fwd-decl in
+// JSHELL.H:379.
+class WWMouseClass;
 extern bool					GameInFocus;
 extern unsigned char 	*InterpolatedPalettes[100];
 extern BOOL					PalettesRead;
