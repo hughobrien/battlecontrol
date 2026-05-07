@@ -202,4 +202,12 @@ typedef BOOL (*LPDDENUMCALLBACKW)  (GUID*, LPWSTR, LPWSTR, LPVOID);
 typedef BOOL (*LPDDENUMCALLBACKEXA)(GUID*, LPSTR,  LPSTR,  LPVOID, HMONITOR);
 typedef BOOL (*LPDDENUMCALLBACKEXW)(GUID*, LPWSTR, LPWSTR, LPVOID, HMONITOR);
 
+/* TIM-46: mirror real Win32 transitive include of <mmsystem.h>.
+ * DSOUND.H references LPWAVEFORMATEX outside any _NO_COM / _WIN32
+ * guard but never #includes mmsystem.h itself; the SDK relied on the
+ * windows.h -> mmsystem.h chain to make the typedef visible. Pull our
+ * stub mmsystem.h here so DSOUND.H sees WAVEFORMATEX through the
+ * force-included msvc-compat.h -> windows.h -> mmsystem.h path. */
+#include "mmsystem.h"
+
 #endif /* LINUX_STUBS_WINDOWS_H */
