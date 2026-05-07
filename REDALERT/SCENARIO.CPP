@@ -528,7 +528,8 @@ bool Read_Scenario(char * name)
 		     	}
 			}
 			CCINIClass ini;
-			if (ini.Load(CCFileClass("MPLAYER.INI"), false)) {
+			CCFileClass mplayerFile("MPLAYER.INI");
+			if (ini.Load(mplayerFile, false)) {
 				Rule.General(ini);
 				Rule.Recharge(ini);
 				Rule.AI(ini);
@@ -2466,7 +2467,8 @@ bool Read_Scenario_INI(char * fname, bool )
 	**	the mission.ini file.  VG 10/17/96
 	*/
 	INIClass mini;
-	mini.Load(CCFileClass("MISSION.INI"));
+	CCFileClass missionFile("MISSION.INI");
+	mini.Load(missionFile);
 	mini.Get_TextBlock(fname, Scen.BriefingText, sizeof(Scen.BriefingText));
 
 	/*

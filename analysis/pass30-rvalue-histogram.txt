@@ -1,0 +1,110 @@
+# TIM-57 pass-30 rvalue-binding cohort (Group C source-level pass).
+#
+# Pre-baseline (pass-29-C, post TIM-54 commit fdd497e): 249 OK / 52 Fail / 301 Total.
+# Pass-30 (TIM-57, this run):                           251 OK / 50 Fail / 301 Total.
+# Delta:                                                 +2 OK (-2 Fail), zero regressions.
+#
+# Fix-shape decision: per-call-site named-temp refactor (11 sites
+# across 6 TUs).
+#
+#   Engine pattern was `Foo(SomeStraw())` / `Foo(SomeFilePipe())` /
+#   `Foo(CCFileClass("X.INI"))` where the callee takes a non-const
+#   lvalue reference (Straw& / Pipe& / FileClass&). Under -fno-permissive
+#   (we run with no -fpermissive flag), C++ rejects this binding.
+#
+# Why named-temp over const& overloads:
+#   - Straw / Pipe declare private copy ctors taking non-const refs as
+#     the upstream's own rvalue-deletion idiom; a clean const& overload
+#     for `Get(void*,int)` / `Put(void const*,int)` would propagate
+#     `const` through the *stateful* base-class virtual surface, which
+#     mutates internal cursor + buffer state. Cascade is unbounded.
+#   - Adding only the surface-level `const Straw&` / `const Pipe&`
+#     overloads on the wrapper functions still routes to non-const
+#     virtuals downstream and does not actually fix the binding.
+#   - 11 named-temp edits are local to 6 TUs and touch zero base classes.
+#
+# Sites edited:
+#   REDALERT/CCINI.CPP:107-110   FileStraw(file)            -> fstraw
+#   REDALERT/CCINI.CPP:184-187   FilePipe(file)             -> fpipe
+#   REDALERT/INI.CPP:176-179     FileStraw(file)            -> fstraw
+#   REDALERT/INI.CPP:312-315     FilePipe(file)             -> fpipe
+#   REDALERT/READLINE.CPP:60-63  FileStraw(file)            -> fstraw
+#   REDALERT/INIT.CPP:307-322    CCFileClass("RULES.INI")        -> rulesFile
+#                                CCFileClass("AFTRMATH.INI")     -> aftermathFile
+#   REDALERT/SAVELOAD.CPP:940-942 CCFileClass(Scen.ScenarioName) -> scenarioFile
+#   REDALERT/SAVELOAD.CPP:1019-1021 CCFileClass("MPLAYER.INI")   -> mplayerFile
+#   REDALERT/SCENARIO.CPP:530-532 CCFileClass("MPLAYER.INI")     -> mplayerFile
+#   REDALERT/SCENARIO.CPP:2467-2470 CCFileClass("MISSION.INI")   -> missionFile
+#
+# Per-TU verdict (pass-29-C -> pass-30):
+#   - INI.CPP        FAIL -> OK         CLEARED      (2 rvalue sites both drained)
+#   - READLINE.CPP   FAIL -> OK         CLEARED      (1 rvalue site drained)
+#   - CCINI.CPP      FAIL -> FAIL       FRAGMENTED   (rvalue cleared at 109/186;
+#                                                     next first-error CCINI.CPP:252
+#                                                     min/max ADL -- TIM-54 Fix C
+#                                                     precedent, not in this scope)
+#   - INIT.CPP       FAIL -> FAIL       FRAGMENTED   (rvalue cleared at 310/317;
+#                                                     next INIT.CPP:1078
+#                                                     SetForegroundWindow -- Win32
+#                                                     long-tail bucket)
+#   - SAVELOAD.CPP   FAIL -> FAIL       FRAGMENTED   (rvalue cleared at 941/1020;
+#                                                     next SAVELOAD.CPP:1089
+#                                                     SelectedObjectsType::COUNT
+#                                                     missing -- container-API gap)
+#   - SCENARIO.CPP   FAIL -> FAIL       FRAGMENTED   (rvalue cleared at 531/2469;
+#                                                     next SCENARIO.CPP:1484
+#                                                     max ADL -- TIM-54 Fix C
+#                                                     precedent, not in this scope)
+#
+# Bucket transition (pass-29-C -> pass-30):
+#   rvalue-binding   : 6 -> 0          (FULLY DRAINED from first-error histogram)
+#
+# Residual first-error histogram diff (pass-29-C -> pass-30):
+#
+#   |  bucket                              | pass-29-C | pass-30 | delta |
+#   |--------------------------------------|-----------|---------|-------|
+#   | rvalue-binding (Straw& / Pipe& / Fc&)|     6     |    0    |  -6   |
+#   | LP64 precision loss                  |     4     |    4    |   0   |
+#   | min/max ADL                          |     0     |    2    |  +2   | (CCINI:252, SCENARIO:1484; from rvalue fragmentation)
+#   | missing-include                      |     3     |    3    |   0   |
+#   | extra-qualification (EventCallback)  |     2     |    2    |   0   |
+#   | parser:expected class-name           |     2     |    2    |   0   |
+#   | overload-resolution (DLLInterface)   |     2     |    2    |   0   |
+#   | MASM lex                             |     2     |    2    |   0   |
+#   | parser:macro-paren (IRANDOM)         |     1     |    1    |   0   |
+#   | incomplete-type                      |     1     |    1    |   0   |
+#   | not-a-type                           |     1     |    1    |   0   |
+#   | SetForegroundWindow (INIT:1078)      |     0     |    1    |  +1   | (NEW from INIT fragmentation)
+#   | SelectedObjectsType::COUNT (SAVELOAD)|     0     |    1    |  +1   | (NEW from SAVELOAD fragmentation)
+#   | long-tail Win32 free-fn / engine gap |   28      |   28    |   0   | (unchanged)
+#
+# Net: -6 rvalue-binding; +2 min/max ADL; +1 SetForegroundWindow; +1
+# COUNT-member; -2 from INI/READLINE clearing entirely (no follow-on
+# first-error). 6 rvalue first-errors became 4 fragmented first-errors
+# in 3 different buckets, plus 2 OK gains.
+#
+# Rvalue-binding bucket: 6 -> 0 (cleared from first-error attribution).
+#
+# Cross-check: zero regressions. Every TU OK in pass-29-C remains OK in pass-30.
+# (Diff against summary file produced exactly two FAIL->OK transitions:
+# INI.CPP and READLINE.CPP. No OK->FAIL.)
+#
+# Remaining Group C inventory (post-TIM-57, for follow-up tickets):
+#   - LP64 precision loss (4 TUs): pointer-to-int casts assuming
+#     sizeof(int) == sizeof(void*). Real 32->64 bit width audit
+#     (TIM-7 territory).
+#   - EventCallbackStruct extra-qualification (2 TUs in DLLInterface.h:616).
+#   - MASM lex errors (2 TUs: DrawMisc.cpp + MiscAsm.cpp): inline asm
+#     uses MSVC-flavour assembler that cc1plus can't tokenize.
+#   - min/max ADL (2 TUs surfaced by this pass: CCINI.CPP, SCENARIO.CPP).
+#     TIM-54 Fix C precedent says: per-file `#define min/max` in the
+#     engine TU; std::min/max can't deduce the engine's mismatched-type
+#     call signatures. These are the *cheapest* next bucket after this
+#     ticket -- mechanical 2-TU port of the existing 31-TU precedent.
+#   - Long tail (~30 TUs): SetForegroundWindow, SelectedObjectsType::COUNT,
+#     SYSTEMTIME, FD_READ, GetKeyState, _dos_open, int386, unlink,
+#     Stop_Primary_Sound_Buffer, Play_Sample, Set_Score_Vol, SoundType,
+#     SampleType, hBitmap, HOUSE/HEAP template specialisation, PALETTE
+#     linkage, MIXFILE unlink missing-args, MPMGRD MGenGetMasterNode,
+#     MPLIB int386, LZWOTRAW staging_buffer, LOADDLG unlink, KEYBOARD
+#     GetKeyState. Group A continuation territory.
