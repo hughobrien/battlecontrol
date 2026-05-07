@@ -80,7 +80,10 @@ TurretClass::~TurretClass(void)
  * HISTORY:                                                                                    *
  *   08/13/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
-TurretClass::TurretClass(void)
+// TIM-68: DriveClass has no default ctor (only NoInit/3-arg/copy).
+// Delegate to the NoInit form so this empty default constructor parses.
+// Matches the established sibling pattern in UnitClass::UnitClass(NoInit&).
+TurretClass::TurretClass(void) : DriveClass(NoInitClass())
 {
 }
 
@@ -102,8 +105,13 @@ TurretClass::TurretClass(void)
  * HISTORY:                                                                                    *
  *   02/02/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
-TurretClass::TurretClass(UnitType classid, HousesType house) :
-	DriveClass(classid, house)
+// TIM-68: same DriveClass overload mismatch as the default ctor above.
+// DriveClass needs (RTTIType, int, HousesType) -- (UnitType, HousesType)
+// no longer matches. TurretClass is dead code in RA (no `new TurretClass`
+// anywhere; only referenced by TURRET.{H,CPP}), so the minimal fix is
+// to delegate to the NoInit form.
+TurretClass::TurretClass(UnitType /*classid*/, HousesType /*house*/) :
+	DriveClass(NoInitClass())
 {
 }
 

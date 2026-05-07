@@ -50,6 +50,16 @@
 #include	"infantry.H"
 #include "DSOUND.H"
 
+// TIM-68: forward-declare GetCDClass so the `extern GetCDClass CDList;`
+// declaration below parses without requiring playcd.h. The recursive
+// include chain WIN32LIB/wwlib32.h:47 -> mouse.h -> ... -> sidebar.h
+// -> function.h -> externs.h reaches this header *before*
+// wwlib32.h:54's `#include <playcd.h>` has fired, so the type isn't
+// visible yet (e.g. WRITEPCX.CPP). Forward decl is sufficient because
+// the extern only declares the symbol -- it does not need a complete
+// type at this point.
+class GetCDClass;
+
 extern char _staging_buffer[32000];
 extern "C" {
 void _PRO(void);
