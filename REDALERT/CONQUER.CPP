@@ -112,6 +112,13 @@ TcpipManagerClass	Winsock;
 #include	"ccdde.h"
 #include	"vortex.h"
 
+// TIM-142: SDL_Quit_Requested() poll, wired into Main_Loop below. Producer
+// is REDALERT/WIN32LIB/DDRAW.CPP (TIM-141 pass-41F). Header is gated on
+// !_MSC_VER so MSVC sees nothing.
+#ifndef _MSC_VER
+#include "sdl_quit.h"
+#endif
+
 #ifdef WOLAPI_INTEGRATION
 //#include "WolDebug.h"
 #include "WolStrng.h"
@@ -2164,6 +2171,18 @@ bool Main_Loop()
 
 Mono_Set_Cursor(0,0);
 
+#ifndef _MSC_VER
+	// TIM-142: honor an SDL_QUIT (window close button, kill signal from the
+	// WM, etc.) by clearing GameActive. The existing `if (!GameActive)`
+	// early-out one line below then returns true and the for-loops in
+	// CONQUER/MPLAYER/SOUNDDLG/etc. break out of Main_Loop, hitting the
+	// same exit path the Win32 build hits via WM_DESTROY (see WINSTUB.CPP
+	// :227). The flag behind SDL_Quit_Requested() is sticky and is set by
+	// SDL_Process_Window_Events() in DDRAW.CPP (TIM-141 pass-41F).
+	if (SDL_Quit_Requested()) {
+		GameActive = false;
+	}
+#endif
 	if (!GameActive) return(!GameActive);
 
 #ifdef WIN32
