@@ -106,7 +106,8 @@
  *=============================================================================================*/
 bool CCINIClass::Load(FileClass & file, bool withdigest)
 {
-	return(Load(FileStraw(file), withdigest));
+	FileStraw fstraw(file);
+	return(Load(fstraw, withdigest));
 }
 
 
@@ -182,7 +183,8 @@ int CCINIClass::Load(Straw & file, bool withdigest)
  *=============================================================================================*/
 int CCINIClass::Save(FileClass & file, bool withdigest) const
 {
-	return(Save(FilePipe(file), withdigest));
+	FilePipe fpipe(file);
+	return(Save(fpipe, withdigest));
 }
 
 
