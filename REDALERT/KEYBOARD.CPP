@@ -124,10 +124,10 @@ static unsigned short SDL_Keysym_To_VK(SDL_Keycode k)
 // TIM-145 pass-43A: drain SDL_KEYDOWN/SDL_KEYUP from the SDL event
 // queue and inject the packed VK + modifier + release-bit value
 // into the existing WWKeyboardClass ring. Uses SDL_PeepEvents with
-// a tight type filter to leave mouse, joystick, and window events
-// queued for their own pumps (window pump runs first in DDRAW.CPP,
-// mouse pump lands in pass-43B). Drained in batches of 16 to keep
-// stack pressure bounded.
+// a tight type filter to leave joystick and window events queued
+// for their own pumps. The mouse-button + motion drain runs in the
+// same call after the keyboard drain (pass-43B). Drained in
+// batches of 16 to keep stack pressure bounded.
 extern "C" void SDL_Process_Input_Events(void)
 {
 	if (_Kbd == NULL) return;
@@ -151,6 +151,45 @@ extern "C" void SDL_Process_Input_Events(void)
 			if (events[i].type == SDL_KEYUP) vk |= WWKEY_RLS_BIT;
 
 			_Kbd->Put(vk);
+		}
+	} while (drained == 16);
+
+	// TIM-145 pass-43B: drain SDL_MOUSEMOTION / SDL_MOUSEBUTTONDOWN
+	// / SDL_MOUSEBUTTONUP. Buttons translate to VK_LBUTTON /
+	// VK_MBUTTON / VK_RBUTTON and follow the Win32 protocol used by
+	// WWKeyboardClass::Message_Handler (KEYBOARD.CPP:398-465 in the
+	// MSVC build): Put(vk) followed by Put(x), Put(y). The matching
+	// drain on the read side is Buff_Get at line 95-99. Modifier
+	// bits are intentionally NOT applied to mouse keys per
+	// Put_Key_Message (line 193: "we do not want to set the shift,
+	// ctrl and alt bits for Mouse keypresses as this would be
+	// incompatible with the dos version"). Motion events are
+	// drained but not yet wired to WWMouseClass — pass-43C.
+	do {
+		drained = SDL_PeepEvents(events, 16, SDL_GETEVENT,
+		                         SDL_MOUSEMOTION, SDL_MOUSEBUTTONUP);
+		for (int i = 0; i < drained; ++i) {
+			Uint32 type = events[i].type;
+			if (type == SDL_MOUSEBUTTONDOWN || type == SDL_MOUSEBUTTONUP) {
+				const SDL_MouseButtonEvent &be = events[i].button;
+				unsigned short vk = 0;
+				switch (be.button) {
+				case SDL_BUTTON_LEFT:   vk = VK_LBUTTON; break;
+				case SDL_BUTTON_MIDDLE: vk = VK_MBUTTON; break;
+				case SDL_BUTTON_RIGHT:  vk = VK_RBUTTON; break;
+				default: continue;
+				}
+				if (type == SDL_MOUSEBUTTONUP) vk |= WWKEY_RLS_BIT;
+
+				_Kbd->Put(vk);
+				_Kbd->Put((unsigned short)be.x);
+				_Kbd->Put((unsigned short)be.y);
+			}
+			// SDL_MOUSEMOTION: drained to keep the SDL queue from
+			// accumulating, but not pumped into _Kbd. The engine
+			// reads cursor position via WWMouseClass::Get_Mouse_X/Y,
+			// which calls GetCursorPos — pass-43C will route that
+			// through SDL_GetMouseState.
 		}
 	} while (drained == 16);
 }
