@@ -160,7 +160,7 @@ int LZWStraw::Get(void * destbuf, int slen)
 			if (incount != sizeof(BlockHeader)) break;
 
 			char *stageing_buffer = new char [BlockHeader.CompCount];
-			incount = Straw::Get(staging_buffer, BlockHeader.CompCount);
+			incount = Straw::Get(stageing_buffer, BlockHeader.CompCount);
 			if (incount != BlockHeader.CompCount) break;
 
 			lz01x_decompress (ptr, BlockHeader.CompCount, Buffer, sizeof(Buffer), NULL);
