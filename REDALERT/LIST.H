@@ -51,14 +51,13 @@
 // parsed and trip the "no arguments depend on a template parameter,
 // so a declaration must be available" error.
 //
-// Fancy_Text_Print is intentionally NOT forward-declared here: the
-// call at the constructor body passes `TBLACK` (a `ColorType` enum)
-// where the canonical signature expects `RemapControlType *`, which
-// fails type-check under C++17 even though it compiled under MSVC.
-// Forward-declaring it would simply relocate the gate from a phase-1
-// lookup error to a no-matching-function error at the same line set,
-// without any OK delta; the real fix is upstream (call site, signature
-// overload, or a compat shim) and is out of scope for this ticket.
+// TIM-43: Fancy_Text_Print is now forward-declared here. The call at
+// the constructor body passes TBLACK (a ColorType enum) where the
+// canonical signature expects RemapControlType *. TIM-43 added a
+// ColorType overload in FUNCTION.H that forwards to the canonical
+// signature with nullptr; we mirror just that overload here so phase-1
+// lookup resolves to it.
+extern void Fancy_Text_Print(int text, unsigned x, unsigned y, ColorType, unsigned back, TextPrintType flag);
 extern void Conditional_Hide_Mouse(int x1, int y1, int x2, int y2);
 extern void Conditional_Show_Mouse(void);
 extern void Draw_Box(int x, int y, int w, int h, BoxStyleEnum up, bool filled);
