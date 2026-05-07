@@ -1315,4 +1315,61 @@ typedef struct tagBITMAP {
 #define TEXT_ABORT          TXT_ABORT
 #endif
 
+/* TIM-106: pass-40U INIT.CPP Win32 registry-API cluster (paired with the
+ * INIT.CPP:3584 lvalue hoist). The DVD-detect path inside
+ *   #ifdef FIXIT_VERSION_3
+ *   bool Is_DVD_Installed() { ... RegOpenKeyEx / RegQueryValueEx /
+ *                              RegCloseKey ... }
+ * at INIT.CPP:3741-3757 is ENABLED for this build (FIXIT_VERSION_3 is
+ * defined at DEFINES.H:133), so the parser must reach symbols that the
+ * other registry call sites (STARTUP.CPP, INTERNET.CPP, WOL_MAIN.CPP,
+ * WOLAPIOB.CPP, CONQUER.CPP) don't surface because they live inside
+ * `#ifdef WOLAPI_INTEGRATION` / `#if (0)` blocks excluded from this
+ * build. HKEY itself is already typedef'd at line 92.
+ *
+ * Inert / not-found semantics: RegOpenKeyEx returns a non-ERROR_SUCCESS
+ * value so `if(RegOpenKeyEx(...) != ERROR_SUCCESS) return false;` short-
+ * circuits cleanly without ever invoking RegQueryValueEx. The DVD probe
+ * therefore reports "no DVD" and the engine falls back to the
+ * non-registry CD path. RegCloseKey / RegDeleteValue / RegQueryValue
+ * round out the family for any later TU that surfaces them; their
+ * inertness is harmless because the only call site reachable in this
+ * build is the Is_DVD_Installed() block above.
+ *
+ * Variadic-template shape mirrors the TIM-87 CreateFile / TIM-94
+ * kernel32 cluster -- no engine-source edits, parser walks past the
+ * cluster on the first compile. The registry universe is dormant on
+ * Linux; the eventual port replaces these with an XDG-config or
+ * key/value-file lookup. Canonical SDK values from <winreg.h> (constant
+ * literals; the exact bit pattern is opaque under the stub since the
+ * variadic template ignores its arguments).
+ */
+#ifndef ERROR_SUCCESS
+#define ERROR_SUCCESS 0L
+#endif
+#ifndef KEY_READ
+#define KEY_READ  0x20019
+#endif
+#ifndef KEY_WRITE
+#define KEY_WRITE 0x20006
+#endif
+#ifndef HKEY_CLASSES_ROOT
+#define HKEY_CLASSES_ROOT  ((HKEY)(uintptr_t)0x80000000u)
+#endif
+#ifndef HKEY_CURRENT_USER
+#define HKEY_CURRENT_USER  ((HKEY)(uintptr_t)0x80000001u)
+#endif
+#ifndef HKEY_LOCAL_MACHINE
+#define HKEY_LOCAL_MACHINE ((HKEY)(uintptr_t)0x80000002u)
+#endif
+
+template <typename... Args> long RegOpenKeyEx    (Args&&...) { return 1; }
+template <typename... Args> long RegOpenKeyExA   (Args&&...) { return 1; }
+template <typename... Args> long RegQueryValueEx (Args&&...) { return 1; }
+template <typename... Args> long RegQueryValueExA(Args&&...) { return 1; }
+template <typename... Args> long RegQueryValue   (Args&&...) { return 1; }
+template <typename... Args> long RegQueryValueA  (Args&&...) { return 1; }
+template <typename... Args> long RegCloseKey     (Args&&...) { return 0; }
+template <typename... Args> long RegDeleteValue  (Args&&...) { return 0; }
+
 #endif /* LINUX_STUBS_WINDOWS_H */
