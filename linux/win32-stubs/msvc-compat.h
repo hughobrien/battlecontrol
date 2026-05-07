@@ -73,6 +73,39 @@
 #define HUGE
 #endif
 
+// TIM-29: lowercase Win16 pointer-attribute and calling-convention
+// keywords. WIN32LIB/TIMER.H:184 and WIN32LIB/SOSDEFS.H:60-69 use the
+// bare `far`/`near` qualifier on prototypes and typedefs; MSVC silently
+// accepts them, g++ rejects. Audit (TIM-29 method step 3) confirmed the
+// codebase only uses these as type qualifiers, never as identifiers.
+#ifndef far
+#define far
+#endif
+#ifndef near
+#define near
+#endif
+#ifndef pascal
+#define pascal
+#endif
+#ifndef __far
+#define __far
+#endif
+#ifndef __near
+#define __near
+#endif
+#ifndef __pascal
+#define __pascal
+#endif
+#ifndef _far
+#define _far
+#endif
+#ifndef _near
+#define _near
+#endif
+#ifndef _pascal
+#define _pascal
+#endif
+
 // MSVC's 64-bit integer extension. <cstdint>'s int64_t is the
 // portable equivalent on Linux. Use the GCC/Clang extension
 // __extension__ to silence -Wpedantic warnings about the typedef.
