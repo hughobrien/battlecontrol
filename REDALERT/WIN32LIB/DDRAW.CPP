@@ -52,6 +52,7 @@
 #ifndef _MSC_VER
 #include <SDL2/SDL.h>
 #include <climits>      // TIM-141 commit 2: Get_Free_Video_Memory uses INT_MAX
+#include "sdl_input.h"  // TIM-145 pass-43A: SDL_Process_Input_Events()
 static SDL_Window*   SDL_VideoWindow    = nullptr;
 static SDL_Renderer* SDL_VideoRenderer  = nullptr;
 static SDL_Surface*  SDL_PrimarySurface = nullptr;
@@ -860,9 +861,15 @@ void Wait_Vert_Blank(void)
 	// transitions and SDL_QUIT are observed on the actual frame
 	// heartbeat. Must run before the early-out below — focus state
 	// needs to flip even on the first call, when the renderer is
-	// still being brought up. Keyboard/mouse stay queued for the
-	// DINPUT lane.
+	// still being brought up.
 	SDL_Process_Window_Events();
+
+	// TIM-145 pass-43A: drain SDL_KEYDOWN/SDL_KEYUP into the
+	// WWKeyboardClass ring. Producer is REDALERT/KEYBOARD.CPP. Order
+	// after the window pump so a quit or focus event in the same
+	// batch is observed first. Mouse buttons / motion stay queued
+	// for pass-43B.
+	SDL_Process_Input_Events();
 
 	// TIM-141 commit 5: present pump. Indexed primary surface ->
 	// SDL_BlitSurface (palette-aware) -> ARGB intermediate ->

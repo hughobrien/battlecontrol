@@ -43,12 +43,118 @@
 
 #include	"monoc.h"
 
+// TIM-145 pass-43A: SDL keyboard pump lives in this TU because
+// _Kbd and the VK_ codes are already in scope here. The companion
+// header forward-declares the extern "C" entry point for DDRAW.CPP.
+#ifndef _MSC_VER
+#include <SDL2/SDL.h>
+#include "sdl_input.h"
+#endif
+
 //void Message_Loop(void);
 
 WWKeyboardClass * _Kbd = NULL;
 
 
 #define	ARRAY_SIZE(x)		int(sizeof(x)/sizeof(x[0]))
+
+
+#ifndef _MSC_VER
+// TIM-145 pass-43A: map an SDL_Keycode to the Westwood/Win32 VK_
+// code the engine already uses everywhere (see KEYBOARD.H VK_*).
+// Returns 0 for keysyms with no engine equivalent — the caller
+// drops those events. Coverage is the subset the original game
+// actually consumes: letters, digits, function keys, arrow keys,
+// modifiers, and editing keys. Numpad and OEM punctuation map to
+// the same VK_ values the upstream Win32 build receives via
+// WM_KEYDOWN, so downstream KN_/KA_ translation is unchanged.
+static unsigned short SDL_Keysym_To_VK(SDL_Keycode k)
+{
+	if (k >= SDLK_a && k <= SDLK_z) return (unsigned short)(VK_A + (k - SDLK_a));
+	if (k >= SDLK_0 && k <= SDLK_9) return (unsigned short)(VK_0 + (k - SDLK_0));
+	if (k >= SDLK_F1 && k <= SDLK_F12) return (unsigned short)(VK_F1 + (k - SDLK_F1));
+
+	switch (k) {
+	case SDLK_ESCAPE:       return VK_ESCAPE;
+	case SDLK_RETURN:       return VK_RETURN;
+	case SDLK_KP_ENTER:     return VK_RETURN;
+	case SDLK_BACKSPACE:    return VK_BACK;
+	case SDLK_TAB:          return VK_TAB;
+	case SDLK_SPACE:        return VK_SPACE;
+	case SDLK_LEFT:         return VK_LEFT;
+	case SDLK_RIGHT:        return VK_RIGHT;
+	case SDLK_UP:           return VK_UP;
+	case SDLK_DOWN:         return VK_DOWN;
+	case SDLK_HOME:         return VK_HOME;
+	case SDLK_END:          return VK_END;
+	case SDLK_PAGEUP:       return VK_PRIOR;
+	case SDLK_PAGEDOWN:     return VK_NEXT;
+	case SDLK_INSERT:       return VK_INSERT;
+	case SDLK_DELETE:       return VK_DELETE;
+	case SDLK_LSHIFT:
+	case SDLK_RSHIFT:       return VK_SHIFT;
+	case SDLK_LCTRL:
+	case SDLK_RCTRL:        return VK_CONTROL;
+	case SDLK_LALT:
+	case SDLK_RALT:         return VK_MENU;
+	case SDLK_PAUSE:        return VK_PAUSE;
+	case SDLK_CAPSLOCK:     return VK_CAPITAL;
+	case SDLK_NUMLOCKCLEAR: return VK_NUMLOCK;
+	case SDLK_SCROLLLOCK:   return VK_SCROLL;
+	case SDLK_PRINTSCREEN:  return VK_PRINT;
+	case SDLK_KP_0:         return VK_NUMPAD0;
+	case SDLK_KP_1:         return VK_NUMPAD1;
+	case SDLK_KP_2:         return VK_NUMPAD2;
+	case SDLK_KP_3:         return VK_NUMPAD3;
+	case SDLK_KP_4:         return VK_NUMPAD4;
+	case SDLK_KP_5:         return VK_NUMPAD5;
+	case SDLK_KP_6:         return VK_NUMPAD6;
+	case SDLK_KP_7:         return VK_NUMPAD7;
+	case SDLK_KP_8:         return VK_NUMPAD8;
+	case SDLK_KP_9:         return VK_NUMPAD9;
+	case SDLK_KP_PLUS:      return VK_ADD;
+	case SDLK_KP_MINUS:     return VK_SUBTRACT;
+	case SDLK_KP_MULTIPLY:  return VK_MULTIPLY;
+	case SDLK_KP_DIVIDE:    return VK_DIVIDE;
+	case SDLK_KP_PERIOD:    return VK_DECIMAL;
+	default:                return 0;
+	}
+}
+
+// TIM-145 pass-43A: drain SDL_KEYDOWN/SDL_KEYUP from the SDL event
+// queue and inject the packed VK + modifier + release-bit value
+// into the existing WWKeyboardClass ring. Uses SDL_PeepEvents with
+// a tight type filter to leave mouse, joystick, and window events
+// queued for their own pumps (window pump runs first in DDRAW.CPP,
+// mouse pump lands in pass-43B). Drained in batches of 16 to keep
+// stack pressure bounded.
+extern "C" void SDL_Process_Input_Events(void)
+{
+	if (_Kbd == NULL) return;
+
+	SDL_PumpEvents();
+
+	SDL_Event events[16];
+	int drained;
+	do {
+		drained = SDL_PeepEvents(events, 16, SDL_GETEVENT,
+		                         SDL_KEYDOWN, SDL_KEYUP);
+		for (int i = 0; i < drained; ++i) {
+			const SDL_KeyboardEvent &ke = events[i].key;
+			unsigned short vk = SDL_Keysym_To_VK(ke.keysym.sym);
+			if (vk == 0) continue;
+
+			Uint16 mod = ke.keysym.mod;
+			if (mod & KMOD_SHIFT) vk |= WWKEY_SHIFT_BIT;
+			if (mod & KMOD_CTRL)  vk |= WWKEY_CTRL_BIT;
+			if (mod & KMOD_ALT)   vk |= WWKEY_ALT_BIT;
+			if (events[i].type == SDL_KEYUP) vk |= WWKEY_RLS_BIT;
+
+			_Kbd->Put(vk);
+		}
+	} while (drained == 16);
+}
+#endif
 
 
 /***********************************************************************************************
