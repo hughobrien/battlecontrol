@@ -341,4 +341,94 @@ static inline int    recvfrom(SOCKET, char*, int, int, struct sockaddr*, int*) {
 static inline int WSAAsyncSelect(SOCKET, HWND, unsigned int, long) { return SOCKET_ERROR; }
 static inline int WSACancelAsyncRequest(HANDLE) { return SOCKET_ERROR; }
 
+/* TIM-77: pass-41 Winsock cluster shim drain. Pre-survey first-error
+ * histogram on WSPIPX/WSPUDP/WSPROTO surfaced WSAStartup, gethostname,
+ * getsockopt as immediate first-errors plus an obvious cascade of
+ * setsockopt / WSAGetLastError / gethostbyname+hostent / WSAEWOULDBLOCK
+ * / WSAGETSELECT* unpack helpers behind them. Same trivially-additive
+ * shape as TIM-67 / TIM-71 / TIM-74 / TIM-75 -- inline returns / no-op
+ * bodies and macro constants. WSPROTO and WSPUDP cascade past the
+ * winsock cluster into Win32 SendMessage (windows.h scope, intentionally
+ * out of TIM-77 scope -- next dispatch). */
+
+/* WSAStartup -- WSPROTO.CPP:318 entry-point bring-up. Engine memsets
+ * its own caller-allocated WSADATA buffer and then compares wVersion
+ * against a baked-in expected version; the stub returns 0 (success)
+ * and the wVersion comparison flow is dormant since sockets never
+ * actually open (socket() returns INVALID_SOCKET above). */
+static inline int WSAStartup(WORD, LPWSADATA) { return 0; }
+
+/* gethostname -- WSPUDP.CPP:180 local-host name lookup. Real winsock1
+ * fills the buffer with the host's name; the stub writes an empty
+ * string so the immediate WWDebugString(hostname) call at WSPUDP.CPP
+ * :181 prints a defined-but-empty value. */
+static inline int gethostname(char* name, int)
+{ if (name) name[0] = '\0'; return 0; }
+
+/* hostent -- minimum-viable Win32 SDK winsock.h shape. WSPUDP.CPP:197
+ * reads h_addr_list (cast through unsigned long**); the SDK form has
+ * h_addr_list as char** and engine code casts. Layout matches winsock.h
+ * so any future code that touches h_name / h_addrtype parses cleanly.
+ * We do NOT pull <netdb.h> -- it would clash with struct in_addr above. */
+#ifndef _WINSOCK1_HOSTENT_DEFINED
+#define _WINSOCK1_HOSTENT_DEFINED
+struct hostent {
+    char*  h_name;
+    char** h_aliases;
+    short  h_addrtype;
+    short  h_length;
+    char** h_addr_list;
+};
+typedef struct hostent  HOSTENT;
+typedef struct hostent* PHOSTENT;
+typedef struct hostent* LPHOSTENT;
+#endif
+
+/* gethostbyname -- WSPUDP.CPP:182 follow-up to gethostname. Returns
+ * NULL; the next-line dereference at WSPUDP.CPP:197 would NULL-trap
+ * on a real run, but the parent Open_Socket path is gated on the
+ * earlier socket() call returning INVALID_SOCKET so the dereference
+ * is unreachable under the dormant-socket stub semantics. */
+static inline struct hostent* gethostbyname(const char*)
+{ return (struct hostent*)0; }
+
+/* getsockopt / setsockopt -- WSPIPX/WSPUDP/WSPROTO socket-option I/O.
+ * Engine code guards each call with `if (... == SOCKET_ERROR)` so a 0
+ * return reads as success and the caller proceeds. Real linux
+ * <sys/socket.h> uses socklen_t for the length pointer; we keep the
+ * Win32 winsock.h signatures verbatim so call sites parse against the
+ * engine's typed expectations. */
+static inline int getsockopt(SOCKET, int, int, char*, int*) { return 0; }
+static inline int setsockopt(SOCKET, int, int, const char*, int) { return 0; }
+
+/* WSAGetLastError -- WSPIPX.CPP:337/427, WSPUDP.CPP:413, WSPROTO.CPP
+ * :321 error-code retrieval after a failed sock op. Stub returns 0
+ * (no error). The engine compares the value against WSAEWOULDBLOCK
+ * to distinguish "would block" from real errors; with a 0 return,
+ * the comparison reads as "real error" and the caller exits the
+ * read loop -- consistent with the dormant-socket semantics. */
+static inline int WSAGetLastError(void) { return 0; }
+
+/* WSAEWOULDBLOCK -- Win32 SDK <winsock.h> error-code constant for
+ * "operation would block on a non-blocking socket". WSPIPX.CPP:337
+ * and WSPUDP.CPP:413 compare WSAGetLastError() against it to decide
+ * whether to break the read loop. Standard SDK value: 10035. */
+#ifndef WSAEWOULDBLOCK
+#define WSAEWOULDBLOCK 10035
+#endif
+
+/* WSAGETSELECTEVENT / WSAGETSELECTERROR -- Win32 SDK <winsock.h>
+ * macros that unpack WM_NETSOCK_EVENT message lParam payloads. WSPIPX
+ * .CPP:316/325 and WSPUDP.CPP:322/331 use them to extract event-type
+ * / error-code from the lParam halves. Standard SDK form is LOWORD/
+ * HIWORD. LOWORD/HIWORD live in windows.h, which is force-included
+ * via msvc-compat.h before this header in the include chain, so they
+ * are visible here. */
+#ifndef WSAGETSELECTEVENT
+#define WSAGETSELECTEVENT(lParam) LOWORD(lParam)
+#endif
+#ifndef WSAGETSELECTERROR
+#define WSAGETSELECTERROR(lParam) HIWORD(lParam)
+#endif
+
 #endif /* LINUX_STUBS_WINSOCK_H_INCLUDED */
