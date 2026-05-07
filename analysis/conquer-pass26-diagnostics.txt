@@ -1,0 +1,140 @@
+In file included from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/ccdde.h:42,
+                 from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:104:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:97:46: error: ‘HSZ’ has not been declared
+   97 |                 BOOL    Test_Server_Running( HSZ );
+      |                                              ^~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:107:47: error: ‘HSZ’ has not been declared
+  107 |                 BOOL    Open_Poke_Connection( HSZ );
+      |                                               ^~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:133:24: error: ‘HDDEDATA’ does not name a type
+  133 |                 static HDDEDATA CALLBACK dde_callback(
+      |                        ^~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:159:17: error: ‘HSZ’ does not name a type
+  159 |                 HSZ remote_name;                // string handle for remote server name
+      |                 ^~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:160:17: error: ‘HSZ’ does not name a type
+  160 |                 HSZ local_name;                 // string handle for local server name
+      |                 ^~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:161:17: error: ‘HSZ’ does not name a type
+  161 |                 HSZ system_topic;               // string handle for the "system" topic
+      |                 ^~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:162:17: error: ‘HSZ’ does not name a type
+  162 |                 HSZ poke_topic;         // string handle for poking data to server topic
+      |                 ^~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:163:17: error: ‘HSZ’ does not name a type
+  163 |                 HSZ poke_item;                  // string handle for poking data to server item
+      |                 ^~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/dde.h:165:17: error: ‘HCONV’ does not name a type
+  165 |                 HCONV conv_handle;   // conversation handle
+      |                 ^~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP: In function ‘void Main_Game(int, char**)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:259:25: error: ‘Hide_Mouse’ was not declared in this scope
+  259 |                         Hide_Mouse();
+      |                         ^~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:264:25: error: ‘Show_Mouse’ was not declared in this scope
+  264 |                         Show_Mouse();
+      |                         ^~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:485:25: error: ‘Show_Mouse’ was not declared in this scope
+  485 |                         Show_Mouse();
+      |                         ^~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP: In function ‘void Call_Back()’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:1630:13: error: ‘SampleType’ was not declared in this scope; did you mean ‘GameType’?
+ 1630 |         if (SampleType) {
+      |             ^~~~~~~~~~
+      |             GameType
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:1631:17: error: ‘Sound_Callback’ was not declared in this scope
+ 1631 |                 Sound_Callback();
+      |                 ^~~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP: In function ‘void Sync_Delay()’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2114:32: error: invalid use of incomplete type ‘class WWMouseClass’
+ 2114 |                         WWMouse->Erase_Mouse(&HidPage, TRUE);
+      |                                ^~
+In file included from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/function.h:421,
+                 from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:85:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/externs.h:122:7: note: forward declaration of ‘class WWMouseClass’
+  122 | class WWMouseClass;
+      |       ^~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP: In function ‘bool Main_Loop()’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2205:13: error: ‘SampleType’ was not declared in this scope; did you mean ‘GameType’?
+ 2205 |         if (SampleType && Theme.What_Is_Playing() == THEME_NONE) {
+      |             ^~~~~~~~~~
+      |             GameType
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2244:32: error: invalid use of incomplete type ‘class WWMouseClass’
+ 2244 |                         WWMouse->Erase_Mouse(&HidPage, TRUE);
+      |                                ^~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/externs.h:122:7: note: forward declaration of ‘class WWMouseClass’
+  122 | class WWMouseClass;
+      |       ^~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2331:24: error: invalid use of incomplete type ‘class WWMouseClass’
+ 2331 |                 WWMouse->Erase_Mouse(&HidPage, TRUE);
+      |                        ^~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/externs.h:122:7: note: forward declaration of ‘class WWMouseClass’
+  122 | class WWMouseClass;
+      |       ^~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2350:24: error: invalid use of incomplete type ‘class WWMouseClass’
+ 2350 |                 WWMouse->Erase_Mouse(&HidPage, TRUE);
+      |                        ^~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/externs.h:122:7: note: forward declaration of ‘class WWMouseClass’
+  122 | class WWMouseClass;
+      |       ^~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2361:24: error: invalid use of incomplete type ‘class WWMouseClass’
+ 2361 |                 WWMouse->Erase_Mouse(&HidPage, TRUE);
+      |                        ^~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/externs.h:122:7: note: forward declaration of ‘class WWMouseClass’
+  122 | class WWMouseClass;
+      |       ^~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2380:24: error: invalid use of incomplete type ‘class WWMouseClass’
+ 2380 |                 WWMouse->Erase_Mouse(&HidPage, TRUE);
+      |                        ^~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/externs.h:122:7: note: forward declaration of ‘class WWMouseClass’
+  122 | class WWMouseClass;
+      |       ^~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2398:53: error: ‘TEXT_MAP_ERROR’ was not declared in this scope; did you mean ‘TXT_NAME_ERROR’?
+ 2398 |                         if (WWMessageBox().Process (TEXT_MAP_ERROR, TEXT_STOP, TEXT_CONTINUE)==0) {
+      |                                                     ^~~~~~~~~~~~~~
+      |                                                     TXT_NAME_ERROR
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2398:69: error: ‘TEXT_STOP’ was not declared in this scope; did you mean ‘TXT_STOP’?
+ 2398 |                         if (WWMessageBox().Process (TEXT_MAP_ERROR, TEXT_STOP, TEXT_CONTINUE)==0) {
+      |                                                                     ^~~~~~~~~
+      |                                                                     TXT_STOP
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:2398:80: error: ‘TEXT_CONTINUE’ was not declared in this scope; did you mean ‘TXT_CONTINUE’?
+ 2398 |                         if (WWMessageBox().Process (TEXT_MAP_ERROR, TEXT_STOP, TEXT_CONTINUE)==0) {
+      |                                                                                ^~~~~~~~~~~~~
+      |                                                                                TXT_CONTINUE
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP: In function ‘const char* Fading_Table_Name(const char*, TheaterType)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:3293:9: error: ‘_makepath’ was not declared in this scope
+ 3293 |         _makepath(_buffer, NULL, NULL, root, ".MRF");
+      |         ^~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP: In function ‘int Get_CD_Index(int, int)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4269:9: error: ‘CountDownTimerClass’ was not declared in this scope; did you mean ‘CountDownTimer’?
+ 4269 |         CountDownTimerClass timer;
+      |         ^~~~~~~~~~~~~~~~~~~
+      |         CountDownTimer
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4271:9: error: ‘timer’ was not declared in this scope; did you mean ‘timer_t’?
+ 4271 |         timer.Set(timeout);
+      |         ^~~~~
+      |         timer_t
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4281:21: error: ‘GetVolumeInformation’ was not declared in this scope
+ 4281 |                 if (GetVolumeInformation ((char const *)buffer, &volume_name[0] ,
+      |                     ^~~~~~~~~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4292:60: error: ‘GENERIC_READ’ was not declared in this scope
+ 4292 |                         HANDLE handle = CreateFile(buffer, GENERIC_READ, FILE_SHARE_READ,NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+      |                                                            ^~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4292:74: error: ‘FILE_SHARE_READ’ was not declared in this scope
+ 4292 |                         HANDLE handle = CreateFile(buffer, GENERIC_READ, FILE_SHARE_READ,NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+      |                                                                          ^~~~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4292:96: error: ‘OPEN_EXISTING’ was not declared in this scope
+ 4292 |                         HANDLE handle = CreateFile(buffer, GENERIC_READ, FILE_SHARE_READ,NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+      |                                                                                                ^~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4292:111: error: ‘FILE_ATTRIBUTE_NORMAL’ was not declared in this scope
+ 4292 |                         HANDLE handle = CreateFile(buffer, GENERIC_READ, FILE_SHARE_READ,NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+      |                                                                                                               ^~~~~~~~~~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4292:41: error: ‘CreateFile’ was not declared in this scope
+ 4292 |                         HANDLE handle = CreateFile(buffer, GENERIC_READ, FILE_SHARE_READ,NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+      |                                         ^~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4296:33: error: ‘CloseHandle’ was not declared in this scope
+ 4296 |                                 CloseHandle(handle);
+      |                                 ^~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/CONQUER.CPP:4325:35: error: ‘GetLastError’ was not declared in this scope
+ 4325 |                         int val = GetLastError();
+      |                                   ^~~~~~~~~~~~
