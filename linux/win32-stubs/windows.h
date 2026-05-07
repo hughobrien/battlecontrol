@@ -592,4 +592,18 @@ static inline int MessageBoxA(HWND, LPCSTR, LPCSTR, UINT) { return IDOK; }
 #define MessageBox MessageBoxA
 #endif
 
+/* TIM-70: GetKeyState -- Win32 keyboard input snapshot. KEY.CPP:217 and
+ * KEYBOARD.CPP:194 (WWKeyboardClass::Put_Key_Message) call
+ * GetKeyState(VK_SHIFT|VK_CONTROL|VK_MENU|VK_CAPITAL|VK_NUMLOCK) and mask
+ * with 0x8000 (high bit = currently pressed) / 0x0008 (caps/numlock toggle
+ * — engine-specific bit, not the SDK 0x0001 convention) to fold modifier
+ * state into the polled keystroke. Real <winuser.h> signature:
+ * `SHORT WINAPI GetKeyState(int nVirtKey)`. The Linux input pipeline is
+ * dormant under the stub (SDL_GetKeyboardState lands in a later port), so
+ * the inert return is "no modifiers held / no toggle active" -- engine
+ * code OR-fold paths simply skip the SHIFT/CTRL/ALT bit decorations and
+ * still produce a usable Put_Key_Message call. The VK_* constants are
+ * defined by the engine's own KEY.H, not here. */
+static inline SHORT GetKeyState(int) { return 0; }
+
 #endif /* LINUX_STUBS_WINDOWS_H */
