@@ -79,5 +79,14 @@ target_include_directories(redalert_includes INTERFACE
     "${CMAKE_SOURCE_DIR}/REDALERT/WIN32LIB"
     "${CMAKE_SOURCE_DIR}/linux/win32-stubs"
 )
+# TIM-6: force-include the MSVC-extension shim (empty calling-convention
+# macros, __int64 typedef, _lrotl) so upstream sources can stay untouched
+# for cross-cutting MSVC-isms. MSVC builds are unaffected (the shim
+# guards everything on `!defined(_MSC_VER)`).
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(redalert_includes INTERFACE
+        "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
+    )
+endif()
 
 add_executable(hello_linux linux/hello.cpp)

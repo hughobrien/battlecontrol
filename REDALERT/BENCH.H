@@ -45,7 +45,9 @@
 **	November of '94. Until the compiler supports this, use the following
 **	definition.
 */
-#ifndef __BORLANDC__
+// TIM-6: scope to legacy Watcom only; modern compilers (g++,
+// clang, modern MSVC) provide `bool` as a built-in keyword.
+#if defined(__WATCOMC__)
 #ifndef TRUE_FALSE_DEFINED
 #define TRUE_FALSE_DEFINED
 enum {false=0,true=1};
