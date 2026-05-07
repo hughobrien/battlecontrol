@@ -38,6 +38,16 @@
 #include	"list.h"
 #include	"edit.h"
 
+// TIM-44: Forward-declare non-dependent names referenced inside the
+// TDropListClass<T> template body (constructor at drop.h:160 and
+// Set_Position at drop.h:333). Phase-1 lookup of g++/C++17 needs these
+// visible at template-definition time; the canonical declarations live
+// in FUNCTION.H but DROP.H is reached before FUNCTION.H finishes
+// publishing them in most TUs, so the names would otherwise be
+// undeclared at parse time. Same diagnostic class as TIM-42.
+extern unsigned short Get_Build_Frame_Width(void const * dataptr);
+extern unsigned short Get_Build_Frame_Height(void const * dataptr);
+
 class DropListClass : public EditClass {
 	public:
 		DropListClass(int id, char * text, int max_len, TextPrintType flags, int x, int y, int w, int h, void const * up, void const * down);
