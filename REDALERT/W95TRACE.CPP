@@ -25,6 +25,7 @@
 #include "w95trace.h"
 
 
+#ifdef _DEBUG
 void OutputDebugStringW95( LPCTSTR /*lpOutputString*/, ...)
 {
 #if 0
@@ -124,3 +125,4 @@ void OutputDebugStringW95( LPCTSTR /*lpOutputString*/, ...)
     return;
 #endif
 }
+#endif  // _DEBUG
