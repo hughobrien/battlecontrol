@@ -65,6 +65,23 @@
 #define ENGLISH 1
 #endif
 
+// TIM-86: Watcom CRT supplies strrev (declared in <string.h>) but
+// Linux libc does not. Keep call-sites at lines 2354/2369 working by
+// providing a TU-local inline for non-Win32 builds. Guarded so Watcom
+// Win32 still picks up its own CRT decl.
+#ifndef _WIN32
+#include <string.h>
+static inline char *strrev(char *s) {
+	if (!s || !*s) return s;
+	char *p = s;
+	char *q = s;
+	while (*q) ++q;
+	--q;
+	while (p < q) { char t = *p; *p++ = *q; *q-- = t; }
+	return s;
+}
+#endif
+
 #include	"function.h"
 #include	"loaddlg.h"
 #ifdef WIN32
