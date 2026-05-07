@@ -530,7 +530,7 @@ typedef unsigned short	LEPTON;
 typedef union {
 	LEPTON Raw;
 	struct {
-#ifdef BIG_ENDIAN
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 		unsigned char Cell;
 		unsigned char Lepton;
 #else
@@ -544,7 +544,7 @@ typedef unsigned long	COORDINATE;
 typedef union {
 	COORDINATE Coord;
 	struct {
-#ifdef BIG_ENDIAN
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 		LEPTON_COMPOSITE Y;
 		LEPTON_COMPOSITE X;
 #else
@@ -559,7 +559,7 @@ typedef signed short		CELL;
 typedef union {
 	CELL Cell;
 	struct {
-#ifdef BIG_ENDIAN
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 #if SLUFF_BITS
 		/*
 		**	Unused upper bits will cause problems on a big-endian machine unless they
@@ -591,7 +591,7 @@ typedef long	TARGET;
 typedef union {
 	TARGET Target;
 	struct {
-#ifdef BIG_ENDIAN
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 		unsigned Exponent:TARGET_EXPONENT;
 		unsigned Mantissa:TARGET_MANTISSA;
 #else
