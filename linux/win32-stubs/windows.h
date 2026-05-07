@@ -739,4 +739,20 @@ static inline BOOL  GetCursorPos(LPPOINT lpPoint)                  { if (lpPoint
 static inline DWORD GetLastError(void)                             { return 0; }
 static inline BOOL  SetForegroundWindow(HWND)                      { return TRUE; }
 
+/* TIM-75: Win32 GDI/window-misc continuation. INIT.CPP:1079 calls
+ * ShowWindow(MainWindow, ShowCommand) right after SetForegroundWindow
+ * to raise the engine's top-level window; TIMERINI.CPP:133 calls
+ * OutputDebugString(error_str) on the timer-system failure path. Both
+ * surfaces are dormant under the stub (no HWND universe; debug output
+ * lands on a real logger in the SDL2 port), so the inert returns are
+ * TRUE / nothing -- no engine code makes a control-flow decision on
+ * the values yet. OutputDebugString is aliased to the A variant since
+ * no UNICODE convention is established in this header. */
+static inline BOOL  ShowWindow(HWND, int)                          { return TRUE; }
+static inline void  OutputDebugStringA(LPCSTR)                     {}
+static inline void  OutputDebugStringW(LPCWSTR)                    {}
+#ifndef OutputDebugString
+#define OutputDebugString OutputDebugStringA
+#endif
+
 #endif /* LINUX_STUBS_WINDOWS_H */
