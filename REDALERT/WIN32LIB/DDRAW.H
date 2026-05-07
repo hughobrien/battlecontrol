@@ -102,12 +102,12 @@ struct IDirectDraw {
     template <typename... Args> long GetCaps(Args&&...) { return 0; }
     template <typename... Args> long WaitForVerticalBlank(Args&&...) { return 0; }
 };
-// TIM-139: graduate WIN32LIB/DDRAW.CPP — Set_DD_Palette calls
-// PalettePtr->SetEntries(...) (DDRAW.CPP:752). Same throwaway pattern
-// as IDirectDraw{,Surface} above; replaced when the SDL2 path lands.
-struct IDirectDrawPalette {
-    template <typename... Args> long SetEntries(Args&&...) { return 0; }
-};
+// TIM-141: IDirectDrawPalette stub removed. Set_DD_Palette now uses the
+// SDL2 path on Linux (DDRAW.CPP under `#ifndef _MSC_VER`); the only stub
+// consumer (PalettePtr->SetEntries) is gated to the MSVC build, where
+// the real DirectDraw COM declaration is in scope. The forward decl
+// below (struct IDirectDrawPalette;) keeps the LPDIRECTDRAWPALETTE
+// typedef alive without a complete type.
 #ifdef __cplusplus
 } // extern "C++"
 #endif
