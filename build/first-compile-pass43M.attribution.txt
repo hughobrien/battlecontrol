@@ -1,0 +1,2 @@
+REDALERT/INTERNET.CPP -> [WIN32] /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/INTERNET.CPP:295:76: error: ‘FindWindow’ was not declared in this scope; did you mean ‘MainWindow’?
+REDALERT/TCPIP.CPP -> [WIN32] /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/TCPIP.CPP:407:25: error: ‘accept’ was not declared in this scope
