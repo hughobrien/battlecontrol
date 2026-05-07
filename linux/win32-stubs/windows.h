@@ -949,4 +949,121 @@ template <typename... Args> BOOL   DeleteObject(Args&&...) { return FALSE; }
 #define TRUNCATE_EXISTING 5
 #endif
 
+/* TIM-90: pass-40J BMP8 wingdi struct cluster. POD typedefs for the
+ * BMP loader's parser-only path. BMP8.CPP first-fails post-TIM-87 on
+ * BITMAPFILEHEADER @35; the cluster drains a tight family of wingdi.h
+ * structs the BMP loader declares on the stack / casts pointers
+ * through. Field names + layouts match the canonical Win32 SDK
+ * (wingdi.h / minwinbase.h / winuser.h) so any sizeof / pointer-cast
+ * through engine code stays well-defined; no field is read at runtime
+ * because the GDI universe is dormant under the stub (CreatePalette,
+ * GetDC, SelectPalette, BitBlt, ... all land in a later SDL2/OpenGL
+ * port).
+ *
+ * Canonical SDK shapes (pulled from public Win32 headers):
+ *   BITMAPFILEHEADER  : <wingdi.h>  -- BMP file header, 5 fields.
+ *   BITMAPINFOHEADER  : <wingdi.h>  -- DIB info header, 11 fields.
+ *   RGBQUAD           : <wingdi.h>  -- 4-byte BGRA palette entry.
+ *   BITMAPINFO        : <wingdi.h>  -- BITMAPINFOHEADER + RGBQUAD[].
+ *   LOGPALETTE        : <wingdi.h>  -- WORD,WORD + PALETTEENTRY[].
+ *   PAINTSTRUCT       : <winuser.h> -- BeginPaint context.
+ *   HGLOBAL           : <minwinbase.h> -- opaque global-mem handle.
+ *   SECURITY_ATTRIBUTES: <minwinbase.h> -- CreateFile lpSecurity arg
+ *     (only used as a (LPSECURITY_ATTRIBUTES)NULL cast in BMP8.CPP).
+ *
+ * PALETTEENTRY (TIM-55), HPALETTE (~line 94), LPVOID (~line 119),
+ * HBITMAP (~line 88), HDC (~line 87), RECT (~line 137), BOOL/BYTE/
+ * WORD/DWORD/LONG/HANDLE are all already shimmed above.
+ */
+
+/* HGLOBAL -- opaque global-memory handle. Same shape as HBITMAP /
+ * HFILE / HHANDLE family. BMP8.CPP:39/71/111 stores GlobalAlloc results
+ * here. The global-mem subsystem is dormant under the stub. */
+typedef HANDLE             HGLOBAL;
+
+/* SECURITY_ATTRIBUTES -- canonical layout. BMP8.CPP:56 only uses the
+ * (LPSECURITY_ATTRIBUTES)NULL cast as the lpSecurityAttributes arg to
+ * CreateFile; the struct is never populated or read on the stub path. */
+typedef struct _SECURITY_ATTRIBUTES {
+    DWORD  nLength;
+    LPVOID lpSecurityDescriptor;
+    BOOL   bInheritHandle;
+} SECURITY_ATTRIBUTES, *PSECURITY_ATTRIBUTES, *LPSECURITY_ATTRIBUTES;
+
+/* BITMAPFILEHEADER -- canonical 14-byte BMP file prefix. Real SDK
+ * applies #pragma pack(2) so total size is 14 bytes; we omit the
+ * pragma here because no engine code on the stub path reads/writes
+ * BMP files at runtime (ReadFile is itself a stub). Field names match
+ * BMP8.CPP usage at lines 65/111/116 (bfSize, bfOffBits). */
+typedef struct tagBITMAPFILEHEADER {
+    WORD  bfType;
+    DWORD bfSize;
+    WORD  bfReserved1;
+    WORD  bfReserved2;
+    DWORD bfOffBits;
+} BITMAPFILEHEADER, *LPBITMAPFILEHEADER, *PBITMAPFILEHEADER;
+
+/* BITMAPINFOHEADER -- canonical DIB header. BMP8.CPP:76-86 reads every
+ * biSize/biWidth/biHeight/biPlanes/biBitCount/biCompression/biSizeImage/
+ * biXPelsPerMeter/biYPelsPerMeter/biClrUsed/biClrImportant field, so
+ * the full 11-field SDK shape is required for the parser. */
+typedef struct tagBITMAPINFOHEADER {
+    DWORD biSize;
+    LONG  biWidth;
+    LONG  biHeight;
+    WORD  biPlanes;
+    WORD  biBitCount;
+    DWORD biCompression;
+    DWORD biSizeImage;
+    LONG  biXPelsPerMeter;
+    LONG  biYPelsPerMeter;
+    DWORD biClrUsed;
+    DWORD biClrImportant;
+} BITMAPINFOHEADER, *LPBITMAPINFOHEADER, *PBITMAPINFOHEADER;
+
+/* RGBQUAD -- BMP palette entry (BGRA byte order, matches SDK). BMP8.CPP
+ * uses sizeof(RGBQUAD) at lines 71/90 and walks the palette as raw
+ * bytes via the BITMAPINFO::bmiColors[] trailer below. */
+typedef struct tagRGBQUAD {
+    BYTE rgbBlue;
+    BYTE rgbGreen;
+    BYTE rgbRed;
+    BYTE rgbReserved;
+} RGBQUAD, *LPRGBQUAD;
+
+/* BITMAPINFO -- BITMAPINFOHEADER + flexible-array RGBQUAD trailer. SDK
+ * declares bmiColors[1] as the standard "extensible struct" idiom; the
+ * actual allocation at BMP8.CPP:71 sizes for sizeof(BITMAPINFOHEADER) +
+ * (1<<biBitCount)*sizeof(RGBQUAD), then casts and dereferences
+ * lpHeaderMem->bmiHeader and lpHeaderMem->bmiColors. */
+typedef struct tagBITMAPINFO {
+    BITMAPINFOHEADER bmiHeader;
+    RGBQUAD          bmiColors[1];
+} BITMAPINFO, *LPBITMAPINFO, *PBITMAPINFO;
+
+/* LOGPALETTE -- canonical GDI logical-palette descriptor. BMP8.CPP:94
+ * allocates `(LPLOGPALETTE)new char[sizeof(LOGPALETTE) +
+ * sizeof(PALETTEENTRY)*256]` then writes palVersion / palNumEntries and
+ * iterates palPalEntry[i].peRed/peGreen/peBlue/peFlags. The SDK uses
+ * the same flexible-array trailer idiom as BITMAPINFO. PALETTEENTRY is
+ * already defined above (TIM-55). */
+typedef struct tagLOGPALETTE {
+    WORD         palVersion;
+    WORD         palNumEntries;
+    PALETTEENTRY palPalEntry[1];
+} LOGPALETTE, *PLOGPALETTE, *LPLOGPALETTE, *NPLOGPALETTE;
+
+/* PAINTSTRUCT -- BeginPaint/EndPaint context. BMP8.CPP:41/146 declares
+ * one on the stack and reads ps.hdc at line 155 (drawBmp). Real
+ * <winuser.h> shape; rgbReserved is 32 bytes per the SDK. The
+ * paint-cycle universe is dormant on Linux. */
+typedef struct tagPAINTSTRUCT {
+    HDC  hdc;
+    BOOL fErase;
+    RECT rcPaint;
+    BOOL fRestore;
+    BOOL fIncUpdate;
+    BYTE rgbReserved[32];
+} PAINTSTRUCT, *PPAINTSTRUCT, *NPPAINTSTRUCT, *LPPAINTSTRUCT;
+
 #endif /* LINUX_STUBS_WINDOWS_H */
