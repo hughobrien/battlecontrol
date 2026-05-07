@@ -7,8 +7,10 @@
 //   * empty calling-convention macros (__cdecl / __stdcall / __fastcall)
 //     and Win16-era pointer attributes (FAR / NEAR / PASCAL / HUGE) so
 //     the parser advances past Win32 prototypes;
-//   * a typedef for __int64 / unsigned __int64 (used in fixed-point
-//     math in FIXED.H and the GlyphX DLL interface);
+//   * a #define for __int64 (mapped to long long) so that the
+//     'unsigned __int64' / 'signed __int64' forms used in fixed-point
+//     math (FIXED.H) and the GlyphX DLL interface (DLLInterface.h)
+//     parse via simple preprocessor expansion;
 //   * an inline _lrotl shim used by CRC.CPP / CRC.H.
 //
 // MSVC is unchanged because its compiler defines _MSC_VER and provides
@@ -126,9 +128,16 @@
 #include <stdint.h>
 #endif
 
+// TIM-62: __int64 is exposed as a #define rather than a typedef so
+// that 'unsigned __int64' / 'signed __int64' / 'typedef unsigned
+// __int64 uint64' parse via simple preprocessor expansion. C++ does
+// not allow 'unsigned <typedef-name>', so the prior typedef form
+// blocked DLLInterface.h:794 (struct member) and DLLInterface.cpp:59
+// (typedef). 'long long' is 64-bit on every platform we target and
+// matches MSVC's __int64 width exactly.
 #if !defined(__INT64_DEFINED)
 #define __INT64_DEFINED
-typedef int64_t __int64;
+#define __int64 long long
 #endif
 
 // _lrotl: MSVC CRT "rotate left long". Used by CRC.CPP / CRC.H. The
