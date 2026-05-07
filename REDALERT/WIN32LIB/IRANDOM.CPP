@@ -69,37 +69,14 @@ int IRandom(int minval, int maxval)
 
 unsigned char Random(void)
 {
-	__asm {
-		lea	esi, [RandNumb]		//; get offset in segment of RandNumb
-		xor	eax,eax
-		mov	al,[esi]
-		shr	al,1						//; shift right 1 bit (bit0 in carry)
-		shr	al,1
-		rcl	[BYTE PTR esi+2],1	//; rcl byte 3 of RandNumb
-		rcl	[BYTE PTR esi+1],1 	//; rcl byte 2 of RandNumb
-		cmc								//; complement carry
-		sbb	al,[esi]					//; sbb byte 1 of RandNumb
-		shr	al,1						//; sets carry
-		rcr	[BYTE PTR esi],1 		//; rcr byte 1 of RandNumb
-		mov	al,[esi]					//; reload byte 1 of RandNumb
-		xor	al,[esi+1]				//; xor with byte 2 of RandNumb
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }		 
 
 
 
 int Get_Random_Mask(int maxval)
 {
-	__asm {
-		
-		bsr	ecx,[maxval]		//	; put bit position of highest bit in ecx
-		mov	eax, 1				//	; set one bit on in eax
-		jz		invalid				//	; if BSR shows maxval==0, return eax=1
-		inc	ecx					// ; get one bit higher than count showed
-		shl	eax,cl				// ; move our EAX bit into position
-		dec	eax					// ; dec it to create the mask.
-invalid:
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
