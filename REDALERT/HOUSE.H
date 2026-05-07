@@ -906,6 +906,11 @@ class HouseClass {
 			void Decode_Pointers(void) {};
 		};
 
+		// TIM-110: namespace-scope explicit specialisations of
+		// TFixedIHeapClass<BuildChoiceClass>::{Save,Load,Code_Pointers,Decode_Pointers}
+		// in HOUSE.CPP need to name the otherwise-private BuildChoiceClass.
+		friend class TFixedIHeapClass<BuildChoiceClass>;
+
 		static TFixedIHeapClass<BuildChoiceClass> BuildChoice;
 
 
