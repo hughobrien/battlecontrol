@@ -584,6 +584,10 @@ void Send_Statistics_Packet(void)
 		/*
 		** Video memory
 		*/
+#ifdef _MSC_VER
+		// TIM-141: DirectDraw caps probe is MSVC-only. The Linux build doesn't
+		// ship a hardware-VRAM number with the stats payload (FIELD_VIDEO_MEMORY
+		// is just informational); see Get_Free_Video_Memory in DDRAW.CPP.
 		DDCAPS	video_capabilities;
 		long		video_memory;
 
@@ -596,6 +600,7 @@ void Send_Statistics_Packet(void)
 				stats.Add_Field (FIELD_VIDEO_MEMORY, (long) video_memory);
 			}
 		}
+#endif
 
 		/*
 		** Game speed setting.

@@ -95,13 +95,13 @@ struct IDirectDrawSurface {
     template <typename... Args> long SetPalette(Args&&...) { return 0; }
     template <typename... Args> long Restore(Args&&...) { return 0; }
 };
-struct IDirectDraw {
-    template <typename... Args> long CreateSurface(Args&&...) { return 0; }
-    template <typename... Args> long RestoreDisplayMode(Args&&...) { return 0; }
-    template <typename... Args> long Release(Args&&...) { return 0; }
-    template <typename... Args> long GetCaps(Args&&...) { return 0; }
-    template <typename... Args> long WaitForVerticalBlank(Args&&...) { return 0; }
-};
+// TIM-141 (commit 2): IDirectDraw stub removed. The five live consumers on
+// the Linux build (DDRAW.CPP Reset_Video_Mode / Get_Free_Video_Memory /
+// Get_Video_Hardware_Capabilities / Wait_Vert_Blank, plus STATS.CPP video-
+// memory probe and GBUFFER.CPP DD_Init) are gated to the MSVC build or
+// replaced with portable SDL2 equivalents. The `struct IDirectDraw;` forward
+// decl below (via the LPDIRECTDRAW typedef) keeps the pointer type alive.
+struct IDirectDraw;
 // TIM-141: IDirectDrawPalette stub removed. Set_DD_Palette now uses the
 // SDL2 path on Linux (DDRAW.CPP under `#ifndef _MSC_VER`); the only stub
 // consumer (PalettePtr->SetEntries) is gated to the MSVC build, where
