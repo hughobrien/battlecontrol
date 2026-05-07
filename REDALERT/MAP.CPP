@@ -1360,10 +1360,15 @@ if (BlubCell->Overlapper[1]) {
 		*/
 		obj = (*this)[cell].Cell_Occupier();
 		if (obj) {
+			// LP64 audit (TIM-69): originally `(unsigned int)ptr & 0xff000000` was an
+			// LP32 sanity check ("top byte set => corrupt user-space pointer"). Cast
+			// widened to `uintptr_t` for warning-free LP64 build; the mask now examines
+			// bits 24-31 of a 64-bit address, which is a weaker check but matches the
+			// pre-port behaviour rather than introducing new logic.
 			if (
-				((unsigned int)obj & 0xff000000) ||
-				((unsigned int)obj->Next & 0xff000000) ||
-//				((unsigned int)obj->Trigger & 0xff000000) ||
+				((uintptr_t)obj & 0xff000000) ||
+				((uintptr_t)obj->Next & 0xff000000) ||
+//				((uintptr_t)obj->Trigger & 0xff000000) ||
 				obj->IsInLimbo ||
 				((unsigned int)Coord_Cell(obj->Coord) >= MAP_CELL_TOTAL)) {
 
@@ -1378,9 +1383,9 @@ if (BlubCell->Overlapper[1]) {
 			obj = (*this)[cell].Overlapper[i];
 			if (obj) {
 				if (
-					((unsigned int)obj & 0xff000000) ||
-					((unsigned int)obj->Next & 0xff000000) ||
-//					((unsigned int)obj->Trigger & 0xff000000) ||
+					((uintptr_t)obj & 0xff000000) ||
+					((uintptr_t)obj->Next & 0xff000000) ||
+//					((uintptr_t)obj->Trigger & 0xff000000) ||
 					obj->IsInLimbo ||
 					((unsigned int)Coord_Cell(obj->Coord) >= MAP_CELL_TOTAL)) {
 
