@@ -1,0 +1,57 @@
+L5    refs=29   tus=13  AllSurfaces
+L4    refs=6    tus=1   Buffer_Frame_To_Page
+L4    refs=2    tus=2   Buffer_Print
+L4    refs=1    tus=1   Buffer_To_Buffer
+L4    refs=1    tus=0   CPUType
+L4    refs=3    tus=0   Check_From_WChat(char*)
+L4    refs=3    tus=1   ConnectionLost
+L4    refs=10   tus=1   DDEServer
+L4    refs=3    tus=0   DDEServerClass::Delete_MPlayer_Game_Info()
+L4    refs=1    tus=0   DDEServerClass::Disable()
+L4    refs=1    tus=0   DDEServerClass::Enable()
+L4    refs=4    tus=0   DDEServerClass::Get_MPlayer_Game_Info()
+L4    refs=1    tus=0   DDEServerClass::Time_Since_Heartbeat()
+L4    refs=1    tus=1   Detect_MMX_Availability
+L5    refs=1    tus=1   DirectDrawObject
+L4    refs=7    tus=2   GameStatisticsPacketSent
+L2?   refs=1    tus=1   GetGameDef
+L1    refs=2    tus=2   GetSystemTimeAsFileTime
+L4    refs=4    tus=2   LCW_Comp
+L2?   refs=1    tus=1   LPCGetMPAddr()
+L2?   refs=15   tus=4   MainWindow
+L4    refs=1    tus=1   Net_Reconnect_Dialog(int, int, int, unsigned long)
+L5    refs=1    tus=1   OverlappedVideoBlits
+L4    refs=2    tus=0   PacketLater
+L5    refs=1    tus=0   PaletteSurface
+L4    refs=1    tus=0   PlanetWestwoodIPAddress
+L4    refs=2    tus=0   PlanetWestwoodIsHost
+L4    refs=2    tus=1   PlanetWestwoodPortNumber
+L4    refs=2    tus=0   Read_Game_Options(char*)
+L4    refs=1    tus=1   Reconnect_Modem()
+L4    refs=5    tus=0   Register_Game_End_Time()
+L4    refs=1    tus=1   Register_Game_Start_Time()
+L1    refs=2    tus=0   SafeArrayAccessData
+L1    refs=2    tus=0   SafeArrayCreate
+L1    refs=2    tus=0   SafeArrayUnaccessData
+L4    refs=1    tus=0   Send_Data_To_DDE_Server(char*, int, int)
+L4    refs=7    tus=0   Send_Statistics_Packet()
+L4    refs=2    tus=0   Server
+L5    refs=2    tus=0   Set_DD_Palette
+L5    refs=3    tus=0   Set_Video_Mode(void*, int, int, int)
+L2?   refs=1    tus=0   ShowCommand
+L4    refs=1    tus=0   Spawn_WChat(bool)
+L4    refs=3    tus=2   SpawnedFromWChat
+L4    refs=1    tus=1   Stop_Execution
+L5    refs=1    tus=0   SurfaceMonitorClass::Add_DD_Surface(IDirectDrawSurface*)
+L5    refs=1    tus=0   SurfaceMonitorClass::Remove_DD_Surface(IDirectDrawSurface*)
+L5    refs=2    tus=0   SurfaceMonitorClass::Restore_Surfaces()
+L2?   refs=3    tus=0   TcpipManagerClass::Close()
+L2?   refs=1    tus=0   TcpipManagerClass::Init()
+L2?   refs=2    tus=0   TcpipManagerClass::Read(void*, int)
+L4    refs=1    tus=0   TcpipManagerClass::Set_Host_Address(char*)
+L4    refs=1    tus=0   TcpipManagerClass::Start_Client()
+L4    refs=1    tus=0   TcpipManagerClass::Start_Server()
+L2?   refs=2    tus=1   TcpipManagerClass::Write(void*, int)
+L4    refs=1    tus=0   VendorID
+L2?   refs=18   tus=2   Winsock
+L4    refs=3    tus=1   vtable for TurretClass

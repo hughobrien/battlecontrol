@@ -1,0 +1,23 @@
+DiffTable
+IndexTable
+LZWStraw::Get(void*, int)
+LZWStraw::LZWStraw(LZWStraw::CompControl, int)
+LZWStraw::~LZWStraw()
+TickCount
+WWKeyboardClass::Buff_Get()
+WWKeyboardClass::Check() const
+WWKeyboardClass::Clear()
+WWKeyboardClass::Down(unsigned short)
+WWKeyboardClass::Fetch_Element()
+WWKeyboardClass::Fill_Buffer_From_System()
+WWKeyboardClass::Get()
+WWKeyboardClass::Is_Buffer_Empty() const
+WWKeyboardClass::Is_Buffer_Full() const
+WWKeyboardClass::Is_Mouse_Key(unsigned short)
+WWKeyboardClass::Message_Handler(void*, unsigned int, unsigned int, long)
+WWKeyboardClass::Peek_Element() const
+WWKeyboardClass::Put(unsigned short)
+WWKeyboardClass::Put_Element(unsigned short)
+WWKeyboardClass::Put_Key_Message(unsigned short, bool)
+WWKeyboardClass::To_ASCII(unsigned short)
+WWKeyboardClass::WWKeyboardClass()
