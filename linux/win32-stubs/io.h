@@ -16,6 +16,15 @@
 
 #ifdef __cplusplus
 template <typename... Args> long filelength(Args&&...) { return 0; }
+/* TIM-88: pass-40H. RAWFILE.CPP:1317 calls `lseek(Handle, pos, dir)`
+ * inside the `#else` (non-WIN32) branch of RawFileClass::Raw_Seek. POSIX
+ * normally exposes lseek via <unistd.h>, but the Watcom CRT placed it in
+ * <io.h>, which is the include the engine reaches through. Same shape as
+ * `filelength` above and the TIM-85 `_dos_*` family in dos.h. The call
+ * site assigns the return into `pos` and only treats `pos == -1` as a
+ * fatal seek error, so an inert `0` return is safe (caller proceeds with
+ * a position-zero file pointer). */
+template <typename... Args> long lseek(Args&&...) { return 0; }
 #endif
 
 #endif
