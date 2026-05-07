@@ -26,6 +26,8 @@
 **********************************************************************/
 
 #ifndef WIN32
+#ifndef BITMAPCLASS
+#define BITMAPCLASS
 class BitmapClass
 {
 	public:
@@ -47,13 +49,13 @@ class TPoint2D
 		int y;
 };
 #endif
+#endif
 
 
 //#include	"function.h"
 #define FILE_H
 #define RAWFILE_H
 #define WWMEM_H
-#define WWFILE_Hx
 #include	<wwlib32.h>
 #include <stdio.h>
 //#include "gbuffer.h"
