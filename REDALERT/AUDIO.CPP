@@ -100,11 +100,24 @@ void Stop_Primary_Sound_Buffer(void) {};
 // SCORE.CPP / STARTUP.CPP and the rationale for living inside
 // REDALERT/AUDIO.CPP rather than a sibling WIN32LIB/SOUNDIO.CPP.
 #include "sdl_audio.h"
+#include "soscomp.h"   // pass-44D: ADPCM decoder (REDALERT/ADPCM.CPP)
 #include <SDL2/SDL.h>
 #include <cstdint>
+#include <cstdlib>     // pass-44D: malloc/free/realloc
 #include <cstring>
 #include <algorithm>
 #include <climits>
+
+// pass-44D: forward decls for the FILE.H API. function.h pre-defines
+// FILE_H (REDALERT/FUNCTION.H:197), so `#include "file.h"` is a no-op in
+// this TU -- see the project memory note. Forward-declaring the four
+// entry points we need keeps AUDIO.CPP independent of that include-guard
+// shadow without having to drag a full file.h replay through the
+// pre-defined-guard list.
+extern int  __cdecl Open_File(char const * file_name, int mode);
+extern void __cdecl Close_File(int handle);
+extern long __cdecl Read_File(int handle, void * buf, unsigned long bytes);
+static constexpr int AUD_FILE_READ_MODE = 1;     // FILE.H:52 `#define READ 1`
 
 static SDL_AudioDeviceID g_audio_device = 0;
 static bool              g_audio_open   = false;
@@ -484,19 +497,230 @@ void Fade_Sample(int handle, int ticks)
     SDL_UnlockAudioDevice(g_audio_device);
 }
 
-// Remaining 14 entry points stay no-op stubs identical to the MSVC branch.
-// Real bodies land in 44D (Load_Sample / Free_Sample / Sample_Read /
-// Load_Sample_Into_Buffer through ADPCM decode), 44E (File_Stream_Sample_*
-// streaming chunker + Sound_Callback / maintenance_callback background fill),
-// and 44F (speech path tied to Stop_Sample_Playing).
+// TIM-148 pass-44D: ADPCM decode + sample load/free.
+//
+// On-disk AUD header / chunk header structs. These exist because the
+// in-memory AUDHeaderType (REDALERT/WIN32LIB/AUDIO.H:46-56) declares its
+// 32-bit-on-Win32 size/uncompsize fields as `long`, which is 8 bytes on
+// x86_64 Linux -- so sizeof(AUDHeaderType) == 20 in memory but 12 on
+// disk. Same shape applies to the chunk header. We read the on-disk
+// structs (compile-time-asserted to the correct byte size), then project
+// into the in-memory AUDHeaderType which is what 44C's Play_Sample_Handle
+// consumer reads back via `static_cast<AUDHeaderType const *>(sample)`.
+//
+// AUD chunk format reference: OpenRA / VanillaConquer (GPLv3-compatible).
+// Layout after the 12-byte AUDHeader is a sequence of chunks each
+// prefixed with this 8-byte chunk header, followed by `Size` bytes of
+// IMA-ADPCM-4 compressed data. Walk chunks until cumulative output ==
+// AUDHeader.UncompSize. The decoder state (dwSampleIndex / dwPredicted)
+// resets per chunk.
+#pragma pack(push, 1)
+struct AUDOnDiskHeader {
+    std::uint16_t rate;
+    std::uint32_t size;
+    std::uint32_t uncomp_size;
+    std::uint8_t  flags;
+    std::uint8_t  compression;
+};
+struct AUDOnDiskChunkHeader {
+    std::uint16_t size;        // compressed byte count for this chunk
+    std::uint16_t out_size;    // decompressed byte count for this chunk
+    std::uint32_t magic;       // 0x0000DEAF
+};
+#pragma pack(pop)
+static_assert(sizeof(AUDOnDiskHeader)      == 12, "AUD on-disk header must be 12 bytes");
+static_assert(sizeof(AUDOnDiskChunkHeader) ==  8, "AUD on-disk chunk header must be 8 bytes");
+static constexpr std::uint32_t AUD_CHUNK_MAGIC = 0x0000DEAFul;
+
+// Decode `pcm_capacity` bytes worth of AUD chunks from the current file
+// position into `pcm_out`. Returns total bytes written, or -1 on a format
+// or I/O error. Used by Load_Sample / Load_Sample_Into_Buffer; Sample_Read
+// drives the per-chunk loop directly because its caller (44E's streaming
+// chunker) needs single-chunk granularity.
+static long Decode_AUD_Chunks(int fh, unsigned char * pcm_out, unsigned long pcm_capacity)
+{
+    unsigned char * scratch     = nullptr;
+    unsigned long   scratch_cap = 0;
+    unsigned long   out_used    = 0;
+
+    while (out_used < pcm_capacity) {
+        AUDOnDiskChunkHeader chunk = {};
+        long const got = Read_File(fh, &chunk, sizeof(chunk));
+        if (got == 0) break;       // clean EOF (rare -- normally exits via UncompSize)
+        if (got != static_cast<long>(sizeof(chunk))) { std::free(scratch); return -1; }
+        if (chunk.magic != AUD_CHUNK_MAGIC)          { std::free(scratch); return -1; }
+        if (out_used + chunk.out_size > pcm_capacity){ std::free(scratch); return -1; }
+
+        if (chunk.size > 0) {
+            if (chunk.size > scratch_cap) {
+                unsigned char * grown =
+                    static_cast<unsigned char *>(std::realloc(scratch, chunk.size));
+                if (grown == nullptr) { std::free(scratch); return -1; }
+                scratch     = grown;
+                scratch_cap = chunk.size;
+            }
+            if (Read_File(fh, scratch, chunk.size) != static_cast<long>(chunk.size)) {
+                std::free(scratch);
+                return -1;
+            }
+        }
+
+        _SOS_COMPRESS_INFO info = {};
+        info.lpSource  = reinterpret_cast<char *>(scratch);
+        info.lpDest    = reinterpret_cast<char *>(pcm_out + out_used);
+        info.wBitSize  = 16;
+        info.wChannels = 1;
+        sosCODECInitStream(&info);     // resets dwSampleIndex / dwPredicted per chunk
+        unsigned long const decoded = sosCODECDecompressData(&info, chunk.size);
+        if (decoded != chunk.out_size) { std::free(scratch); return -1; }
+
+        out_used += decoded;
+    }
+
+    std::free(scratch);
+    return static_cast<long>(out_used);
+}
+
+// Project an AUDOnDiskHeader (12 bytes) into the in-memory AUDHeaderType
+// (20 bytes on x86_64 Linux) at `dst`. The 8-byte size delta lives in
+// padding bytes after Size / UncompSize / Flags / Compression -- the
+// engine never reads those, only the named fields, so we leave the rest
+// zero.
+static void Project_AUD_Header(AUDOnDiskHeader const & disk, AUDHeaderType * dst)
+{
+    std::memset(dst, 0, sizeof(*dst));
+    dst->Rate        = disk.rate;
+    dst->Size        = static_cast<long>(disk.size);
+    dst->UncompSize  = static_cast<long>(disk.uncomp_size);
+    dst->Flags       = disk.flags;
+    dst->Compression = disk.compression;
+}
+
+void * Load_Sample(char const * filename)
+{
+    if (filename == NULL) return NULL;
+
+    int fh = Open_File(filename, AUD_FILE_READ_MODE);
+    if (fh == -1) return NULL;
+
+    AUDOnDiskHeader disk = {};
+    if (Read_File(fh, &disk, sizeof(disk)) != static_cast<long>(sizeof(disk))) {
+        Close_File(fh);
+        return NULL;
+    }
+
+    std::size_t const blob_size = sizeof(AUDHeaderType) + disk.uncomp_size;
+    void * const blob = std::malloc(blob_size);
+    if (blob == NULL) {
+        Close_File(fh);
+        return NULL;
+    }
+
+    Project_AUD_Header(disk, static_cast<AUDHeaderType *>(blob));
+
+    unsigned char * const pcm_out =
+        static_cast<unsigned char *>(blob) + sizeof(AUDHeaderType);
+    long const decoded = Decode_AUD_Chunks(fh, pcm_out, disk.uncomp_size);
+    Close_File(fh);
+
+    if (decoded < 0 || static_cast<unsigned long>(decoded) != disk.uncomp_size) {
+        std::free(blob);
+        return NULL;
+    }
+    return blob;
+}
+
+long Load_Sample_Into_Buffer(char const * filename, void * buffer, long size)
+{
+    if (filename == NULL || buffer == NULL || size < static_cast<long>(sizeof(AUDHeaderType))) {
+        return 0;
+    }
+
+    int fh = Open_File(filename, AUD_FILE_READ_MODE);
+    if (fh == -1) return 0;
+
+    AUDOnDiskHeader disk = {};
+    if (Read_File(fh, &disk, sizeof(disk)) != static_cast<long>(sizeof(disk))) {
+        Close_File(fh);
+        return 0;
+    }
+
+    long const required = static_cast<long>(sizeof(AUDHeaderType)) +
+                          static_cast<long>(disk.uncomp_size);
+    if (required > size) {
+        Close_File(fh);
+        return 0;
+    }
+
+    Project_AUD_Header(disk, static_cast<AUDHeaderType *>(buffer));
+
+    unsigned char * const pcm_out =
+        static_cast<unsigned char *>(buffer) + sizeof(AUDHeaderType);
+    long const decoded = Decode_AUD_Chunks(fh, pcm_out, disk.uncomp_size);
+    Close_File(fh);
+
+    if (decoded < 0 || static_cast<unsigned long>(decoded) != disk.uncomp_size) {
+        return 0;
+    }
+    return required;
+}
+
+// Stateless single-chunk reader. Caller (44E's streaming chunker) supplies
+// an `fh` already positioned past the 12-byte AUD header, and drives the
+// loop. Each call reads exactly one chunk: the 8-byte chunk header, then
+// `chunk.size` bytes of compressed data, then decodes into `buffer`.
+// Returns the number of decoded bytes (== chunk.out_size), or 0 on EOF or
+// any error condition (caller-buffer-too-small included). Decoder state
+// resets per chunk so there's no per-fh state to maintain across calls.
+long Sample_Read(int fh, void * buffer, long size)
+{
+    if (fh < 0 || buffer == NULL || size <= 0) return 0;
+
+    AUDOnDiskChunkHeader chunk = {};
+    long const got = Read_File(fh, &chunk, sizeof(chunk));
+    if (got != static_cast<long>(sizeof(chunk)))    return 0;   // EOF / short read
+    if (chunk.magic != AUD_CHUNK_MAGIC)             return 0;
+    if (static_cast<long>(chunk.out_size) > size)   return 0;
+
+    unsigned char * scratch = nullptr;
+    if (chunk.size > 0) {
+        scratch = static_cast<unsigned char *>(std::malloc(chunk.size));
+        if (scratch == nullptr) return 0;
+        if (Read_File(fh, scratch, chunk.size) != static_cast<long>(chunk.size)) {
+            std::free(scratch);
+            return 0;
+        }
+    }
+
+    _SOS_COMPRESS_INFO info = {};
+    info.lpSource  = reinterpret_cast<char *>(scratch);
+    info.lpDest    = static_cast<char *>(buffer);
+    info.wBitSize  = 16;
+    info.wChannels = 1;
+    sosCODECInitStream(&info);
+    unsigned long const decoded = sosCODECDecompressData(&info, chunk.size);
+    std::free(scratch);
+
+    if (decoded != chunk.out_size) return 0;
+    return static_cast<long>(decoded);
+}
+
+void Free_Sample(void const * sample)
+{
+    if (sample != NULL) {
+        std::free(const_cast<void *>(sample));
+    }
+}
+
+// Remaining 10 entry points stay no-op stubs identical to the MSVC branch.
+// Real bodies land in 44E (File_Stream_Sample_* streaming chunker driving
+// Sample_Read above + Sound_Callback / maintenance_callback background
+// fill via the music voice slot) and 44F (Stop_Sample_Playing tied to the
+// speech path).
 int File_Stream_Sample(char const *filename, BOOL real_time_start) { return 1; };
 int File_Stream_Sample_Vol(char const *filename, int volume, BOOL real_time_start) { return 1; };
 void __cdecl Sound_Callback(void) {};
 void __cdecl far maintenance_callback(void) {};
-void *Load_Sample(char const *filename) { return NULL; };
-long Load_Sample_Into_Buffer(char const *filename, void *buffer, long size) { return 0; }
-long Sample_Read(int fh, void *buffer, long size) { return 0; };
-void Free_Sample(void const *sample) {};
 void Stop_Sample_Playing(void const * sample) {};
 int Get_Digi_Handle(void) { return 1; }
 void Restore_Sound_Buffers(void) {};
