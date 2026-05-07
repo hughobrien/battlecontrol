@@ -66,6 +66,23 @@ TurretClass::~TurretClass(void)
 }
 
 
+// TIM-146: anchor the TurretClass vtable. Itanium ABI emits the vtable
+// in the TU defining the first non-inline non-pure virtual ("key
+// function"). For TurretClass that's Code_Pointers — declared in
+// TURRET.H but never previously defined, leaving the vtable absent
+// and triggering "undefined reference to vtable for TurretClass" at
+// link time. Empty bodies match the inline pattern from BASE.H and
+// suffice because TurretClass is dead code in RA (no `new TurretClass`
+// anywhere; see TIM-68 note on the ctors below).
+void TurretClass::Code_Pointers(void)
+{
+}
+
+void TurretClass::Decode_Pointers(void)
+{
+}
+
+
 /***********************************************************************************************
  * TurretClass::TurretClass -- The default constructor for turret class objects.               *
  *                                                                                             *
