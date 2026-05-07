@@ -64,37 +64,20 @@ DEFINE_GUID( IID_IDirectDrawClipper,            0x6C14DB85,0xA733,0x11CE,0xA5,0x
  *==========================================================================*/
 
 #if defined(_NO_COM)
-// TIM-15: on Linux the full COM interface block (DECLARE_INTERFACE_ at the
-// bottom of this header) is gated out by `_NO_COM`. WIN32LIB/GBUFFER.H/CPP
-// still calls the DirectDraw methods at parse time though, so promote the
-// forward decls to stub structs whose variadic-template members swallow
-// any signature and return 0 (== DD_OK). The methods are never reached at
-// runtime — `IsDirectDraw` is false on Linux, so all hardware-blit paths
-// are dead code. The SDL2 replacement is a separate later port.
+// TIM-141 (commit 3): IDirectDrawSurface stub removed. The nine live
+// consumers on the Linux build are now gated to MSVC:
+//   * GBUFFER.CPP — Attach_DD_Surface (290), Un_Init Unlock/Release
+//     (367/376), GraphicBufferClass::Lock VideoSurfacePtr->Lock (574),
+//     GraphicBufferClass::Unlock VideoSurfacePtr->Unlock (638),
+//     DD_Linear_Blit_To_Linear (705).
+//   * GBUFFER.H — GraphicViewPortClass::Fill_Rect DD fast-path
+//     (GetBltStatus + Blt, single inline gate).
+//   * DDRAW.CPP — Wait_Blit (PaletteSurface->GetBltStatus),
+//     SurfaceMonitorClass::Restore_Surfaces (Surface[i]->Restore).
+// Lock-buffer wiring (sourcing GraphicBufferClass::Buffer/Pitch from an
+// SDL surface so Linux Lock() can return TRUE with a usable byte buffer)
+// is the next commit's scope; commit 3 is gates only.
 //
-// Wrapped in `extern "C++"` because this header opens an `extern "C"`
-// block above and templates require C++ linkage. `extern "C++"` is the
-// portable opt-out (works on MSVC and gcc) and only takes effect when
-// the caller is C++ — under C this branch is skipped entirely because
-// `_NO_COM` only fires on the Linux-shim build, which is C++-only.
-//
-// Limited to the method names required by the gbuffer-blocked TUs
-// (GBUFFER.H/CPP). Other call sites in REDALERT (PaletteSurface->SetPalette,
-// DirectDrawObject->SetDisplayMode, ...) remain as separate downstream
-// diagnostics for the next measurement pass to size honestly.
-#ifdef __cplusplus
-extern "C++" {
-#endif
-struct IDirectDrawSurface {
-    template <typename... Args> long GetBltStatus(Args&&...) { return 0; }
-    template <typename... Args> long Blt(Args&&...) { return 0; }
-    template <typename... Args> long Lock(Args&&...) { return 0; }
-    template <typename... Args> long Unlock(Args&&...) { return 0; }
-    template <typename... Args> long AddAttachedSurface(Args&&...) { return 0; }
-    template <typename... Args> long Release(Args&&...) { return 0; }
-    template <typename... Args> long SetPalette(Args&&...) { return 0; }
-    template <typename... Args> long Restore(Args&&...) { return 0; }
-};
 // TIM-141 (commit 2): IDirectDraw stub removed. The five live consumers on
 // the Linux build (DDRAW.CPP Reset_Video_Mode / Get_Free_Video_Memory /
 // Get_Video_Hardware_Capabilities / Wait_Vert_Blank, plus STATS.CPP video-
@@ -102,15 +85,13 @@ struct IDirectDrawSurface {
 // replaced with portable SDL2 equivalents. The `struct IDirectDraw;` forward
 // decl below (via the LPDIRECTDRAW typedef) keeps the pointer type alive.
 struct IDirectDraw;
+struct IDirectDrawSurface;
 // TIM-141: IDirectDrawPalette stub removed. Set_DD_Palette now uses the
 // SDL2 path on Linux (DDRAW.CPP under `#ifndef _MSC_VER`); the only stub
 // consumer (PalettePtr->SetEntries) is gated to the MSVC build, where
 // the real DirectDraw COM declaration is in scope. The forward decl
 // below (struct IDirectDrawPalette;) keeps the LPDIRECTDRAWPALETTE
 // typedef alive without a complete type.
-#ifdef __cplusplus
-} // extern "C++"
-#endif
 #else
 struct IDirectDraw;
 struct IDirectDrawSurface;

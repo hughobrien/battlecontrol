@@ -877,12 +877,17 @@ void Set_DD_Palette ( void *palette )
 
 void Wait_Blit (void)
 {
+#ifdef _MSC_VER
+	// TIM-141 commit 3: hardware blit-completion poll retained on MSVC.
+	// On Linux this is a no-op — vsync rides the SDL_RENDERER_PRESENTVSYNC
+	// renderer (created in Set_Video_Mode) and IDirectDrawSurface is
+	// incomplete in the Linux build.
 	HRESULT	return_code;
 
 	do {
 		return_code=PaletteSurface->GetBltStatus (DDGBS_ISBLTDONE);
 	} while (return_code != DD_OK && return_code != DDERR_SURFACELOST);
-
+#endif
 }
 
 
@@ -1018,12 +1023,19 @@ void SurfaceMonitorClass::Restore_Surfaces (void)
 		for (int i=0 ; i<MAX_SURFACES ; i++)
 		{
 			if ( Surface[i] ){
+#ifdef _MSC_VER
+				// TIM-141 commit 3: IDirectDrawSurface::Restore is
+				// MSVC-only; SDL2 doesn't lose surfaces on focus
+				// loss the way DDRAW does, so the Linux path treats
+				// every entry as already-restored and falls through
+				// to the Misc_Focus_Restore_Function notification.
 				if (Surface[i]->Restore() != DD_OK){
 					if (Misc_Focus_Loss_Function){
 						Misc_Focus_Loss_Function();
 					}
 					return;
 				}
+#endif
 			}
 		}
 
@@ -1095,7 +1107,13 @@ void SurfaceMonitorClass::Release(void)
 	for (int i=0 ; i<MAX_SURFACES ; i++)
 	{
 		if ( Surface[i] ){
+#ifdef _MSC_VER
+			// TIM-141 commit 3: IDirectDrawSurface::Release is MSVC-only
+			// (forward decl on Linux). On Linux nothing ever populates
+			// Surface[] because GBUFFER.CPP DD_Init's CreateSurface is
+			// MSVC-gated, so the loop body is unreachable at runtime.
 			Surface[i]->Release();
+#endif
 			Surface[i] = 0;
 		}
 	}

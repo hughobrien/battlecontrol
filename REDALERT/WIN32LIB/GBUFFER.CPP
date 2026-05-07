@@ -287,7 +287,15 @@ void GraphicBufferClass::DD_Init(GBC_Enum flags)
 
 void GraphicBufferClass::Attach_DD_Surface (GraphicBufferClass * attach_buffer)
 {
+#ifdef _MSC_VER
+	// TIM-141 commit 3: IDirectDrawSurface is a forward decl on Linux,
+	// so AddAttachedSurface cannot be resolved. The Linux DD_Init path
+	// also gates CreateSurface (so VideoSurfacePtr is always NULL here),
+	// making this the unreachable hardware-attach branch.
 	VideoSurfacePtr->AddAttachedSurface (attach_buffer->Get_DD_Surface());
+#else
+	(void)attach_buffer;
+#endif
 }
 
 
@@ -361,7 +369,12 @@ void GraphicBufferClass::Un_Init (void)
 	if ( IsDirectDraw ){
 
 		if ( VideoSurfacePtr ){
-
+#ifdef _MSC_VER
+			// TIM-141 commit 3: Unlock/Release require a complete
+			// IDirectDrawSurface, which is now a forward decl on Linux.
+			// VideoSurfacePtr is always NULL on Linux because DD_Init
+			// gates CreateSurface to MSVC, so this branch is dead at
+			// runtime there; keep the legacy DD teardown for MSVC.
 			while ( LockCount ){
 
 				if (VideoSurfacePtr->Unlock ( NULL ) == DDERR_SURFACELOST){
@@ -375,6 +388,7 @@ void GraphicBufferClass::Un_Init (void)
 			AllSurfaces.Remove_DD_Surface (VideoSurfacePtr);
 			VideoSurfacePtr->Release();
 			VideoSurfacePtr = NULL;
+#endif
 		}
 	}
 }
@@ -570,6 +584,14 @@ BOOL GraphicBufferClass::Lock(void)
 	//
 
 	if (VideoSurfacePtr){
+#ifdef _MSC_VER
+		// TIM-141 commit 3: VideoSurfacePtr->Lock requires a complete
+		// IDirectDrawSurface; on Linux it is a forward decl. The Linux
+		// DD_Init path never assigns VideoSurfacePtr (CreateSurface is
+		// MSVC-gated), so this branch is unreachable at runtime — the
+		// `if (!VideoSurfacePtr) return (FALSE)` guard above fires first.
+		// Lock-buffer wiring (sourcing Buffer/Pitch from an SDL surface)
+		// is the next commit's scope.
 		while (!LockCount && restore_attempts<2) {
 			result = VideoSurfacePtr->Lock ( NULL
 										, &(VideoSurfaceDescription)
@@ -600,6 +622,10 @@ BOOL GraphicBufferClass::Lock(void)
 					return (FALSE);
 			}
 		}
+#else
+		(void)result;
+		(void)restore_attempts;
+#endif
 	}
 	//Colour_Debug(1);
 	Unblock_Mouse(this);
@@ -635,6 +661,11 @@ BOOL GraphicBufferClass::Unlock(void)
 	//
 	if (LockCount == 1 && VideoSurfacePtr) {
 		Block_Mouse(this);
+#ifdef _MSC_VER
+		// TIM-141 commit 3: IDirectDrawSurface::Unlock is unavailable
+		// on Linux (forward decl). VideoSurfacePtr is always NULL on
+		// Linux (CreateSurface gated to MSVC in DD_Init), so this
+		// block is unreachable at runtime there.
 		if ( VideoSurfacePtr->Unlock ( NULL ) != DD_OK ){
 			Unblock_Mouse(this);
 			return(FALSE);
@@ -644,6 +675,10 @@ BOOL GraphicBufferClass::Unlock(void)
 			Unblock_Mouse(this);
 			return(TRUE);
 		}
+#else
+		Unblock_Mouse(this);
+		return(FALSE);
+#endif
 	}
 	//Colour_Debug (0);
 	LockCount--;
@@ -702,11 +737,23 @@ HRESULT GraphicViewPortClass::DD_Linear_Blit_To_Linear (
 	dest_rectangle.right	= dest_x+width;
 	dest_rectangle.bottom	= dest_y+height;
 
+#ifdef _MSC_VER
+   // TIM-141 commit 3: DD hardware blit retained on MSVC. On Linux this
+   // function is unreachable — its only callers (Blit_Display in DDRAW.CPP
+   // and the GVPC blit fast-paths) are inside `_MSC_VER`-gated blocks
+   // because IDirectDrawSurface is incomplete in the Linux build.
    return (	dest.GraphicBuff->Get_DD_Surface()->Blt ( &dest_rectangle,
 												GraphicBuff->Get_DD_Surface(),
 												&source_rectangle,
 												key_source | DDBLT_WAIT | DDBLT_ASYNC,
 												NULL ) );
+#else
+   (void)dest;
+   (void)source_rectangle;
+   (void)dest_rectangle;
+   (void)key_source;
+   return DD_OK;
+#endif
 }
 
 
