@@ -505,4 +505,60 @@ static inline void _splitpath(const char* path,
 // guarded so re-inclusion is free.
 #include "windows.h"
 
+// TIM-135: Glyphx wrapper compile-floor compatibility for
+// DLLInterface.cpp / DLLInterfaceEditor.cpp.
+//
+// (1) __declspec(dllexport/dllimport/...): GCC requires -fdeclspec to
+//     accept the keyword; we macro-stub it to a no-op instead. This is
+//     a parser-level no-op only — we are not building a PE DLL on Linux.
+//     Wide-blast safety: ripgrep confirms __declspec appears in only
+//     three RedAlert files: MOVIE.H (gated behind #ifdef MPEGMOVIE,
+//     never reached) and the two DLLInterface*.cpp TUs covered here.
+//
+// (2) OLE Automation declarations (SAFEARRAY / SAFEARRAYBOUND /
+//     SafeArrayCreate / SafeArrayAccessData / SafeArrayUnaccessData /
+//     SUCCEEDED / VT_UI1 / VT_I4 / VARTYPE) needed by
+//     DLLInterfaceEditor.cpp's CNC_Editor_Get_Cell_Texture_Buffer and
+//     CNC_Editor_Get_Template_Data exports (lines 36, 38, 542, 592,
+//     596, 600, 627, 646, 671, 674, 677). HRESULT is already defined
+//     in linux/win32-stubs/windows.h. Under -fsyntax-only the linker
+//     is never invoked, so declarations alone suffice. Real OLE
+//     Automation runtime (or a Wine-backed replacement) is a
+//     separate later port.
+//     Wide-blast safety: ripgrep confirms zero other RedAlert TUs
+//     reference SAFEARRAY / SafeArray* / VT_UI1 / VT_I4.
+//     Placed after #include "windows.h" so HRESULT is already defined
+//     when the SafeArray* function declarations are parsed.
+#ifndef __declspec
+#define __declspec(x)
+#endif
+
+#ifndef SUCCEEDED
+#define SUCCEEDED(hr) (((HRESULT)(hr)) >= 0)
+#endif
+
+#ifndef _TIM135_OLE_AUTOMATION_DEFINED
+#define _TIM135_OLE_AUTOMATION_DEFINED
+typedef unsigned short VARTYPE;
+#define VT_I4   3
+#define VT_UI1 17
+
+typedef struct tagSAFEARRAYBOUND {
+    unsigned long cElements;
+    long          lLbound;
+} SAFEARRAYBOUND;
+
+typedef struct tagSAFEARRAY SAFEARRAY;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+SAFEARRAY* SafeArrayCreate(VARTYPE vt, unsigned int cDims, SAFEARRAYBOUND* rgsabound);
+HRESULT    SafeArrayAccessData(SAFEARRAY* psa, void** ppvData);
+HRESULT    SafeArrayUnaccessData(SAFEARRAY* psa);
+#ifdef __cplusplus
+}
+#endif
+#endif // _TIM135_OLE_AUTOMATION_DEFINED
+
 #endif // LINUX_WIN32_STUBS_MSVC_COMPAT_H
