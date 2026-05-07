@@ -35,6 +35,13 @@
 #ifndef TARGET_H
 #define TARGET_H
 
+// TIM-20: TARGET.H names RTTIType, TARGET and TARGET_COMPOSITE in inline
+// helpers; the originals were defined in DEFINES.H but only made visible
+// to TARGET.H via the includer's pre-include order. Pull DEFINES.H in
+// here so TARGET.H is self-contained -- same shape as the TIM-17
+// STAGE.H / ABSTRACT.H fix.
+#include	"defines.h"
+
 
 inline RTTIType Target_Kind(TARGET a)
 {

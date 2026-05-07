@@ -38,9 +38,30 @@
 #include	"mission.h"
 #include	"target.h"
 
+// TIM-20: TYPE.H references CCINIClass on Read_INI signatures, calls
+// strncpy in an inline AbstractTypeClass::Set_Name, embeds Rect for
+// DimensionData, and uses _MAX_EXT / _MAX_FNAME from the MSVC CRT to
+// size string buffers. Pull each in (or forward-declare) so TYPE.H
+// parses standalone instead of requiring FUNCTION.H's pre-include set.
+#include	<cstring>		// strncpy in inline Set_Name body.
+#include	"rect.h"		// Rect DimensionData member.
+
+// _MAX_EXT / _MAX_FNAME live in <stdlib.h> on MSVC; glibc doesn't ship
+// them. Provide MSVC's documented sizes so the buffers in TYPE.H remain
+// the same on both platforms. Long-form path constants (LP32 vs LP64
+// differences) are out of scope -- this is the same shim posture the
+// other TIM-* tickets have taken for missing CRT extensions.
+#ifndef _MAX_EXT
+#define _MAX_EXT   256
+#endif
+#ifndef _MAX_FNAME
+#define _MAX_FNAME 256
+#endif
+
 class MapEditClass;
 class HouseClass;
 class WeaponTypeClass;
+class CCINIClass;
 
 
 /***************************************************************************

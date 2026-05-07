@@ -37,6 +37,13 @@
 
 #include "vector.h"
 
+// TIM-20: HEAP.H exposes virtual `Save(Pipe&)` / `Load(Straw&)` on the
+// IHeap classes; these were forward-declared further down in FUNCTION.H,
+// not by HEAP.H itself. Pull the forward decls forward so HEAP.H parses
+// standalone (TIM-17 shape).
+class Pipe;
+class Straw;
+
 /**************************************************************************
 **	This is a block memory management handler. It is used when memory is to
 **	be treated as a series of blocks of fixed size. This is similar to an

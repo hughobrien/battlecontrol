@@ -39,6 +39,22 @@
 #include	"fly.h"
 #include	"fuse.h"
 
+// TIM-20: BULLET.H carries CCPtr<BulletTypeClass> Class and FacingClass
+// PrimaryFacing as direct members, names Pipe / Straw on the Save / Load
+// signatures, and dereferences Class for the inline `operator BulletType`
+// and `Class_Of` method bodies (which need BulletTypeClass complete --
+// not just forward-declared). TYPE.H is therefore pulled in directly so
+// BULLET.H is self-contained instead of relying on the includer's
+// FUNCTION.H ordering -- same shape as the TIM-17 STAGE.H / ABSTRACT.H
+// fix. CCPTR.H / FACE.H are listed explicitly so consumers don't have to
+// rely on TYPE.H's internal include chain to expose them.
+#include	"ccptr.h"		// CCPtr<BulletTypeClass> Class member.
+#include	"facing.h"		// FacingClass PrimaryFacing member.
+#include	"type.h"		// BulletTypeClass complete (Class->Type, *Class).
+
+class Pipe;
+class Straw;
+
 
 class BulletClass :	public ObjectClass,
 							public FlyClass,

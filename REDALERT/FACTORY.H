@@ -37,6 +37,20 @@
 
 #include	"stage.h"
 
+// TIM-20: FACTORY.H names RTTIType (DEFINES.H) on a member, plus Pipe /
+// Straw / TechnoTypeClass / TechnoClass / HouseClass on method
+// signatures. The originals reached FACTORY.H only via the includer's
+// FUNCTION.H ordering. Pull DEFINES.H in for RTTIType (member type --
+// full definition required) and forward-declare the rest since they're
+// used purely by reference / pointer (TIM-17 shape).
+#include	"defines.h"		// RTTIType.
+
+class Pipe;
+class Straw;
+class TechnoTypeClass;
+class TechnoClass;
+class HouseClass;
+
 class FactoryClass : private StageClass
 {
 	public:

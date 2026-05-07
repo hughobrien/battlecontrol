@@ -38,6 +38,12 @@
 #include "object.h"
 #include	"monoc.h"
 
+// TIM-20: MissionControlClass::Read_INI takes CCINIClass &, but
+// MISSION.H never pulled CCINI.H in -- it relied on the includer
+// ordering FUNCTION.H provides. A forward decl is enough since it's a
+// reference parameter. Same shape as the TIM-17 fix.
+class CCINIClass;
+
 /****************************************************************************
 **	This handles order assignment and tracking. The order is used to guide
 **	overall AI processing.

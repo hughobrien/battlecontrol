@@ -36,6 +36,19 @@
 #ifndef CCPTR_H
 #define CCPTR_H
 
+// TIM-20: CCPTR.H names NoInitClass (constructor parameter), assert
+// (inline operator bodies), NULL (return value), and FixedIHeapClass
+// with its `Length()` / `operator[]` (inline operator bodies). The
+// original Windows build relied on FUNCTION.H pre-pulling FTIMER.H,
+// HEAP.H and the assert macro before CCPTR.H was included; making the
+// header self-contained means consumers like OBJECT.H can parse without
+// inheriting that ordering. Same shape as the TIM-17 STAGE.H /
+// ABSTRACT.H fix.
+#include <assert.h>
+#include <stddef.h>		// NULL
+#include "ftimer.h"		// NoInitClass
+#include "heap.h"		// FixedIHeapClass + Length() / operator[].
+
 /*
 **	The CCPtr class is designed for a specific purpose. It functions like a pointer except that
 **	it requires no fixups for saving and loading. If pointer fixups are not an issue, than using
