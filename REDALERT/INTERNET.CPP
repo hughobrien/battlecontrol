@@ -292,7 +292,9 @@ int Read_Game_Options(char *name)
 
 	PlanetWestwoodGameID = WWGetPrivateProfileInt("Internet", "GameID", 0, buffer);
 	PlanetWestwoodStartTime = WWGetPrivateProfileInt ("Internet", "StartTime", 0, buffer);
-	WChatHWND = (HWND) WWGetPrivateProfileInt("Internet", "HWND", (int)FindWindow("OWL_Window", "Westwood Chat"), buffer);
+	/* TIM-147: cast HWND -> int through intptr_t to satisfy LP64 ABI;
+	** on Win32 HWND was 32-bit so the original (int) cast was safe. */
+	WChatHWND = (HWND) WWGetPrivateProfileInt("Internet", "HWND", (int)(intptr_t)FindWindow("OWL_Window", "Westwood Chat"), buffer);
 
 	Session.Options.AIPlayers = WWGetPrivateProfileInt("Options", "AI", 0, buffer);		//Number of AI players
 	if (Session.Options.AIPlayers){
