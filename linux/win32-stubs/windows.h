@@ -747,12 +747,24 @@ extern "C" {
 #endif
 extern int SDL_Cursor_X;
 extern int SDL_Cursor_Y;
+/* TIM-145 pass-43D: SDL window-bring-up accessors. Defined in
+ * REDALERT/WIN32LIB/DDRAW.CPP where SDL_VideoWindow lives. The
+ * static inline ShowWindow / SetForegroundWindow stubs below
+ * forward to these so the engine's existing window-raise calls
+ * (INIT.CPP:1104-1105 WChat path; NETDLG.CPP:6323-7127 host/join)
+ * actually surface the SDL window instead of being silently
+ * inert. SDL_Window_Show maps the SW_ command via SW_HIDE /
+ * SW_MINIMIZE-family / SW_MAXIMIZE-family / default to SDL's
+ * Hide/Minimize/Maximize+Show/Show. Both accessors no-op safely
+ * if the SDL window has not been created yet. */
+void SDL_Window_Show(int sw_command);
+void SDL_Window_Raise(void);
 #ifdef __cplusplus
 }
 #endif
 static inline BOOL  GetCursorPos(LPPOINT lpPoint)                  { if (lpPoint) { lpPoint->x = SDL_Cursor_X; lpPoint->y = SDL_Cursor_Y; } return TRUE; }
 static inline DWORD GetLastError(void)                             { return 0; }
-static inline BOOL  SetForegroundWindow(HWND)                      { return TRUE; }
+static inline BOOL  SetForegroundWindow(HWND)                      { SDL_Window_Raise(); return TRUE; }
 
 /* TIM-75: Win32 GDI/window-misc continuation. INIT.CPP:1079 calls
  * ShowWindow(MainWindow, ShowCommand) right after SetForegroundWindow
@@ -763,12 +775,25 @@ static inline BOOL  SetForegroundWindow(HWND)                      { return TRUE
  * TRUE / nothing -- no engine code makes a control-flow decision on
  * the values yet. OutputDebugString is aliased to the A variant since
  * no UNICODE convention is established in this header. */
-static inline BOOL  ShowWindow(HWND, int)                          { return TRUE; }
+static inline BOOL  ShowWindow(HWND, int nCmdShow)                 { SDL_Window_Show(nCmdShow); return TRUE; }
 static inline void  OutputDebugStringA(LPCSTR)                     {}
 static inline void  OutputDebugStringW(LPCWSTR)                    {}
 #ifndef OutputDebugString
 #define OutputDebugString OutputDebugStringA
 #endif
+
+/* TIM-147 pass-43N: FindWindow -- Win32 top-level window lookup by
+ * class/title. INTERNET.CPP:295 calls FindWindow("OWL_Window",
+ * "Westwood Chat") to discover the WChat client's HWND for the
+ * Internet-launch handshake. Real <winuser.h>:
+ *   HWND WINAPI FindWindowA(LPCSTR lpClassName, LPCSTR lpWindowName);
+ * The window-message universe is dormant under the stub (no HWND
+ * universe, no other process to find), so the inert NULL return is
+ * the correct runtime semantic: the caller treats null as "WChat not
+ * present" and falls back to the explicit-HWND path read from the
+ * profile. Same shape as the TIM-75 ShowWindow / SetForegroundWindow
+ * cluster. */
+static inline HWND  FindWindow(LPCSTR, LPCSTR)                     { return (HWND)0; }
 
 /* TIM-80: SendMessage -- Win32 window-message synchronous dispatch.
  * WSPROTO.CPP:453/506 (WIC::Send / WIC::Broadcast) and WSPUDP.CPP:280

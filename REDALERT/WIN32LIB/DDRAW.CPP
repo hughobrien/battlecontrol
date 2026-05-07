@@ -135,6 +135,50 @@ extern "C" bool SDL_Quit_Requested(void)
 {
     return SDL_QuitRequested;
 }
+
+// TIM-145 pass-43D: SDL window-bring-up accessors that back the
+// ShowWindow / SetForegroundWindow stubs in linux/win32-stubs/
+// windows.h. INIT.CPP:1104-1105 (WChat-spawned launch path) and
+// NETDLG.CPP host/join paths use these to raise the engine's
+// top-level window when returning from a network dialog. The SDL
+// window is created lazily in Set_Video_Mode and only shown for
+// real on the first present (SDL_FirstPresentDone latch). These
+// accessors no-op safely before that point, matching the Win32
+// behaviour where ShowWindow on a non-existent HWND is a soft
+// failure rather than a crash.
+extern "C" void SDL_Window_Show(int sw_command)
+{
+    if (SDL_VideoWindow == nullptr) return;
+
+    // SW_ values are defined in linux/win32-stubs/windows.h. Branch
+    // by behavioural family rather than chaining every constant —
+    // SW_SHOWNORMAL / SW_SHOWNOACTIVATE / SW_SHOW / SW_SHOWNA all
+    // collapse to "show the window without changing minimize/
+    // maximize state".
+    switch (sw_command) {
+    case 0:  // SW_HIDE
+        SDL_HideWindow(SDL_VideoWindow);
+        break;
+    case 2:  // SW_SHOWMINIMIZED
+    case 6:  // SW_MINIMIZE
+    case 7:  // SW_SHOWMINNOACTIVE
+        SDL_MinimizeWindow(SDL_VideoWindow);
+        break;
+    case 3:  // SW_SHOWMAXIMIZED / SW_MAXIMIZE
+        SDL_MaximizeWindow(SDL_VideoWindow);
+        SDL_ShowWindow(SDL_VideoWindow);
+        break;
+    default: // SW_SHOWNORMAL=1, SW_SHOWNOACTIVATE=4, SW_SHOW=5, SW_SHOWNA=8
+        SDL_ShowWindow(SDL_VideoWindow);
+        break;
+    }
+}
+
+extern "C" void SDL_Window_Raise(void)
+{
+    if (SDL_VideoWindow == nullptr) return;
+    SDL_RaiseWindow(SDL_VideoWindow);
+}
 #endif
 
 LPDIRECTDRAW		DirectDrawObject=NULL;	// Pointer to the direct draw object
