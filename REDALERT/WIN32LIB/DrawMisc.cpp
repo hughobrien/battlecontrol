@@ -1141,7 +1141,7 @@ void __cdecl Buffer_Fill_Rect(void *thisptr, int sx, int sy, int dx, int dy, uns
 		;*===================================================================
 		cmp	eax, [VPwidth]			; compare with the max
 		jge	done				; starts off screen, then later
-		jb	short sx_done			; if it's not negative, it's ok
+		jb	short sx_done			; if it is not negative, it is ok
 
 		;------ Clip source X to left edge of screen.
 		add	ecx, eax			; Reduce width (add in negative src X).
@@ -1153,7 +1153,7 @@ void __cdecl Buffer_Fill_Rect(void *thisptr, int sx, int sy, int dx, int dy, uns
 		;*===================================================================
 		cmp	ebx, [VPheight]			; compare with the max
 		jge	done				; starts off screen, then later
-		jb	short sy_done			; if it's not negative, it's ok
+		jb	short sy_done			; if it is not negative, it is ok
 
 		;------ Clip source Y to top edge of screen.
 		add	edx, ebx			; Reduce height (add in negative src Y).
@@ -2695,7 +2695,7 @@ extern "C" void __cdecl Init_Stamps(unsigned int icondata)
 		cmp	[icondata],0
 		je	short fini
 
-		; Don't initialize if already initialized to this set (speed reasons).
+		; Do not initialize if already initialized to this set (speed reasons).
 		mov	edi,[icondata]
 		cmp	[LastIconset],edi
 		je	short fini
@@ -2832,7 +2832,7 @@ notmap:
 			mov	eax,[IconWidth]
 			mov	[iwidth],eax		; Stack copy of byte width for easy BP access.
 
-			; Fetch pointer to start of icon's data.  ESI = ptr to icon data.
+			; Fetch pointer to start of icon data.  ESI = ptr to icon data.
 			mov	eax,[icon]
 			mul	[IconSize]
 			mov	esi,[StampPtr]
@@ -3018,7 +3018,7 @@ notmap2:
 			mov	eax,[IconWidth]
 			mov	[iwidth],eax		; Stack copy of byte width for easy BP access.
 
-			; Fetch pointer to start of icon's data.  ESI = ptr to icon data.
+			; Fetch pointer to start of icon data.  ESI = ptr to icon data.
 			mov	eax,[icon]
 			mul	[IconSize]
 			mov	esi,[StampPtr]
@@ -4187,7 +4187,7 @@ void * __cdecl Build_Fading_Table(void const *palette, void const *dest, long in
 		mov	bh,1
 	innerloop:
 
-		; Recursion through the fading table won't work if a color is allowed
+		; Recursion through the fading table will not work if a color is allowed
 		; to remap to itself.  Prevent this from occuring.
 		add	esi,3
 		cmp	bh,bl
@@ -4952,7 +4952,7 @@ extern "C" unsigned long __cdecl LCW_Uncompress(void *source, void *dest, unsign
 		cmp	ecx,[maxlen]	; is it too big to fit?
 		jbe	short rsok		; if not, its ok
 
-		mov	ecx,[maxlen]	; if so, max it out so it dosen't overrun
+		mov	ecx,[maxlen]	; if so, max it out so it does not overrun
 
 	rsok:
 		mov	al,[esi]	; get rel offset low byte
@@ -4977,7 +4977,7 @@ extern "C" unsigned long __cdecl LCW_Uncompress(void *source, void *dest, unsign
 		cmp	ecx,[maxlen]	; is it too big to fit?
 		jbe	short lenok		; if not, its ok
 
-		mov	ecx,[maxlen]	; if so, max it out so it dosen't overrun
+		mov	ecx,[maxlen]	; if so, max it out so it does not overrun
 
 	lenok:
 		rep movsb
@@ -5008,7 +5008,7 @@ extern "C" unsigned long __cdecl LCW_Uncompress(void *source, void *dest, unsign
 		cmp	ecx,[maxlen]	; is it too big to fit?
 		jbe	short runlenok		; if not, its ok
 
-		mov	ecx,[maxlen]	; if so, max it out so it dosen't overrun
+		mov	ecx,[maxlen]	; if so, max it out so it does not overrun
 
 	runlenok:
 		test	ecx,0ffe0h
@@ -5068,7 +5068,7 @@ extern "C" unsigned long __cdecl LCW_Uncompress(void *source, void *dest, unsign
 		mov	esi,eax		;use eax as new source
 		jbe	short runok	; if not, its ok
 
-		mov	ecx,[maxlen]	; if so, max it out so it dosen't overrun
+		mov	ecx,[maxlen]	; if so, max it out so it does not overrun
 
 	runok:
 		test	ecx,0ffe0h
