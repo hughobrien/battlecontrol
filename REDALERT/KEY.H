@@ -660,7 +660,11 @@ typedef enum KeyNumType {
 } KeyNumType;
 
 
-//extern WWKeyboardClass *_Kbd;
+// TIM-145 pass-43E: activate so KEY.CPP's SDL pump (and the eventual
+// link-side dedup that retires KEYBOARD.CPP per TIM-144) can resolve
+// the global. Per-TU compile of TUs that include KEY.H via
+// FUNCTION.H/JSHELL.H is unaffected — extern decls add no symbol.
+extern WWKeyboardClass *_Kbd;
 #endif
 
 #endif
