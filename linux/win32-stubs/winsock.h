@@ -234,6 +234,56 @@ typedef struct sockaddr_in* LPSOCKADDR_IN;
 #define FD_CLOSE    0x20
 #endif
 
+/* TIM-63: INADDR_ANY -- wildcard IPv4 bind address. WSPUDP.CPP:168 sets
+ * `addr.sin_addr.s_addr = htonl(INADDR_ANY)` to bind on all local
+ * interfaces. Standard <winsock.h> value (0u). The htonl wrapper above
+ * folds the constant to 0 on every endianness; engine code never
+ * numerically compares against INADDR_ANY, so the value is opaque. */
+#ifndef INADDR_ANY
+#define INADDR_ANY  ((unsigned long)0x00000000)
+#endif
+
+/* TIM-63: SOL_SOCKET + SO_* socket-option-name macros. WSPUDP.CPP:219
+ * (SO_LINGER), WSPIPX.CPP:237 (SO_BROADCAST), WSPROTO.CPP:536/538
+ * (SO_ERROR), 569 (SO_RCVBUF), 580 (SO_SNDBUF) all pass these through
+ * setsockopt/getsockopt. The setsockopt/getsockopt function shims land
+ * in the pass-33 function-shim bundle; this pass pre-positions the
+ * option-name singletons that those calls reference. Standard SDK
+ * values from <winsock.h>; engine code never branches on the numbers,
+ * so the literals only need to parse. */
+#ifndef SOL_SOCKET
+#define SOL_SOCKET   0xffff
+#endif
+#ifndef SO_BROADCAST
+#define SO_BROADCAST 0x0020
+#endif
+#ifndef SO_LINGER
+#define SO_LINGER    0x0080
+#endif
+#ifndef SO_SNDBUF
+#define SO_SNDBUF    0x1001
+#endif
+#ifndef SO_RCVBUF
+#define SO_RCVBUF    0x1002
+#endif
+#ifndef SO_ERROR
+#define SO_ERROR     0x1007
+#endif
+
+/* TIM-63: IPX_PTYPE / IPX_FILTERPTYPE -- IPX-protocol-level option-name
+ * macros. WSPIPX.CPP:247 sets the outgoing IPX packet type via
+ * setsockopt(NSPROTO_IPX, IPX_PTYPE, ...), and 258 installs the
+ * inbound filter via setsockopt(NSPROTO_IPX, IPX_FILTERPTYPE, ...).
+ * Standard <wsnwlink.h> values from the Microsoft IPX/SPX header.
+ * The setsockopt() function shim itself lands in pass-33; this pass
+ * pre-positions the option-name singletons. */
+#ifndef IPX_PTYPE
+#define IPX_PTYPE       0x4000
+#endif
+#ifndef IPX_FILTERPTYPE
+#define IPX_FILTERPTYPE 0x4001
+#endif
+
 /* TIM-59: struct sockaddr forward + LPSOCKADDR. WSPUDP.CPP / WSPIPX.CPP
  * cast `(LPSOCKADDR)&addr` (where addr is `struct sockaddr_in`) when
  * passing to bind/sendto/recvfrom. We forward-declare the generic

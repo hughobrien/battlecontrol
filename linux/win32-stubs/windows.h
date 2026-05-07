@@ -190,6 +190,27 @@ typedef const CLSID*       REFCLSID;
              |  (unsigned long)(code)))
 #endif
 
+/* TIM-63: named HRESULT error-code constants. The DDRAW.H shim aliases
+ * a handful of DDERR_* values to the standard <winerror.h> named
+ * HRESULTs (E_FAIL at ddraw.h:2623, E_INVALIDARG at 2660, E_OUTOFMEMORY
+ * and E_NOTIMPL further on). Without these the entire DDRAW.CPP shim
+ * chain fails on the first DDERR_GENERIC line. Standard SDK values from
+ * <winerror.h> (sev=1, fac=FACILITY_WIN32 for INVALIDARG, fac=FACILITY_NULL
+ * for the rest); engine code never compares against them numerically,
+ * so the literals only need to parse and link as ordinary HRESULTs. */
+#ifndef E_FAIL
+#define E_FAIL          ((HRESULT)0x80004005L)
+#endif
+#ifndef E_INVALIDARG
+#define E_INVALIDARG    ((HRESULT)0x80070057L)
+#endif
+#ifndef E_OUTOFMEMORY
+#define E_OUTOFMEMORY   ((HRESULT)0x8007000EL)
+#endif
+#ifndef E_NOTIMPL
+#define E_NOTIMPL       ((HRESULT)0x80004001L)
+#endif
+
 /* ------------------------------------------------------------------
  * DirectDraw enumeration callback function-pointer typedefs.
  *
