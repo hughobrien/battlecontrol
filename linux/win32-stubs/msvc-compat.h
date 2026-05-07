@@ -19,6 +19,15 @@
 
 #if !defined(_MSC_VER)
 
+// TIM-11: Honor DDRAW.H's upstream `#if defined(_WIN32) && !defined(_NO_COM)`
+// guard so its COM interface block (DECLARE_INTERFACE_ / STDMETHOD / IUnknown)
+// is skipped on Linux. WIN32LIB/wwstd.h auto-defines _WIN32, so without this
+// the COM cascade explodes against our minimal objbase.h placeholder
+// (TIM-5). The SDL2 / DirectDraw replacement is a separate later port.
+#ifndef _NO_COM
+#define _NO_COM
+#endif
+
 // Calling-convention and far-pointer attributes are no-ops on x86_64
 // Linux — there is no equivalent and only one ABI.
 #ifndef __cdecl
