@@ -415,38 +415,13 @@ COORDINATE Coord_Scatter(COORDINATE coord, unsigned distance, bool lock)
 
 int __cdecl calcx(signed short param1, short distance)
 {
-	__asm {
-
-		//#pragma aux calcx parm [ax] [bx] \
-			
-		movzx	eax, [param1]
-		mov	bx, [distance]
-		imul 	bx
-		shl	ax, 1
-		rcl	dx, 1
-		mov	al, ah
-		mov	ah, dl
-		cwd
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
 int __cdecl calcy(signed short param1, short distance)
 {
-	__asm {
-
-		//#pragma aux calcy parm [ax] [bx] \
-			
-		movzx	eax, [param1]
-		mov	bx, [distance]
-		imul bx
-		shl	ax, 1
-		rcl	dx, 1
-		mov	al, ah
-		mov	ah, dl
-		cwd
-		neg	eax
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
