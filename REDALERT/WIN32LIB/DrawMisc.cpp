@@ -4135,7 +4135,7 @@ void * __cdecl Build_Fading_Table(void const *palette, void const *dest, long in
 		mov	[edi],bl
 		inc	edi
 
-		; EBX = source palette logical number (1..255).
+		; EBX = source palette logical number (1-255).
 		; EDI = running pointer into dest remap table.
 	mainloop:
 		inc	ebx
