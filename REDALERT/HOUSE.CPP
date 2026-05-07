@@ -142,20 +142,24 @@
 
 TFixedIHeapClass<HouseClass::BuildChoiceClass> HouseClass::BuildChoice;
 
+template<>
 int TFixedIHeapClass<HouseClass::BuildChoiceClass>::Save(Pipe &) const
 {
 	return(true);
 }
 
+template<>
 int TFixedIHeapClass<HouseClass::BuildChoiceClass>::Load(Straw &)
 {
 	return(0);
 }
 
+template<>
 void TFixedIHeapClass<HouseClass::BuildChoiceClass>::Code_Pointers(void)
 {
 }
 
+template<>
 void TFixedIHeapClass<HouseClass::BuildChoiceClass>::Decode_Pointers(void)
 {
 }
