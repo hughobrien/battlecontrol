@@ -61,10 +61,24 @@
 
 #include	<stdlib.h>
 #include	<stddef.h>
+#include	<new>		// TIM-20: placement-new (Vector = new((void*)array) T[size]).
 
 // ST - 5/8/1029
 //inline void * operator new(size_t , void * pointer) {return(pointer);}
 //inline void * operator new[](size_t , void * pointer) {return(pointer);}
+
+// TIM-20: VECTOR.H names a few types/functions that historically came in
+// via includer-supplied prereqs (FUNCTION.H pre-pulled FTIMER.H + JSHELL.H).
+// Pulling them in here so the header parses standalone -- same shape as
+// the TIM-17 STAGE.H / ABSTRACT.H fix.
+#include	"ftimer.h"		// NoInitClass (used by Vector/Dynamic ctors).
+
+// TIM-20: bit-array helpers historically declared in JSHELL.H. Forward-
+// declaring them here avoids dragging the entire JSHELL.H keyboard / lib
+// shim chain in for headers that only need vector.h.
+int __cdecl Get_Bit(void const * array, int bit);
+int __cdecl First_True_Bit(void const * array);
+int __cdecl First_False_Bit(void const * array);
 
 
 /**************************************************************************
@@ -129,6 +143,19 @@ template<class T>
 class DynamicVectorClass : public VectorClass<T>
 {
 	public:
+		// TIM-20: g++ two-phase name lookup -- inherited members of a
+		// dependent base class must be brought into scope (or named with
+		// `this->` / `VectorClass<T>::`). MSVC accepted bare references.
+		// `Length`, `IsAllocated`, `VectorMax`, `Vector` and `Resize` are
+		// all referenced unqualified by the out-of-line method bodies
+		// below; importing them here is the surgical fix that matches
+		// the TIM-17 `using BasicTimerClass<T>::Started;` pattern.
+		using VectorClass<T>::Length;
+		using VectorClass<T>::Resize;
+		using VectorClass<T>::IsAllocated;
+		using VectorClass<T>::VectorMax;
+		using VectorClass<T>::Vector;
+
 		DynamicVectorClass(unsigned size=0, T const * array=0);
 
 		// Change maximum size of vector.
@@ -188,7 +215,13 @@ template<class T, int COUNT, int FIRST = 0, int DEFAULT = FIRST>
 class DynamicVectorArrayClass
 {
 public:
-	static const int COUNT = COUNT;
+	// TIM-20: Original `static const int COUNT = COUNT;` shadows the
+	// template parameter and is rejected by g++ (and is in any case
+	// self-referential -- the static would have been initialised from
+	// itself, not from the template parameter, even if the shadow rule
+	// allowed it). Rename the static so the template parameter is still
+	// the COUNT seen elsewhere in the class body.
+	static const int Length = COUNT;
 
 	DynamicVectorArrayClass() : Active(DEFAULT) {}
 

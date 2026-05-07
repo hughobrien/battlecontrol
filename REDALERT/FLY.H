@@ -35,6 +35,14 @@
 #ifndef FLY_H
 #define FLY_H
 
+// TIM-20: FLY.H names MPHType, MPH_IMMOBILE and COORDINATE (DEFINES.H),
+// DirType (FACE.H), and NoInitClass (FTIMER.H) -- all of which had to be
+// pre-included via FUNCTION.H ordering originally. Pulling them in so
+// FLY.H parses standalone (TIM-17 shape).
+#include	"defines.h"		// MPHType, MPH_IMMOBILE, COORDINATE.
+#include	"face.h"		// DirType.
+#include	"ftimer.h"		// NoInitClass.
+
 typedef enum ImpactType : unsigned char {
 	IMPACT_NONE,		// No movement (of significance) occurred.
 	IMPACT_NORMAL,		// Some (non eventful) movement occurred.

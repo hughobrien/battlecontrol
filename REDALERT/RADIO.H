@@ -37,6 +37,13 @@
 
 #include	"mission.h"
 
+// TIM-20: RADIO.H's Transmit_Message default argument names the global
+// `extern long LParam;` -- distinct from <windows.h>'s LPARAM. The
+// declaration originally lived in FUNCTION.H and reached RADIO.H only
+// because the includer pre-pulled function.h. Forward-declare the
+// extern here so RADIO.H is self-contained (TIM-17 shape).
+extern long LParam;
+
 class ObjectClass;
 class TechnoClass;
 

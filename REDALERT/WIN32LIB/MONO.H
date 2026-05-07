@@ -35,139 +35,34 @@
 #ifndef MONOC_H
 #define MONOC_H
 
+// TIM-20: WIN32LIB/MONO.H historically defined `class MonoClass` -- a
+// DOS-era stub left over from the original Westwood library. The same
+// class name is also defined (with a richer feature set) by
+// REDALERT/MONOC.H, which is the version game code actually uses
+// (Fill_Attrib, Sub_Window, MonoAttribute enum, MAX_MONO_PAGES=16,
+// COLUMNS/LINES enums, etc.). When a TU pulls in `<wwlib32.h>` (which
+// includes this header) before `"monoc.h"`, both definitions land and
+// g++ rejects the second with `redefinition of class MonoClass`.
+//
+// No code inside WIN32LIB itself names the class -- this header was the
+// only consumer (verified via repo-wide grep). Stripping the local
+// class definition and forward-declaring it instead (so the canonical
+// definition comes from REDALERT/MONOC.H) eliminates the redefinition
+// without disturbing gameplay code that depends on the richer API.
+//
+// The TIM-20 ticket text suggested the inverse change (have MONOC.H
+// `#include <mono.h>` and stop redefining locally), but that direction
+// would silently break Fill_Attrib / Sub_Window / Pan / MonoAttribute
+// usage in BUILDING.CPP / FOOT.CPP / HOUSE.CPP / etc. (gated by
+// CHEAT_KEYS) and also leave MONOC.CPP's out-of-line method definitions
+// orphaned. Same goal -- fix the redefinition -- via the path that
+// preserves the existing call sites.
+//
+// The free Mono_* C functions are kept here; they're the only thing
+// downstream of `<wwlib32.h>` actually relied on, and they don't clash
+// with any REDALERT declaration.
 
-class MonoClass {
-		/*
-		**	This is a private structure that is used to control which characters
-		**	are used when a box is drawn. Line drawing on the monochrome screen is
-		**	really made up of characters. This specifies which characters to use.
-		*/
-		typedef struct {
-			char	UpperLeft;
-			char	TopEdge;
-			char	UpperRight;
-			char	RightEdge;
-			char	BottomRight;
-			char	BottomEdge;
-			char	BottomLeft;
-			char	LeftEdge;
-		} BoxDataType;
-
-		/*
-		**	Each cell is constructed of the actual character that is displayed and the
-		**	attribute to use. This character pair is located at every position on the
-		**	display (80 x 25). Since this cell pair can be represented by a "short"
-		**	integer, certain speed optimizations are taken in the monochrome drawing
-		**	code.
-		*/
-		typedef struct {
-			char Character;			// Character to display.
-			char Attribute;			// Attribute.
-		} CellType;
-
-		/*
-		**	These private constants are used in the various monochrome operations.
-		*/
-		enum MonoClassPortEnums {
-			CONTROL_PORT=0x03B4,			// CRTC control register.
-			DATA_PORT=0x03B5,				// CRTC data register.
-			COLUMNS=80,						// Number of columns.
-			LINES=25,						// Number of lines.
-			SIZE_OF_PAGE=LINES*COLUMNS*sizeof(CellType),	// Entire page size.
-			DEFAULT_ATTRIBUTE=0x02		// Normal white on black color attribute.
-		};
-
-	public:
-		enum MonoClassPageEnums {
-			MAX_MONO_PAGES=16,	// Maximum RAM pages on mono card.
-			SEGMENT=0xB000  		// Monochrome screen segment.
-		};
-
-		/*
-		**	These are the various box styles that may be used.
-		*/
-		typedef enum BoxStyleType {
-			SINGLE,				// Single thickness.
-			DOUBLE_HORZ,		// Double thick on the horizontal axis.
-			DOUBLE_VERT,		// Double thick on the vertical axis.
-			DOUBLE,				// Double thickness.
-
-			COUNT
-		} BoxStyleType;
-
-		MonoClass(void);
-		~MonoClass(void);
-
-		static void Enable(void) {Enabled = 1;};
-		static void Disable(void) {Enabled = 0;};
-		static int Is_Enabled(void) {return Enabled;};
-		static MonoClass * Get_Current(void) {return PageUsage[0];};
-
-		void Draw_Box(int x, int y, int w, int h, char attrib=DEFAULT_ATTRIBUTE, BoxStyleType thick=SINGLE);
-		void Set_Default_Attribute(char attrib) {Attrib = attrib;};
-		void Clear(void);
-		void Set_Cursor(int x, int y);
-		void Print(char const *text);
-		void Print(int text);
-		void Printf(char const *text, ...);
-		void Printf(int text, ...);
-		void Text_Print(char const *text, int x, int y, char attrib=DEFAULT_ATTRIBUTE);
-		void Text_Print(int text, int x, int y, char attrib=DEFAULT_ATTRIBUTE);
-		void View(void);
-		int Get_X(void) const {return X;};
-		int Get_Y(void) const {return Y;};
-
-		/*
-		**	Handles deep copies for the mono class objects. This performs what is essentially
-		**	a screen copy.
-		*/
-		MonoClass & operator = (MonoClass const & );
-
-		/*
-		**	This merely makes a duplicate of the mono object into a newly created mono
-		**	object.
-		*/
-		MonoClass (MonoClass const &);
-
-	private:
-		char	X;					// Cursor X position.
-		char	Y;					// Cursor Y position.
-		char	Attrib;			// Normal attribute to use if none specified.
-		char	Page;				// The current page to write to.
-
-		/*
-		**	Helper functions to help with display operations.
-		*/
-		int Offset(int x=0, int y=0) const {return (SIZE_OF_PAGE*Page) + sizeof(CellType)*(x + (y*COLUMNS));};
-		void Scroll(int lines);
-		void Store_Cell(CellType &cell, int x, int y) {
-			*(CellType *)((long)MonoSegment + Offset(x, y)) = cell;
-		};
-
-		/*
-		**	This is the segment/selector of the monochrome screen.
-		*/
-		static void * MonoSegment;
-
-		/*
-		** This the the arrays of characters used for drawing boxes.
-		*/
-		static BoxDataType const CharData[4];
-
-		/*
-		**	This array contains pointers to the monochrome objects that are assigned
-		**	to each of the monochrome pages. As the monochrome pages are made visible,
-		**	they can be shuffled around between the actual locations. The first entry
-		**	in this table is the one that is visible.
-		*/
-		static MonoClass * PageUsage[MAX_MONO_PAGES];
-
-		/*
-		**	If this is true, then monochrome output is allowed. It defaults to false
-		**	so that monochrome output must be explicitly enabled.
-		*/
-		static int Enabled;
-};
+class MonoClass;		// Canonical definition lives in REDALERT/MONOC.H.
 
 void Mono_Set_Cursor(int x, int y);
 int Mono_Printf(char const *string, ...);

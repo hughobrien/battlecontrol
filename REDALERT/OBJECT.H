@@ -37,6 +37,16 @@
 
 #include	"abstract.h"
 
+// TIM-20: OBJECT.H carries SmartPtr<ObjectClass> Next and
+// CCPtr<TriggerClass> Trigger as direct members. These need the full
+// template definitions, not just forward declarations -- the originals
+// reached OBJECT.H only because FUNCTION.H pre-pulled JSHELL.H +
+// CCPTR.H. SMARTPTR.H is the TIM-20 split-out of the SmartPtr template
+// from JSHELL.H (which itself has a deeper transitive closure we don't
+// want to drag through OBJECT.H consumers).
+#include	"smartptr.h"
+#include	"ccptr.h"
+
 class ObjectClass;
 class TechnoClass;
 class ObjectTypeClass;

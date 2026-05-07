@@ -35,6 +35,17 @@
 #ifndef FUSE_H
 #define FUSE_H
 
+// TIM-20: FUSE.H names COORDINATE on every method, takes NoInitClass for
+// the no-init constructor, and references FileClass on Fuse_Write /
+// Fuse_Read. The originals reached FUSE.H only because FUNCTION.H
+// pre-pulled DEFINES.H and FTIMER.H. Pull them in (and forward-decl
+// FileClass since it's a reference parameter) so FUSE.H is self-
+// contained -- same shape as the TIM-17 STAGE.H / ABSTRACT.H fix.
+#include	"defines.h"		// COORDINATE.
+#include	"ftimer.h"		// NoInitClass.
+
+class FileClass;
+
 /****************************************************************************
 **	The fuse is used by projectiles to determine whether detonation should
 **	occur. This is usually determined by tracking the distance to the
