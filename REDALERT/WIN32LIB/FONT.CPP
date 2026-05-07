@@ -37,7 +37,10 @@
 #include <dos.h>
 #include <fcntl.h>
 #include <io.h>
-#include <sys\stat.h>
+// TIM-65: backslash path separator in `<sys\stat.h>` is a Windows-ism;
+// the canonical POSIX/Linux path is `<sys/stat.h>`. Forward slash is
+// portable to Windows compilers so this is a one-way safe normalization.
+#include <sys/stat.h>
 #include <string.h>
 #include <wwstd.h>
 

@@ -33,7 +33,15 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 
-#ifndef WIN32
+// TIM-65: tighten legacy guard from `#ifndef WIN32` to also exclude
+// modern non-Watcom toolchains. The wwflat32 directory is the legacy
+// Watcom DOS extender path and does not exist in this tree, so the
+// only build that should reach it is a real Watcom compile (which
+// would not define WIN32 either). On Linux/g++ we need the WIN32
+// branch's <windows.h> cascade and WWKeyboardClass declaration, so
+// route modern compilers there. Mirrors the TIM-6 `__WATCOMC__`
+// gate in MONOC.H / KEY.H below.
+#if !defined(WIN32) && defined(__WATCOMC__)
 #include	"..\wwflat32\include\keyboard.h"
 #else
 
