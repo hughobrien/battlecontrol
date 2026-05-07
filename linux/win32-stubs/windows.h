@@ -1270,4 +1270,36 @@ typedef struct tagBITMAP {
 #define SRCCOPY          0x00CC0020L
 #endif
 
+/* TIM-97: pass-40M WINSTUB text-constant alias drain. WINSTUB.CPP:802
+ * (Memory_Error_Handler) calls
+ *     WWMessageBox().Process(TEXT_MEMORY_ERROR, TEXT_ABORT, false);
+ * The TEXT_* spelling is the LANGUAGE.H string-table convention -- those
+ * macros expand only when the TU pins ENGLISH (see the TIM-84 INIT.CPP /
+ * STARTUP.CPP fix). WINSTUB.CPP is not ENGLISH-pinned, so the symbols are
+ * undeclared. The TU only ever uses the int overload of
+ * WWMessageBox::Process (msgbox.h:47), so a textual alias to the
+ * existing TXT_* int constants from CONQUER.H is enough to let the
+ * parser resolve and the overload to bind:
+ *     Process(int msg, int b1txt=TXT_OK, int b2txt=TXT_NONE,
+ *             int b3txt=TXT_NONE, bool preserve=false)
+ * TEXT_MEMORY_ERROR -> TXT_ERROR_ERROR (the closest existing TXT_* slot
+ * the compiler itself suggests; the engine's runtime text universe is
+ * dormant under the stub, so the precise table index is moot here).
+ * TEXT_ABORT -> TXT_ABORT (canonical 1:1 match).
+ *
+ * In TUs that DO pin ENGLISH (INIT.CPP, STARTUP.CPP per TIM-84),
+ * LANGUAGE.H later redefines TEXT_MEMORY_ERROR / TEXT_ABORT to their
+ * string-literal forms. The pass harness compiles with -w so the
+ * preprocessor's redefinition warning is silenced and the LANGUAGE.H
+ * string macro replaces this alias for those TUs -- no behaviour change
+ * for the TIM-84 compile paths. The TXT_* names resolve at the call
+ * site (post-CONQUER.H), not here, so there is no ordering hazard at
+ * force-include time. */
+#ifndef TEXT_MEMORY_ERROR
+#define TEXT_MEMORY_ERROR   TXT_ERROR_ERROR
+#endif
+#ifndef TEXT_ABORT
+#define TEXT_ABORT          TXT_ABORT
+#endif
+
 #endif /* LINUX_STUBS_WINDOWS_H */
