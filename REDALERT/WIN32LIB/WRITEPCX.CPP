@@ -35,6 +35,11 @@
 #include  <wwlib32.h>
 #include "filepcx.h"
 #include <wwmem.h>
+
+int  __cdecl Open_File (char const *file_name, int mode);
+void __cdecl Close_File(int handle);
+long __cdecl Write_File(int handle, void const *buf, unsigned long bytes);
+
 static void Write_Pcx_ScanLine ( int file_handle , int scansize , unsigned char * ptr );
 
 
