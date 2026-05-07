@@ -39,7 +39,14 @@
 #   pass 40B (TIM-76)                     : 268
 #   pass 40C (TIM-78)                     : 268
 #   pass 41  (TIM-77)                     : 269
-#   pass 42  (TIM-80, this run)           : ???  (expected 271)
+#   pass 42  (TIM-80, this run)           : 271  (+2 -- ceiling hit)
+#
+# Final measurement (post-edit, DDRAW.H reverted to 38baebb baseline so
+# parallel TIM-79 IDirectDrawPalette WIP did not contaminate the count):
+#   ok=271 fail=30 total=301 include-misses=0
+#   Diff vs pass 41: WSPROTO.CPP FAIL->OK, WSPUDP.CPP FAIL->OK.
+#   No regressions. SendMessage drops out of the first-error histogram
+#   entirely (no surviving FAIL TU first-errors on it).
 #
 # Measurement script -- the actual fix lives in linux/win32-stubs/windows.h.
 
