@@ -657,3 +657,54 @@ DirType xDesired_Facing256(int srcx, int srcy, int dstx, int dsty)
 	return(DirType(composite & 0x00FF));
 }
 #endif
+
+
+/*
+** TIM-22: KeyboardClass methods moved out-of-line so JSHELL.H is self-contained
+** without needing KEY.H (KeyASCIIType) or WIN32LIB/MOUSE.H (Get_Mouse_X/Y) at
+** the point JSHELL.H is parsed. KEY.H and KEYBOARD.H share the KEYBOARD_H
+** header guard, so cascade order can leave KeyASCIIType undefined inside
+** JSHELL.H. Definitions live here where FUNCTION.H has already pulled the
+** keyboard and mouse declarations transitively.
+*/
+#ifdef WIN32
+KeyboardClass::KeyboardClass() : IsLibrary(true) {}
+KeyNumType KeyboardClass::Get(void) {return ((KeyNumType)WWKeyboardClass::Get());}
+KeyNumType KeyboardClass::Check(void) {return ((KeyNumType)WWKeyboardClass::Check());}
+KeyASCIIType KeyboardClass::To_ASCII(KeyNumType key) {return((KeyASCIIType)WWKeyboardClass::To_ASCII(key));}
+void KeyboardClass::Clear(void) {WWKeyboardClass::Clear();}
+int KeyboardClass::Down(KeyNumType key) {return(WWKeyboardClass::Down(key));}
+#else
+KeyboardClass::KeyboardClass() :
+	IsLibrary(true),
+	MouseQX(::MouseQX),
+	MouseQY(::MouseQY)
+{}
+KeyNumType KeyboardClass::Get(void) {return (IsLibrary ? (KeyNumType)Get_Key_Num() : (KeyNumType)getch());}
+KeyNumType KeyboardClass::Check(void) {return (IsLibrary ? (KeyNumType)Check_Key_Num() : (KeyNumType)kbhit());}
+KeyASCIIType KeyboardClass::To_ASCII(KeyNumType key) {return((KeyASCIIType)KN_To_KA(key));}
+void KeyboardClass::Clear(void) {if (IsLibrary) Clear_KeyBuffer();}
+int KeyboardClass::Down(KeyNumType key) {return(Key_Down(key));}
+#endif
+
+int KeyboardClass::Mouse_X(void) {return(Get_Mouse_X());}
+int KeyboardClass::Mouse_Y(void) {return(Get_Mouse_Y());}
+
+
+/*
+** TIM-22: SystemTimerClass / UserTimerClass operator bodies. Out-of-line so
+** JSHELL.H only needs a forward declaration of WinTimerClass (the full
+** definition lives in WIN32LIB/TIMER.H, pulled in here transitively via
+** function.h).
+*/
+#ifdef WIN32
+long SystemTimerClass::operator () (void) const {if (!WindowsTimer) return(0);return(WindowsTimer->Get_System_Tick_Count());}
+SystemTimerClass::operator long (void) const {if (!WindowsTimer) return(0);return(WindowsTimer->Get_System_Tick_Count());}
+long UserTimerClass::operator () (void) const {if (!WindowsTimer) return(0);return(WindowsTimer->Get_User_Tick_Count());}
+UserTimerClass::operator long (void) const {if (!WindowsTimer) return(0);return(WindowsTimer->Get_User_Tick_Count());}
+#else
+long SystemTimerClass::operator () (void) const {return(Get_System_Tick_Count());}
+SystemTimerClass::operator long (void) const {return(Get_System_Tick_Count());}
+long UserTimerClass::operator () (void) const {return(Get_User_Tick_Count());}
+UserTimerClass::operator long (void) const {return(Get_User_Tick_Count());}
+#endif

@@ -46,6 +46,20 @@
 #include	<conio.h>
 #endif
 
+// TIM-22: Pull KEYBOARD.H so KeyNumType / KeyASCIIType / WWKeyboardClass are
+// always visible to KeyboardClass below, regardless of WIN32 / cascade state.
+// KEY.H and KEYBOARD.H share the KEYBOARD_H include guard so only one runs
+// per TU; the include here is a no-op when KEY.H or KEYBOARD.H has already
+// fired. KEYBOARD.H's KA_ enum was made a named typedef in this commit so it
+// also provides KeyASCIIType (KEY.H always did).
+#include	"keyboard.h"
+
+// TIM-22: Forward-declare the global mouse helpers used by KeyboardClass's
+// Mouse_X / Mouse_Y inline bodies (see JSHELL.CPP). Defined in
+// WIN32LIB/MOUSE.H but that header is not always parsed before this point.
+int Get_Mouse_X(void);
+int Get_Mouse_Y(void);
+
 /*
 **	Interface class to the keyboard. This insulates the game from library vagaries. Most
 **	notable being the return values are declared as "int" in the library whereas C&C
@@ -74,27 +88,29 @@ struct KeyboardClass
 	int &MouseQX;
 	int &MouseQY;
 
-	KeyboardClass() :
-		IsLibrary(true),
-		MouseQX(::MouseQX),
-		MouseQY(::MouseQY)
-	{}
-	KeyNumType Get(void) {return (IsLibrary ? (KeyNumType)Get_Key_Num() : (KeyNumType)getch());};
-	KeyNumType Check(void) {return (IsLibrary ? (KeyNumType)Check_Key_Num() : (KeyNumType)kbhit());};
-	KeyASCIIType To_ASCII(KeyNumType key) {return((KeyASCIIType)KN_To_KA(key));};
-	void Clear(void) {if (IsLibrary) Clear_KeyBuffer();};
-	int Down(KeyNumType key) {return(Key_Down(key));};
+	KeyboardClass();
+	KeyNumType Get(void);
+	KeyNumType Check(void);
+	KeyASCIIType To_ASCII(KeyNumType key);
+	void Clear(void);
+	int Down(KeyNumType key);
 #else
-	KeyboardClass() : IsLibrary(true) {}
-	KeyNumType Get(void) {return ((KeyNumType)WWKeyboardClass::Get());};
-	KeyNumType Check(void) {return ((KeyNumType)WWKeyboardClass::Check());};
-	KeyASCIIType To_ASCII(KeyNumType key) {return((KeyASCIIType)WWKeyboardClass::To_ASCII(key));};
-	void Clear(void) {WWKeyboardClass::Clear();};
-	int Down(KeyNumType key) {return(WWKeyboardClass::Down(key));};
+	// TIM-22: KeyboardClass methods moved out-of-line to JSHELL.CPP so this
+	// header does not depend on KEY.H / WIN32LIB/MOUSE.H being visible at
+	// the point JSHELL.H is parsed. KEY.H and KEYBOARD.H share the
+	// KEYBOARD_H header guard, so whichever is included first wins; KEY.H
+	// alone defines KeyASCIIType while KEYBOARD.H does not, leaving inline
+	// uses here unresolvable depending on cascade order.
+	KeyboardClass();
+	KeyNumType Get(void);
+	KeyNumType Check(void);
+	KeyASCIIType To_ASCII(KeyNumType key);
+	void Clear(void);
+	int Down(KeyNumType key);
 #endif
 
-	int Mouse_X(void) {return(Get_Mouse_X());};
-	int Mouse_Y(void) {return(Get_Mouse_Y());};
+	int Mouse_X(void);
+	int Mouse_Y(void);
 };
 
 
@@ -199,6 +215,10 @@ T _rotl(T X, int n)
 **	The shape flags are likely to be "or"ed together and other such bitwise
 **	manipulations. These instatiated operator templates allow this.
 */
+// TIM-22: Forward-decl ShapeFlags_Type with the underlying type defined in
+// WIN32LIB/SHAPE.H so these operator declarations parse without requiring
+// SHAPE.H to be included first. Definitions live in WIN32LIB/SHAPE.H.
+enum ShapeFlags_Type : unsigned short;
 inline ShapeFlags_Type operator |(ShapeFlags_Type, ShapeFlags_Type);
 inline ShapeFlags_Type operator &(ShapeFlags_Type, ShapeFlags_Type);
 inline ShapeFlags_Type operator ~(ShapeFlags_Type);
@@ -353,21 +373,24 @@ extern "C" {
 //bool Init_Timer_System(unsigned int freq, int partial=false);
 bool Remove_Timer_System(void);
 #else
+// TIM-22: Forward-decl WinTimerClass so this header parses without requiring
+// WIN32LIB/TIMER.H. The full definition is provided by TIMER.H, pulled in
+// via the wwlib32.h cascade for any TU that actually uses WindowsTimer.
+class WinTimerClass;
 extern WinTimerClass	*		WindowsTimer;
 #endif
 
+// TIM-22: SystemTimerClass / UserTimerClass operator bodies moved out-of-line
+// to JSHELL.CPP so JSHELL.H does not need the full WinTimerClass definition
+// (forward-declared above). The bodies dereference WindowsTimer which
+// requires a complete WinTimerClass type — see TIMER.H.
 #ifndef SYSTEM_TIMER_CLASS
 #define SYSTEM_TIMER_CLASS
 class SystemTimerClass
 {
 	public:
-		#ifdef WIN32
-			long operator () (void) const {if (!WindowsTimer) return(0);return(WindowsTimer->Get_System_Tick_Count());};
-			operator long (void) const {if (!WindowsTimer) return(0);return(WindowsTimer->Get_System_Tick_Count());};
-		#else
-			long operator () (void) const {return(Get_System_Tick_Count());};
-			operator long (void) const {return(Get_System_Tick_Count());};
-		#endif
+		long operator () (void) const;
+		operator long (void) const;
 };
 #endif
 
@@ -375,13 +398,8 @@ class SystemTimerClass
 class UserTimerClass
 {
 	public:
-		#ifdef WIN32
-			long operator () (void) const {if (!WindowsTimer) return(0);return(WindowsTimer->Get_User_Tick_Count());};
-			operator long (void) const {if (!WindowsTimer) return(0);return(WindowsTimer->Get_User_Tick_Count());};
-		#else
-			long operator () (void) const {return(Get_User_Tick_Count());};
-			operator long (void) const {return(Get_User_Tick_Count());};
-		#endif
+		long operator () (void) const;
+		operator long (void) const;
 };
 
 

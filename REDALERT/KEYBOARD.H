@@ -379,7 +379,12 @@ class WWKeyboardClass
 #define	VK_DOWNRIGHT		  VK_NEXT
 #define	VK_ALT				  VK_MENU
 
-enum {
+// TIM-22: Named typedef so KEYBOARD.H provides KeyASCIIType the same way it
+// provides KeyNumType, matching KEY.H. KEY.H and KEYBOARD.H share the
+// KEYBOARD_H include guard, so whichever the cascade reaches first wins;
+// previously KEYBOARD.H winning left KeyASCIIType undefined and JSHELL.H's
+// KeyboardClass::To_ASCII signature unresolvable.
+typedef enum KeyASCIIType {
 	//
 	// Define all the KA types as variations of the VK types.  This is
 	// so the KA functions will work properly under windows 95.
@@ -524,7 +529,7 @@ enum {
 	KA_CTRL_BIT  		= WWKEY_CTRL_BIT,
 	KA_ALT_BIT   		= WWKEY_ALT_BIT,
 	KA_RLSE_BIT  		= WWKEY_RLS_BIT,
-};
+} KeyASCIIType;
 
 
 typedef enum KeyNumType {

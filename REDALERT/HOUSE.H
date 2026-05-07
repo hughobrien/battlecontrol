@@ -39,10 +39,12 @@
 #include	"region.h"
 #include	"vector.h"
 #include "Credits.h"
+#include	"super.h"		// SuperWeapon[] is a value member array; needs full type.
 
 class TriggerClass;
 class FootClass;
 class FactoryClass;
+class UnitTrackerClass;	// pointer-only members; defined in utracker.h
 
 #define HOUSE_NAME_MAX	12
 
