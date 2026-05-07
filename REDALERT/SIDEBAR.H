@@ -38,6 +38,7 @@
 #include	"function.h"
 #include	"power.h"
 #include	"factory.h"
+#include	"control.h"
 
 class InitClass {};
 
