@@ -35,6 +35,12 @@
 #ifndef STAGE_H
 #define STAGE_H
 
+// TIM-17: pull in CDTimerClass<> + FrameTimerClass + NoInitClass so this
+// header is self-contained instead of relying on includer-side ordering
+// (the original MSVC build always happened to pre-include FUNCTION.H,
+// which masked the dependency).
+#include	"ftimer.h"
+
 class StageClass {
 
 		/*
