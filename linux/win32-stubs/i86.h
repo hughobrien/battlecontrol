@@ -46,4 +46,17 @@ union REGS {
 
 #endif /* LINUX_STUBS_REGS_DEFINED */
 
+/* Pass-40AL: Watcom DOS interrupt intrinsics — no-op macros. The OK TUs
+ * (IPX.CPP, NULLMGR.CPP, IPXMGR.CPP, etc.) get these via FUNCTION.H:272-273
+ * gated under #ifdef WIN32 (auto-set by wwstd.h). MPLIB.CPP does NOT include
+ * FUNCTION.H or wwstd.h, so the int386 macro never activates there. Provide
+ * unconditionally in i86.h (Linux-only shim). #ifndef guard prevents collision
+ * with FUNCTION.H's WIN32-gated definition. */
+#ifndef int386
+#define int386(a,b,c)    0
+#endif
+#ifndef int386x
+#define int386x(a,b,c,d) 0
+#endif
+
 #endif /* LINUX_STUBS_I86_H_INCLUDED */
