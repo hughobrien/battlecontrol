@@ -57,6 +57,11 @@ CXXFLAGS=(
     -I "$SRC_DIR"
     -I "$SRC_DIR/WIN32LIB"
     -I "$STUB_DIR"
+    # TIM-6: force-include the MSVC-extension shim (calling-convention
+    # macros, __int64 typedef, _lrotl). Force-include keeps the upstream
+    # sources untouched for the cross-cutting MSVC-isms; per-header
+    # patches (bool typedef, typename annotations) are still needed.
+    -include "$STUB_DIR/msvc-compat.h"
 )
 
 shopt -s nullglob nocaseglob
