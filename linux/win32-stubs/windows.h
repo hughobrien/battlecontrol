@@ -708,4 +708,35 @@ static inline BOOL  GetMessage(LPMSG, HWND, UINT, UINT)            { return FALS
 static inline BOOL  TranslateMessage(const MSG*)                   { return FALSE; }
 static inline LONG  DispatchMessage(const MSG*)                    { return 0; }
 
+/* TIM-74: Win32 GDI / window-misc cluster. MOUSEWW.CPP calls
+ * GetCursorPos to seed the mouse position before WIN32LIB's own
+ * mouse-tracking takes over; INIT.CPP calls SetForegroundWindow when
+ * the engine raises its top-level window after init; TIMERINI.CPP
+ * pokes GetLastError after a CreateThread/SetThreadPriority pair to
+ * log a startup failure code. All three Win32 surfaces are dormant
+ * under the stub (the real input/window/thread paths land with the
+ * SDL2 + pthread port), so the inert returns are TRUE / TRUE / 0 --
+ * no engine code makes a control-flow decision on the values yet.
+ *
+ * GetCursorPos zero-initialises *lpPoint when non-null so MOUSEWW
+ * sees a deterministic (0,0) seed instead of an indeterminate stack
+ * read on the first cursor sample. Real <winuser.h> signature:
+ * `BOOL WINAPI GetCursorPos(LPPOINT lpPoint)`. POINT/LPPOINT and
+ * HWND/BOOL/TRUE/DWORD are already defined above.
+ *
+ * S_OK is the canonical HRESULT success code; included here so the
+ * shim header can return it from any HRESULT-typed surface added in
+ * a follow-up pass without forcing a separate header edit. */
+
+#ifndef S_OK
+#define S_OK            ((HRESULT)0L)
+#endif
+#ifndef S_FALSE
+#define S_FALSE         ((HRESULT)1L)
+#endif
+
+static inline BOOL  GetCursorPos(LPPOINT lpPoint)                  { if (lpPoint) { lpPoint->x = 0; lpPoint->y = 0; } return TRUE; }
+static inline DWORD GetLastError(void)                             { return 0; }
+static inline BOOL  SetForegroundWindow(HWND)                      { return TRUE; }
+
 #endif /* LINUX_STUBS_WINDOWS_H */
