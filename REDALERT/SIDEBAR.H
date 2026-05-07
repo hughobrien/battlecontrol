@@ -39,6 +39,7 @@
 #include	"power.h"
 #include	"factory.h"
 #include	"control.h"
+#include	"shapebtn.h"	// TIM-28: ShapeButtonClass UpButton/DownButton/Repair/Upgrade/Zoom static members.
 
 class InitClass {};
 
