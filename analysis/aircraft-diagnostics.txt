@@ -1,0 +1,23 @@
+In file included from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/AIRCRAFT.CPP:94:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/function.h:601:11: error: expected initializer before ‘Dialog_Message’
+  601 | int cdecl Dialog_Message(char *errormsg, ...);
+      |           ^~~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/AIRCRAFT.CPP: In member function ‘int AircraftClass::Process_Fly_To(bool, TARGET)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/AIRCRAFT.CPP:2136:29: error: ‘min’ was not declared in this scope; did you mean ‘std::min’?
+ 2136 |                 int speed = min(distance, 0x0300);
+      |                             ^~~
+      |                             std::min
+In file included from /usr/include/c++/14/algorithm:61,
+                 from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/list.h:41,
+                 from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert/function.h:333:
+/usr/include/c++/14/bits/stl_algo.h:5696:5: note: ‘std::min’ declared here
+ 5696 |     min(initializer_list<_Tp> __l, _Compare __comp)
+      |     ^~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/AIRCRAFT.CPP: In member function ‘virtual void AircraftClass::Set_Speed(int)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/AIRCRAFT.CPP:3599:30: error: ‘min’ was not declared in this scope; did you mean ‘std::min’?
+ 3599 |         MPHType sp = MPHType(min(Class->MaxSpeed * SpeedBias * House->AirspeedBias, MPH_LIGHT_SPEED));
+      |                              ^~~
+      |                              std::min
+/usr/include/c++/14/bits/stl_algo.h:5696:5: note: ‘std::min’ declared here
+ 5696 |     min(initializer_list<_Tp> __l, _Compare __comp)
+      |     ^~~
