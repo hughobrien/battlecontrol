@@ -3581,7 +3581,8 @@ static void Init_Bulk_Data(void)
 	**	Fetch the tutorial message data.
 	*/
 	INIClass ini;
-	ini.Load(CCFileClass("TUTORIAL.INI"));
+	CCFileClass tutorial_file("TUTORIAL.INI");
+	ini.Load(tutorial_file);
 	for (int index = 0; index < ARRAY_SIZE(TutorialText); index++) {
 		TutorialText[index] = NULL;
 
