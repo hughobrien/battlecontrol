@@ -61,7 +61,11 @@ Shape drawing flags:
 - The low byte is for coordinate transformations.
 - The high byte is for drawing effects.
 ---------------------------------------------------------------------------*/
-typedef enum : unsigned short {
+// TIM-38: named enum (was anonymous typedef-enum). REDALERT/JSHELL.H:221
+// forward-declares `enum ShapeFlags_Type : unsigned short;` so this
+// definition must use a matching named-enum form -- a typedef of an
+// anonymous enum is not the same kind of declaration and conflicts.
+enum ShapeFlags_Type : unsigned short {
 	SHAPE_NORMAL 			= 0x0000,		// Standard shape
 	SHAPE_HORZ_REV 		= 0x0001,		// Flipped horizontally
 	SHAPE_VERT_REV 		= 0x0002,		// Flipped vertically
@@ -80,7 +84,7 @@ typedef enum : unsigned short {
 	SHAPE_PARTIAL  		= 0x4000,
 	SHAPE_COLOR 			= 0x8000			// Remap the shape's colors
 													//  (void * color_table)
-} ShapeFlags_Type;
+};
 
 inline ShapeFlags_Type operator|(ShapeFlags_Type a, ShapeFlags_Type b)
 {return static_cast<ShapeFlags_Type>(static_cast<int>(a) | static_cast<int>(b));}
