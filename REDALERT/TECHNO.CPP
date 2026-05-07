@@ -131,6 +131,19 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include	"function.h"
+// TIM-54 Fix C: define min/max as macros mirroring Win32 <windef.h>.
+// Several call sites pass mismatched arg types (int + enum, char + int,
+// LEPTON + int) that std::min<T,T> cannot deduce; the original Win32
+// build relied on windef.h's untyped macros, and MP.CPP / SHA.CPP /
+// MPMGRD.CPP / MPMGRW.CPP already use this exact pattern locally.
+// JSHELL.H's free `min`/`max` templates are guarded `#ifndef WIN32`
+// so they aren't visible under our Win32-shaped build.
+#ifndef min
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+#ifndef max
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#endif
 
 
 /***************************************************************************
