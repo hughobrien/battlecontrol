@@ -101,4 +101,15 @@ static inline unsigned long _lrotl(unsigned long value, int shift)
 
 #endif // !_MSC_VER
 
+// TIM-9: pull in the Win32 type taxonomy stub for every TU. Several
+// upstream headers (DDRAW.H, MMSYSTEM.H, the wwlib32 chain) reference
+// BOOL/HRESULT/GUID/LPSTR without an explicit #include <windows.h>,
+// because the original build relied on FUNCTION.H's `#ifdef WIN32`
+// guard pulling windows.h in first. We don't define WIN32 in the
+// Linux preprocessor (it would re-enable too much Win32-only code in
+// one go), so we make windows.h visible the same way as the rest of
+// this shim: via -include on the command line. The header is fully
+// guarded so re-inclusion is free.
+#include "windows.h"
+
 #endif // LINUX_WIN32_STUBS_MSVC_COMPAT_H
