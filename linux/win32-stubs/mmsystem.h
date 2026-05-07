@@ -53,6 +53,27 @@ typedef WAVEFORMATEX*       NPWAVEFORMATEX;
 typedef WAVEFORMATEX*       LPWAVEFORMATEX;
 typedef const WAVEFORMATEX* LPCWAVEFORMATEX;
 
+/* TIM-55: timeBeginPeriod / timeEndPeriod -- Win32 winmm.dll multimedia
+ * timer-resolution APIs. WIN32LIB/TIMERINI.CPP:107/110/161 calls these
+ * to bump the system tick from the default ~15.6ms down to a sub-ms
+ * cadence for the engine's frame timing. On Linux clock_gettime already
+ * provides ns resolution, so the no-op stub is semantically correct
+ * once the timer subsystem is ported (TIM follow-up). MMRESULT is the
+ * SDK's `unsigned int` typedef; TIMERR_NOERROR is 0.
+ *
+ * The stub is intentionally NOT marked WINAPI (which is empty on Linux
+ * via msvc-compat.h) so the prototype matches whatever the upstream
+ * call site assumed about the calling convention. */
+#ifndef _MMSYSTEM_TIMEPERIOD_DEFINED
+#define _MMSYSTEM_TIMEPERIOD_DEFINED
+typedef UINT MMRESULT;
+#ifndef TIMERR_NOERROR
+#define TIMERR_NOERROR 0
+#endif
+static inline MMRESULT timeBeginPeriod(UINT period) { (void)period; return TIMERR_NOERROR; }
+static inline MMRESULT timeEndPeriod(UINT period)   { (void)period; return TIMERR_NOERROR; }
+#endif
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

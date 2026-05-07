@@ -290,4 +290,61 @@ typedef struct _OVERLAPPED {
  * ddeml.h here so the full force-include chain reaches it. */
 #include "ddeml.h"
 
+/* TIM-54: CRITICAL_SECTION -- Win32 user-mode mutex object. Real
+ * <synchapi.h> / <minwinbase.h> exposes RTL_CRITICAL_SECTION as a tagged
+ * struct with kernel-internal fields (DebugInfo, LockCount, OwningThread,
+ * LockSemaphore, SpinCount, ...). Engine code stores it by value as a
+ * class member in WIN32LIB/MOUSE.H:103 (WWMouseClass::MouseCriticalSection),
+ * WIN32LIB/SOUNDINT.H:185 (LockedDataType::AudioCriticalSection), and
+ * WIN32LIB/AUDIO.H:157 (extern GlobalAudioCriticalSection). Layout here
+ * is opaque vs the real ABI -- we never run any of the Initialize/Enter/
+ * LeaveCriticalSection paths (those would be Pthread mutex shims in a
+ * later port). Field set is intentionally inert; we just need a complete
+ * type so the member declarations parse. Prerequisite for TIM-54's
+ * source-level fix that pulls WIN32LIB/MOUSE.H into the WWMouseClass
+ * call sites (DIALOG.CPP, GSCREEN.CPP, QUEUE.CPP). */
+typedef struct _RTL_CRITICAL_SECTION {
+    void*  DebugInfo;
+    LONG   LockCount;
+    LONG   RecursionCount;
+    HANDLE OwningThread;
+    HANDLE LockSemaphore;
+    ULONG* SpinCount;
+} CRITICAL_SECTION, *LPCRITICAL_SECTION, *PCRITICAL_SECTION;
+
+/* TIM-55: PALETTEENTRY -- Win32 GDI palette entry. REDALERT/WIN32LIB/
+ * DDRAW.CPP:55 declares `PALETTEENTRY PaletteEntries[256]` and writes
+ * .peRed/.peGreen/.peBlue/.peFlags fields at lines 739-741. Layout
+ * matches the Win32 SDK (4 BYTE fields, 4 bytes total). The blit/palette
+ * subsystem is dormant under the DDraw stub; this just lets the parser
+ * advance past the global array declaration that gates the rest of
+ * DDRAW.CPP. */
+#ifndef _PALETTEENTRY_DEFINED
+#define _PALETTEENTRY_DEFINED
+typedef struct tagPALETTEENTRY {
+    BYTE peRed;
+    BYTE peGreen;
+    BYTE peBlue;
+    BYTE peFlags;
+} PALETTEENTRY, *PPALETTEENTRY, *LPPALETTEENTRY;
+#endif
+
+/* TIM-55: DLL_PROCESS_* / DLL_THREAD_* reason codes. REDALERT/STARTUP.CPP
+ * :100-141 implements DllMain(...) with the standard four-case switch on
+ * fdwReason. Real <minwinbase.h> values (1, 0, 2, 3). The DLL is never
+ * actually loaded on Linux; the call sites just need the integer
+ * constants to compile. */
+#ifndef DLL_PROCESS_DETACH
+#define DLL_PROCESS_DETACH 0
+#endif
+#ifndef DLL_PROCESS_ATTACH
+#define DLL_PROCESS_ATTACH 1
+#endif
+#ifndef DLL_THREAD_ATTACH
+#define DLL_THREAD_ATTACH  2
+#endif
+#ifndef DLL_THREAD_DETACH
+#define DLL_THREAD_DETACH  3
+#endif
+
 #endif /* LINUX_STUBS_WINDOWS_H */
