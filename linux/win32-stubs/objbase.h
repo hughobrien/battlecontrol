@@ -93,6 +93,24 @@ struct IUnknown { };
 #define PURE                                = 0
 #endif
 
+/* TIM-55: OleInitialize / OleUninitialize -- COM library lifetime APIs.
+ * REDALERT/COMINIT.CPP:35/42 calls them at startup/shutdown of the DLL
+ * networking entry points (HRESULT hRes = OleInitialize(NULL); ...
+ * OleUninitialize();). We are not running OLE on Linux; the no-op
+ * returns let the parser advance. S_OK is the SDK's success HRESULT.
+ *
+ * Real signatures: HRESULT WINAPI OleInitialize(LPVOID); void WINAPI
+ * OleUninitialize(void). Engine ignores the OleInitialize return value
+ * structurally beyond storing it. */
+#ifndef S_OK
+#define S_OK ((HRESULT)0L)
+#endif
+#ifndef _OBJBASE_OLE_INIT_DEFINED
+#define _OBJBASE_OLE_INIT_DEFINED
+static inline HRESULT OleInitialize(LPVOID reserved) { (void)reserved; return S_OK; }
+static inline void    OleUninitialize(void)          { }
+#endif
+
 #endif /* __cplusplus */
 
 #endif /* LINUX_STUBS_OBJBASE_H_INCLUDED */

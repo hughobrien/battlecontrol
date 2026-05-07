@@ -270,6 +270,60 @@ static inline int _memicmp(const void* a, const void* b, std::size_t n)
 #endif
 #endif // _MSVC_STRICMP_DEFINED
 
+// TIM-55: MSVC CRT case-fold-in-place helpers. _strlwr / strupr modify
+// the buffer in place and return it; glibc has no equivalent. Targets
+// SESSION.CPP:1219 (_strlwr on a copied path), PROFILE.CPP:271 and
+// SESSION.CPP:818/843/851 (strupr on phone book entries / section name).
+// Same contract as MSVC's CRT: caller owns the buffer, NUL-terminated.
+#ifndef _MSVC_STRLWR_STRUPR_DEFINED
+#define _MSVC_STRLWR_STRUPR_DEFINED
+#ifdef __cplusplus
+#include <cctype>
+static inline char* _strlwr(char* s)
+{
+    if (s) {
+        for (char* p = s; *p; ++p) {
+            *p = (char)std::tolower((unsigned char)*p);
+        }
+    }
+    return s;
+}
+static inline char* strlwr(char* s) { return _strlwr(s); }
+static inline char* _strupr(char* s)
+{
+    if (s) {
+        for (char* p = s; *p; ++p) {
+            *p = (char)std::toupper((unsigned char)*p);
+        }
+    }
+    return s;
+}
+static inline char* strupr(char* s) { return _strupr(s); }
+#else
+#include <ctype.h>
+static inline char* _strlwr(char* s)
+{
+    if (s) {
+        for (char* p = s; *p; ++p) {
+            *p = (char)tolower((unsigned char)*p);
+        }
+    }
+    return s;
+}
+static inline char* strlwr(char* s) { return _strlwr(s); }
+static inline char* _strupr(char* s)
+{
+    if (s) {
+        for (char* p = s; *p; ++p) {
+            *p = (char)toupper((unsigned char)*p);
+        }
+    }
+    return s;
+}
+static inline char* strupr(char* s) { return _strupr(s); }
+#endif
+#endif // _MSVC_STRLWR_STRUPR_DEFINED
+
 // TIM-53: MSVC path-length limits and _makepath / _splitpath family.
 // MSVC's <stdlib.h> defines these; glibc has no equivalent. Engine code
 // uses _MAX_PATH for char buffers (CDFILE.CPP MAX_PATH alias, SESSION

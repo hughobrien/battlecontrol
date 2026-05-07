@@ -134,4 +134,27 @@ static inline int WSACleanup(void) { return 0; }
 static inline int WSACleanup(void) { return 0; }
 #endif
 
+/* TIM-55: closesocket -- WSPROTO.CPP:161 tear-down call after a SOCKET
+ * is no longer needed. We never actually open a socket on Linux through
+ * the stub, so the no-op return preserves parser semantics without
+ * requiring real fd lifetime management. */
+#ifdef __cplusplus
+static inline int closesocket(SOCKET) { return 0; }
+#else
+static inline int closesocket(SOCKET s) { (void)s; return 0; }
+#endif
+
+/* TIM-55: LINGER -- Win32 socket-option payload for SO_LINGER. WSPUDP.CPP
+ * :145 declares one on the stack and passes &ling to setsockopt. Layout
+ * matches the real winsock1 ABI (two u_short halves: enable flag, then
+ * timeout in seconds). Engine code only writes/reads the fields by name;
+ * setsockopt is itself a stub (sockets are dormant on Linux for now). */
+#ifndef _WINSOCK1_LINGER_DEFINED
+#define _WINSOCK1_LINGER_DEFINED
+typedef struct linger {
+    unsigned short l_onoff;
+    unsigned short l_linger;
+} LINGER, *PLINGER, *LPLINGER;
+#endif
+
 #endif /* LINUX_STUBS_WINSOCK_H_INCLUDED */
