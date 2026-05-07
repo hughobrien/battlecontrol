@@ -733,7 +733,7 @@ unsigned int __cdecl Fixed_To_Cardinal(unsigned base, unsigned fixed)
 	__asm {
 		mov	eax,[base]
 		mul	[fixed]
-		add	eax,08000h		//; eax = (base * fixed) + 0x8000
+		add	eax,8000h		//; eax = (base * fixed) + 0x8000
 
 		shr	eax,16			//; return eax/65536
 		//ret
@@ -743,7 +743,7 @@ unsigned int __cdecl Fixed_To_Cardinal(unsigned base, unsigned fixed)
 #if (0)
 	mov	eax,[base]
 	mul	[fixed]
-	add	eax,080h		; eax = (base * fixed) + 0x80
+	add	eax,80h		; eax = (base * fixed) + 0x80
 
 	test	eax,0FF000000h		; if high byte set, return FFFF
 	jnz	??rneg1

@@ -3589,7 +3589,7 @@ PROC	Apply_XOR_Delta C near
 		;
 
 		check_others:
-			sub	eax,080h		; opcode -= 0x80
+			sub	eax,80h		; opcode -= 0x80
 			jnz	do_skip		; if zero then get next word, otherwise use remainder.
 
 			mov	ax,[esi]
@@ -3607,7 +3607,7 @@ PROC	Apply_XOR_Delta C near
 
 		not_long_skip:
 			jz	stop			; long count of zero means stop
-			sub	eax,08000h     		; opcode -= 0x8000
+			sub	eax,8000h     		; opcode -= 0x8000
 			test	eax,04000h		; is it a LONGRUN (code & 0x4000)?
 			je	long_dump
 
@@ -3800,7 +3800,7 @@ void __cdecl XOR_Delta_Buffer(int nextrow)
 		;
 
 		check_others:
-			sub	eax,080h		; opcode -= 0x80
+			sub	eax,80h		; opcode -= 0x80
 			jnz	do_skip		; if zero then get next word, otherwise use remainder.
 
 			mov	ax,[esi]		; get word code in ax
@@ -3828,7 +3828,7 @@ void __cdecl XOR_Delta_Buffer(int nextrow)
 
 		not_long_skip:
 			jz	stop			; long count of zero means stop
-			sub	eax,08000h     		; opcode -= 0x8000
+			sub	eax,8000h     		; opcode -= 0x8000
 			test	eax,04000h		; is it a LONGRUN (code & 0x4000)?
 			je	long_dump
 
@@ -3953,7 +3953,7 @@ void __cdecl Copy_Delta_Buffer(int nextrow)
 		;
 
 		check_others:
-			sub	eax,080h		; opcode -= 0x80
+			sub	eax,80h		; opcode -= 0x80
 			jnz	do_skip		; if zero then get next word, otherwise use remainder.
 
 			mov	ax,[esi]		; get word code in ax
@@ -3981,7 +3981,7 @@ void __cdecl Copy_Delta_Buffer(int nextrow)
 
 		not_long_skip:
 			jz	stop			; long count of zero means stop
-			sub	eax,08000h     		; opcode -= 0x8000
+			sub	eax,8000h     		; opcode -= 0x8000
 			test	eax,04000h		; is it a LONGRUN (code & 0x4000)?
 			je	long_dump
 
