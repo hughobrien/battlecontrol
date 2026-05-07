@@ -62,6 +62,9 @@ typedef int                INT;
 typedef short              SHORT;
 typedef unsigned short     USHORT;
 typedef wchar_t            WCHAR;
+/* TIM-53: UCHAR is needed by wsnwlink.h:140 (IPX_ADDRESS_DATA fields).
+ * Win32 SDK has it as `unsigned char`. */
+typedef unsigned char      UCHAR;
 
 #ifndef TRUE
 #define TRUE  1
@@ -201,6 +204,66 @@ typedef BOOL (*LPDDENUMCALLBACKA)  (GUID*, LPSTR,  LPSTR,  LPVOID);
 typedef BOOL (*LPDDENUMCALLBACKW)  (GUID*, LPWSTR, LPWSTR, LPVOID);
 typedef BOOL (*LPDDENUMCALLBACKEXA)(GUID*, LPSTR,  LPSTR,  LPVOID, HMONITOR);
 typedef BOOL (*LPDDENUMCALLBACKEXW)(GUID*, LPWSTR, LPWSTR, LPVOID, HMONITOR);
+
+/* TIM-53: WM_USER -- Win32 message-id base for user-defined messages.
+ * Real <winuser.h> has `#define WM_USER 0x0400`. WSProto.h:60-61
+ * (WM_IPXASYNCEVENT / WM_UDPASYNCEVENT) and WINSTUB.CPP:58 reference
+ * it without including <winuser.h>; upstream relied on windows.h's
+ * transitive winuser pull. Kept as a bare integer constant since the
+ * engine only computes message ids from it, never dispatches them. */
+#ifndef WM_USER
+#define WM_USER     0x0400
+#endif
+
+/* TIM-53: MAX_PATH alias for path-buffer dimensions. MSVC <windows.h>
+ * exposes both MAX_PATH (260) and the lowercase _MAX_PATH from stdlib.h
+ * via the same headers. Engine code uses MAX_PATH (CDFILE.CPP:394) and
+ * _MAX_PATH (SESSION.CPP:1217, STARTUP.CPP:54) interchangeably. The
+ * underscored variant is defined in msvc-compat.h. Mirror MAX_PATH here
+ * so windows.h consumers see it without needing to pull stdlib. */
+#ifndef MAX_PATH
+#define MAX_PATH    260
+#endif
+
+/* TIM-53: FILETIME -- Win32 64-bit timestamp split across two DWORDs.
+ * Real <minwinbase.h> has the same shape; engine code in EVENT.CPP:610
+ * uses `FILETIME ft; GetSystemTimeAsFileTime(&ft);` then composes a
+ * 64-bit unsigned from the low/high halves. Stub matches the layout
+ * so engine arithmetic on dwLowDateTime / dwHighDateTime parses; the
+ * GetSystemTimeAsFileTime declaration unblocks the call site. The
+ * actual time-source replacement is a separate later port. */
+typedef struct _FILETIME {
+    DWORD dwLowDateTime;
+    DWORD dwHighDateTime;
+} FILETIME, *LPFILETIME, *PFILETIME;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void GetSystemTimeAsFileTime(LPFILETIME);
+#ifdef __cplusplus
+}
+#endif
+
+/* TIM-53: OVERLAPPED -- Win32 async I/O context. Real <minwinbase.h>
+ * has a tagged struct with an internal pointer and an HANDLE event
+ * field; engine code in WIN32LIB/WINCOMM.H:237/242 stores OVERLAPPED
+ * by value as class members (ReadOverlap / WriteOverlap) under a
+ * `#ifdef WIN32` guarded block. Layout matches the real ABI for any
+ * byte-level reasoning, but no field is read by code that we are
+ * actually compiling -- the wincomm path is dormant on Linux. */
+typedef struct _OVERLAPPED {
+    ULONG*  Internal;
+    ULONG*  InternalHigh;
+    union {
+        struct {
+            DWORD Offset;
+            DWORD OffsetHigh;
+        } DUMMYSTRUCTNAME;
+        void* Pointer;
+    } DUMMYUNIONNAME;
+    HANDLE  hEvent;
+} OVERLAPPED, *LPOVERLAPPED;
 
 /* TIM-46: mirror real Win32 transitive include of <mmsystem.h>.
  * DSOUND.H references LPWAVEFORMATEX outside any _NO_COM / _WIN32

@@ -270,6 +270,102 @@ static inline int _memicmp(const void* a, const void* b, std::size_t n)
 #endif
 #endif // _MSVC_STRICMP_DEFINED
 
+// TIM-53: MSVC path-length limits and _makepath / _splitpath family.
+// MSVC's <stdlib.h> defines these; glibc has no equivalent. Engine code
+// uses _MAX_PATH for char buffers (CDFILE.CPP MAX_PATH alias, SESSION
+// _MAX_PATH+1, STARTUP _MAX_PATH, LOADDLG _MAX_NAME+_MAX_EXT) and
+// _makepath to assemble drive\dir\fname.ext paths from components
+// (AADATA, ADATA, BBDATA, BDATA, CDATA, IDATA, ODATA, SDATA, SIDEBAR,
+// TDATA, UDATA, VDATA: 12 TUs). Values mirror MSVC's <stdlib.h>.
+#ifndef _MAX_PATH
+#define _MAX_PATH    260
+#endif
+#ifndef _MAX_DRIVE
+#define _MAX_DRIVE   3
+#endif
+#ifndef _MAX_DIR
+#define _MAX_DIR     256
+#endif
+#ifndef _MAX_FNAME
+#define _MAX_FNAME   256
+#endif
+#ifndef _MAX_EXT
+#define _MAX_EXT     256
+#endif
+#ifndef _MAX_NAME
+// MSVC names this _MAX_FNAME; some engine code uses _MAX_NAME (see
+// LOADDLG.CPP:187 `char fname[_MAX_NAME+_MAX_EXT]`).
+#define _MAX_NAME    _MAX_FNAME
+#endif
+
+// _makepath: MSVC CRT path assembler. Real signature returns void and
+// writes drive:dir\fname.ext into `path`. Engine call sites pass NULL
+// for drive/dir (e.g. AADATA:421 _makepath(fullname, NULL, NULL,
+// buffer, ".SHP")), so the directory-separator semantics are not
+// exercised here. The shim concatenates the non-NULL components with
+// portable forward-slash separators. The destination buffer is the
+// caller's responsibility -- same contract as MSVC's CRT.
+#ifndef _WWLIB_MAKEPATH_DEFINED
+#define _WWLIB_MAKEPATH_DEFINED
+#ifdef __cplusplus
+#include <cstring>
+static inline void _makepath(char* path,
+                             const char* drive,
+                             const char* dir,
+                             const char* fname,
+                             const char* ext)
+{
+    if (!path) return;
+    path[0] = '\0';
+    if (drive && drive[0]) {
+        std::strcat(path, drive);
+        // MSVC appends ':' if missing. Engine never relies on it.
+    }
+    if (dir && dir[0]) {
+        std::strcat(path, dir);
+        std::size_t len = std::strlen(path);
+        if (len > 0 && path[len - 1] != '/' && path[len - 1] != '\\') {
+            std::strcat(path, "/");
+        }
+    }
+    if (fname && fname[0]) {
+        std::strcat(path, fname);
+    }
+    if (ext && ext[0]) {
+        // MSVC tolerates a leading '.' on ext; reproduce that.
+        if (ext[0] != '.') {
+            std::strcat(path, ".");
+        }
+        std::strcat(path, ext);
+    }
+}
+#else
+#include <string.h>
+static inline void _makepath(char* path,
+                             const char* drive,
+                             const char* dir,
+                             const char* fname,
+                             const char* ext)
+{
+    if (!path) return;
+    path[0] = '\0';
+    if (drive && drive[0]) strcat(path, drive);
+    if (dir && dir[0]) {
+        strcat(path, dir);
+        size_t len = strlen(path);
+        if (len > 0 && path[len - 1] != '/' && path[len - 1] != '\\') {
+            strcat(path, "/");
+        }
+    }
+    if (fname && fname[0]) strcat(path, fname);
+    if (ext && ext[0]) {
+        if (ext[0] != '.') strcat(path, ".");
+        strcat(path, ext);
+    }
+}
+#endif
+#endif // _WWLIB_MAKEPATH_DEFINED
+
 #endif // !_MSC_VER
 
 // TIM-9: pull in the Win32 type taxonomy stub for every TU. Several
