@@ -95,6 +95,10 @@ struct IDirectDrawSurface {
 };
 struct IDirectDraw {
     template <typename... Args> long CreateSurface(Args&&...) { return 0; }
+    template <typename... Args> long RestoreDisplayMode(Args&&...) { return 0; }
+    template <typename... Args> long Release(Args&&...) { return 0; }
+    template <typename... Args> long GetCaps(Args&&...) { return 0; }
+    template <typename... Args> long WaitForVerticalBlank(Args&&...) { return 0; }
 };
 #ifdef __cplusplus
 } // extern "C++"
