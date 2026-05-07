@@ -56,6 +56,16 @@ static SDL_Window*   SDL_VideoWindow    = nullptr;
 static SDL_Renderer* SDL_VideoRenderer  = nullptr;
 static SDL_Surface*  SDL_PrimarySurface = nullptr;
 static SDL_Color     SDL_PaletteEntries[256] = {};
+// TIM-141 commit 5: present-pump caches. Texture is the GPU streaming
+// destination; PrimaryARGB is the CPU-side 32-bit blit target that holds
+// SDL_BlitSurface's indexed->ARGB conversion using the palette set by
+// Set_DD_Palette. Both are recreated when the primary surface's size
+// changes; both are freed in Reset_Video_Mode.
+static SDL_Texture*  SDL_PrimaryTexture = nullptr;
+static SDL_Surface*  SDL_PrimaryARGB    = nullptr;
+static int           SDL_CachedW        = 0;
+static int           SDL_CachedH        = 0;
+static bool          SDL_FirstPresentDone = false;
 
 // TIM-141 commit 4: typed accessors over the file-static SDL_PrimarySurface
 // for GBUFFER.CPP's GraphicBufferClass::Lock/Unlock. Keeps <SDL.h> out of
@@ -616,6 +626,19 @@ void Reset_Video_Mode(void)
 {
 #ifndef _MSC_VER
 	// TIM-141: Linux SDL2 teardown. Mirrors the open path in Set_Video_Mode.
+	// Texture and ARGB intermediate are commit-5 present-pump caches and
+	// must be freed before the renderer they were created against.
+	if (SDL_PrimaryTexture) {
+		SDL_DestroyTexture(SDL_PrimaryTexture);
+		SDL_PrimaryTexture = nullptr;
+	}
+	if (SDL_PrimaryARGB) {
+		SDL_FreeSurface(SDL_PrimaryARGB);
+		SDL_PrimaryARGB = nullptr;
+	}
+	SDL_CachedW = 0;
+	SDL_CachedH = 0;
+	SDL_FirstPresentDone = false;
 	if (SDL_PrimarySurface) {
 		SDL_FreeSurface(SDL_PrimarySurface);
 		SDL_PrimarySurface = nullptr;
@@ -785,11 +808,57 @@ extern int ScreenWidth;
 void Wait_Vert_Blank(void)
 {
 #ifndef _MSC_VER
-	// TIM-141: real vsync is the SDL renderer's job (created with
-	// SDL_RENDERER_PRESENTVSYNC in Set_Video_Mode). The cheap delay below is
-	// a placeholder so call sites that pace on this function don't busy-spin
-	// before the renderer is wired through GBUFFER (commit 3).
-	SDL_Delay(1);
+	// TIM-141 commit 5: present pump. Indexed primary surface ->
+	// SDL_BlitSurface (palette-aware) -> ARGB intermediate ->
+	// SDL_UpdateTexture -> SDL_RenderCopy -> SDL_RenderPresent. The
+	// renderer was created with SDL_RENDERER_PRESENTVSYNC in
+	// Set_Video_Mode, so SDL_RenderPresent blocks to vblank — the
+	// function name remains accurate.
+	if (SDL_PrimarySurface == nullptr || SDL_VideoRenderer == nullptr) {
+		return;
+	}
+
+	int w = SDL_PrimarySurface->w;
+	int h = SDL_PrimarySurface->h;
+
+	if (SDL_PrimaryTexture == nullptr || SDL_PrimaryARGB == nullptr ||
+	    SDL_CachedW != w || SDL_CachedH != h) {
+		if (SDL_PrimaryTexture) {
+			SDL_DestroyTexture(SDL_PrimaryTexture);
+			SDL_PrimaryTexture = nullptr;
+		}
+		if (SDL_PrimaryARGB) {
+			SDL_FreeSurface(SDL_PrimaryARGB);
+			SDL_PrimaryARGB = nullptr;
+		}
+		SDL_PrimaryTexture = SDL_CreateTexture(
+			SDL_VideoRenderer,
+			SDL_PIXELFORMAT_ARGB8888,
+			SDL_TEXTUREACCESS_STREAMING,
+			w, h);
+		SDL_PrimaryARGB = SDL_CreateRGBSurfaceWithFormat(
+			0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
+		SDL_CachedW = w;
+		SDL_CachedH = h;
+		if (SDL_PrimaryTexture == nullptr || SDL_PrimaryARGB == nullptr) {
+			return;
+		}
+	}
+
+	// Palette-aware indexed->ARGB conversion. SDL_BlitSurface honors
+	// SDL_PrimarySurface->format->palette (populated by Set_DD_Palette
+	// at DDRAW.CPP:864-867).
+	SDL_BlitSurface(SDL_PrimarySurface, nullptr, SDL_PrimaryARGB, nullptr);
+	SDL_UpdateTexture(SDL_PrimaryTexture, nullptr,
+	                  SDL_PrimaryARGB->pixels, SDL_PrimaryARGB->pitch);
+	SDL_RenderClear(SDL_VideoRenderer);
+	SDL_RenderCopy(SDL_VideoRenderer, SDL_PrimaryTexture, nullptr, nullptr);
+	SDL_RenderPresent(SDL_VideoRenderer);
+
+	if (!SDL_FirstPresentDone) {
+		SDL_ShowWindow(SDL_VideoWindow);
+		SDL_FirstPresentDone = true;
+	}
 	return;
 #else
 	if (DirectDrawObject == NULL) {
