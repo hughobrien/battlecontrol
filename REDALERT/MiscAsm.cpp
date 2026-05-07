@@ -1144,7 +1144,7 @@ ALLOWED_START	EQU	256-ALLOWED_COUNT
 			mov	[edi],bl
 			inc	edi
 
-			; EBX = source palette logical number (1..255).
+			; EBX = source palette logical number (1-255).
 			; EDI = running pointer into dest remap table.
 		mainloop:
 			inc	ebx
