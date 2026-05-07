@@ -108,6 +108,62 @@ static inline unsigned long _lrotl(unsigned long value, int shift)
 #endif
 #endif
 
+// TIM-15: itoa / ltoa are MSVC CRT extensions, not in glibc. WIN32LIB's
+// GBUFFER.H::Print(int|short|long) overloads call them at radix 10 to
+// stringify numbers before forwarding to the text renderer. The shim
+// preserves MSVC return semantics (returns the destination buffer) and
+// supports the documented radix range 2..36. The caller is responsible
+// for sizing `buffer` — same contract as MSVC's CRT.
+#ifndef _ITOA_LTOA_DEFINED
+#define _ITOA_LTOA_DEFINED
+static inline char* _wwlib_itoa_impl(long value, char* buffer, int radix)
+{
+    if (radix < 2 || radix > 36) {
+        buffer[0] = '\0';
+        return buffer;
+    }
+    unsigned long uvalue;
+    int negative = 0;
+    if (radix == 10 && value < 0) {
+        negative = 1;
+        // Two-step negation is safe even at LONG_MIN, where -value
+        // would overflow signed long.
+        uvalue = (unsigned long)(-(value + 1)) + 1;
+    } else {
+        uvalue = (unsigned long)value;
+    }
+    char* p = buffer;
+    do {
+        int digit = (int)(uvalue % (unsigned long)radix);
+        *p++ = (char)(digit < 10 ? '0' + digit : 'a' + digit - 10);
+        uvalue /= (unsigned long)radix;
+    } while (uvalue != 0);
+    if (negative) {
+        *p++ = '-';
+    }
+    *p = '\0';
+    // Reverse the digits in place (they were emitted least-significant first).
+    char* start = buffer;
+    char* end = p - 1;
+    while (start < end) {
+        char tmp = *start;
+        *start = *end;
+        *end = tmp;
+        ++start;
+        --end;
+    }
+    return buffer;
+}
+static inline char* itoa(int value, char* buffer, int radix)
+{
+    return _wwlib_itoa_impl((long)value, buffer, radix);
+}
+static inline char* ltoa(long value, char* buffer, int radix)
+{
+    return _wwlib_itoa_impl(value, buffer, radix);
+}
+#endif // _ITOA_LTOA_DEFINED
+
 #endif // !_MSC_VER
 
 // TIM-9: pull in the Win32 type taxonomy stub for every TU. Several
