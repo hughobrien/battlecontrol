@@ -73,22 +73,19 @@ typedef __int64 int64;
 // For compatibility with Watcom in audio enums
 #pragma warning (disable : 4091)
 
-// From RedAlert\Audio.cpp 
-enum ContextType;
+// From RedAlert\Audio.cpp
+typedef enum {
+	IN_NOVAR,			// No variation or alterations allowed.
+	IN_VAR				// Infantry variance response modification.
+} ContextType;
 extern struct SoundEffectNameStruct {
 	char const *Name;			// Digitized voice file name.
 	int			Priority;	// Playback priority of this sample.
 	ContextType	Where;		// In what game context does this sample exist.
 } SoundEffectName[VOC_COUNT];
 
-// From RedAlert\Audio.cpp 
+// From RedAlert\Audio.cpp
 extern char const* Speech[VOX_COUNT];
-
-// From RedAlert\Audio.cpp 
-typedef enum {
-	IN_NOVAR,			// No variation or alterations allowed.
-	IN_VAR				// Infantry variance response modification.
-};
 
 
 
@@ -3232,7 +3229,7 @@ extern "C" __declspec(dllexport) bool __cdecl CNC_Get_Game_State(GameStateReques
 			char* dot_ptr = strchr(Scen.ScenarioName, '.');
 			const int count = (dot_ptr != nullptr) ? (dot_ptr - Scen.ScenarioName) : sizeof(Scen.ScenarioName);
 			memset(map_data->ScenarioName, 0, sizeof(map_data->ScenarioName));
-			strncpy(map_data->ScenarioName, Scen.ScenarioName, min(sizeof(map_data->ScenarioName) - 1, count));
+			strncpy(map_data->ScenarioName, Scen.ScenarioName, min(sizeof(map_data->ScenarioName) - 1, (size_t)count));
 
 			int cell_index = 0;
 			char cell_name[_MAX_PATH];
@@ -3790,7 +3787,7 @@ bool DLLExportClass::Get_Layer_State(uint64 player_id, unsigned char *buffer_in,
 						CNCObjectStruct& root_object = ObjectList->Objects[TotalObjectCount];
 						if (root_object.IsFactory) {
 							BuildingClass* building = (BuildingClass*)root_object.CNCInternalObjectPointer;
-							FactoryClass* factory = building->House->IsHuman ? building->House->Fetch_Factory(building->Class->ToBuild) : building->Factory;
+							FactoryClass* factory = building->House->IsHuman ? building->House->Fetch_Factory(building->Class->ToBuild) : (FactoryClass*)building->Factory;
 							if (factory != nullptr) {
 								for (int i = CurrentDrawCount - 1; i > 0; --i) {
 									CNCObjectStruct& base_object = ObjectList->Objects[TotalObjectCount + i];
@@ -8817,7 +8814,7 @@ void DLLExportClass::Decode_Pointers(void)
 		Sidebar_Glyphx_Decode_Pointers(&MultiplayerSidebars[i]);
 
 		if (PlacementType[i]) {
-			StructType type = (StructType) reinterpret_cast<unsigned int>(PlacementType[i]);
+			StructType type = (StructType) reinterpret_cast<uintptr_t>(PlacementType[i]);
 			PlacementType[i] = NULL;
 			if (type >= STRUCT_FIRST && type < STRUCT_COUNT) {
 				

@@ -453,6 +453,19 @@ using std::max;
 #endif
 #endif // _MSVC_MINMAX_USING_DEFINED
 
+/* TIM-138: UNREFERENCED_PARAMETER -- Win32 SDK helper macro from
+ * winnt.h. Standard expansion is `((void)(P))`, which discards the
+ * argument expression as a void value -- no codegen, no warning.
+ *
+ * Wide-blast safety: ripgrep finds 1 call site in the entire tree
+ * (DLLInterface.cpp:6192, inside Get_Occupier_State which ignores
+ * its `player_id` argument). No other TU references the macro, so
+ * this shim graduates the single call site and cannot regress
+ * anything. */
+#ifndef UNREFERENCED_PARAMETER
+#define UNREFERENCED_PARAMETER(P) ((void)(P))
+#endif
+
 // TIM-91: _splitpath inert shim. MSVC CRT path decomposer; glibc has no
 // equivalent. Three engine call sites: LOADDLG.CPP:760 (reads ext after,
 // `atoi(ext + 1)`), MIXFILE.CPP:320 (reads name + ext), STARTUP.CPP:342
