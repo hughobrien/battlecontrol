@@ -755,4 +755,21 @@ static inline void  OutputDebugStringW(LPCWSTR)                    {}
 #define OutputDebugString OutputDebugStringA
 #endif
 
+/* TIM-80: SendMessage -- Win32 window-message synchronous dispatch.
+ * WSPROTO.CPP:453/506 (WIC::Send / WIC::Broadcast) and WSPUDP.CPP:280
+ * (WinsockInterfaceClass::Broadcast) post a `(MainWindow,
+ * Protocol_Event_Message(), 0, (LONG)FD_WRITE)` self-message after
+ * queueing an outbound packet, so the next message-pump turn kicks
+ * the asynchronous Winsock writer. Real <winuser.h> signature:
+ * `LRESULT WINAPI SendMessageA(HWND, UINT, WPARAM, LPARAM)`. The
+ * window-message universe is dormant under the stub (no HWND, no
+ * pump -- PeekMessage/GetMessage already return FALSE per TIM-71),
+ * so the inert return is `0`. The matching SDL2-event port is in a
+ * later pass. LONG return matches the TIM-71 sibling style for the
+ * message-pump cluster (PeekMessage/GetMessage/TranslateMessage/
+ * DispatchMessage) and is wide enough on LP64 to absorb the LRESULT
+ * convention; engine code never reads the return value at any of the
+ * surveyed call sites. */
+static inline LONG  SendMessage(HWND, UINT, WPARAM, LPARAM)        { return 0; }
+
 #endif /* LINUX_STUBS_WINDOWS_H */
