@@ -157,4 +157,81 @@ typedef struct linger {
 } LINGER, *PLINGER, *LPLINGER;
 #endif
 
+/* TIM-56: sockaddr_in -- IPv4 socket-address record. Real winsock1
+ * <winsock.h> shape: sin_family / sin_port / sin_addr / sin_zero[8].
+ * WSPUDP.CPP:146 declares `struct sockaddr_in addr;` then writes
+ * sin_family/sin_port/sin_addr.s_addr at lines 166-168 and reads
+ * sin_addr.s_addr at line 356/366. Layout matches the SDK so engine
+ * memcpy/memcmp through these fields stays well-defined. We do NOT
+ * pull <netinet/in.h> here -- it would clash with the in_addr struct
+ * defined above and trigger the same cascade trap as TIM-53's
+ * <arpa/inet.h> attempt. */
+#ifndef _WINSOCK1_SOCKADDR_IN_DEFINED
+#define _WINSOCK1_SOCKADDR_IN_DEFINED
+struct sockaddr_in {
+    short          sin_family;
+    unsigned short sin_port;
+    struct in_addr sin_addr;
+    char           sin_zero[8];
+};
+typedef struct sockaddr_in  SOCKADDR_IN;
+typedef struct sockaddr_in* PSOCKADDR_IN;
+typedef struct sockaddr_in* LPSOCKADDR_IN;
+#endif
+
+/* TIM-56: socket-type macros. WSPUDP.CPP / WSPIPX.CPP pass SOCK_DGRAM
+ * to socket() for UDP / IPX datagram sockets. SOCK_STREAM is included
+ * for completeness so any TCP fallback path in mplpc / mplib / wol
+ * also parses. Standard Berkeley/Winsock1 values. */
+#ifndef SOCK_STREAM
+#define SOCK_STREAM 1
+#endif
+#ifndef SOCK_DGRAM
+#define SOCK_DGRAM  2
+#endif
+#ifndef SOCK_RAW
+#define SOCK_RAW    3
+#endif
+
+/* TIM-56: address-family macros. WSPUDP.CPP:166/400 sets
+ * addr.sin_family = AF_INET; WSPIPX.CPP:107 uses AF_IPX; mplib/wol
+ * sources reference AF_NS as a deprecated alias. Standard Winsock1
+ * values from <winsock.h>: AF_INET=2, AF_IPX=6, AF_NS=6. */
+#ifndef AF_UNSPEC
+#define AF_UNSPEC 0
+#endif
+#ifndef AF_INET
+#define AF_INET   2
+#endif
+#ifndef AF_IPX
+#define AF_IPX    6
+#endif
+#ifndef AF_NS
+#define AF_NS     6
+#endif
+
+/* TIM-56: WSAAsyncSelect event-type macros. WSPROTO.CPP:187 passes
+ * `FD_READ | FD_WRITE` as the lEvent bitmask. Standard Winsock1
+ * values from <winsock.h>; the engine never receives a real event,
+ * so the macros only need to be the right bit constants for the
+ * `if (events & FD_READ) ...` style checks elsewhere to fold. */
+#ifndef FD_READ
+#define FD_READ     0x01
+#endif
+#ifndef FD_WRITE
+#define FD_WRITE    0x02
+#endif
+#ifndef FD_OOB
+#define FD_OOB      0x04
+#endif
+#ifndef FD_ACCEPT
+#define FD_ACCEPT   0x08
+#endif
+#ifndef FD_CONNECT
+#define FD_CONNECT  0x10
+#endif
+#ifndef FD_CLOSE
+#define FD_CLOSE    0x20
+#endif
+
 #endif /* LINUX_STUBS_WINSOCK_H_INCLUDED */
