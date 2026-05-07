@@ -772,6 +772,20 @@ static inline void  OutputDebugStringW(LPCWSTR)                    {}
  * surveyed call sites. */
 static inline LONG  SendMessage(HWND, UINT, WPARAM, LPARAM)        { return 0; }
 
+/* TIM-95: pass-40L STARTUP shutdown-message cluster. STARTUP.CPP:780 and
+ * :1086 (Main_Game cleanup paths) post `(MainWindow, WM_DESTROY, 0, 0)`
+ * to trigger the Win32 message-pump destroy handler. Real <winuser.h>:
+ * `#define WM_DESTROY 0x0002` and `BOOL WINAPI PostMessageA(HWND, UINT,
+ * WPARAM, LPARAM)`. The window-message universe is dormant under the
+ * stub (no HWND, no pump -- the engine's headless shutdown path drives
+ * itself via ReadyToQuit), so PostMessage is the inert FALSE return.
+ * Sibling shape to the TIM-80 SendMessage shim and the TIM-71 message-
+ * pump cluster. */
+#ifndef WM_DESTROY
+#define WM_DESTROY          0x0002
+#endif
+static inline BOOL  PostMessage(HWND, UINT, WPARAM, LPARAM)        { return FALSE; }
+
 /* TIM-85: pass-40F Win32 type/API stub bundle. Five additive declarations
  * to drain the CONQUER / MENUS / WINSTUB / RAWFILE / BMP8 cluster. Same
  * inert-stub policy as the TIM-71 / TIM-74 / TIM-75 bundles -- no engine
