@@ -110,6 +110,16 @@ typedef struct IDirectDrawClipper               FAR *LPDIRECTDRAWCLIPPER;
 typedef struct _DDFXROP                 FAR *LPDDFXROP;
 typedef struct _DDSURFACEDESC           FAR *LPDDSURFACEDESC;
 
+#ifndef _MSC_VER
+// TIM-141 commit 4: SDL primary-surface accessors. The SDL_Surface that
+// backs the Linux primary screen is a file-static in DDRAW.CPP; these
+// accessors give GBUFFER.CPP's GraphicBufferClass::Lock/Unlock a typed
+// view of its pixel buffer without leaking <SDL.h> into headers.
+extern bool             SDL_Has_Primary_Surface(void);
+extern unsigned char *  SDL_Get_Primary_Pixels(void);
+extern int              SDL_Get_Primary_Pitch(void);
+#endif
+
 /*
  * API's
  */

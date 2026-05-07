@@ -56,6 +56,26 @@ static SDL_Window*   SDL_VideoWindow    = nullptr;
 static SDL_Renderer* SDL_VideoRenderer  = nullptr;
 static SDL_Surface*  SDL_PrimarySurface = nullptr;
 static SDL_Color     SDL_PaletteEntries[256] = {};
+
+// TIM-141 commit 4: typed accessors over the file-static SDL_PrimarySurface
+// for GBUFFER.CPP's GraphicBufferClass::Lock/Unlock. Keeps <SDL.h> out of
+// every TU that includes DDRAW.H/GBUFFER.H. Indexed (8-bit) SDL surfaces
+// have CPU-resident pixels; SDL_LockSurface is unnecessary for the
+// non-RLE software-rendered case the engine drives.
+bool SDL_Has_Primary_Surface(void)
+{
+    return SDL_PrimarySurface != nullptr && SDL_PrimarySurface->pixels != nullptr;
+}
+
+unsigned char * SDL_Get_Primary_Pixels(void)
+{
+    return SDL_PrimarySurface ? static_cast<unsigned char *>(SDL_PrimarySurface->pixels) : nullptr;
+}
+
+int SDL_Get_Primary_Pitch(void)
+{
+    return SDL_PrimarySurface ? SDL_PrimarySurface->pitch : 0;
+}
 #endif
 
 LPDIRECTDRAW		DirectDrawObject=NULL;	// Pointer to the direct draw object
