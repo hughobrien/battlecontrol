@@ -165,7 +165,21 @@ enum MapEditButtonIDEnum{
 
 
 class TeamTypeClass;
+// TIM-66: forward-declare MapEditClass so externs.h:196 (extern MapEditClass
+// Map under SCENARIO_EDITOR) and other consumers see at least a type name
+// even when the body below is skipped because MouseClass is incomplete.
+class MapEditClass;
 
+// TIM-66: only emit the MapEditClass body when MouseClass has a complete
+// definition (MOUSECLASS_DEFINED is published at the end of mouse.h). When
+// WIN32LIB TUs (MOUSEWW.CPP, WRITEPCX.CPP via wwlib32.h) include mouse.h
+// directly, the recursive include chain reaches mapedit.h while mouse.h is
+// still mid-parse, so MouseClass is incomplete and inheriting from it would
+// fail. Those TUs do not reference MapEditClass, so a forward decl suffices.
+// All editor TUs include function.h directly (which fully parses mouse.h
+// before mapedit.h), so MOUSECLASS_DEFINED is set and the body lands as
+// before.
+#ifdef MOUSECLASS_DEFINED
 class MapEditClass : public MouseClass
 {
 	/*
@@ -337,5 +351,6 @@ class MapEditClass : public MouseClass
 		TextLabelClass *BaseLabel;
 		static MissionType MapEditMissions[];
 };
+#endif // MOUSECLASS_DEFINED -- TIM-66
 
 #endif

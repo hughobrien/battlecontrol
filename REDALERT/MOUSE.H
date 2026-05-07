@@ -35,6 +35,15 @@
 #ifndef MOUSE_H
 #define MOUSE_H
 
+// TIM-66: forward-declare MouseClass so externs.h:198 (extern MouseClass Map)
+// parses during the recursive include chain triggered when WIN32LIB TUs
+// (MOUSEWW.CPP, WRITEPCX.CPP via wwlib32.h) include mouse.h directly.
+// In that chain, function.h is entered for the first time *before* the
+// MouseClass body below has been parsed, so the canonical declaration is
+// not yet visible at externs.h. The forward decl makes MouseClass a known
+// type name at that point; the full definition below is unaffected.
+class MouseClass;
+
 #include	"stage.h"
 #include	"scroll.h"
 // TIM-54 Fix B: pull WIN32LIB/MOUSE.H so the engine free-function decls
@@ -129,6 +138,13 @@ class MouseClass: public ScrollClass
 		static CDTimerClass<SystemTimerClass> Timer;
 		int Frame;
 };
+
+// TIM-66: sentinel published once MouseClass has a complete definition.
+// mapedit.h checks this around `class MapEditClass : public MouseClass`
+// to skip the body when reached during the WIN32LIB recursive include
+// chain (mouse.h is mid-parse at that point, so MouseClass is incomplete
+// and inheritance would fail).
+#define MOUSECLASS_DEFINED
 
 
 #endif
