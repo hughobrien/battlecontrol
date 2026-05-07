@@ -197,6 +197,68 @@ static inline char* ltoa(long value, char* buffer, int radix)
 }
 #endif // _ITOA_LTOA_DEFINED
 
+// TIM-45: stricmp / strnicmp / _stricmp / _strnicmp / memicmp / _memicmp
+// are MSVC CRT extensions; POSIX has strcasecmp / strncasecmp and no
+// case-insensitive memcmp at all. The 181-TU first-error cohort that
+// previously gated at list.h then drop.h relocated to TEVENT.H:172
+// (EventChoiceClass operator< / > / <= / >= bodies that call stricmp on
+// inline-class member function results). TACTION.H:141-144 has the same
+// pattern; many .CPP call sites also use stricmp / strnicmp / _stricmp /
+// memicmp directly. Inline wrappers preserve the MSVC contract (returns
+// 0 on match, sign of first differing byte otherwise) without touching
+// upstream call sites.
+#ifndef _MSVC_STRICMP_DEFINED
+#define _MSVC_STRICMP_DEFINED
+#ifdef __cplusplus
+#include <strings.h>  // POSIX strcasecmp / strncasecmp
+#include <cstddef>    // size_t
+#include <cctype>     // tolower (for memicmp)
+static inline int stricmp(const char* a, const char* b)
+{
+    return strcasecmp(a, b);
+}
+static inline int _stricmp(const char* a, const char* b)
+{
+    return strcasecmp(a, b);
+}
+static inline int strnicmp(const char* a, const char* b, std::size_t n)
+{
+    return strncasecmp(a, b, n);
+}
+static inline int _strnicmp(const char* a, const char* b, std::size_t n)
+{
+    return strncasecmp(a, b, n);
+}
+static inline int _wwlib_memicmp_impl(const void* a, const void* b, std::size_t n)
+{
+    const unsigned char* pa = static_cast<const unsigned char*>(a);
+    const unsigned char* pb = static_cast<const unsigned char*>(b);
+    for (std::size_t i = 0; i < n; ++i) {
+        int ca = std::tolower(pa[i]);
+        int cb = std::tolower(pb[i]);
+        if (ca != cb) {
+            return ca - cb;
+        }
+    }
+    return 0;
+}
+static inline int memicmp(const void* a, const void* b, std::size_t n)
+{
+    return _wwlib_memicmp_impl(a, b, n);
+}
+static inline int _memicmp(const void* a, const void* b, std::size_t n)
+{
+    return _wwlib_memicmp_impl(a, b, n);
+}
+#else
+#include <strings.h>
+#define stricmp(a, b)        strcasecmp((a), (b))
+#define _stricmp(a, b)       strcasecmp((a), (b))
+#define strnicmp(a, b, n)    strncasecmp((a), (b), (n))
+#define _strnicmp(a, b, n)   strncasecmp((a), (b), (n))
+#endif
+#endif // _MSVC_STRICMP_DEFINED
+
 #endif // !_MSC_VER
 
 // TIM-9: pull in the Win32 type taxonomy stub for every TU. Several
