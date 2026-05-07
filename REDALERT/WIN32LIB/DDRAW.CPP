@@ -86,6 +86,54 @@ int SDL_Get_Primary_Pitch(void)
 {
     return SDL_PrimarySurface ? SDL_PrimarySurface->pitch : 0;
 }
+
+// TIM-141 commit 6: window-class event pump. Drives
+// SurfaceMonitorClass::Set_Surface_Focus from SDL_WINDOWEVENT_FOCUS_*
+// and captures SDL_QUIT into SDL_QuitRequested for the game loop to
+// poll via SDL_Quit_Requested(). SDL_PeepEvents with a tight type
+// filter is used (NOT SDL_PollEvent) so keyboard, mouse and joystick
+// events stay queued for the DINPUT lane. This mirrors what Wine's
+// winex11 driver does for the same separation.
+static bool SDL_QuitRequested = false;
+
+static void SDL_Process_Window_Events(void)
+{
+    SDL_PumpEvents();
+
+    SDL_Event events[16];
+    int drained;
+    do {
+        drained = SDL_PeepEvents(events, 16, SDL_GETEVENT,
+                                 SDL_WINDOWEVENT, SDL_WINDOWEVENT);
+        for (int i = 0; i < drained; ++i) {
+            switch (events[i].window.event) {
+            case SDL_WINDOWEVENT_FOCUS_LOST:
+            case SDL_WINDOWEVENT_MINIMIZED:
+                AllSurfaces.Set_Surface_Focus(FALSE);
+                break;
+            case SDL_WINDOWEVENT_FOCUS_GAINED:
+            case SDL_WINDOWEVENT_RESTORED:
+                AllSurfaces.Set_Surface_Focus(TRUE);
+                break;
+            default:
+                break;
+            }
+        }
+    } while (drained == 16);
+
+    do {
+        drained = SDL_PeepEvents(events, 16, SDL_GETEVENT,
+                                 SDL_QUIT, SDL_QUIT);
+        if (drained > 0) {
+            SDL_QuitRequested = true;
+        }
+    } while (drained == 16);
+}
+
+extern "C" bool SDL_Quit_Requested(void)
+{
+    return SDL_QuitRequested;
+}
 #endif
 
 LPDIRECTDRAW		DirectDrawObject=NULL;	// Pointer to the direct draw object
@@ -808,6 +856,14 @@ extern int ScreenWidth;
 void Wait_Vert_Blank(void)
 {
 #ifndef _MSC_VER
+	// TIM-141 commit 6: pump window-class events first so focus
+	// transitions and SDL_QUIT are observed on the actual frame
+	// heartbeat. Must run before the early-out below — focus state
+	// needs to flip even on the first call, when the renderer is
+	// still being brought up. Keyboard/mouse stay queued for the
+	// DINPUT lane.
+	SDL_Process_Window_Events();
+
 	// TIM-141 commit 5: present pump. Indexed primary surface ->
 	// SDL_BlitSurface (palette-aware) -> ARGB intermediate ->
 	// SDL_UpdateTexture -> SDL_RenderCopy -> SDL_RenderPresent. The
