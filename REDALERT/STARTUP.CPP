@@ -34,6 +34,14 @@
  *   main -- Initial startup routine (preps library systems).                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+// TIM-84: language define is normally injected by the original
+// makefile. STARTUP.CPP uses TEXT_NO_RAM from LANGUAGE.H, which gates
+// it on `#ifdef ENGLISH` (etc.). Pin ENGLISH for this TU so the
+// language-table macros expand. Same pattern as TIM-68 in CONQUER.CPP.
+#ifndef ENGLISH
+#define ENGLISH 1
+#endif
+
 #include	"function.h"
 #include	<conio.h>
 #include	<io.h>

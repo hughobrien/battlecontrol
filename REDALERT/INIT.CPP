@@ -56,6 +56,15 @@
  *   Load_Prolog_Page -- Loads the special pre-prolog "please wait" page.                      *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+// TIM-84: language define is normally injected by the original
+// makefile. INIT.CPP uses TEXT_OPTIONS / TEXT_INVALID / TEXT_NO_MOUSE
+// from LANGUAGE.H, which gates them on `#ifdef ENGLISH` (etc.). Pin
+// ENGLISH for this TU so the language-table macros expand. Same
+// pattern as TIM-68 in CONQUER.CPP.
+#ifndef ENGLISH
+#define ENGLISH 1
+#endif
+
 #include	"function.h"
 #include	"loaddlg.h"
 #ifdef WIN32
