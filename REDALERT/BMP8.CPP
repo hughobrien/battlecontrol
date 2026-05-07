@@ -139,51 +139,8 @@ bool BMP8::Init( const char* szFile, HWND hWnd )
 }
 
 
-// Westwood `wstypes.h` (no longer in repo) defined `bit8` as an unsigned 8-bit
-// scalar; restore the typedef locally so this dead drawBmp() body parses.
-typedef unsigned char bit8;
-bit8 BMP8::drawBmp(void)
+bool BMP8::Draw(void)
 {
-  // Paint the window (and draw the bitmap). 
- 
-  PAINTSTRUCT ps;
-  HDC         hdc;
-  char        string[128];
-
-  InvalidateRect(WindowHandle_,NULL,FALSE); // keep windows from screwing up the
-                                           //  redrawing (as much).
-  hdc=BeginPaint(WindowHandle_,&ps);
-
-  //Do palette stuff
-  HPALETTE select=SelectPalette(ps.hdc,PalHandle_,0);
-  if (select==NULL)
-  {
-    sprintf(string,"Select Pal Fail: %d",GetLastError());
-    MessageBox(NULL,string,"OK",MB_OK);
-  }
-  UINT realize=RealizePalette(ps.hdc);
-  if (realize==GDI_ERROR)
-  {
-    sprintf(string,"Realize Pal Fail: %d",GetLastError());
-    MessageBox(NULL,string,"OK",MB_OK);
-  }
-
-  HDC hdcMem = CreateCompatibleDC(ps.hdc); 
-  SelectObject(hdcMem, BitmapHandle_); 
-  BITMAP bm;
-  GetObject(BitmapHandle_, sizeof(BITMAP), (LPSTR) &bm);
-  
-  /// for non-stretching version
-  ///////BitBlt(ps.hdc, 0, 0, bm.bmWidth, bm.bmHeight, hdcMem, 0, 0, SRCCOPY); 
-
-  RECT clientRect;
-  GetClientRect(WindowHandle_,&clientRect);
-  SetStretchBltMode(ps.hdc,COLORONCOLOR);
-  StretchBlt(ps.hdc,0,0,clientRect.right,clientRect.bottom,hdcMem,0,0,bm.bmWidth,
-    bm.bmHeight,SRCCOPY);
-
-
-  DeleteDC(hdcMem); 
-  EndPaint(WindowHandle_,&ps);
-  return(TRUE);
+  // Stub: GDI dead code; not used in headless build.
+  return false;
 }
