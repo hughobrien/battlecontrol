@@ -47,7 +47,11 @@
 #include	"function.h"
 #include <stdio.h>
 //#include <mem.h>
-#include <sys\timeb.h>
+// TIM-65: backslash path separator in `<sys\timeb.h>` is a Windows-ism;
+// the canonical Linux path is `<sys/timeb.h>` (glibc ships it under
+// /usr/include/x86_64-linux-gnu/sys/timeb.h). Forward slash also works
+// on Windows so this is a one-way safe normalization.
+#include <sys/timeb.h>
 #include "connect.h"
 
 //#include "WolDebug.h"
