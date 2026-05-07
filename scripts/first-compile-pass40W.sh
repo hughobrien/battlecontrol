@@ -48,6 +48,25 @@ SUMMARY_FILE="$LOG_DIR/first-compile-pass40W.summary.txt"
 ATTRIB_FILE="$LOG_DIR/first-compile-pass40W.attribution.txt"
 
 mkdir -p "$LOG_DIR"
+
+# TIM-112: serialise pass-40W invocations end-to-end via flock.
+#
+# generate-include-shim.py --clean unlinks every symlink under
+# build/include-shim/{redalert,win32lib} and recreates them. If a
+# second invocation runs --clean while a first invocation is still in
+# its compile loop, the first invocation transiently sees missing
+# include-shim outputs (manifested historically as "fatal error: ...:
+# No such file or directory" on TUs like SMUDGE.CPP and SOUNDDLG.CPP).
+#
+# Locking only the regen call is insufficient: the lock would be
+# released before the compile loop, leaving the symlinks vulnerable
+# to a follow-up invocation's --clean. Holding the lock for the whole
+# script means concurrent or rapid back-to-back invocations queue
+# end-to-end, and the compile loop runs against a stable shim tree.
+SHIM_LOCK="$LOG_DIR/include-shim.lock"
+exec 200>"$SHIM_LOCK"
+flock -x 200
+
 : > "$LOG_FILE"
 : > "$SUMMARY_FILE"
 : > "$ATTRIB_FILE"
