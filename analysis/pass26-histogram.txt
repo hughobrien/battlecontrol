@@ -1,0 +1,15 @@
+      7 dde.h:97
+      2 mapedit.h:170
+      2 WSProto.h:61
+      2 DLLInterface.h:616
+      1 wsnwlink.h:140
+      1 wincomm.h:237
+      1 key.h:37
+      1 gbuffer.h:148
+      1 WSPROTO.CPP:137
+      1 WINSTUB.CPP:58
+      1 VISUDLG.CPP:208
+      1 VDATA.CPP:572
+      1 UTRACKER.CPP:202
+      1 UNIT.CPP:2418
+      1 UDATA.CPP:1086

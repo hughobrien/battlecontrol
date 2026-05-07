@@ -210,4 +210,13 @@ typedef BOOL (*LPDDENUMCALLBACKEXW)(GUID*, LPWSTR, LPWSTR, LPVOID, HMONITOR);
  * force-included msvc-compat.h -> windows.h -> mmsystem.h path. */
 #include "mmsystem.h"
 
+/* TIM-51: same transitive-include trick for the Winsock1 type taxonomy.
+ * REDALERT/tcpip.h declares TcpipManagerClass members typed SOCKET /
+ * WSADATA / IN_ADDR / struct in_addr without including <winsock.h>;
+ * function.h doesn't pull it either. Upstream's Win32 build relied on
+ * a /FI or PCH path that made winsock1 globally visible. Pull our stub
+ * winsock.h from windows.h so every force-include of msvc-compat.h ->
+ * windows.h reaches the taxonomy, mirroring TIM-46. */
+#include "winsock.h"
+
 #endif /* LINUX_STUBS_WINDOWS_H */
