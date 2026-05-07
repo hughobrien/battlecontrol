@@ -30,4 +30,54 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     )
 endif()
 
+# ---------------------------------------------------------------------------
+# TIM-5: case-folding include shim + Win32 stub headers
+#
+# `redalert_includes` is an INTERFACE target that any future RedAlert library
+# can link to via target_link_libraries(... PRIVATE redalert_includes) to
+# inherit the full include search path (shim → real source dirs → stubs).
+# We don't add a RedAlert library yet (that's TIM-6+), but the include path
+# is reproducible from CMake.
+#
+# Order of -I flags matters:
+#   1. include-shim/redalert + win32lib  — case-folded relative symlinks
+#   2. REDALERT/ + REDALERT/WIN32LIB     — original on-disk sources
+#   3. linux/win32-stubs/                — declarations-only Win32 stubs,
+#                                          last-resort so they only fire
+#                                          for genuinely missing headers
+# ---------------------------------------------------------------------------
+set(RA_SHIM_DIR "${CMAKE_BINARY_DIR}/include-shim")
+set(RA_SHIM_STAMP "${CMAKE_BINARY_DIR}/include-shim.stamp")
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+# Regenerate the shim whenever the generator or any source's include
+# graph changes. The script is idempotent (it skips up-to-date links).
+add_custom_command(
+    OUTPUT "${RA_SHIM_STAMP}"
+    COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/scripts/generate-include-shim.py"
+            --repo-root "${CMAKE_SOURCE_DIR}"
+            --shim-root "${RA_SHIM_DIR}"
+            --quiet
+    COMMAND "${CMAKE_COMMAND}" -E touch "${RA_SHIM_STAMP}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/scripts/generate-include-shim.py"
+    COMMENT "Generating RedAlert case-folding include shim"
+    VERBATIM
+)
+
+add_custom_target(redalert_include_shim ALL
+    DEPENDS "${RA_SHIM_STAMP}"
+)
+
+add_library(redalert_includes INTERFACE)
+add_dependencies(redalert_includes redalert_include_shim)
+target_include_directories(redalert_includes INTERFACE
+    "${RA_SHIM_DIR}/redalert"
+    "${RA_SHIM_DIR}/win32lib"
+    "${CMAKE_SOURCE_DIR}/REDALERT"
+    "${CMAKE_SOURCE_DIR}/REDALERT/WIN32LIB"
+    "${CMAKE_SOURCE_DIR}/linux/win32-stubs"
+)
+
 add_executable(hello_linux linux/hello.cpp)
