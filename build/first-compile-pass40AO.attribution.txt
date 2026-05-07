@@ -1,0 +1,2 @@
+REDALERT/DLLInterface.cpp -> /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:3232:79: error: no matching function for call to ‘min(long unsigned int, const int&)’
+REDALERT/WIN32LIB/DDRAW.CPP -> /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/WIN32LIB/DDRAW.CPP:752:27: error: invalid use of incomplete type ‘struct IDirectDrawPalette’

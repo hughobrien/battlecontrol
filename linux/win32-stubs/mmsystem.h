@@ -72,6 +72,29 @@ typedef UINT MMRESULT;
 #endif
 static inline MMRESULT timeBeginPeriod(UINT period) { (void)period; return TIMERR_NOERROR; }
 static inline MMRESULT timeEndPeriod(UINT period)   { (void)period; return TIMERR_NOERROR; }
+/* TIM-136: timeGetTime -- Win32 winmm millisecond monotonic counter.
+ * Win32 SDK signature is `DWORD timeGetTime(void)`, returning the
+ * number of milliseconds since system boot. On Linux we back this
+ * with CLOCK_MONOTONIC; the absolute origin differs but every call
+ * site uses the value either as an srand seed
+ * (DLLInterface.cpp:1011) or a relative deadline
+ * (`now + WAIT > timeout`), so a monotonic ms counter is
+ * semantically equivalent.
+ *
+ * Wide-blast safety: ripgrep finds 8 call sites in REDALERT/. Seven
+ * (CONQUER.CPP, WOLAPIOB.CPP, WOL_CHAT.CPP, WOL_DNLD.CPP,
+ * WOL_GSUP.CPP, RAWOLAPI.CPP, SENDFILE.CPP) are gated behind
+ * `#ifdef WOLAPI_INTEGRATION` (undefined under our build) so the
+ * preprocessor removes them. The eighth, DLLInterface.cpp:1011, is
+ * unguarded and is the FAIL this edit clears. No header in the tree
+ * currently declares timeGetTime, so there is no clash. */
+#include <time.h>
+static inline DWORD timeGetTime(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (DWORD)((unsigned long long)ts.tv_sec * 1000ULL
+                 + (unsigned long long)ts.tv_nsec / 1000000ULL);
+}
 #endif
 
 /* TIM-56: multimedia-timer event-type macros. WIN32LIB/TIMERINI.CPP:122
