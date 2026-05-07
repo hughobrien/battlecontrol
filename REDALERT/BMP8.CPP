@@ -139,6 +139,9 @@ bool BMP8::Init( const char* szFile, HWND hWnd )
 }
 
 
+// Westwood `wstypes.h` (no longer in repo) defined `bit8` as an unsigned 8-bit
+// scalar; restore the typedef locally so this dead drawBmp() body parses.
+typedef unsigned char bit8;
 bit8 BMP8::drawBmp(void)
 {
   // Paint the window (and draw the bitmap). 
