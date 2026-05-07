@@ -169,9 +169,20 @@ def main() -> int:
 
         # Prefer a candidate whose REAL directory matches the include's
         # angle-vs-quote intent? We don't know that without re-parsing,
-        # so just take the first match. There are no collisions in the
-        # current tree (verified by inspection).
+        # so just take the first match. The one known collision is
+        # AUDIO.H, where REDALERT/AUDIO.H is dead-code (defines an
+        # AudioClass referenced nowhere) and REDALERT/WIN32LIB/AUDIO.H
+        # carries the Westwood audio surface (Play_Sample, SFX_Type,
+        # Sample_Type) consumed by the only `<audio.h>` include site
+        # (REDALERT/WIN32LIB/WWLIB32.H:51). Prefer the WIN32LIB copy
+        # for that one basename so the shim's redalert/audio.h does not
+        # mask the Westwood header.
         real_path = candidates[0]
+        if basename.lower() == "audio.h" and len(candidates) > 1:
+            for c in candidates:
+                if c.parent.name.upper() == "WIN32LIB":
+                    real_path = c
+                    break
         target_dir = shim_dir_for(basename, repo_root, shim_root, real_path)
         if target_dir is None:
             continue
