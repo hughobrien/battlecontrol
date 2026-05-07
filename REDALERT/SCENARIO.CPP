@@ -60,6 +60,18 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include	"function.h"
+// TIM-61 Fix C: define min/max as macros mirroring Win32 <windef.h>.
+// Replicates the TIM-54 Fix C precedent for the 2-TU min/max ADL
+// residual surfaced by TIM-57 fragmentation. JSHELL.H's free
+// `min`/`max` templates are guarded `#ifndef WIN32` so the WIN32-
+// shaped build relies on windef.h's untyped macros at the engine's
+// mismatched-arg-type call sites.
+#ifndef min
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+#ifndef max
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#endif
 #ifdef WIN32
 #include "tcpip.h"
 #include "ccdde.h"
