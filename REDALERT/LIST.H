@@ -38,6 +38,7 @@
 #include "control.h"
 #include "shapebtn.h"
 #include "slider.h"
+#include <algorithm>		// TIM-40: std::max in template body (list.h:263)
 
 
 /***************************************************************************
@@ -260,7 +261,7 @@ TListClass<T>::TListClass(int id, int x, int y, int w, int h, TextPrintType flag
 	UpGadget.X -= UpGadget.Width;
 	DownGadget.X -= DownGadget.Width;
 	DownGadget.Y -= DownGadget.Height;
-	ScrollGadget.X -= max(UpGadget.Width, DownGadget.Width);
+	ScrollGadget.X -= std::max(UpGadget.Width, DownGadget.Width);
 	ScrollGadget.Y = Y+UpGadget.Height;
 	ScrollGadget.Height -= UpGadget.Height + DownGadget.Height;
 	ScrollGadget.Width = max(UpGadget.Width, DownGadget.Width);
