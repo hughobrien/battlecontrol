@@ -264,7 +264,13 @@ void GraphicBufferClass::DD_Init(GBC_Enum flags)
 	//
 	// Call CreateSurface
 	//
+#ifdef _MSC_VER
+	// TIM-141: native CreateSurface is MSVC-only until commit 3 graduates
+	// VideoSurfacePtr to an SDL_Surface*-backed wrapper. The IDirectDrawSurface
+	// stub in DDRAW.H still keeps the pointer type complete on Linux, so
+	// downstream code (Attach_DD_Surface, blit paths) compiles unchanged.
 	DirectDrawObject->CreateSurface( &VideoSurfaceDescription , &VideoSurfacePtr , NULL);
+#endif
 	AllSurfaces.Add_DD_Surface (VideoSurfacePtr);
 
 	if ( GBC_VISIBLE & flags ){

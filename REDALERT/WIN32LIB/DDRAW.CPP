@@ -51,6 +51,7 @@
 // document on TIM-141 for the full mapping.
 #ifndef _MSC_VER
 #include <SDL2/SDL.h>
+#include <climits>      // TIM-141 commit 2: Get_Free_Video_Memory uses INT_MAX
 static SDL_Window*   SDL_VideoWindow    = nullptr;
 static SDL_Renderer* SDL_VideoRenderer  = nullptr;
 static SDL_Surface*  SDL_PrimarySurface = nullptr;
@@ -610,7 +611,7 @@ void Reset_Video_Mode(void)
 	if (SDL_WasInit(SDL_INIT_VIDEO)) {
 		SDL_QuitSubSystem(SDL_INIT_VIDEO);
 	}
-#endif
+#else
 	HRESULT result;
 
 	//
@@ -625,6 +626,7 @@ void Reset_Video_Mode(void)
 
 		DirectDrawObject = NULL;
 	}
+#endif
 }
 
 
@@ -646,7 +648,12 @@ void Reset_Video_Mode(void)
  *=============================================================================================*/
 unsigned int Get_Free_Video_Memory(void)
 {
-
+#ifndef _MSC_VER
+	// TIM-141: SDL2 has no fixed VRAM ceiling on Linux; report effectively
+	// unlimited. The only call sites (STARTUP.CPP stats logging) just record
+	// the value, so this is safe.
+	return (unsigned int)INT_MAX;
+#else
 	DDCAPS	video_capabilities;
 
 	if (DirectDrawObject){
@@ -664,6 +671,7 @@ unsigned int Get_Free_Video_Memory(void)
 
 	//MessageBox(MainWindow, "In Get_Free_Video_Memory. About to return failure","Note", MB_ICONEXCLAMATION|MB_OK);
 	return (0);
+#endif
 }
 
 
@@ -685,6 +693,13 @@ unsigned int Get_Free_Video_Memory(void)
  *=============================================================================================*/
 unsigned Get_Video_Hardware_Capabilities(void)
 {
+#ifndef _MSC_VER
+	// TIM-141: SDL2 doesn't expose DirectDraw hardware-blit caps. Report no
+	// hardware acceleration so callers fall through to the software paths
+	// they already implement (STARTUP.CPP stats logging, INIT.CPP feature
+	// gates). The native renderer in commit 3+ will surface real caps.
+	return 0;
+#else
 	DDCAPS	video_capabilities;
 	unsigned	video;
 
@@ -729,6 +744,7 @@ unsigned Get_Video_Hardware_Capabilities(void)
 
 	//MessageBox(MainWindow, "In Get_Video_Hardware_Capabilities. About to return success.","Note", MB_ICONEXCLAMATION|MB_OK);
 	return (video);
+#endif
 }
 
 
@@ -748,6 +764,14 @@ unsigned Get_Video_Hardware_Capabilities(void)
 extern int ScreenWidth;
 void Wait_Vert_Blank(void)
 {
+#ifndef _MSC_VER
+	// TIM-141: real vsync is the SDL renderer's job (created with
+	// SDL_RENDERER_PRESENTVSYNC in Set_Video_Mode). The cheap delay below is
+	// a placeholder so call sites that pace on this function don't busy-spin
+	// before the renderer is wired through GBUFFER (commit 3).
+	SDL_Delay(1);
+	return;
+#else
 	if (DirectDrawObject == NULL) {
 		return;
 	}
@@ -759,6 +783,7 @@ void Wait_Vert_Blank(void)
 		}
 		Process_DD_Result(result, FALSE);
 	}
+#endif
 }
 
 
