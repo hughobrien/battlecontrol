@@ -1,0 +1,76 @@
+# TIM-54 pass-29-C residual first-error histogram (after Fix A + B + C).
+#
+# Pre-baseline: pass-28 (TIM-53) -- 203 OK / 98 Fail / 301 Total.
+# Pass-29-C:                       249 OK / 52 Fail / 301 Total.
+# Delta:                           +46 OK (-46 Fail), zero regressions.
+#
+# Group C fix-shapes targeted by this pass (all fully cleared from
+# first-error attribution):
+#
+#   |  bucket                          | pass-28 | pass-29-A | pass-29-B | pass-29-C |
+#   |----------------------------------|---------|-----------|-----------|-----------|
+#   | WWMouseClass incomplete          |    3    |     0     |     0     |     0     |
+#   | Hide_Mouse / Show_Mouse / Set_*  |   17    |    17     |     0     |     0     |
+#   | min / max ADL                    |   33    |    34     |    35     |     0     |
+#
+# Per-fix verdict:
+#   - Fix A (WIN32LIB/MOUSE.H per-file include in DIALOG/GSCREEN/QUEUE):
+#       2 cleared (DIALOG, GSCREEN). 1 fragmented (QUEUE -> min/max).
+#       29-A delta vs 28: +3 OK (DIALOG, GSCREEN, plus PROFILE which
+#       cleared via TIM-55's parallel strupr shim landing in the same
+#       HEAD).
+#   - Fix B (REDALERT/MOUSE.H pulls WIN32LIB/MOUSE.H so the function.h
+#     chain exposes Hide_Mouse / Show_Mouse / Set_Mouse_Cursor / Get_*):
+#       12 cleared net: BAR, CHECKBOX, COMINIT, DIAL8, EXPAND, MOUSE,
+#       MPGSET, MPLAYER, MSGLIST, SOUNDDLG, TACTION, VISUDLG.
+#       17 mouse-fn first-errors cleared (some were second-layer failures
+#       behind another bucket and so didn't gain a global OK).
+#   - Fix C (per-file Win32-style #define min/max macros in 35 TUs --
+#     mirrors MP.CPP / SHA.CPP / MPMGRD.CPP / MPMGRW.CPP precedent;
+#     std::min / std::max can't deduce mismatched arg types like the
+#     engine's `min(int, MPHType)` / `max(char, int)` / `min(LEPTON, int)`):
+#       31 cleared net (AIRCRAFT, ANIM, BUILDING, BULLET, CELL, COMBAT,
+#       CREDITS, DISPLAY, DRIVE, FACING, FACTORY, FINDPATH, FOOT, FUSE,
+#       GOPTIONS, HELP, INFANTRY, LIST, MONOC, MSGBOX, OBJECT, RADAR,
+#       RULES, SLIDER, SMUDGE, SPECIAL, SUPER, TEAMTYPE, TECHNO, UDATA,
+#       UNIT). 4 fragmented (COORD parser, MAP LP64 precision, MENUS
+#       SYSTEMTIME, QUEUE extern/static).
+#
+# Residual top-N first-error pattern histogram (pass-29-C):
+      6 rvalue-binding (Straw& / Pipe& cannot bind to rvalue temps)
+      4 LP64:pointer-to-int precision loss
+      3 missing-include
+      2 parser:expected class-name (mapedit.h:170 -- TIM-48 watch site)
+      2 overload-resolution (DLLInterface.h:616)
+      2 extra-qualification (EventCallbackStruct nested type)
+      1 incomplete-type
+      1 not-a-type
+      1 MASM lex (DrawMisc.cpp missing terminating ")
+      1 MASM lex (MiscAsm.cpp too many decimal points)
+      1 parser:macro-paren (IRANDOM.CPP:72)
+#
+# Long tail of Win32 free-function and engine-source gaps (1 TU each):
+#   SYSTEMTIME, FD_READ, SOCK_DGRAM, TIME_PERIODIC, MB_ICONEXCLAMATION,
+#   GetKeyState, SW_HIDE, WIN32_FIND_DATA, _dos_open, int386, unlink;
+#   Stop_Primary_Sound_Buffer, Play_Sample, Set_Score_Vol, SoundType,
+#   SampleType, hBitmap; HOUSE.CPP / HEAP.CPP template specialisation,
+#   PALETTE.CPP linkage, MIXFILE.CPP unlink missing-args, MPMGRD.CPP
+#   MGenGetMasterNode, MPLIB.CPP int386, LZWOTRAW.CPP staging_buffer,
+#   LOADDLG.CPP unlink, KEYBOARD.CPP GetKeyState.
+#
+# TIM-48 mapedit.h:170 watch status:
+#   Still 2 TUs (MOUSEWW.CPP, WRITEPCX.CPP) fail with
+#   "expected class-name before { token". Unchanged from pass-28.
+#   Unrelated to TIM-54's three Group C fix-shapes.
+#
+# Remaining Group C inventory (for follow-up tickets):
+#   - rvalue-binding (6 TUs): Straw / Pipe & temp binding under
+#     -fno-permissive. Engine pattern is `Foo(SomeStraw())` where the
+#     ctor takes Straw& -- needs either a const&-qualified ctor or a
+#     named-temp refactor at the call sites.
+#   - LP64 precision loss (4 TUs): pointer-to-int casts assuming
+#     sizeof(int) == sizeof(void*). Real 32->64 bit width audit
+#     (TIM-7 territory).
+#   - EventCallbackStruct extra-qualification (2 TUs in DLLInterface.h:616).
+#   - MASM lex errors (2 TUs: DrawMisc.cpp + MiscAsm.cpp): inline asm
+#     uses MSVC-flavour assembler that cc1plus can't tokenize.

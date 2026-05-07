@@ -46,6 +46,11 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include	"function.h"
+// TIM-54: pull WIN32LIB/MOUSE.H for the WWMouseClass full def (member
+// access on WWMouse->Draw_Mouse / Erase_Mouse at lines 152-154). The
+// case-folding shim resolves "mouse.h" to REDALERT/MOUSE.H (MouseClass),
+// so we name the WIN32LIB path explicitly via -I REDALERT/.
+#include	"WIN32LIB/MOUSE.H"
 
 #include   "defines.h"   //VG 10/17/96
 

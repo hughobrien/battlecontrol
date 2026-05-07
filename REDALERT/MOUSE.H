@@ -37,6 +37,17 @@
 
 #include	"stage.h"
 #include	"scroll.h"
+// TIM-54 Fix B: pull WIN32LIB/MOUSE.H so the engine free-function decls
+// (Hide_Mouse, Show_Mouse, Set_Mouse_Cursor, Get_Mouse_X/Y, ...) and the
+// WWMouseClass full definition are visible at every consumer of mouse.h
+// (everything reachable from function.h). The case-folding shim resolves
+// the bare basename "mouse.h" to REDALERT/MOUSE.H; naming the WIN32LIB
+// path explicitly bypasses the shim and lets -I REDALERT/ find the
+// uppercase original. Header guards differ (WW_MOUSE_H vs MOUSE_H) so
+// no recursive include occurs. Targets the 17-TU Hide_Mouse / Show_Mouse
+// / Set_Mouse_Cursor first-error bucket and incidentally also subsumes
+// the per-file includes added in DIALOG/GSCREEN/QUEUE for Fix A.
+#include	"WIN32LIB/MOUSE.H"
 
 class MouseClass: public ScrollClass
 {
