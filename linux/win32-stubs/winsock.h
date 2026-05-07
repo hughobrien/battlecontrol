@@ -234,4 +234,61 @@ typedef struct sockaddr_in* LPSOCKADDR_IN;
 #define FD_CLOSE    0x20
 #endif
 
+/* TIM-59: struct sockaddr forward + LPSOCKADDR. WSPUDP.CPP / WSPIPX.CPP
+ * cast `(LPSOCKADDR)&addr` (where addr is `struct sockaddr_in`) when
+ * passing to bind/sendto/recvfrom. We forward-declare the generic
+ * sockaddr as opaque rather than pulling <sys/socket.h> -- doing so
+ * would clash with the in_addr layout above and trigger the same
+ * cascade trap as the <arpa/inet.h> attempt in TIM-53. The C-style
+ * pointer casts at the call sites coerce sockaddr_in* through this
+ * forward decl without needing field access. */
+#ifndef _WINSOCK1_SOCKADDR_FWD_DEFINED
+#define _WINSOCK1_SOCKADDR_FWD_DEFINED
+struct sockaddr;
+typedef struct sockaddr  SOCKADDR;
+typedef struct sockaddr* PSOCKADDR;
+typedef struct sockaddr* LPSOCKADDR;
+#endif
+
+/* TIM-59: NSPROTO_IPX -- Win32 Winsock IPX protocol selector. WSPIPX
+ * .CPP:98 calls `socket(AF_IPX, SOCK_DGRAM, NSPROTO_IPX)` to open an
+ * IPX datagram socket. Standard <wsnetbs.h>/<wsnwlink.h> value (1000)
+ * from the Microsoft NSP catalogue. The IPX path is dormant under the
+ * stub (socket() itself returns INVALID_SOCKET below); the constant
+ * just lets the call site parse. */
+#ifndef NSPROTO_IPX
+#define NSPROTO_IPX 1000
+#endif
+
+/* TIM-59: socket / bind / sendto / recvfrom -- core Winsock1 BSD-shape
+ * I/O surface. WSPUDP.CPP:158/170/341/410 (UDP path) and WSPIPX.CPP
+ * :98/216/335/424 (IPX path) drive the engine's network transport. We
+ * are NOT wiring real Linux sockets here -- the stub returns
+ * INVALID_SOCKET on socket() so the engine's caller-side check
+ * (`if (Socket == INVALID_SOCKET) return false;`) bails out and the
+ * subsequent bind/sendto/recvfrom calls parse but never run.
+ *
+ * Real Win32 signatures from <winsock.h>:
+ *   SOCKET socket(int af, int type, int protocol);
+ *   int    bind(SOCKET, const struct sockaddr*, int);
+ *   int    sendto(SOCKET, const char*, int, int, const struct sockaddr*, int);
+ *   int    recvfrom(SOCKET, char*, int, int, struct sockaddr*, int*);
+ * Linux <sys/socket.h> uses ssize_t / socklen_t in places; we keep the
+ * Win32 signatures verbatim because that is what the engine call sites
+ * are typed against. */
+static inline SOCKET socket(int, int, int) { return INVALID_SOCKET; }
+static inline int    bind(SOCKET, const struct sockaddr*, int) { return SOCKET_ERROR; }
+static inline int    sendto(SOCKET, const char*, int, int, const struct sockaddr*, int) { return SOCKET_ERROR; }
+static inline int    recvfrom(SOCKET, char*, int, int, struct sockaddr*, int*) { return SOCKET_ERROR; }
+
+/* TIM-59: WSAAsyncSelect / WSACancelAsyncRequest -- Win32 async I/O
+ * notification surface (Winsock1). WSPROTO.CPP:187 enables FD_READ |
+ * FD_WRITE notifications via WSAAsyncSelect; lines 190/215 cancel
+ * outstanding async-DNS requests on tear-down. The async-event pump
+ * is dormant on Linux (no Win32 message loop); a later port routes
+ * these via select()/poll(). Stubs return SOCKET_ERROR so any caller
+ * that branches on success treats them as a no-op failure. */
+static inline int WSAAsyncSelect(SOCKET, HWND, unsigned int, long) { return SOCKET_ERROR; }
+static inline int WSACancelAsyncRequest(HANDLE) { return SOCKET_ERROR; }
+
 #endif /* LINUX_STUBS_WINSOCK_H_INCLUDED */
