@@ -7,3 +7,11 @@
 [Dd]ebug/
 [Rr]elease/
 [Bb]in/
+
+# CMake / Linux build outputs
+build/
+build-*/
+CMakeUserPresets.json
+compile_commands.json
+.cache/
+
