@@ -44,6 +44,19 @@
 #include <palette.h>
 #include "stdio.h"
 
+// TIM-141: Linux native SDL2 path. Replaces the (already-no-op'd) DirectDraw
+// runtime in Set_Video_Mode / Reset_Video_Mode / Set_DD_Palette / Wait_*. The
+// MSVC build keeps the upstream DirectDraw COM path; on Linux we drive an
+// SDL_Window + SDL_Renderer + 8-bit indexed SDL_Surface directly. See plan
+// document on TIM-141 for the full mapping.
+#ifndef _MSC_VER
+#include <SDL2/SDL.h>
+static SDL_Window*   SDL_VideoWindow    = nullptr;
+static SDL_Renderer* SDL_VideoRenderer  = nullptr;
+static SDL_Surface*  SDL_PrimarySurface = nullptr;
+static SDL_Color     SDL_PaletteEntries[256] = {};
+#endif
+
 LPDIRECTDRAW		DirectDrawObject=NULL;	// Pointer to the direct draw object
 LPDIRECTDRAW2	DirectDraw2Interface = NULL;  	// Pointer to direct draw 2 interface
 
@@ -451,7 +464,39 @@ void Check_Overlapped_Blit_Capability(void)
 BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 {
 // ST - 1/3/2019 10:41AM
+#ifndef _MSC_VER
+	// TIM-141: Linux native SDL2 entry. The original DirectDraw path below
+	// (#if(0)) is dead on every platform after Steve Tall's 2019 stub.
+	// On the MSVC build this function still returns TRUE without doing
+	// anything; on Linux we open a real SDL window + renderer + indexed
+	// primary surface so the rest of the engine has something to talk to
+	// once the GBUFFER consumers migrate (TIM-141 commit 2-3).
+	if (SDL_VideoWindow == nullptr) {
+		if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
+			if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0) {
+				return FALSE;
+			}
+		}
+		SDL_VideoWindow = SDL_CreateWindow(
+			"Red Alert",
+			SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+			w, h,
+			SDL_WINDOW_HIDDEN);  // hidden until the engine drives a frame
+		if (SDL_VideoWindow == nullptr) {
+			return FALSE;
+		}
+		SDL_VideoRenderer = SDL_CreateRenderer(
+			SDL_VideoWindow, -1,
+			SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+		// Indexed 8-bit primary surface; palette is filled in by
+		// Set_DD_Palette and applied via SDL_SetPaletteColors.
+		SDL_PrimarySurface = SDL_CreateRGBSurfaceWithFormat(
+			0, w, h, 8, SDL_PIXELFORMAT_INDEX8);
+	}
 	return TRUE;
+#else
+	return TRUE;
+#endif
 #if (0)
 	HRESULT result;
 	//
@@ -548,6 +593,24 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
  *=============================================================================================*/
 void Reset_Video_Mode(void)
 {
+#ifndef _MSC_VER
+	// TIM-141: Linux SDL2 teardown. Mirrors the open path in Set_Video_Mode.
+	if (SDL_PrimarySurface) {
+		SDL_FreeSurface(SDL_PrimarySurface);
+		SDL_PrimarySurface = nullptr;
+	}
+	if (SDL_VideoRenderer) {
+		SDL_DestroyRenderer(SDL_VideoRenderer);
+		SDL_VideoRenderer = nullptr;
+	}
+	if (SDL_VideoWindow) {
+		SDL_DestroyWindow(SDL_VideoWindow);
+		SDL_VideoWindow = nullptr;
+	}
+	if (SDL_WasInit(SDL_INIT_VIDEO)) {
+		SDL_QuitSubSystem(SDL_INIT_VIDEO);
+	}
+#endif
 	HRESULT result;
 
 	//
@@ -728,31 +791,44 @@ void Set_DD_Palette ( void *palette )
 	int	k;
 	char	*palette_get;
 
+	// TIM-141: always populate the Westwood 6-bit palette table (was
+	// previously gated behind `DirectDrawObject && PaletteSurface`, which
+	// meant the table never got filled on Linux). The SDL2 path below
+	// reads from PaletteEntries[]; the MSVC DirectDraw path keeps its
+	// own SetPalette/SetEntries flow under #ifdef _MSC_VER.
+	k=0;
+	palette_get = (char*)palette;
+	for( j=0 ; j<768 ; j+=3 )
+	{
+		PaletteEntries[k].peRed = (unsigned char)((*palette_get++)<<2);
+		PaletteEntries[k].peGreen = (unsigned char)((*palette_get++)<<2);
+		PaletteEntries[k].peBlue = (unsigned char)((*palette_get++)<<2);
+		k++;
+	}
+
+#ifndef _MSC_VER
+	// Mirror into SDL_Color[256] and apply to the indexed primary surface
+	// (if Set_Video_Mode has opened one). 8-bit 6→8 expansion already
+	// happened above via the `<<2` shift on each channel.
+	for (int i = 0; i < 256; ++i) {
+		SDL_PaletteEntries[i].r = PaletteEntries[i].peRed;
+		SDL_PaletteEntries[i].g = PaletteEntries[i].peGreen;
+		SDL_PaletteEntries[i].b = PaletteEntries[i].peBlue;
+		SDL_PaletteEntries[i].a = 255;
+	}
+	if (SDL_PrimarySurface && SDL_PrimarySurface->format && SDL_PrimarySurface->format->palette) {
+		SDL_SetPaletteColors(SDL_PrimarySurface->format->palette,
+		                     SDL_PaletteEntries, 0, 256);
+	}
+#else
 	if ( DirectDrawObject && PaletteSurface ){
-
-		k=0;
-
-		palette_get = (char*)palette;
-
-		for( j=0 ; j<768 ; j+=3 )
-		{
-			PaletteEntries[k].peRed = (unsigned char)((*palette_get++)<<2);
-			PaletteEntries[k].peGreen = (unsigned char)((*palette_get++)<<2);
-			PaletteEntries[k].peBlue = (unsigned char)((*palette_get++)<<2);
-			k++;
-		}
-
 		if ( !FirstPaletteSet ){
-			//MessageBox(MainWindow, "In Set_DD_Palette. About to call SetPalette","Note", MB_ICONEXCLAMATION|MB_OK);
 			PaletteSurface->SetPalette( PalettePtr );
 			FirstPaletteSet=TRUE;
 		}
-
-		//MessageBox(MainWindow, "In Set_DD_Palette. About to call SetEntries","Note", MB_ICONEXCLAMATION|MB_OK);
 		PalettePtr->SetEntries( 0 , 0 , 256 , &PaletteEntries[0] );
 	}
-	//MessageBox(MainWindow, "Leaving Set_DD_Palette","Note", MB_ICONEXCLAMATION|MB_OK);
-
+#endif
 }
 
 
