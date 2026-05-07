@@ -140,7 +140,7 @@ MixFileClass<T>::~MixFileClass(void)
 	/*
 	**	Unlink this mixfile object from the chain.
 	*/
-	Unlink();
+	this->Unlink();
 }
 
 
