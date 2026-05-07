@@ -735,7 +735,22 @@ static inline LONG  DispatchMessage(const MSG*)                    { return 0; }
 #define S_FALSE         ((HRESULT)1L)
 #endif
 
-static inline BOOL  GetCursorPos(LPPOINT lpPoint)                  { if (lpPoint) { lpPoint->x = 0; lpPoint->y = 0; } return TRUE; }
+/* TIM-145 pass-43C: route GetCursorPos through the SDL motion drain.
+ * The producer is REDALERT/KEYBOARD.CPP::SDL_Process_Input_Events,
+ * which writes the latest SDL_MOUSEMOTION x/y into these file-scope
+ * cursor cells. Defined in KEYBOARD.CPP (one TU) so all TUs that
+ * include this header through #include "windows.h" share the same
+ * cursor state. Pre-pass-43C every caller saw a static (0,0); now
+ * they see the real cursor as soon as the SDL window has focus. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern int SDL_Cursor_X;
+extern int SDL_Cursor_Y;
+#ifdef __cplusplus
+}
+#endif
+static inline BOOL  GetCursorPos(LPPOINT lpPoint)                  { if (lpPoint) { lpPoint->x = SDL_Cursor_X; lpPoint->y = SDL_Cursor_Y; } return TRUE; }
 static inline DWORD GetLastError(void)                             { return 0; }
 static inline BOOL  SetForegroundWindow(HWND)                      { return TRUE; }
 
