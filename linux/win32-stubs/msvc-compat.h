@@ -106,6 +106,17 @@
 #define _pascal
 #endif
 
+// TIM-50: bare lowercase `cdecl` keyword. FUNCTION.H:601, WWALLOC.H,
+// CDFILE.CPP, WIN32LIB/GETSHAPE.CPP, MEMCHECK.H all use `<type> cdecl
+// <ident>(...)` as a calling-convention qualifier on prototypes /
+// definitions; MSVC silently accepts, g++ rejects. Sister macros
+// (__cdecl, _cdecl, CDECL) were already defined empty above; bare
+// `cdecl` was the only spelling missed. Audit confirmed no use as an
+// identifier.
+#ifndef cdecl
+#define cdecl
+#endif
+
 // MSVC's 64-bit integer extension. <cstdint>'s int64_t is the
 // portable equivalent on Linux. Use the GCC/Clang extension
 // __extension__ to silence -Wpedantic warnings about the typedef.
