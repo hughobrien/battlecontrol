@@ -57,6 +57,21 @@
 
 
 /*
+**	TIM-17: FrameTimerClass moved here from JSHELL.H so that headers
+**	which instantiate CDTimerClass<FrameTimerClass> (e.g. STAGE.H) can
+**	be self-contained on a single ftimer.h include. JSHELL.H now
+**	re-includes this header to preserve its existing API surface.
+*/
+extern long Frame;
+class FrameTimerClass
+{
+	public:
+		long operator () (void) const {return(Frame);};
+		operator long (void) const {return(Frame);};
+};
+
+
+/*
 **	The "bool" integral type was defined by the C++ committee in
 **	November of '94. Until the compiler supports this, use the following
 **	definition.
@@ -259,6 +274,13 @@ class TTimerClass : public BasicTimerClass<T> {
 
 		// Queries whether the timer is currently active.
 		bool Is_Active(void) const;
+
+	protected:
+		// TIM-17: g++ two-phase name lookup requires explicitly bringing
+		// dependent base members into scope so unqualified references in
+		// the method bodies below resolve at template definition time.
+		using BasicTimerClass<T>::Started;
+		using BasicTimerClass<T>::Timer;
 
 	private:
 		unsigned long Accumulated;				//	Total accumulated ticks.
@@ -486,6 +508,13 @@ class CDTimerClass : public BasicTimerClass<T> {
 		bool Is_Active(void) const;
 
 		bool Was_Started(void) const { return WasStarted; }
+
+	protected:
+		// TIM-17: see TTimerClass — same g++ two-phase lookup fix so
+		// the unqualified `Started` / `Timer` references in the method
+		// bodies below resolve at template definition time.
+		using BasicTimerClass<T>::Started;
+		using BasicTimerClass<T>::Timer;
 
 	private:
 		unsigned long DelayTime;			// Ticks remaining before countdown timer expires.

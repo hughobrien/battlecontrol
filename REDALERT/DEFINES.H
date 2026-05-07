@@ -33,6 +33,13 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
+// TIM-17: GroundType (line ~3521) embeds `fixed Cost[SPEED_COUNT]`,
+// so this header was always implicitly relying on the includer
+// pre-loading fixed.h. Pull it in here so DEFINES.H is self-contained
+// and ABSTRACT.H (added in TIM-17) can include defines.h without an
+// extra ordering hint.
+#include	"fixed.h"
+
 /**********************************************************************
 **	Language control: define the desired language for this build.
 */

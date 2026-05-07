@@ -336,15 +336,12 @@ extern void outport(int port, unsigned short data);
 
 /*
 **	Timer objects that fetch the appropriate timer value according to
-**	the type of timer they are.
+**	the type of timer they are. FrameTimerClass and `extern long Frame`
+**	live in ftimer.h (TIM-17) so STAGE.H — which instantiates
+**	CDTimerClass<FrameTimerClass> — needs only ftimer.h to be
+**	self-contained. Re-include it here to preserve JSHELL.H's API.
 */
-extern long Frame;
-class FrameTimerClass
-{
-	public:
-		long operator () (void) const {return(Frame);};
-		operator long (void) const {return(Frame);};
-};
+#include	"ftimer.h"
 
 
 #ifndef WIN32

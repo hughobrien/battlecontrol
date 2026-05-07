@@ -35,6 +35,24 @@
 #ifndef ABSTRACT_H
 #define ABSTRACT_H
 
+// TIM-17: pull in everything this header references so it is
+// self-contained instead of relying on includer-side ordering (the
+// original MSVC build always pre-included FUNCTION.H, which masked
+// the dependency on a per-TU basis).
+//   defines.h  — COORDINATE / RTTIType / HousesType / TARGET / CELL /
+//                MoveType / FacingType / HOUSE_NONE / MOVE_OK /
+//                FACING_NONE / Build_Target
+//   face.h     — DirType (the canonical definition; defines.h has it
+//                only inside an #ifdef NEVER fossil block)
+//   ftimer.h   — NoInitClass (used by AbstractClass(NoInitClass const&))
+#include	"defines.h"
+#include	"face.h"
+#include	"ftimer.h"
+
+// TIM-17: forward-declare Coord_Cell rather than #include "function.h"
+// — function.h includes abstract.h, so a back-include would loop.
+CELL Coord_Cell(COORDINATE coord);
+
 DirType Direction(CELL cell1, CELL cell2);
 DirType Direction(COORDINATE coord1, COORDINATE coord2);
 int Distance(COORDINATE coord1, COORDINATE coord2);
