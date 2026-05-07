@@ -837,6 +837,20 @@ static inline DWORD GetModuleFileName(HMODULE, LPSTR lpFilename, DWORD nSize) {
 }
 #endif
 
+/* TIM-94: pass-40K sibling drain -- ShowCursor.
+ * INIT.CPP:3422 (Init_Mouse) calls `ShowCursor(false)` inside a
+ * `#ifdef WIN32` block to hide the OS cursor before the engine's own
+ * mouse-shape system takes over. Real Win32 signature:
+ *   `int ShowCursor(BOOL bShow)` -- returns the post-call display
+ *   counter (negative when hidden). Engine code discards the return
+ *   value, so the inert stub returns 0. The OS-cursor universe is
+ *   dormant on Linux; the eventual SDL2 port replaces this with
+ *   SDL_ShowCursor / SDL_SetRelativeMouseMode. Variadic-template
+ *   shape mirrors the TIM-87 CreateFile / DeleteObject family;
+ *   placed outside the extern "C" block above because C linkage
+ *   forbids templates. */
+template <typename... Args> int ShowCursor(Args&&...) { return 0; }
+
 /* TIM-85: GetVolumeInformation -- Win32 file-system label/serial query.
  * CONQUER.CPP:4289 (Get_CD_Index) probes the CD drive for a known
  * volume label to identify which CD is inserted. Real signature:
@@ -961,6 +975,49 @@ template <typename... Args> BOOL   DeleteObject(Args&&...) { return FALSE; }
 #endif
 #ifndef TRUNCATE_EXISTING
 #define TRUNCATE_EXISTING 5
+#endif
+
+/* TIM-94: pass-40K BMP8 kernel32 file/global-mem cluster.
+ *
+ * Post-TIM-90 (wingdi struct cluster), BMP8.CPP first-fails on
+ * `::ReadFile @65`. The next surface before any GDI dispatch is a
+ * tight kernel32 file-IO and global-memory family. All inert
+ * variadic-template stubs in the same shape as TIM-87 (CreateFile /
+ * CloseHandle / DeleteObject) -- the kernel32 universe is dormant in
+ * headless mode (no real file IO, no Windows global heap), and the
+ * eventual SDL2 / std::fstream / std::malloc port replaces these.
+ *
+ * BMP8.CPP call sites (also covered: DIBUTIL.CPP, DIBFILE.CPP,
+ * RAWFILE.CPP, WOLAPIOB.CPP -- the global-namespace template matches
+ * both `::ReadFile(...)` and `ReadFile(...)` use):
+ *   ::ReadFile      @ 65, 68, 90, 116    -- kernel32 sync read
+ *   ::GlobalAlloc   @ 71, 111            -- global-heap alloc
+ *   ::GlobalLock    @ 73, 113            -- pin / map global handle
+ *   ::GlobalUnlock  @ 131, 132           -- release global handle
+ *   GHND            @ 71, 111            -- GMEM_MOVEABLE | GMEM_ZEROINIT
+ *
+ * Real Win32 SDK signatures (from <fileapi.h> / <winbase.h>):
+ *   BOOL    ReadFile(HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED);
+ *   HGLOBAL GlobalAlloc(UINT uFlags, SIZE_T dwBytes);
+ *   LPVOID  GlobalLock(HGLOBAL hMem);
+ *   BOOL    GlobalUnlock(HGLOBAL hMem);
+ *
+ * GlobalAlloc returns HANDLE (not HGLOBAL) because the wingdi cluster
+ * below contains `typedef HANDLE HGLOBAL;` -- using HANDLE here
+ * avoids a forward-decl cycle while remaining type-compatible at
+ * every call site (HGLOBAL == HANDLE).
+ *
+ * GHND constant from <winbase.h>: 0x0042 = GMEM_MOVEABLE (0x0002) |
+ * GMEM_ZEROINIT (0x0040). Engine code only uses the value as a flag
+ * passthrough -- no allocator code path inspects the bits under the
+ * stub. */
+template <typename... Args> BOOL   ReadFile     (Args&&...) { return FALSE; }
+template <typename... Args> HANDLE GlobalAlloc  (Args&&...) { return nullptr; }
+template <typename... Args> LPVOID GlobalLock   (Args&&...) { return nullptr; }
+template <typename... Args> BOOL   GlobalUnlock (Args&&...) { return FALSE; }
+
+#ifndef GHND
+#define GHND 0x0042
 #endif
 
 /* TIM-90: pass-40J BMP8 wingdi struct cluster. POD typedefs for the
