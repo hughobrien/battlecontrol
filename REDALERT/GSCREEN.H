@@ -38,6 +38,8 @@
 #include	"function.h"
 #include	"cell.h"
 
+class GadgetClass;	// pointer/ref-only members; defined in gadget.h
+
 class GScreenClass
 {
 	public:

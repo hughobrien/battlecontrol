@@ -236,3 +236,16 @@ TemplateClass::TemplateClass(TemplateType type, CELL pos) :
 		Unlimbo(Cell_Coord(pos));
 	}
 }
+
+
+/***********************************************************************************************
+ * TemplateClass::~TemplateClass -- Template object destructor.                                *
+ *                                                                                             *
+ * Out-of-line so TEMPLATE.H does not need to see the global GameActive declaration            *
+ * (TIM-22 header self-containment).                                                           *
+ *=============================================================================================*/
+TemplateClass::~TemplateClass(void)
+{
+	if (GameActive) TemplateClass::Limbo();
+	Class = 0;
+}
