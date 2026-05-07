@@ -90,6 +90,18 @@ typedef void*              HKEY;
 typedef void*              HMONITOR;
 typedef void*              HPALETTE;     /* GDI palette handle, used by upstream blit code */
 
+/* TIM-31: INVALID_HANDLE_VALUE. Win32 SDK form is
+ * `((HANDLE)(LONG_PTR)-1)`; on LP64 Linux we use intptr_t to get the
+ * pointer-sized signed integer with no platform-dependent assumptions.
+ * Referenced by REDALERT/RAWFILE.H:269 (RawFileClass ctor) and :326
+ * (Is_Open) inside `#ifdef WIN32` blocks; the WWLIB32 chain defensively
+ * defines WIN32 in several headers (wwstd.h, TIMER.H, RAWFILE.H,
+ * WINCOMM.H, MODEMREG.H), so on Linux this constant must exist as a
+ * stub even though we never run a Win32 kernel handle. */
+#ifndef INVALID_HANDLE_VALUE
+#define INVALID_HANDLE_VALUE ((HANDLE)(intptr_t)-1)
+#endif
+
 /* HRESULT is `long` on Win32 and is treated as a signed 32-bit error
  * code throughout DDRAW.H (DDERR_* macros are signed long literals). */
 typedef long               HRESULT;
