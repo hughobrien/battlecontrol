@@ -197,7 +197,13 @@ struct NoInitClass {
 #define FILE_H
 #define WWMEM_H
 
-#ifndef WIN32
+// TIM-82: Original Watcom non-WIN32 build pre-defined TIMER_H here to skip
+// WIN32LIB/TIMER.H (which assumed WIN32). The Linux port doesn't define
+// WIN32 either (see linux/win32-stubs/msvc-compat.h), but we DO want the
+// WIN32-style TimerClass / CountDownTimerClass definitions — without them,
+// CONQUER.CPP:4277 and INIT.CPP:1141 fail to declare CountDownTimerClass.
+// Carve __linux__ out so the real TIMER.H runs through the wwlib32 cascade.
+#if !defined(WIN32) && !defined(__linux__)
 #define TIMER_H
 #endif
 
