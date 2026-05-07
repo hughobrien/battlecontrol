@@ -847,6 +847,19 @@ static inline DWORD GetModuleFileName(HMODULE, LPSTR lpFilename, DWORD nSize) {
     if (lpFilename && nSize > 0) lpFilename[0] = '\0';
     return 0;
 }
+/* TIM-98: pass-40N WINSTUB first-error drain -- ExitProcess.
+ * WINSTUB.CPP:812 (Memory_Error_Handler) and :256 (Process Quit branch
+ * in Message_Loop) call `ExitProcess(0)` to terminate the Win32
+ * process from engine code. Real <processthreadsapi.h> signature:
+ *   `void WINAPI ExitProcess(UINT uExitCode)` -- declared `noreturn`
+ *   on Windows. The shim is inert (does NOT actually exit) because
+ *   under -fsyntax-only the call is a parser walk, and at runtime
+ *   under the eventual SDL2 port the engine wires shutdown through
+ *   its own ReadyToQuit / atexit path rather than aborting via the
+ *   kernel32 process API. Sibling-shape to the TIM-92
+ *   GetModuleFileName stub above; same kernel32 process-control
+ *   cluster, same extern "C" placement. */
+static inline void ExitProcess(UINT) {}
 #ifdef __cplusplus
 }
 #endif
