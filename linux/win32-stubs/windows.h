@@ -772,4 +772,73 @@ static inline void  OutputDebugStringW(LPCWSTR)                    {}
  * surveyed call sites. */
 static inline LONG  SendMessage(HWND, UINT, WPARAM, LPARAM)        { return 0; }
 
+/* TIM-85: pass-40F Win32 type/API stub bundle. Five additive declarations
+ * to drain the CONQUER / MENUS / WINSTUB / RAWFILE / BMP8 cluster. Same
+ * inert-stub policy as the TIM-71 / TIM-74 / TIM-75 bundles -- no engine
+ * behaviour change, just enough surface for the parser to walk through
+ * the dormant Win32 branches. */
+
+/* TIM-85: LPCTSTR -- Win32 const-TCHAR string pointer. WINSTUB.CPP:499
+ * (Window_Dialog_Box) takes an LPCTSTR template name on a Win32-only
+ * dialog API. Without UNICODE the SDK defines TCHAR=char, so LPCTSTR
+ * collapses to LPCSTR. Engine never reads through the pointer (the
+ * dialog body itself is `#if (0)//PG`-disabled), so a typedef alias
+ * is sufficient. */
+typedef LPCSTR LPCTSTR;
+typedef LPSTR  LPTSTR;
+
+/* TIM-85: SYSTEMTIME -- Win32 broken-down clock record. Real
+ * <minwinbase.h> shape; field set fully populated because INIT.CPP:2499
+ * (CryptRandom seeding) reads wMilliseconds/wSecond/wMinute/wHour/wDay/
+ * wDayOfWeek/wMonth/wYear. MENUS.CPP:842 only reads wMilliseconds. The
+ * struct is just a passive seed source on Linux; the matching
+ * GetSystemTime declaration is the inert sibling -- engine never asserts
+ * on the values, only feeds them into the cryptographic RNG. */
+typedef struct _SYSTEMTIME {
+    WORD wYear;
+    WORD wMonth;
+    WORD wDayOfWeek;
+    WORD wDay;
+    WORD wHour;
+    WORD wMinute;
+    WORD wSecond;
+    WORD wMilliseconds;
+} SYSTEMTIME, *LPSYSTEMTIME, *PSYSTEMTIME;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* Inert: leaves the SYSTEMTIME zero-initialized at declaration time, so
+ * the seed bits are deterministic until the SDL2 time-source port
+ * lands. RNG seeding is the only consumer. */
+static inline void GetSystemTime(LPSYSTEMTIME) {}
+#ifdef __cplusplus
+}
+#endif
+
+/* TIM-85: GetVolumeInformation -- Win32 file-system label/serial query.
+ * CONQUER.CPP:4289 (Get_CD_Index) probes the CD drive for a known
+ * volume label to identify which CD is inserted. Real signature:
+ * `BOOL GetVolumeInformationA(LPCSTR, LPSTR, DWORD, LPDWORD, LPDWORD,
+ * LPDWORD, LPSTR, DWORD)`. Variadic-template inert stub returning 0
+ * (FALSE) so the volume-detect loop falls through to the no-CD branch.
+ * The CD-detect path is dormant on Linux (we don't enumerate physical
+ * drive letters); the eventual port replaces this with an
+ * SDL_RWops/asset-pack lookup. Variadic shape mirrors the
+ * TIM-74/TIM-75 GDI-cluster stubs -- same return-int policy. */
+template <typename... Args> int GetVolumeInformation(Args&&...) { return 0; }
+template <typename... Args> int GetVolumeInformationA(Args&&...) { return 0; }
+
+/* TIM-85: hBitmap -- referenced by REDALERT/BMP8.CPP:23/24 in
+ * BMP8::~BMP8 as `if( hBitmap ) ::DeleteObject( hBitmap );`. Note: this
+ * is an upstream typo -- the BMP8.H member is `hBMP`, not `hBitmap`,
+ * so the destructor ALREADY did not free its own bitmap on the original
+ * Watcom build (the symbol must have resolved to a global elsewhere or
+ * the file was simply never compiled). On Linux we expose a global
+ * HBITMAP `hBitmap` so the parser walks past the destructor body; the
+ * BMP8 class is unused by any compiling call site, so the latent
+ * destructor leak is preserved as-is rather than introduced. The
+ * `inline` makes this header-safe across all TUs. */
+inline HBITMAP hBitmap = nullptr;
+
 #endif /* LINUX_STUBS_WINDOWS_H */
