@@ -37,8 +37,10 @@
 
 #include	"function.h"
 #include	"cell.h"
-
-class GadgetClass;	// pointer/ref-only members; defined in gadget.h
+#include	"gadget.h"		// TIM-24: full include -- DisplayClass::TacticalClass /
+								// RadarClass::RTacticalClass / PowerClass::PowerButtonClass /
+								// SidebarClass::SBGadgetClass inherit from GadgetClass and
+								// need the full type, not a forward decl.
 
 class GScreenClass
 {

@@ -57,6 +57,8 @@ typedef int bool;
 #include	<string.h>
 #include	<stdlib.h>
 #include	<new.h>
+#include	<new>			// TIM-24: standard placement-new operator (the
+							// linux/win32-stubs/new.h shim is empty).
 
 
 /*
