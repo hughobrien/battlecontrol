@@ -841,4 +841,105 @@ template <typename... Args> int GetVolumeInformationA(Args&&...) { return 0; }
  * `inline` makes this header-safe across all TUs. */
 inline HBITMAP hBitmap = nullptr;
 
+/* TIM-87: pass-40G Win32-stub-shape bundle.
+ *
+ * Four sibling first-errors surfaced post-TIM-85 (pass-40F):
+ *   WINSTUB.CPP:499 -> DLGPROC          (function-pointer typedef)
+ *   CONQUER.CPP:4300 -> GENERIC_READ    (CreateFile flag-constant cluster)
+ *   RAWFILE.CPP:881  -> filelength      (DOS file-size API; see dos.h)
+ *   BMP8.CPP:24      -> ::DeleteObject  (Win32 GDI cleanup)
+ *
+ * All shimmed here as inert / canonical-value stubs.
+ *
+ * Pointer-sized integer aliases. Win32 SDK signature for DLGPROC is
+ * `INT_PTR (CALLBACK *)(HWND, UINT, WPARAM, LPARAM)`. We already
+ * have WPARAM = uintptr_t and LPARAM = intptr_t (see ~line 634); add
+ * the matching INT_PTR / UINT_PTR / LONG_PTR / ULONG_PTR aliases for
+ * symmetry. CALLBACK / WINAPI / APIENTRY collapse to nothing on
+ * non-Windows -- the Win32 calling-convention attributes don't apply
+ * here (msvc-compat.h already collapses __stdcall / __cdecl).
+ */
+typedef intptr_t           INT_PTR;
+typedef uintptr_t          UINT_PTR;
+typedef intptr_t           LONG_PTR;
+typedef uintptr_t          ULONG_PTR;
+#ifndef CALLBACK
+#define CALLBACK
+#endif
+#ifndef WINAPI
+#define WINAPI
+#endif
+#ifndef APIENTRY
+#define APIENTRY
+#endif
+
+/* DLGPROC -- standard Win32 SDK shape. WINSTUB.CPP:499 uses it as a
+ * `Window_Dialog_Box` parameter type; the dialog-procedure dispatch
+ * surface is dormant on Linux (Window_Dialog_Box body is `#if (0)//PG`
+ * gated). The typedef just satisfies the parser. */
+typedef INT_PTR (CALLBACK *DLGPROC)(HWND, UINT, WPARAM, LPARAM);
+
+/* CreateFile / CloseHandle -- file-handle open/close. Used unguarded by
+ * CONQUER.CPP:4300 (CD volume-detect: opens main.mix to verify CD),
+ * BMP8.CPP:52 (loads a .bmp via Win32 file API), and inside `#ifdef
+ * WIN32` blocks in RAWFILE.CPP / WINSTUB.CPP / NULLMGR.CPP that we are
+ * not pruning. Variadic-template inert stubs return INVALID_HANDLE_VALUE
+ * (CreateFile) and FALSE (CloseHandle), same shape as the TIM-85
+ * GetVolumeInformation / _dos_* family. The filesystem surface is
+ * dormant under the stub -- eventual SDL2/std::fstream port replaces
+ * these with real file IO. */
+template <typename... Args> HANDLE CreateFile (Args&&...) { return INVALID_HANDLE_VALUE; }
+template <typename... Args> HANDLE CreateFileA(Args&&...) { return INVALID_HANDLE_VALUE; }
+template <typename... Args> BOOL   CloseHandle(Args&&...) { return FALSE; }
+
+/* DeleteObject -- Win32 GDI cleanup function. BMP8.CPP:24/26 calls it
+ * on hBitmap / hPal in the destructor. The GDI universe is dormant
+ * (palette/bitmap handles are inert pointers), so the inert stub
+ * returns FALSE. Variadic-template form mirrors TIM-74 GDI cluster. */
+template <typename... Args> BOOL   DeleteObject(Args&&...) { return FALSE; }
+
+/* GENERIC_* access-mask constants. Canonical Win32 SDK values from
+ * winnt.h. Bit positions are ABI for the access-mask DWORD passed to
+ * CreateFile et al; see WIN32 SDK `<winnt.h>` GENERIC_READ etc. */
+#ifndef GENERIC_READ
+#define GENERIC_READ    0x80000000L
+#endif
+#ifndef GENERIC_WRITE
+#define GENERIC_WRITE   0x40000000L
+#endif
+#ifndef GENERIC_EXECUTE
+#define GENERIC_EXECUTE 0x20000000L
+#endif
+#ifndef GENERIC_ALL
+#define GENERIC_ALL     0x10000000L
+#endif
+
+/* FILE_SHARE_* share-mode bitflags. Canonical from winnt.h. */
+#ifndef FILE_SHARE_READ
+#define FILE_SHARE_READ   0x00000001
+#endif
+#ifndef FILE_SHARE_WRITE
+#define FILE_SHARE_WRITE  0x00000002
+#endif
+#ifndef FILE_SHARE_DELETE
+#define FILE_SHARE_DELETE 0x00000004
+#endif
+
+/* CreateFile dwCreationDisposition values. Canonical from winbase.h. */
+#ifndef CREATE_NEW
+#define CREATE_NEW        1
+#endif
+#ifndef CREATE_ALWAYS
+#define CREATE_ALWAYS     2
+#endif
+#ifndef OPEN_EXISTING
+#define OPEN_EXISTING     3
+#endif
+#ifndef OPEN_ALWAYS
+#define OPEN_ALWAYS       4
+#endif
+#ifndef TRUNCATE_EXISTING
+#define TRUNCATE_EXISTING 5
+#endif
+
 #endif /* LINUX_STUBS_WINDOWS_H */
