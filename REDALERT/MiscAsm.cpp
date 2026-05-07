@@ -53,27 +53,7 @@ extern "C" void __cdecl Mem_Copy(void const *source, void *dest, unsigned long b
  *=============================================================================================*/
 int Distance_Coord(COORDINATE coord1, COORDINATE coord2)
 {
-	__asm {
-		mov	eax,[coord1]
-		mov	ebx,[coord2]
-		mov	dx,ax			
-		sub	dx,bx			
-		jg	okx				
-		neg	dx				
-		okx:					
-		shr	eax,16			
-		shr	ebx,16			
-		sub	ax,bx			
-		jg	oky				
-		neg	ax				
-oky:					
-		cmp	ax,dx			
-		jg	ok				
-		xchg	ax,dx			
-ok:						
-		shr	dx,1				
-		add	ax,dx
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }			  
 
 
@@ -111,57 +91,7 @@ long __cdecl Desired_Facing16(long x1, long y1, long x2, long y2)
 	};
 
 	
-	__asm {		  
-		xor	ebx,ebx			//; Index byte (built).
-
-		//; Determine Y axis difference.
-		mov	edx,[y1]
-		mov	ecx,[y2]
-		sub	edx,ecx			//; DX = Y axis (signed).
-		jns	short absy
-		inc	ebx			//; Set the signed bit.
-		neg	edx			//; ABS(y)
-absy:
-
-		//; Determine X axis difference.
-		shl	ebx,1
-		mov	eax,[x1]
-		mov	ecx,[x2]
-		sub	ecx,eax			//; CX = X axis (signed).
-		jns	short absx
-		inc	ebx			//; Set the signed bit.
-		neg	ecx			//; ABS(x)
-absx:
-
-		//; Determine the greater axis.
-		cmp	ecx,edx
-		jb	short dxisbig
-		xchg	ecx,edx
-dxisbig:
-		rcl	ebx,1			//; Y > X flag bit.
-
-		//; Determine the closeness or farness of lesser axis.
-		mov	eax,edx
-		inc	eax			//; Round up.
-		shr	eax,1
-		inc	eax			//; Round up.
-		shr	eax,1			//; 1/4 of greater axis.
-
-		cmp	ecx,eax
-		rcl	ebx,1			//; Very close to major axis bit.
-
-		sub	edx,eax
-		cmp	edx,ecx
-		rcl	ebx,1			//; Very far from major axis bit.
-
-		xor	eax,eax
-		mov	al,[_new_facing16+ebx]
-
-		//; Normalize to 0..FF range.
-		shl	eax,4
-
-//		ret
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
@@ -204,89 +134,7 @@ dxisbig:
 int __cdecl Desired_Facing256(LONG srcx, LONG srcy, LONG dstx, LONG dsty)
 {
 	
-	__asm {
-			xor	ebx,ebx			//; Facing number.
-
-			////; Determine absolute X delta and left/right direction.
-			mov	ecx,[dstx]
-			sub	ecx,[srcx]
-			jge	short xnotneg
-			neg	ecx
-			mov	ebx,11000000b		//; Set bit 7 and 6 for leftward.
-xnotneg:
-
-			//; Determine absolute Y delta and top/bottom direction.
-			mov	eax,[srcy]
-			sub	eax,[dsty]
-			jge	short ynotneg
-			xor	ebx,01000000b		//; Complement bit 6 for downward.
-			neg	eax
-ynotneg:
-
-			//; Set DX=64 for quadrants 0 and 2.
-			mov	edx,ebx
-			and	edx,01000000b
-			xor	edx,01000000b
-
-			//; Determine if the direction is closer to the Y axis and make sure that
-			//; CX holds the larger of the two deltas.  This is in preparation for the
-			//; divide.
-			cmp	eax,ecx
-			jb	short gotaxis
-			xchg	eax,ecx
-			xor	edx,01000000b		//; Closer to Y axis so make DX=64 for quad 0 and 2.
-gotaxis:
-
-			//; If closer to the X axis then add 64 for quadrants 0 and 2.  If
-			//; closer to the Y axis then add 64 for quadrants 1 and 3.  Determined
-			//; add value is in DX and save on stack.
-			push	edx
-
-			//; Make sure that the division won't overflow.  Reduce precision until
-			//; the larger number is less than 256 if it appears that an overflow
-			//; will occur.  If the high byte of the divisor is not zero, then this
-			//; guarantees no overflow, so just abort shift operation.
-			test	eax,0FFFFFF00h
-			jnz	short nooverflow
-again:
-			test	ecx,0FFFFFF00h
-			jz	short nooverflow
-			shr	ecx,1
-			shr	eax,1
-			jmp	short again
-nooverflow:
-
-			//; Make sure that the division won't underflow (divide by zero).  If
-			//; this would occur, then set the quotient to $FF and skip divide.
-			or	ecx,ecx
-			jnz	short nounderflow
-			mov	eax,0FFFFFFFFh
-			jmp	short divcomplete
-
-			//; Derive a pseudo angle number for the octant.  The angle is based
-			//; on $00 = angle matches long axis, $00 = angle matches $FF degrees.
-nounderflow:
-			xor	edx,edx
-			shld	edx,eax,8	//; shift high byte of eax into dl
-			shl	eax,8
-			div	ecx
-divcomplete:
-
-			//; Integrate the 5 most significant bits into the angle index.  If DX
-			//; is not zero, then it is 64.  This means that the dividend must be negated
-			//; before it is added into the final angle value.
-			shr	eax,3
-			pop	edx
-			or	edx,edx
-			je	short noneg
-			dec	edx
-			neg	eax
-noneg:
-			add	eax,edx
-			add	eax,ebx
-			and	eax,0FFH
-//			ret
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }		 
 
 
@@ -373,53 +221,7 @@ int __cdecl Desired_Facing8(long x1, long y1, long x2, long y2)
 	
 	static const char _new_facing8[] = {1,2,1,0,7,6,7,0,3,2,3,4,5,6,5,4};
 	
-	__asm {
-		
-		xor	ebx,ebx			//; Index byte (built).
-
-		//; Determine Y axis difference.
-		mov	edx,[y1]
-		mov	ecx,[y2]
-		sub	edx,ecx			//; DX = Y axis (signed).
-		jns	short absy
-		inc	ebx			//; Set the signed bit.
-		neg	edx			//; ABS(y)
-absy:
-
-		//; Determine X axis difference.
-		shl	ebx,1
-		mov	eax,[x1]
-		mov	ecx,[x2]
-		sub	ecx,eax			//; CX = X axis (signed).
-		jns	short absx
-		inc	ebx			//; Set the signed bit.
-		neg	ecx			//; ABS(x)
-absx:
-
-		//; Determine the greater axis.
-		cmp	ecx,edx
-		jb	short dxisbig
-		xchg	ecx,edx
-dxisbig:
-		rcl	ebx,1			//; Y > X flag bit.
-
-		//; Determine the closeness or farness of lesser axis.
-		mov	eax,edx
-		inc	eax			//; Round up.
-		shr	eax,1
-
-		cmp	ecx,eax
-		rcl	ebx,1			//; Close to major axis bit.
-
-		xor	eax,eax
-		mov	al,[_new_facing8+ebx]
-
-		//; Normalize to 0..FF range.
-		shl	eax,5
-
-//		ret
-
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 	
 }
 
@@ -660,24 +462,7 @@ dxisbig:
 
 unsigned int __cdecl Cardinal_To_Fixed(unsigned base, unsigned cardinal)
 {
-	__asm {
-		
-				mov	eax, 0FFFFFFFFh	//; establish default return value
-
-				mov	ebx,[base]
-				or		ebx, ebx
-				jz		retneg1		//; if base==0, return 4294967295
-
-				mov	eax,[cardinal]		//; otherwise, return (cardinal*65536)/base
-				shl	eax,16
-				xor	edx,edx
-				div	ebx
-
-retneg1:
-				//ret
-
-		  
-	}	
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 #if (0)
@@ -730,14 +515,7 @@ unsigned int __cdecl Fixed_To_Cardinal(unsigned base, unsigned fixed)
 //	ARG	base:DWORD
 //	ARG	fixed:DWORD
 
-	__asm {
-		mov	eax,[base]
-		mul	[fixed]
-		add	eax,8000h		//; eax = (base * fixed) + 0x8000
-
-		shr	eax,16			//; return eax/65536
-		//ret
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 
 
 #if (0)
@@ -777,85 +555,29 @@ unsigned int __cdecl Fixed_To_Cardinal(unsigned base, unsigned fixed)
 
 void __cdecl Set_Bit(void * array, int bit, int value)
 {
-	__asm {
-		mov	ecx, [bit]
-		mov	eax, [value]
-		mov	esi, [array]
-		mov	ebx,ecx					
-		shr	ebx,5					
-		and	ecx,01Fh				
-		btr	[esi+ebx*4],ecx		
-		or	eax,eax					
-		jz	ok						
-		bts	[esi+ebx*4],ecx		
-ok:
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
 int __cdecl Get_Bit(void const * array, int bit)
 {
-	__asm {
-		mov	eax, [bit]
-		mov	esi, [array]
-		mov	ebx,eax					
-		shr	ebx,5					
-		and	eax,01Fh				
-		bt	[esi+ebx*4],eax		
-		setc	al
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 int __cdecl First_True_Bit(void const * array)
 {
-	__asm {
-		mov	esi, [array]
-		mov	eax,-32					
-again:							
-		add	eax,32					
-		mov	ebx,[esi]				
-		add	esi,4					
-		bsf	ebx,ebx					
-		jz	again					
-		add	eax,ebx
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
 int __cdecl First_False_Bit(void const * array)
 {
-	__asm {
-		
-		mov	esi, [array]
-		mov	eax,-32					
-again:							
-		add	eax,32					
-		mov	ebx,[esi]				
-		not	ebx						
-		add	esi,4					
-		bsf	ebx,ebx					
-		jz	again					
-		add	eax,ebx
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 int __cdecl Bound(int original, int min, int max)
 {		
-	__asm {
-		mov	eax,[original]
-		mov	ebx,[min]
-		mov	ecx,[max]
-		cmp	ebx,ecx					
-		jl	okorder					
-		xchg	ebx,ecx					
-okorder: cmp	eax,ebx		
-		jg	okmin					
-		mov	eax,ebx					
-okmin: cmp	eax,ecx			
-		jl	okmax					
-		mov	eax,ecx					
-okmax:
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
@@ -1106,152 +828,7 @@ ALLOWED_START	EQU	256-ALLOWED_COUNT
 	unsigned char idealblue = 0;		//BYTE	
 	unsigned char matchcolor = 0;		//:BYTE		; Tentative match color.
 
-	__asm {
-	
-			cld
-
-			; If the source palette is NULL, then just return with current fading table pointer.
-			cmp	[palette],0
-			je	fini1
-			cmp	[dest],0
-			je	fini1
-
-			; Fractions above 255 become 255.
-			mov	eax,[frac]
-			cmp	eax,0100h
-			jb	short ok
-			mov	[frac],0FFh
-		ok:
-
-			; Record the target gun values.
-			mov	esi,[palette]
-			mov	ebx,[color]
-			add	esi,ebx
-			add	esi,ebx
-			add	esi,ebx
-			lodsb
-			mov	[targetred],al
-			lodsb
-			mov	[targetgreen],al
-			lodsb
-			mov	[targetblue],al
-
-			; Main loop.
-			xor	ebx,ebx			; Remap table index.
-
-			; Transparent black never gets remapped.
-			mov	edi,[dest]
-			mov	[edi],bl
-			inc	edi
-
-			; EBX = source palette logical number (1-255).
-			; EDI = running pointer into dest remap table.
-		mainloop:
-			inc	ebx
-			mov	esi,[palette]
-			add	esi,ebx
-			add	esi,ebx
-			add	esi,ebx
-
-			mov	edx,[frac]
-			shr	edx,1
-			; new = orig - ((orig-target) * fraction);
-
-			lodsb				; orig
-			mov	dh,al			; preserve it for later.
-			sub	al,[targetred]		; al = (orig-target)
-			imul	dl			; ax = (orig-target)*fraction
-			shl	eax,1
-			sub	dh,ah			; dh = orig - ((orig-target) * fraction)
-			mov	[idealred],dh		; preserve ideal color gun value.
-
-			lodsb				; orig
-			mov	dh,al			; preserve it for later.
-			sub	al,[targetgreen]	; al = (orig-target)
-			imul	dl			; ax = (orig-target)*fraction
-			shl	eax,1
-			sub	dh,ah			; dh = orig - ((orig-target) * fraction)
-			mov	[idealgreen],dh		; preserve ideal color gun value.
-
-			lodsb				; orig
-			mov	dh,al			; preserve it for later.
-			sub	al,[targetblue]		; al = (orig-target)
-			imul	dl			; ax = (orig-target)*fraction
-			shl	eax,1
-			sub	dh,ah			; dh = orig - ((orig-target) * fraction)
-			mov	[idealblue],dh		; preserve ideal color gun value.
-
-			; Sweep through a limited set of existing colors to find the closest
-			; matching color.
-
-			mov	eax,[color]
-			mov	[matchcolor],al		; Default color (self).
-			mov	[matchvalue],-1		; Ridiculous match value init.
-			mov	ecx,ALLOWED_COUNT
-
-			mov	esi,[palette]		; Pointer to original palette.
-			add	esi,(ALLOWED_START)*3
-
-			; BH = color index.
-			mov	bh,ALLOWED_START
-		innerloop:
-
-			xor	edx,edx			; Comparison value starts null.
-
-			; Build the comparison value based on the sum of the differences of the color
-			; guns squared.
-			lodsb
-			sub	al,[idealred]
-			mov	ah,al
-			imul	ah
-			add	edx,eax
-
-			lodsb
-			sub	al,[idealgreen]
-			mov	ah,al
-			imul	ah
-			add	edx,eax
-
-			lodsb
-			sub	al,[idealblue]
-			mov	ah,al
-			imul	ah
-			add	edx,eax
-			jz	short perfect		; If perfect match found then quit early.
-
-			cmp	edx,[matchvalue]
-			jae	short notclose
-			mov	[matchvalue],edx	; Record new possible color.
-			mov	[matchcolor],bh
-		notclose:
-			inc	bh			; Checking color index.
-			loop	innerloop
-			mov	bh,[matchcolor]
-		perfect:
-			mov	[matchcolor],bh
-			xor	bh,bh			; Make BX valid main index again.
-
-			; When the loop exits, we have found the closest match.
-			mov	al,[matchcolor]
-			stosb
-			cmp	ebx,ALLOWED_START-1
-			jne	mainloop
-
-			; Fill the remainder of the remap table with values
-			; that will remap the color to itself.
-			mov	ecx,ALLOWED_COUNT
-		fillerloop:
-			inc	bl
-			mov	al,bl
-			stosb
-			loop	fillerloop
-
-		fini1:
-			mov	esi,[dest]
-			mov	eax,esi
-			
-			//ret
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
@@ -1261,31 +838,20 @@ ALLOWED_START	EQU	256-ALLOWED_COUNT
 
 extern "C" long __cdecl Reverse_Long(long number)
 {
-	__asm {
-		mov	eax,dword ptr [number]
-		xchg	al,ah
-		ror	eax,16
-		xchg	al,ah
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
 extern "C" short __cdecl Reverse_Short(short number)
 {
-	__asm {
-		mov	ax,[number]
-		xchg	ah,al
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }	
 
 
 
 extern "C" long __cdecl Swap_Long(long number)
 {
-	__asm {
-		mov	eax,dword ptr [number]
-		ror	eax,16
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
@@ -1324,44 +890,7 @@ extern "C" long __cdecl Swap_Long(long number)
 */
 void __cdecl strtrim(char *buffer)
 {
-	__asm {		  
-			cmp	[buffer],0
-			je	short fini
-
-			; Prepare for string scanning by loading pointers.
-			cld
-			mov	esi,[buffer]
-			mov	edi,esi
-
-			; Strip white space from the start of the string.
-		looper:
-			lodsb
-			cmp	al,20h			; Space
-			je	short looper
-			cmp	al,9			; TAB
-			je	short looper
-			stosb
-
-			; Copy the rest of the string.
-		gruntloop:
-			lodsb
-			stosb
-			or	al,al
-			jnz	short gruntloop
-			dec	edi
-			; Strip the white space from the end of the string.
-		looper2:
-			mov	[edi],al
-			dec	edi
-			mov	ah,[edi]
-			cmp	ah,20h
-			je	short looper2
-			cmp	ah,9
-			je	short looper2
-
-		fini:
-			//ret
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
@@ -1403,50 +932,7 @@ void __cdecl strtrim(char *buffer)
 
 void __cdecl Fat_Put_Pixel(int x, int y, int color, int siz, GraphicViewPortClass &gpage)
 {
-	__asm {
-				  
-			cmp	[siz],0
-			je	short exit_label
-
-			; Set EDI to point to start of logical page memory.
-			;*===================================================================
-			; Get the viewport information and put bytes per row in ecx
-			;*===================================================================
-			mov	ebx,[gpage]				; get a pointer to viewport
-			mov	edi,[ebx]GraphicViewPortClass.Offset	; get the correct offset
-
-			; Verify the the Y pixel offset is legal.
-			mov	eax,[y]
-			cmp	eax,[ebx]GraphicViewPortClass.Height	;YPIXEL_MAX
-			jae	short exit_label
-			mov	ecx,[ebx]GraphicViewPortClass.Width
-			add	ecx,[ebx]GraphicViewPortClass.XAdd
-			add	ecx,[ebx]GraphicViewPortClass.Pitch
-			mul	ecx
-			add	edi,eax
-
-			; Verify the the X pixel offset is legal.
-	
-			mov	edx,[ebx]GraphicViewPortClass.Width
-			cmp	edx,[x]
-			mov	edx,ecx
-			jbe	short exit_label
-			add	edi,[x]
-
-			; Write the pixel to the screen.
-			mov	ebx,[siz]		; Copy of pixel size.
-			sub	edx,ebx			; Modulo to reach start of next row.
-			mov	eax,[color]
-		again:
-			mov	ecx,ebx
-			rep stosb
-			add	edi,edx			; EDI points to start of next row.
-			dec	[siz]
-			jnz	short again
-
-		exit_label:
-			//ret
-	}
+	{ /* __asm body removed for syntax-only build (TIM-124) */ }
 }
 
 
