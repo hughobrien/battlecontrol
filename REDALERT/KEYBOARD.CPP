@@ -49,6 +49,15 @@
 #ifndef _MSC_VER
 #include <SDL2/SDL.h>
 #include "sdl_input.h"
+
+// TIM-145 pass-43C: storage for the cursor cells GetCursorPos reads
+// from. Declared extern "C" in linux/win32-stubs/windows.h so every
+// TU that includes windows.h sees the same cells. Updated by the
+// SDL_MOUSEMOTION drain below.
+extern "C" {
+int SDL_Cursor_X = 0;
+int SDL_Cursor_Y = 0;
+}
 #endif
 
 //void Message_Loop(void);
@@ -185,11 +194,16 @@ extern "C" void SDL_Process_Input_Events(void)
 				_Kbd->Put((unsigned short)be.x);
 				_Kbd->Put((unsigned short)be.y);
 			}
-			// SDL_MOUSEMOTION: drained to keep the SDL queue from
-			// accumulating, but not pumped into _Kbd. The engine
-			// reads cursor position via WWMouseClass::Get_Mouse_X/Y,
-			// which calls GetCursorPos — pass-43C will route that
-			// through SDL_GetMouseState.
+			else if (type == SDL_MOUSEMOTION) {
+				// TIM-145 pass-43C: capture cursor position so the
+				// stubbed GetCursorPos in linux/win32-stubs/windows.h
+				// returns the real SDL cursor instead of (0,0). All
+				// six WWMouseClass query sites (Get_Mouse_X, Get_Mouse_Y,
+				// Get_Mouse_XY, Show_Mouse, Conditional_Hide_Mouse,
+				// Draw_Mouse) read through GetCursorPos.
+				SDL_Cursor_X = events[i].motion.x;
+				SDL_Cursor_Y = events[i].motion.y;
+			}
 		}
 	} while (drained == 16);
 }
