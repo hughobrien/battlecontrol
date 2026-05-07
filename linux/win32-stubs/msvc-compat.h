@@ -429,6 +429,30 @@ static inline void _makepath(char* path,
 #endif
 #endif // _WWLIB_MAKEPATH_DEFINED
 
+// TIM-99: MSVC unqualified min/max drain. MSVC's <windows.h> defines
+// `min`/`max` as macros (unless NOMINMAX is defined), so engine sources
+// like SCORE.CPP:1008 / 1064 / 1074 / 1177 / 1185 call `max(a, b)` and
+// `min(...)` (lowercase, unqualified) in MSVC-style. On Linux <algorithm>
+// is already reached transitively via list.h → function.h, but it puts
+// std::max / std::min only in `std`. Most engine TUs work around this with
+// a per-TU `#define min/max` block (see TIM-54/TIM-61: AIRCRAFT/ANIM/
+// BUILDING/CCINI/SCENARIO/... — 39 TUs). SCORE.CPP doesn't have one. A
+// global `using` brings the std overloads into the unqualified namespace
+// for all TUs without colliding with per-TU `#define min/max` blocks
+// (those override at preprocessor time at the call site, and msvc-compat.h
+// is force-included before any per-TU code, so the using-decls are parsed
+// while `min`/`max` are still plain identifiers). #include <algorithm> is
+// explicit here even though it already arrives transitively, so the shim
+// owns the dependency rather than relying on inline.h / list.h ordering.
+#ifndef _MSVC_MINMAX_USING_DEFINED
+#define _MSVC_MINMAX_USING_DEFINED
+#ifdef __cplusplus
+#include <algorithm>
+using std::min;
+using std::max;
+#endif
+#endif // _MSVC_MINMAX_USING_DEFINED
+
 // TIM-91: _splitpath inert shim. MSVC CRT path decomposer; glibc has no
 // equivalent. Three engine call sites: LOADDLG.CPP:760 (reads ext after,
 // `atoi(ext + 1)`), MIXFILE.CPP:320 (reads name + ext), STARTUP.CPP:342
