@@ -219,4 +219,12 @@ typedef BOOL (*LPDDENUMCALLBACKEXW)(GUID*, LPWSTR, LPWSTR, LPVOID, HMONITOR);
  * windows.h reaches the taxonomy, mirroring TIM-46. */
 #include "winsock.h"
 
+/* TIM-52: same transitive-include trick for the Win32 DDEML handle
+ * taxonomy. REDALERT/dde.h declares Instance_Class members typed HSZ /
+ * HCONV / HDDEDATA without including <ddeml.h>; ccdde.h pulls dde.h
+ * under `#ifdef WIN32` but never includes ddeml itself. Upstream relied
+ * on /FI or PCH to make the taxonomy globally visible. Pull our stub
+ * ddeml.h here so the full force-include chain reaches it. */
+#include "ddeml.h"
+
 #endif /* LINUX_STUBS_WINDOWS_H */
