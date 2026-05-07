@@ -1,0 +1,689 @@
+# TIM-135 first compile attempt -- pass 40AN (__declspec stub + OLE Automation + ContextType typedef-enum)
+# host: Linux 6.12.85+deb13-amd64 x86_64
+# compiler: g++ (Debian 14.2.0-19) 14.2.0
+# date: 2026-05-07T12:40:42-07:00
+# sources: 301 .cpp files (REDALERT/ + WIN32LIB/)
+# flags: -std=c++17 -fsyntax-only -fmax-errors=20 -fno-strict-aliasing -w -I /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/redalert -I /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/win32lib -I /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT -I /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/WIN32LIB -I /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/linux/win32-stubs -include /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/linux/win32-stubs/msvc-compat.h
+
+
+===== [1/301] REDALERT/2KEYFRAM.CPP =====
+
+===== [2/301] REDALERT/AADATA.CPP =====
+
+===== [3/301] REDALERT/ABSTRACT.CPP =====
+
+===== [4/301] REDALERT/ADATA.CPP =====
+
+===== [5/301] REDALERT/ADPCM.CPP =====
+
+===== [6/301] REDALERT/AIRCRAFT.CPP =====
+
+===== [7/301] REDALERT/ANIM.CPP =====
+
+===== [8/301] REDALERT/AUDIO.CPP =====
+
+===== [9/301] REDALERT/B64PIPE.CPP =====
+
+===== [10/301] REDALERT/B64STRAW.CPP =====
+
+===== [11/301] REDALERT/BAR.CPP =====
+
+===== [12/301] REDALERT/BASE.CPP =====
+
+===== [13/301] REDALERT/BASE64.CPP =====
+
+===== [14/301] REDALERT/BBDATA.CPP =====
+
+===== [15/301] REDALERT/BDATA.CPP =====
+
+===== [16/301] REDALERT/BENCH.CPP =====
+
+===== [17/301] REDALERT/BFIOFILE.CPP =====
+
+===== [18/301] REDALERT/BIGCHECK.CPP =====
+
+===== [19/301] REDALERT/BLOWFISH.CPP =====
+
+===== [20/301] REDALERT/BLOWPIPE.CPP =====
+
+===== [21/301] REDALERT/BLWSTRAW.CPP =====
+
+===== [22/301] REDALERT/BMP8.CPP =====
+
+===== [23/301] REDALERT/BUFF.CPP =====
+
+===== [24/301] REDALERT/BUILDING.CPP =====
+
+===== [25/301] REDALERT/BULLET.CPP =====
+
+===== [26/301] REDALERT/CARGO.CPP =====
+
+===== [27/301] REDALERT/CARRY.CPP =====
+
+===== [28/301] REDALERT/CCDDE.CPP =====
+
+===== [29/301] REDALERT/CCFILE.CPP =====
+
+===== [30/301] REDALERT/CCINI.CPP =====
+
+===== [31/301] REDALERT/CCMPATH.CPP =====
+
+===== [32/301] REDALERT/CCPTR.CPP =====
+
+===== [33/301] REDALERT/CCTEN.CPP =====
+
+===== [34/301] REDALERT/CDATA.CPP =====
+
+===== [35/301] REDALERT/CDFILE.CPP =====
+
+===== [36/301] REDALERT/CELL.CPP =====
+
+===== [37/301] REDALERT/CHECKBOX.CPP =====
+
+===== [38/301] REDALERT/CHEKLIST.CPP =====
+
+===== [39/301] REDALERT/CLASS.CPP =====
+
+===== [40/301] REDALERT/COLRLIST.CPP =====
+
+===== [41/301] REDALERT/COMBAT.CPP =====
+
+===== [42/301] REDALERT/COMBUF.CPP =====
+
+===== [43/301] REDALERT/COMINIT.CPP =====
+
+===== [44/301] REDALERT/COMQUEUE.CPP =====
+
+===== [45/301] REDALERT/CONFDLG.CPP =====
+
+===== [46/301] REDALERT/CONNECT.CPP =====
+
+===== [47/301] REDALERT/CONQUER.CPP =====
+
+===== [48/301] REDALERT/CONST.CPP =====
+
+===== [49/301] REDALERT/CONTROL.CPP =====
+
+===== [50/301] REDALERT/COORD.CPP =====
+
+===== [51/301] REDALERT/CRATE.CPP =====
+
+===== [52/301] REDALERT/CRC.CPP =====
+
+===== [53/301] REDALERT/CRCPIPE.CPP =====
+
+===== [54/301] REDALERT/CRCSTRAW.CPP =====
+
+===== [55/301] REDALERT/CREDITS.CPP =====
+
+===== [56/301] REDALERT/CREW.CPP =====
+
+===== [57/301] REDALERT/CSTRAW.CPP =====
+
+===== [58/301] REDALERT/DDE.CPP =====
+
+===== [59/301] REDALERT/DEBUG.CPP =====
+
+===== [60/301] REDALERT/DESCDLG.CPP =====
+
+===== [61/301] REDALERT/DIAL8.CPP =====
+
+===== [62/301] REDALERT/DIALOG.CPP =====
+
+===== [63/301] REDALERT/DIBFILE.CPP =====
+
+===== [64/301] REDALERT/DIBUTIL.CPP =====
+
+===== [65/301] REDALERT/DISPLAY.CPP =====
+
+===== [66/301] REDALERT/DLLInterface.cpp =====
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:77:6: error: use of enum ‘ContextType’ without previous declaration
+   77 | enum ContextType;
+      |      ^~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:81:9: error: ‘ContextType’ does not name a type
+   81 |         ContextType     Where;          // In what game context does this sample exist.
+      |         ^~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp: In function ‘void On_Sound_Effect(int, int, COORDINATE, int)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:436:42: error: ‘struct SoundEffectNameStruct’ has no member named ‘Where’
+  436 |                 if (SoundEffectName[voc].Where == IN_VAR) {
+      |                                          ^~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp: In function ‘void GlyphX_Assign_Houses()’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:1011:15: error: ‘timeGetTime’ was not declared in this scope; did you mean ‘timer_gettime’?
+ 1011 |         srand(timeGetTime());
+      |               ^~~~~~~~~~~
+      |               timer_gettime
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp: In static member function ‘static void DLLExportClass::On_Sound_Effect(const HouseClass*, int, const char*, int, COORDINATE)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:2431:98: error: ‘struct SoundEffectNameStruct’ has no member named ‘Where’
+ 2431 |                 new_event.SoundEffect.SoundEffectContext = SoundEffectName[ sound_effect_index ].Where;
+      |                                                                                                  ^~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp: In function ‘bool CNC_Get_Game_State(GameStateRequestEnum, uint64, unsigned char*, unsigned int)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:3235:79: error: no matching function for call to ‘min(long unsigned int, const int&)’
+ 3235 |                         strncpy(map_data->ScenarioName, Scen.ScenarioName, min(sizeof(map_data->ScenarioName) - 1, count));
+      |                                                                            ~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/14/algorithm:61,
+                 from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/linux/win32-stubs/msvc-compat.h:450,
+                 from <command-line>:
+/usr/include/c++/14/bits/stl_algo.h:5696:5: note: candidate: ‘template<class _Tp, class _Compare> constexpr _Tp std::min(initializer_list<_Tp>, _Compare)’
+ 5696 |     min(initializer_list<_Tp> __l, _Compare __comp)
+      |     ^~~
+/usr/include/c++/14/bits/stl_algo.h:5696:5: note:   template argument deduction/substitution failed:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:3235:79: note:   mismatched types ‘std::initializer_list<_Tp>’ and ‘long unsigned int’
+ 3235 |                         strncpy(map_data->ScenarioName, Scen.ScenarioName, min(sizeof(map_data->ScenarioName) - 1, count));
+      |                                                                            ~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h:5686:5: note: candidate: ‘template<class _Tp> constexpr _Tp std::min(initializer_list<_Tp>)’
+ 5686 |     min(initializer_list<_Tp> __l)
+      |     ^~~
+/usr/include/c++/14/bits/stl_algo.h:5686:5: note:   candidate expects 1 argument, 2 provided
+In file included from /usr/include/c++/14/algorithm:60:
+/usr/include/c++/14/bits/stl_algobase.h:281:5: note: candidate: ‘template<class _Tp, class _Compare> constexpr const _Tp& std::min(const _Tp&, const _Tp&, _Compare)’
+  281 |     min(const _Tp& __a, const _Tp& __b, _Compare __comp)
+      |     ^~~
+/usr/include/c++/14/bits/stl_algobase.h:281:5: note:   candidate expects 3 arguments, 2 provided
+/usr/include/c++/14/bits/stl_algobase.h:233:5: note: candidate: ‘template<class _Tp> constexpr const _Tp& std::min(const _Tp&, const _Tp&)’
+  233 |     min(const _Tp& __a, const _Tp& __b)
+      |     ^~~
+/usr/include/c++/14/bits/stl_algobase.h:233:5: note:   template argument deduction/substitution failed:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:3235:79: note:   deduced conflicting types for parameter ‘const _Tp’ (‘long unsigned int’ and ‘int’)
+ 3235 |                         strncpy(map_data->ScenarioName, Scen.ScenarioName, min(sizeof(map_data->ScenarioName) - 1, count));
+      |                                                                            ~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp: In static member function ‘static bool DLLExportClass::Get_Layer_State(uint64, unsigned char*, unsigned int)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:3793:106: error: operands to ‘?:’ have different types ‘FactoryClass*’ and ‘CCPtr<FactoryClass>’
+ 3793 |                                                         FactoryClass* factory = building->House->IsHuman ? building->House->Fetch_Factory(building->Class->ToBuild) : building->Factory;
+      |                                                                                 ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:3793:106: note:   and each type can be converted to the other
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp: In static member function ‘static bool DLLExportClass::Get_Occupier_State(uint64, unsigned char*, unsigned int)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:6192:9: error: ‘UNREFERENCED_PARAMETER’ was not declared in this scope
+ 6192 |         UNREFERENCED_PARAMETER(player_id);
+      |         ^~~~~~~~~~~~~~~~~~~~~~
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp: In static member function ‘static void DLLExportClass::Decode_Pointers()’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/DLLInterface.cpp:8820:56: error: cast from ‘BuildingTypeClass*’ to ‘unsigned int’ loses precision [-fpermissive]
+ 8820 |                         StructType type = (StructType) reinterpret_cast<unsigned int>(PlacementType[i]);
+      |                                                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+===== [67/301] REDALERT/DLLInterfaceEditor.cpp =====
+
+===== [68/301] REDALERT/DOOR.CPP =====
+
+===== [69/301] REDALERT/DPMI.CPP =====
+
+===== [70/301] REDALERT/DRIVE.CPP =====
+
+===== [71/301] REDALERT/DROP.CPP =====
+
+===== [72/301] REDALERT/DTABLE.CPP =====
+
+===== [73/301] REDALERT/DYNAVEC.CPP =====
+
+===== [74/301] REDALERT/EDIT.CPP =====
+
+===== [75/301] REDALERT/EGOS.CPP =====
+
+===== [76/301] REDALERT/ENDING.CPP =====
+
+===== [77/301] REDALERT/EVENT.CPP =====
+
+===== [78/301] REDALERT/EXPAND.CPP =====
+
+===== [79/301] REDALERT/FACE.CPP =====
+
+===== [80/301] REDALERT/FACING.CPP =====
+
+===== [81/301] REDALERT/FACTORY.CPP =====
+
+===== [82/301] REDALERT/FIELD.CPP =====
+
+===== [83/301] REDALERT/FINDPATH.CPP =====
+
+===== [84/301] REDALERT/FIXED.CPP =====
+
+===== [85/301] REDALERT/FLASHER.CPP =====
+
+===== [86/301] REDALERT/FLY.CPP =====
+
+===== [87/301] REDALERT/FOOT.CPP =====
+
+===== [88/301] REDALERT/FUSE.CPP =====
+
+===== [89/301] REDALERT/GADGET.CPP =====
+
+===== [90/301] REDALERT/GAMEDLG.CPP =====
+
+===== [91/301] REDALERT/GAUGE.CPP =====
+
+===== [92/301] REDALERT/GETCPU.CPP =====
+
+===== [93/301] REDALERT/GLOBALS.CPP =====
+
+===== [94/301] REDALERT/GOPTIONS.CPP =====
+
+===== [95/301] REDALERT/GSCREEN.CPP =====
+
+===== [96/301] REDALERT/HDATA.CPP =====
+
+===== [97/301] REDALERT/HEAP.CPP =====
+
+===== [98/301] REDALERT/HELP.CPP =====
+
+===== [99/301] REDALERT/HOUSE.CPP =====
+
+===== [100/301] REDALERT/HSV.CPP =====
+
+===== [101/301] REDALERT/ICONLIST.CPP =====
+
+===== [102/301] REDALERT/IDATA.CPP =====
+
+===== [103/301] REDALERT/INFANTRY.CPP =====
+
+===== [104/301] REDALERT/INI.CPP =====
+
+===== [105/301] REDALERT/INIBIN.CPP =====
+
+===== [106/301] REDALERT/INICODE.CPP =====
+
+===== [107/301] REDALERT/INIT.CPP =====
+
+===== [108/301] REDALERT/INT.CPP =====
+
+===== [109/301] REDALERT/INTERNET.CPP =====
+
+===== [110/301] REDALERT/INTERPAL.CPP =====
+
+===== [111/301] REDALERT/INTRO.CPP =====
+
+===== [112/301] REDALERT/IOMAP.CPP =====
+
+===== [113/301] REDALERT/IOOBJ.CPP =====
+
+===== [114/301] REDALERT/IPX.CPP =====
+
+===== [115/301] REDALERT/IPX95.CPP =====
+
+===== [116/301] REDALERT/IPXADDR.CPP =====
+
+===== [117/301] REDALERT/IPXCONN.CPP =====
+
+===== [118/301] REDALERT/IPXGCONN.CPP =====
+
+===== [119/301] REDALERT/IPXMGR.CPP =====
+
+===== [120/301] REDALERT/ITABLE.CPP =====
+
+===== [121/301] REDALERT/JSHELL.CPP =====
+
+===== [122/301] REDALERT/KEY.CPP =====
+
+===== [123/301] REDALERT/KEYBOARD.CPP =====
+
+===== [124/301] REDALERT/LAYER.CPP =====
+
+===== [125/301] REDALERT/LCW.CPP =====
+
+===== [126/301] REDALERT/LCWPIPE.CPP =====
+
+===== [127/301] REDALERT/LCWSTRAW.CPP =====
+
+===== [128/301] REDALERT/LCWUNCMP.CPP =====
+
+===== [129/301] REDALERT/LINK.CPP =====
+
+===== [130/301] REDALERT/LIST.CPP =====
+
+===== [131/301] REDALERT/LOADDLG.CPP =====
+
+===== [132/301] REDALERT/LOGIC.CPP =====
+
+===== [133/301] REDALERT/LZO1X_C.CPP =====
+
+===== [134/301] REDALERT/LZO1X_D.CPP =====
+
+===== [135/301] REDALERT/LZOPIPE.CPP =====
+
+===== [136/301] REDALERT/LZOSTRAW.CPP =====
+
+===== [137/301] REDALERT/LZW.CPP =====
+
+===== [138/301] REDALERT/LZWOTRAW.CPP =====
+
+===== [139/301] REDALERT/LZWPIPE.CPP =====
+
+===== [140/301] REDALERT/LZWSTRAW.CPP =====
+
+===== [141/301] REDALERT/MAP.CPP =====
+
+===== [142/301] REDALERT/MAPEDDLG.CPP =====
+
+===== [143/301] REDALERT/MAPEDIT.CPP =====
+
+===== [144/301] REDALERT/MAPEDPLC.CPP =====
+
+===== [145/301] REDALERT/MAPEDSEL.CPP =====
+
+===== [146/301] REDALERT/MAPEDTM.CPP =====
+
+===== [147/301] REDALERT/MAPSEL.CPP =====
+
+===== [148/301] REDALERT/MCI.CPP =====
+
+===== [149/301] REDALERT/MCIMOVIE.CPP =====
+
+===== [150/301] REDALERT/MENUS.CPP =====
+
+===== [151/301] REDALERT/MISSION.CPP =====
+
+===== [152/301] REDALERT/MIXFILE.CPP =====
+
+===== [153/301] REDALERT/MONOC.CPP =====
+
+===== [154/301] REDALERT/MOUSE.CPP =====
+
+===== [155/301] REDALERT/MP.CPP =====
+
+===== [156/301] REDALERT/MPGSET.CPP =====
+
+===== [157/301] REDALERT/MPLAYER.CPP =====
+
+===== [158/301] REDALERT/MPLIB.CPP =====
+
+===== [159/301] REDALERT/MPMGRD.CPP =====
+
+===== [160/301] REDALERT/MPMGRW.CPP =====
+
+===== [161/301] REDALERT/MPU.CPP =====
+
+===== [162/301] REDALERT/MSGBOX.CPP =====
+
+===== [163/301] REDALERT/MSGLIST.CPP =====
+
+===== [164/301] REDALERT/MiscAsm.cpp =====
+
+===== [165/301] REDALERT/NETDLG.CPP =====
+
+===== [166/301] REDALERT/NOSEQCON.CPP =====
+
+===== [167/301] REDALERT/NULLCONN.CPP =====
+
+===== [168/301] REDALERT/NULLDLG.CPP =====
+
+===== [169/301] REDALERT/NULLMGR.CPP =====
+
+===== [170/301] REDALERT/OBJECT.CPP =====
+
+===== [171/301] REDALERT/ODATA.CPP =====
+
+===== [172/301] REDALERT/OPTIONS.CPP =====
+
+===== [173/301] REDALERT/OVERLAY.CPP =====
+
+===== [174/301] REDALERT/PACKET.CPP =====
+
+===== [175/301] REDALERT/PALETTEC.CPP =====
+
+===== [176/301] REDALERT/PIPE.CPP =====
+
+===== [177/301] REDALERT/PK.CPP =====
+
+===== [178/301] REDALERT/PKPIPE.CPP =====
+
+===== [179/301] REDALERT/PKSTRAW.CPP =====
+
+===== [180/301] REDALERT/POWER.CPP =====
+
+===== [181/301] REDALERT/PROFILE.CPP =====
+
+===== [182/301] REDALERT/QUEUE.CPP =====
+
+===== [183/301] REDALERT/RADAR.CPP =====
+
+===== [184/301] REDALERT/RADIO.CPP =====
+
+===== [185/301] REDALERT/RAMFILE.CPP =====
+
+===== [186/301] REDALERT/RAND.CPP =====
+
+===== [187/301] REDALERT/RANDOM.CPP =====
+
+===== [188/301] REDALERT/RAWFILE.CPP =====
+
+===== [189/301] REDALERT/RAWOLAPI.CPP =====
+
+===== [190/301] REDALERT/READLINE.CPP =====
+
+===== [191/301] REDALERT/RECT.CPP =====
+
+===== [192/301] REDALERT/REINF.CPP =====
+
+===== [193/301] REDALERT/RGB.CPP =====
+
+===== [194/301] REDALERT/RNDSTRAW.CPP =====
+
+===== [195/301] REDALERT/ROTBMP.CPP =====
+
+===== [196/301] REDALERT/RULES.CPP =====
+
+===== [197/301] REDALERT/SAVELOAD.CPP =====
+
+===== [198/301] REDALERT/SCENARIO.CPP =====
+
+===== [199/301] REDALERT/SCORE.CPP =====
+
+===== [200/301] REDALERT/SCROLL.CPP =====
+
+===== [201/301] REDALERT/SDATA.CPP =====
+
+===== [202/301] REDALERT/SEDITDLG.CPP =====
+
+===== [203/301] REDALERT/SENDFILE.CPP =====
+
+===== [204/301] REDALERT/SEQCONN.CPP =====
+
+===== [205/301] REDALERT/SESSION.CPP =====
+
+===== [206/301] REDALERT/SHA.CPP =====
+
+===== [207/301] REDALERT/SHAPEBTN.CPP =====
+
+===== [208/301] REDALERT/SHAPIPE.CPP =====
+
+===== [209/301] REDALERT/SHASTRAW.CPP =====
+
+===== [210/301] REDALERT/SIDEBAR.CPP =====
+
+===== [211/301] REDALERT/SIDEBARGlyphx.CPP =====
+
+===== [212/301] REDALERT/SLIDER.CPP =====
+
+===== [213/301] REDALERT/SMUDGE.CPP =====
+
+===== [214/301] REDALERT/SOUNDDLG.CPP =====
+
+===== [215/301] REDALERT/SPECIAL.CPP =====
+
+===== [216/301] REDALERT/SPRITE.CPP =====
+
+===== [217/301] REDALERT/STARTUP.CPP =====
+
+===== [218/301] REDALERT/STATBTN.CPP =====
+
+===== [219/301] REDALERT/STATS.CPP =====
+
+===== [220/301] REDALERT/STRAW.CPP =====
+
+===== [221/301] REDALERT/STUB.CPP =====
+
+===== [222/301] REDALERT/SUPER.CPP =====
+
+===== [223/301] REDALERT/SURFACE.CPP =====
+
+===== [224/301] REDALERT/Shape.cpp =====
+
+===== [225/301] REDALERT/TAB.CPP =====
+
+===== [226/301] REDALERT/TACTION.CPP =====
+
+===== [227/301] REDALERT/TARGET.CPP =====
+
+===== [228/301] REDALERT/TCPIP.CPP =====
+
+===== [229/301] REDALERT/TDATA.CPP =====
+
+===== [230/301] REDALERT/TEAM.CPP =====
+
+===== [231/301] REDALERT/TEAMTYPE.CPP =====
+
+===== [232/301] REDALERT/TECHNO.CPP =====
+
+===== [233/301] REDALERT/TEMPLATE.CPP =====
+
+===== [234/301] REDALERT/TENMGR.CPP =====
+
+===== [235/301] REDALERT/TERRAIN.CPP =====
+
+===== [236/301] REDALERT/TEVENT.CPP =====
+
+===== [237/301] REDALERT/TEXTBTN.CPP =====
+
+===== [238/301] REDALERT/THEME.CPP =====
+
+===== [239/301] REDALERT/TOGGLE.CPP =====
+
+===== [240/301] REDALERT/TOOLTIP.CPP =====
+
+===== [241/301] REDALERT/TRACKER.CPP =====
+
+===== [242/301] REDALERT/TRIGGER.CPP =====
+
+===== [243/301] REDALERT/TRIGTYPE.CPP =====
+
+===== [244/301] REDALERT/TURRET.CPP =====
+
+===== [245/301] REDALERT/TXTLABEL.CPP =====
+
+===== [246/301] REDALERT/UDATA.CPP =====
+
+===== [247/301] REDALERT/UDPADDR.CPP =====
+
+===== [248/301] REDALERT/UNIT.CPP =====
+
+===== [249/301] REDALERT/UTRACKER.CPP =====
+
+===== [250/301] REDALERT/VDATA.CPP =====
+
+===== [251/301] REDALERT/VECTOR.CPP =====
+
+===== [252/301] REDALERT/VERSION.CPP =====
+
+===== [253/301] REDALERT/VESSEL.CPP =====
+
+===== [254/301] REDALERT/VISUDLG.CPP =====
+
+===== [255/301] REDALERT/VORTEX.CPP =====
+
+===== [256/301] REDALERT/W95TRACE.CPP =====
+
+===== [257/301] REDALERT/WARHEAD.CPP =====
+
+===== [258/301] REDALERT/WEAPON.CPP =====
+
+===== [259/301] REDALERT/WINSTUB.CPP =====
+
+===== [260/301] REDALERT/WOLAPIOB.CPP =====
+
+===== [261/301] REDALERT/WOLEDIT.CPP =====
+
+===== [262/301] REDALERT/WOLSTRNG.CPP =====
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/WOLSTRNG.CPP:606:50: note: ‘#pragma message: ...Building French version...’
+  606 | #pragma message( "...Building French version..." )
+      |                                                  ^
+
+===== [263/301] REDALERT/WOL_CGAM.CPP =====
+
+===== [264/301] REDALERT/WOL_CHAT.CPP =====
+
+===== [265/301] REDALERT/WOL_DNLD.CPP =====
+
+===== [266/301] REDALERT/WOL_GSUP.CPP =====
+
+===== [267/301] REDALERT/WOL_LOGN.CPP =====
+
+===== [268/301] REDALERT/WOL_MAIN.CPP =====
+
+===== [269/301] REDALERT/WOL_OPT.CPP =====
+
+===== [270/301] REDALERT/WSPIPX.CPP =====
+
+===== [271/301] REDALERT/WSPROTO.CPP =====
+
+===== [272/301] REDALERT/WSPUDP.CPP =====
+
+===== [273/301] REDALERT/XPIPE.CPP =====
+
+===== [274/301] REDALERT/XSTRAW.CPP =====
+
+===== [275/301] REDALERT/_WSPROTO.CPP =====
+
+===== [276/301] REDALERT/WIN32LIB/ALLOC.CPP =====
+
+===== [277/301] REDALERT/WIN32LIB/BUFFER.CPP =====
+
+===== [278/301] REDALERT/WIN32LIB/BUFFGLBL.CPP =====
+
+===== [279/301] REDALERT/WIN32LIB/DDRAW.CPP =====
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/WIN32LIB/DDRAW.CPP: In function ‘void Set_DD_Palette(void*)’:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/WIN32LIB/DDRAW.CPP:752:27: error: invalid use of incomplete type ‘struct IDirectDrawPalette’
+  752 |                 PalettePtr->SetEntries( 0 , 0 , 256 , &PaletteEntries[0] );
+      |                           ^~
+In file included from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/win32lib/misc.h:43,
+                 from /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/REDALERT/WIN32LIB/DDRAW.CPP:42:
+/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/include-shim/win32lib/ddraw.h:112:8: note: forward declaration of ‘struct IDirectDrawPalette’
+  112 | struct IDirectDrawPalette;
+      |        ^~~~~~~~~~~~~~~~~~
+
+===== [280/301] REDALERT/WIN32LIB/DELAY.CPP =====
+
+===== [281/301] REDALERT/WIN32LIB/DIPTHONG.CPP =====
+
+===== [282/301] REDALERT/WIN32LIB/DRAWRECT.CPP =====
+
+===== [283/301] REDALERT/WIN32LIB/DrawMisc.cpp =====
+
+===== [284/301] REDALERT/WIN32LIB/FONT.CPP =====
+
+===== [285/301] REDALERT/WIN32LIB/GBUFFER.CPP =====
+
+===== [286/301] REDALERT/WIN32LIB/GETSHAPE.CPP =====
+
+===== [287/301] REDALERT/WIN32LIB/ICONSET.CPP =====
+
+===== [288/301] REDALERT/WIN32LIB/IFF.CPP =====
+
+===== [289/301] REDALERT/WIN32LIB/IRANDOM.CPP =====
+
+===== [290/301] REDALERT/WIN32LIB/LOAD.CPP =====
+
+===== [291/301] REDALERT/WIN32LIB/LOADFONT.CPP =====
+
+===== [292/301] REDALERT/WIN32LIB/MOUSEWW.CPP =====
+
+===== [293/301] REDALERT/WIN32LIB/PALETTE.CPP =====
+
+===== [294/301] REDALERT/WIN32LIB/SET_FONT.CPP =====
+
+===== [295/301] REDALERT/WIN32LIB/TIMER.CPP =====
+
+===== [296/301] REDALERT/WIN32LIB/TIMERDWN.CPP =====
+
+===== [297/301] REDALERT/WIN32LIB/TIMERINI.CPP =====
+
+===== [298/301] REDALERT/WIN32LIB/WINDOWS.CPP =====
+
+===== [299/301] REDALERT/WIN32LIB/WINHIDE.CPP =====
+
+===== [300/301] REDALERT/WIN32LIB/WRITEPCX.CPP =====
+
+===== [301/301] REDALERT/WIN32LIB/_DIPTABL.CPP =====
+
+----- totals -----
+ok:                  299
+fail:                2
+total:               301
+include-not-found:   0
