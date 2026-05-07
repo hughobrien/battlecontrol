@@ -87,4 +87,51 @@ typedef WSADATA*           LPWSADATA;
 #define MAXGETHOSTSTRUCT   1024
 #endif
 
+/* TIM-53: byte-order helpers and WSACleanup. FIELD.CPP:141/146 calls
+ * htons / htonl on engine values to byte-flip serialization payloads
+ * for cross-arch save files; UTRACKER.CPP:202 calls htonl; WSPROTO.CPP
+ * :137 calls WSACleanup() under a tear-down path. We can NOT pull
+ * <arpa/inet.h> here -- it redefines `struct in_addr` and would clash
+ * with the opaque stub above. Compute byte-swaps inline using the
+ * GCC/Clang builtins so semantics are exact on every endianness, and
+ * provide a no-op WSACleanup since we are not actually managing a
+ * Winsock instance. */
+static inline unsigned short __wwlib_htons(unsigned short v)
+{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    return v;
+#else
+    return __builtin_bswap16(v);
+#endif
+}
+static inline unsigned int __wwlib_htonl(unsigned int v)
+{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    return v;
+#else
+    return __builtin_bswap32(v);
+#endif
+}
+
+#ifndef htons
+#define htons(v) __wwlib_htons((unsigned short)(v))
+#endif
+#ifndef htonl
+#define htonl(v) __wwlib_htonl((unsigned int)(v))
+#endif
+/* Network-to-host inverses are identical to host-to-network on every
+ * supported endianness, so reuse the same builtin-driven path. */
+#ifndef ntohs
+#define ntohs(v) __wwlib_htons((unsigned short)(v))
+#endif
+#ifndef ntohl
+#define ntohl(v) __wwlib_htonl((unsigned int)(v))
+#endif
+
+#ifdef __cplusplus
+static inline int WSACleanup(void) { return 0; }
+#else
+static inline int WSACleanup(void) { return 0; }
+#endif
+
 #endif /* LINUX_STUBS_WINSOCK_H_INCLUDED */
