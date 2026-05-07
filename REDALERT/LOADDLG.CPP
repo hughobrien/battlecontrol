@@ -39,6 +39,15 @@
  *   LoadOptionsClass::Compare -- for qsort                                                    *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+// TIM-86: <io.h> is a Watcom/Win32 header — on Linux our shim is an
+// empty placeholder, so unlink (used at line 483) needs a POSIX
+// declaration. Must be pulled in BEFORE function.h, which transitively
+// includes wwstd.h and auto-defines _WIN32 (see WIN32LIB/wwstd.h:43).
+// Guarded so Watcom Win32 keeps using <io.h>'s decl.
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 #include "function.h"
 #include <io.h>				// for unlink
 
