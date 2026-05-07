@@ -1137,4 +1137,123 @@ typedef struct tagPAINTSTRUCT {
     BYTE rgbReserved[32];
 } PAINTSTRUCT, *PPAINTSTRUCT, *NPPAINTSTRUCT, *LPPAINTSTRUCT;
 
+/* TIM-96: pass-40L BMP8 GDI-dispatch surface.
+ *
+ * Post-TIM-94 (kernel32 file/global-mem cluster), BMP8.CPP first-fails
+ * on `::CreatePalette @107`. The remaining surface is a tight wingdi /
+ * winuser GDI-dispatch family that BMP8::Init and BMP8::drawBmp walk
+ * before any DirectDraw or SDL2 path can take over. All inert
+ * variadic-template stubs in the same shape as the TIM-87 / TIM-94
+ * kernel32 cluster -- the GDI universe is dormant in headless mode (no
+ * device contexts, no real bitmap blitting), and the eventual SDL2 +
+ * OpenGL/Vulkan port replaces every entry point here.
+ *
+ * BMP8.CPP call sites (also covered by the global-namespace match:
+ * DIBUTIL.CPP, DIBFILE.CPP, WOLAPIOB.CPP):
+ *   ::CreatePalette       @107        -- HPALETTE from LOGPALETTE*
+ *   ::GetDC               @119        -- HDC from HWND
+ *   ::SelectPalette       @120, 155   -- HPALETTE swap on HDC
+ *   ::RealizePalette      @123, 161   -- UINT (entries realized) or
+ *                                        GDI_ERROR
+ *   ::CreateDIBitmap      @127        -- HBITMAP from BITMAPINFO+bits
+ *   ::ReleaseDC           @128        -- int (1=released, 0=fail)
+ *    BeginPaint           @152        -- HDC into PAINTSTRUCT
+ *    EndPaint             @184        -- BOOL
+ *    CreateCompatibleDC   @168        -- HDC compatible with another
+ *    SelectObject         @169        -- previous HGDIOBJ
+ *    GetObject            @171        -- int bytes copied
+ *    GetClientRect        @177        -- BOOL, fills RECT
+ *    InvalidateRect       @150        -- BOOL
+ *    SetStretchBltMode    @178        -- int (previous mode)
+ *    StretchBlt           @179        -- BOOL
+ *    DeleteDC             @183        -- BOOL
+ *
+ * Real Win32 SDK signatures (from <wingdi.h> / <winuser.h>):
+ *   HPALETTE CreatePalette(const LOGPALETTE*);
+ *   HDC      GetDC(HWND);
+ *   HPALETTE SelectPalette(HDC, HPALETTE, BOOL);
+ *   UINT     RealizePalette(HDC);
+ *   HBITMAP  CreateDIBitmap(HDC, const BITMAPINFOHEADER*, DWORD, const VOID*, const BITMAPINFO*, UINT);
+ *   int      ReleaseDC(HWND, HDC);
+ *   HDC      BeginPaint(HWND, LPPAINTSTRUCT);
+ *   BOOL     EndPaint(HWND, const PAINTSTRUCT*);
+ *   HDC      CreateCompatibleDC(HDC);
+ *   BOOL     DeleteDC(HDC);
+ *   HGDIOBJ  SelectObject(HDC, HGDIOBJ);
+ *   int      GetObject(HANDLE, int, LPVOID);
+ *   BOOL     GetClientRect(HWND, LPRECT);
+ *   BOOL     InvalidateRect(HWND, const RECT*, BOOL);
+ *   int      SetStretchBltMode(HDC, int);
+ *   BOOL     StretchBlt(HDC, int, int, int, int, HDC, int, int, int, int, DWORD);
+ *
+ * HBITMAP/HDC/HPALETTE/HGDIOBJ are all `typedef void*` in this shim
+ * (see ~lines 87-94), and HANDLE is also `typedef void*`, so returning
+ * HANDLE from the pointer-typed surfaces avoids any forward-decl cycle
+ * and is type-compatible at every call site (same trick as TIM-94's
+ * GlobalAlloc -> HANDLE return).
+ *
+ * RealizePalette returns UINT 0 (not GDI_ERROR) so the
+ * `if (realize == GDI_ERROR)` failure branches in BMP8 / DIBUTIL stay
+ * dormant. SelectPalette returns nullptr; the `if (!select) return
+ * false;` path in BMP8::Init then takes the safe early-return -- the
+ * function itself is never called by anything compiling in this pass,
+ * so the latent "no GDI" semantics are preserved as-is. */
+template <typename... Args> HANDLE CreatePalette     (Args&&...) { return nullptr; }
+template <typename... Args> HANDLE GetDC             (Args&&...) { return nullptr; }
+template <typename... Args> HANDLE SelectPalette     (Args&&...) { return nullptr; }
+template <typename... Args> UINT   RealizePalette    (Args&&...) { return 0; }
+template <typename... Args> HANDLE CreateDIBitmap    (Args&&...) { return nullptr; }
+template <typename... Args> int    ReleaseDC         (Args&&...) { return 0; }
+template <typename... Args> HANDLE BeginPaint        (Args&&...) { return nullptr; }
+template <typename... Args> BOOL   EndPaint          (Args&&...) { return TRUE; }
+template <typename... Args> HANDLE CreateCompatibleDC(Args&&...) { return nullptr; }
+template <typename... Args> BOOL   DeleteDC          (Args&&...) { return TRUE; }
+template <typename... Args> HANDLE SelectObject      (Args&&...) { return nullptr; }
+template <typename... Args> int    GetObject         (Args&&...) { return 0; }
+template <typename... Args> int    GetObjectA        (Args&&...) { return 0; }
+template <typename... Args> BOOL   GetClientRect     (Args&&...) { return TRUE; }
+template <typename... Args> BOOL   InvalidateRect    (Args&&...) { return TRUE; }
+template <typename... Args> int    SetStretchBltMode (Args&&...) { return 0; }
+template <typename... Args> BOOL   StretchBlt        (Args&&...) { return TRUE; }
+
+/* BITMAP -- canonical <wingdi.h> bitmap descriptor. BMP8.CPP:170-179
+ * declares `BITMAP bm;`, calls `GetObject(BitmapHandle_, sizeof(BITMAP),
+ * &bm)`, then reads bm.bmWidth / bm.bmHeight to feed StretchBlt. The
+ * full SDK shape lets sizeof(BITMAP) round-trip correctly even though
+ * the GetObject stub never populates the struct on the dormant path --
+ * bm is uninitialised, but the StretchBlt call below is itself a no-op
+ * stub so the indeterminate width/height never reach a real blitter. */
+typedef struct tagBITMAP {
+    LONG   bmType;
+    LONG   bmWidth;
+    LONG   bmHeight;
+    LONG   bmWidthBytes;
+    WORD   bmPlanes;
+    WORD   bmBitsPixel;
+    LPVOID bmBits;
+} BITMAP, *PBITMAP, *NPBITMAP, *LPBITMAP;
+
+/* TIM-96: GDI dispatch constants. Canonical Win32 SDK values from
+ * <wingdi.h>. Bit positions are ABI for the flags / mode parameters
+ * passed to the GDI calls above; engine code only uses them as opaque
+ * passthrough values under the stub. */
+#ifndef GDI_ERROR
+#define GDI_ERROR        ((UINT)0xFFFFFFFF)
+#endif
+#ifndef CBM_INIT
+#define CBM_INIT         0x04L
+#endif
+#ifndef DIB_RGB_COLORS
+#define DIB_RGB_COLORS   0
+#endif
+#ifndef DIB_PAL_COLORS
+#define DIB_PAL_COLORS   1
+#endif
+#ifndef COLORONCOLOR
+#define COLORONCOLOR     3
+#endif
+#ifndef SRCCOPY
+#define SRCCOPY          0x00CC0020L
+#endif
+
 #endif /* LINUX_STUBS_WINDOWS_H */
