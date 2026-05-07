@@ -378,6 +378,12 @@ class GraphicBufferClass : public GraphicViewPortClass, public BufferClass {
 	protected:
 		LPDIRECTDRAWSURFACE	VideoSurfacePtr;		//Pointer to the related direct draw surface
 		DDSURFACEDESC			VideoSurfaceDescription;//Description of the said surface
+#ifndef _MSC_VER
+		// TIM-141 commit 4: marks the GBC bound to the SDL_PrimarySurface
+		// (Linux-only). MSVC keeps the legacy IDirectDrawSurface path via
+		// IsDirectDraw + VideoSurfacePtr, so this flag is unneeded there.
+		BOOL					IsSDLPrimary;
+#endif
 
 };
 

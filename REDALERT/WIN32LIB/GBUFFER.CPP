@@ -275,6 +275,12 @@ void GraphicBufferClass::DD_Init(GBC_Enum flags)
 
 	if ( GBC_VISIBLE & flags ){
 		PaletteSurface=VideoSurfacePtr;
+#ifndef _MSC_VER
+		// TIM-141 commit 4: bind this GBC to the SDL primary surface
+		// (created in Set_Video_Mode). Lock/Unlock will route through
+		// the SDL pixel buffer instead of the dead VideoSurfacePtr path.
+		IsSDLPrimary = SDL_Has_Primary_Surface();
+#endif
 	}
 
 	Allocated		= FALSE;			//	even if system alloced, dont flag it cuz
@@ -320,6 +326,9 @@ void GraphicBufferClass::Init(int w, int h, void *buffer, long size, GBC_Enum fl
 	Size			= size;									// find size of physical buffer
 	Width			= w;										// Record width of Buffer
 	Height		= h;										// Record height of Buffer
+#ifndef _MSC_VER
+	IsSDLPrimary	= FALSE;								// TIM-141 commit 4: default off; DD_Init flips it for the visible GBC.
+#endif
 
 	//
 	// If the surface we are creating is a direct draw object then
@@ -408,6 +417,9 @@ GraphicBufferClass::GraphicBufferClass(void)
 {
 	GraphicBuff			= this; 							// Get a pointer to our self
 	VideoSurfacePtr	= NULL;
+#ifndef _MSC_VER
+	IsSDLPrimary	= FALSE;
+#endif
 	memset(&VideoSurfaceDescription, 0, sizeof(DDSURFACEDESC));
 }
 
@@ -555,6 +567,31 @@ BOOL GraphicBufferClass::Lock(void)
 	//
 	if (!IsDirectDraw) return(TRUE);
 
+#ifndef _MSC_VER
+	// TIM-141 commit 4: Linux primary-surface fast path. The GBC bound to
+	// the SDL_PrimarySurface (set in DD_Init when GBC_VISIBLE) sources its
+	// pixel buffer from SDL — VideoSurfacePtr stays NULL on Linux because
+	// CreateSurface is MSVC-gated. Mirrors the MSVC DDLOCK_WAIT branch:
+	// Offset = locked pixel pointer, Pitch = surface stride - Width
+	// (the engine adds Width back when stepping rows). Indexed SDL
+	// surfaces don't need SDL_LockSurface for CPU writes.
+	if (IsSDLPrimary) {
+		if (!SDL_Has_Primary_Surface()) {
+			return (FALSE);
+		}
+		if (LockCount) {
+			LockCount++;
+			return (TRUE);
+		}
+		Offset		= (unsigned long)SDL_Get_Primary_Pixels();
+		Pitch		= SDL_Get_Primary_Pitch();
+		Pitch	   -= Width;
+		LockCount++;
+		TotalLocks++;
+		return (TRUE);
+	}
+#endif
+
 	/*
 	** If the video surface pointer is null then return
 	*/
@@ -654,6 +691,20 @@ BOOL GraphicBufferClass::Unlock(void)
 	if (!(LockCount && IsDirectDraw)) {
 		return(TRUE);
 	}
+
+#ifndef _MSC_VER
+	// TIM-141 commit 4: SDL primary-surface unlock. The indexed SDL
+	// surface needs no paired SDL_UnlockSurface for CPU writes; we
+	// just retire the lock count and clear Offset on the final pop
+	// (mirrors the MSVC DD_OK branch in the code path below).
+	if (IsSDLPrimary) {
+		if (LockCount == 1) {
+			Offset = NOT_LOCKED;
+		}
+		LockCount--;
+		return (TRUE);
+	}
+#endif
 
 	//
 	// If lock count is directly equal to one then we actually need to
