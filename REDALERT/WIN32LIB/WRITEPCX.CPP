@@ -178,5 +178,5 @@ void Write_Pcx_ScanLine ( int file_handle , int scansize , unsigned char * ptr )
 		}
 	}
 
-	Write_File ( file_handle, pool , ( int ) file_ptr - ( int ) pool ) ;
+	Write_File ( file_handle, pool , static_cast<unsigned long>(file_ptr - pool) ) ;
 }
