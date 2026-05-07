@@ -88,30 +88,141 @@ void Stop_Primary_Sound_Buffer(void) {};
 
 #else // !_MSC_VER
 
-// TIM-148 pass-44B: Linux SDL2 audio substrate. Audio_Init / Sound_End get
-// real bodies that open and close one SDL_AudioDevice; the other 24 WIN32LIB
-// audio entry points stay no-op stubs identical to the MSVC branch above
-// (voice table, ADPCM decode, streaming chunker land in pass-44C/D/E).
+// TIM-148 pass-44C: 8-voice table + per-voice S16 PCM mix loop + graduated
+// bodies for Play_Sample / Play_Sample_Handle / Stop_Sample / Sample_Status /
+// Is_Sample_Playing / Get_Free_Sample_Handle / Sample_Length / Set_Sound_Vol /
+// Set_Score_Vol / Fade_Sample. Streaming (44E), ADPCM decode (44D), and the
+// speech path (44F) remain stubbed.
 //
-// See the audio-survey document on TIM-148 for the runtime contract pulled
-// from the live consumers (THEME.CPP / SCORE.CPP / STARTUP.CPP) and the
-// rationale for living inside REDALERT/AUDIO.CPP rather than a sibling
-// WIN32LIB/SOUNDIO.CPP. The seam declarations are in
-// linux/win32-stubs/sdl_audio.h (TIM-148 pass-44A, commit 2db00e8).
+// Built on pass-44A (sdl_audio.h seam, commit 2db00e8) and pass-44B
+// (Audio_Init / Sound_End real bodies, commit 2e05f2a). See the audio-survey
+// document on TIM-148 for the runtime contract pulled from THEME.CPP /
+// SCORE.CPP / STARTUP.CPP and the rationale for living inside
+// REDALERT/AUDIO.CPP rather than a sibling WIN32LIB/SOUNDIO.CPP.
 #include "sdl_audio.h"
 #include <SDL2/SDL.h>
-#include <cstring>      // memset for the silence callback
+#include <cstdint>
+#include <cstring>
+#include <algorithm>
+#include <climits>
 
 static SDL_AudioDeviceID g_audio_device = 0;
 static bool              g_audio_open   = false;
 
-// Silence-only mixer for pass-44B. The real per-voice mix loop lands in
-// pass-44C alongside the voice table. SDL2 invokes this on its audio thread,
-// so any future shared state reached from here will need an SDL audio lock
-// (SDL_LockAudioDevice) -- right now there is no shared state to protect.
+// Captured from SDL_AudioSpec have after SDL_OpenAudioDevice succeeds.
+// SDL_AUDIO_ALLOW_FREQUENCY_CHANGE means the driver can renegotiate freq;
+// the mix loop rate-rescales each voice against g_audio_actual_freq.
+static int g_audio_actual_freq     = 0;
+static int g_audio_actual_channels = 0;
+
+// Engine master volumes (0..255). Set_Sound_Vol routes to SFX voices,
+// Set_Score_Vol routes to music + speech voices. Both default to "full"
+// so a missed Set_*_Vol call before the first Play_Sample doesn't silence
+// the substrate.
+static int g_master_sfx_vol   = 255;
+static int g_master_score_vol = 255;
+
+// 8-voice table per the locked CEO reconcile: 5 SFX + music + speech +
+// reserved. MAX_SFX (REDALERT/WIN32LIB/SOUND.H:45) stays as the SFX-subset
+// cap; mirrored as VOICE_SFX_COUNT here so AUDIO.CPP doesn't depend on the
+// SOUND.H inclusion order.
+static constexpr int VOICE_COUNT     = 8;
+static constexpr int VOICE_SFX_BASE  = 0;
+static constexpr int VOICE_SFX_COUNT = 5;
+static constexpr int VOICE_MUSIC     = 5;     // reserved for File_Stream_Sample_Vol (44E)
+static constexpr int VOICE_SPEECH    = 6;     // reserved for Speak path (44F)
+static constexpr int VOICE_RESERVED  = 7;
+
+struct Voice {
+    bool          active;
+    void const *  sample;        // engine-handed pointer to the AUD blob (header + PCM)
+    Uint8 const * pcm;           // sample + sizeof(AUDHeaderType)
+    int           pcm_len;       // bytes; uses UncompSize for forward-compat with 44D ADPCM decode
+    double        cursor;        // PCM byte cursor (double for fractional rate-rescale advance)
+    int           source_rate;   // AUD header Rate (Hz)
+    int           priority;
+    int           volume;        // 0..255
+    int           pan;           // -32767..32767 (only applied when output is stereo)
+    bool          is_sfx;        // routes through g_master_sfx_vol vs g_master_score_vol
+    int           fade_remaining_callbacks;
+    int           fade_volume_per_callback;
+};
+
+static Voice g_voices[VOICE_COUNT] = {};
+
+static int Master_For_Voice(Voice const & v)
+{
+    return v.is_sfx ? g_master_sfx_vol : g_master_score_vol;
+}
+
+// Per-voice S16 PCM mixer. SDL2 invokes this while holding the device lock,
+// so reads and writes to g_voices[] here are safe; external mutators below
+// must take SDL_LockAudioDevice. The mix path is intentionally simple:
+// per-voice byte cursor, nearest-neighbor stride, int32 accumulator with
+// saturating clamp to int16. 8 voices x 1024 frames per callback is trivial
+// CPU; quality refinement (linear interpolation, sample-aligned cursor) is
+// out of scope for 44C.
 static void Sound_Mixer_Callback(void * /*userdata*/, Uint8 * stream, int len)
 {
     std::memset(stream, 0, len);
+
+    if (g_audio_actual_channels <= 0 || g_audio_actual_freq <= 0) {
+        return;
+    }
+
+    int16_t * const out      = reinterpret_cast<int16_t *>(stream);
+    int       const channels = g_audio_actual_channels;
+    int       const frames   = len / (static_cast<int>(sizeof(int16_t)) * channels);
+
+    for (int vi = 0; vi < VOICE_COUNT; ++vi) {
+        Voice & v = g_voices[vi];
+        if (!v.active) continue;
+        if (v.pcm == nullptr || v.pcm_len <= 0 || v.source_rate <= 0) {
+            v.active = false;
+            continue;
+        }
+
+        double const stride = 2.0 * static_cast<double>(v.source_rate)
+                                  / static_cast<double>(g_audio_actual_freq);
+        int    const master = Master_For_Voice(v);
+
+        for (int f = 0; f < frames; ++f) {
+            int const byte_index = static_cast<int>(v.cursor);
+            if (byte_index + 1 >= v.pcm_len) {
+                v.active = false;
+                break;
+            }
+
+            int16_t const s = *reinterpret_cast<int16_t const *>(v.pcm + byte_index);
+            int32_t const scaled = (static_cast<int32_t>(s) * v.volume * master) / (255 * 255);
+
+            if (channels == 2) {
+                int32_t const pan_pos = std::max(v.pan, 0);
+                int32_t const pan_neg = std::min(v.pan, 0);
+                int32_t const left    = scaled * (32767 - pan_pos) / 32767;
+                int32_t const right   = scaled * (32767 + pan_neg) / 32767;
+                int32_t const acc_l   = static_cast<int32_t>(out[f * 2 + 0]) + left;
+                int32_t const acc_r   = static_cast<int32_t>(out[f * 2 + 1]) + right;
+                out[f * 2 + 0] = static_cast<int16_t>(std::clamp(acc_l, -32768, 32767));
+                out[f * 2 + 1] = static_cast<int16_t>(std::clamp(acc_r, -32768, 32767));
+            } else {
+                int32_t const acc = static_cast<int32_t>(out[f]) + scaled;
+                out[f] = static_cast<int16_t>(std::clamp(acc, -32768, 32767));
+            }
+
+            v.cursor += stride;
+        }
+
+        if (v.fade_remaining_callbacks > 0) {
+            v.volume -= v.fade_volume_per_callback;
+            v.fade_remaining_callbacks -= 1;
+            if (v.volume <= 0 || v.fade_remaining_callbacks == 0) {
+                v.volume = 0;
+                v.active = false;
+                v.fade_remaining_callbacks = 0;
+            }
+        }
+    }
 }
 
 extern "C" {
@@ -122,10 +233,6 @@ bool SDL_Audio_Open(int rate, int channels, int bits_per_sample)
         return true;
     }
 
-    // The survey locked 16-bit signed as the only in-scope sample format
-    // (8-bit is dead per the AUD asset analysis). Caller-side rate /
-    // channels are honored as-passed to keep parity with the engine's
-    // existing call shape.
     if (bits_per_sample != 16) {
         return false;
     }
@@ -138,38 +245,45 @@ bool SDL_Audio_Open(int rate, int channels, int bits_per_sample)
     want.freq     = rate;
     want.format   = AUDIO_S16SYS;
     want.channels = static_cast<Uint8>(channels);
-    want.samples  = 1024;     // ~46ms at 22050Hz, inside the 50-100ms budget
+    want.samples  = 1024;
     want.callback = Sound_Mixer_Callback;
     want.userdata = nullptr;
 
     SDL_AudioSpec have = {};
     SDL_AudioDeviceID dev = SDL_OpenAudioDevice(
-        nullptr,                            // default playback device
-        0,                                  // capture = false
-        &want,
-        &have,
-        SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);  // accept driver renegotiation
+        nullptr, 0, &want, &have, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
 
     if (dev == 0) {
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return false;
     }
 
-    g_audio_device = dev;
-    g_audio_open   = true;
-    SDL_PauseAudioDevice(g_audio_device, 0);  // unpaused -> callback fires
+    g_audio_device          = dev;
+    g_audio_open            = true;
+    g_audio_actual_freq     = have.freq;
+    g_audio_actual_channels = have.channels;
+    for (int i = 0; i < VOICE_COUNT; ++i) {
+        g_voices[i] = Voice{};
+    }
+
+    SDL_PauseAudioDevice(g_audio_device, 0);
     return true;
 }
 
 void SDL_Audio_Close(void)
 {
     if (!g_audio_open) {
-        return;     // idempotent: safe to call before Open or twice
+        return;
     }
     SDL_PauseAudioDevice(g_audio_device, 1);
     SDL_CloseAudioDevice(g_audio_device);
-    g_audio_device = 0;
-    g_audio_open   = false;
+    g_audio_device          = 0;
+    g_audio_open            = false;
+    g_audio_actual_freq     = 0;
+    g_audio_actual_channels = 0;
+    for (int i = 0; i < VOICE_COUNT; ++i) {
+        g_voices[i] = Voice{};
+    }
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
@@ -181,7 +295,8 @@ bool SDL_Audio_Is_Open(void)
 } // extern "C"
 
 // WIN32LIB audio entry points. Audio_Init / Sound_End route to the SDL2
-// helpers above; the rest stay no-op stubs symmetric with the MSVC branch.
+// helpers above; pass-44C graduates the voice-table consumers below. The
+// remaining 14 entry points stay no-op stubs symmetric with the MSVC branch.
 // `window` and `reverse_channels` are Win32-isms with no Linux analogue.
 BOOL Audio_Init(HWND window, int bits_per_sample, BOOL stereo, int rate, int reverse_channels)
 {
@@ -193,6 +308,187 @@ void Sound_End(void)
     SDL_Audio_Close();
 }
 
+int Get_Free_Sample_Handle(int priority)
+{
+    if (!g_audio_open) {
+        return -1;
+    }
+    SDL_LockAudioDevice(g_audio_device);
+    int free_slot           = -1;
+    int lowest_prio_slot    = -1;
+    int lowest_prio         = INT_MAX;
+    for (int i = VOICE_SFX_BASE; i < VOICE_SFX_BASE + VOICE_SFX_COUNT; ++i) {
+        if (!g_voices[i].active) {
+            free_slot = i;
+            break;
+        }
+        if (g_voices[i].priority < lowest_prio) {
+            lowest_prio      = g_voices[i].priority;
+            lowest_prio_slot = i;
+        }
+    }
+    int result;
+    if (free_slot >= 0) {
+        result = free_slot;
+    } else if (lowest_prio_slot >= 0 && priority > lowest_prio) {
+        g_voices[lowest_prio_slot].active = false;
+        result = lowest_prio_slot;
+    } else {
+        result = -1;
+    }
+    SDL_UnlockAudioDevice(g_audio_device);
+    return result;
+}
+
+int Play_Sample_Handle(void const *sample, int priority, int volume, signed short panloc, int id)
+{
+    if (sample == NULL || id < 0 || id >= VOICE_COUNT || !g_audio_open) {
+        return -1;
+    }
+
+    AUDHeaderType const * const header = static_cast<AUDHeaderType const *>(sample);
+
+    SDL_LockAudioDevice(g_audio_device);
+    Voice & v = g_voices[id];
+    v.active                   = true;
+    v.sample                   = sample;
+    v.pcm                      = static_cast<Uint8 const *>(sample) + sizeof(AUDHeaderType);
+    v.pcm_len                  = static_cast<int>(header->UncompSize);
+    v.cursor                   = 0.0;
+    v.source_rate              = static_cast<int>(header->Rate);
+    v.priority                 = priority;
+    v.volume                   = volume;
+    v.pan                      = panloc;
+    v.is_sfx                   = (id >= VOICE_SFX_BASE && id < VOICE_SFX_BASE + VOICE_SFX_COUNT);
+    v.fade_remaining_callbacks = 0;
+    v.fade_volume_per_callback = 0;
+    SDL_UnlockAudioDevice(g_audio_device);
+    return id;
+}
+
+int Play_Sample(void const *sample, int priority, int volume, signed short panloc)
+{
+    int const id = Get_Free_Sample_Handle(priority);
+    if (id < 0) {
+        return -1;
+    }
+    return Play_Sample_Handle(sample, priority, volume, panloc, id);
+}
+
+void Stop_Sample(int handle)
+{
+    if (handle < 0 || handle >= VOICE_COUNT || !g_audio_open) {
+        return;
+    }
+    SDL_LockAudioDevice(g_audio_device);
+    g_voices[handle].active                   = false;
+    g_voices[handle].fade_remaining_callbacks = 0;
+    SDL_UnlockAudioDevice(g_audio_device);
+}
+
+BOOL Sample_Status(int handle)
+{
+    if (handle < 0 || handle >= VOICE_COUNT || !g_audio_open) {
+        return FALSE;
+    }
+    SDL_LockAudioDevice(g_audio_device);
+    BOOL const r = g_voices[handle].active ? TRUE : FALSE;
+    SDL_UnlockAudioDevice(g_audio_device);
+    return r;
+}
+
+BOOL Is_Sample_Playing(void const * sample)
+{
+    if (sample == NULL || !g_audio_open) {
+        return FALSE;
+    }
+    SDL_LockAudioDevice(g_audio_device);
+    BOOL r = FALSE;
+    for (int i = 0; i < VOICE_COUNT; ++i) {
+        if (g_voices[i].active && g_voices[i].sample == sample) {
+            r = TRUE;
+            break;
+        }
+    }
+    SDL_UnlockAudioDevice(g_audio_device);
+    return r;
+}
+
+long Sample_Length(void const *sample)
+{
+    if (sample == NULL) {
+        return 0;
+    }
+    return static_cast<long>(static_cast<AUDHeaderType const *>(sample)->UncompSize);
+}
+
+int Set_Sound_Vol(int volume)
+{
+    int old;
+    if (!g_audio_open) {
+        old              = g_master_sfx_vol;
+        g_master_sfx_vol = volume;
+        return old;
+    }
+    SDL_LockAudioDevice(g_audio_device);
+    old              = g_master_sfx_vol;
+    g_master_sfx_vol = volume;
+    SDL_UnlockAudioDevice(g_audio_device);
+    return old;
+}
+
+int Set_Score_Vol(int volume)
+{
+    int old;
+    if (!g_audio_open) {
+        old                = g_master_score_vol;
+        g_master_score_vol = volume;
+        return old;
+    }
+    SDL_LockAudioDevice(g_audio_device);
+    old                = g_master_score_vol;
+    g_master_score_vol = volume;
+    SDL_UnlockAudioDevice(g_audio_device);
+    return old;
+}
+
+void Fade_Sample(int handle, int ticks)
+{
+    if (handle < 0 || handle >= VOICE_COUNT || !g_audio_open) {
+        return;
+    }
+    if (ticks <= 0) {
+        Stop_Sample(handle);
+        return;
+    }
+    if (g_audio_actual_freq <= 0) {
+        return;
+    }
+
+    // ticks are 60Hz timer ticks (see THEME.CPP::Queue_Song). Convert to
+    // mixer-callback periods given the device's actual freq and the 1024
+    // samples/callback chosen in SDL_Audio_Open.
+    double const callbacks_per_tick =
+        (static_cast<double>(g_audio_actual_freq) / 60.0) / 1024.0;
+    int total_callbacks = static_cast<int>(static_cast<double>(ticks) * callbacks_per_tick);
+    if (total_callbacks < 1) total_callbacks = 1;
+
+    SDL_LockAudioDevice(g_audio_device);
+    Voice & v = g_voices[handle];
+    if (v.active && v.volume > 0) {
+        int per = v.volume / total_callbacks;
+        if (per < 1) per = 1;
+        v.fade_remaining_callbacks = total_callbacks;
+        v.fade_volume_per_callback = per;
+    }
+    SDL_UnlockAudioDevice(g_audio_device);
+}
+
+// Remaining 14 entry points stay no-op stubs identical to the MSVC branch.
+// Real bodies land in 44D (Load_Sample / Free_Sample / Sample_Read /
+// Load_Sample_Into_Buffer through ADPCM decode), 44E (File_Stream_Sample_*
+// streaming chunker + Sound_Callback / maintenance_callback background fill),
+// and 44F (speech path tied to Stop_Sample_Playing).
 int File_Stream_Sample(char const *filename, BOOL real_time_start) { return 1; };
 int File_Stream_Sample_Vol(char const *filename, int volume, BOOL real_time_start) { return 1; };
 void __cdecl Sound_Callback(void) {};
@@ -201,18 +497,8 @@ void *Load_Sample(char const *filename) { return NULL; };
 long Load_Sample_Into_Buffer(char const *filename, void *buffer, long size) { return 0; }
 long Sample_Read(int fh, void *buffer, long size) { return 0; };
 void Free_Sample(void const *sample) {};
-void Stop_Sample(int handle) {};
-BOOL Sample_Status(int handle) { return 0; };
-BOOL Is_Sample_Playing(void const * sample) { return 0; };
 void Stop_Sample_Playing(void const * sample) {};
-int Play_Sample(void const *sample, int priority, int volume, signed short panloc) { return 1; };
-int Play_Sample_Handle(void const *sample, int priority, int volume, signed short panloc, int id) { return 1; };
-int Set_Sound_Vol(int volume) { return 0; };
-int Set_Score_Vol(int volume) { return 0; };
-void Fade_Sample(int handle, int ticks) {};
-int Get_Free_Sample_Handle(int priority) { return 1; };
 int Get_Digi_Handle(void) { return 1; }
-long Sample_Length(void const *sample) { return 0; };
 void Restore_Sound_Buffers(void) {};
 BOOL Set_Primary_Buffer_Format(void) { return 0; };
 BOOL Start_Primary_Sound_Buffer(BOOL forced) { return 0; };
