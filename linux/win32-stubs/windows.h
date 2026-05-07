@@ -812,6 +812,13 @@ extern "C" {
  * the seed bits are deterministic until the SDL2 time-source port
  * lands. RNG seeding is the only consumer. */
 static inline void GetSystemTime(LPSYSTEMTIME) {}
+/* TIM-89: GetLocalTime -- Win32 local-time-of-day API, sibling of
+ * GetSystemTime. WINSTUB.CPP:746 (Assert_Failure) calls it to stamp the
+ * assertion-log line written to ASSERT.TXT. Inert stub leaves the
+ * SYSTEMTIME zero-initialized; the assert path is engine-side
+ * diagnostic only and the timestamp is cosmetic. The eventual port
+ * wires this to localtime_r/clock_gettime alongside GetSystemTime. */
+static inline void GetLocalTime(LPSYSTEMTIME) {}
 #ifdef __cplusplus
 }
 #endif
