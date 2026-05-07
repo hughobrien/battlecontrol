@@ -92,6 +92,8 @@ struct IDirectDrawSurface {
     template <typename... Args> long Unlock(Args&&...) { return 0; }
     template <typename... Args> long AddAttachedSurface(Args&&...) { return 0; }
     template <typename... Args> long Release(Args&&...) { return 0; }
+    template <typename... Args> long SetPalette(Args&&...) { return 0; }
+    template <typename... Args> long Restore(Args&&...) { return 0; }
 };
 struct IDirectDraw {
     template <typename... Args> long CreateSurface(Args&&...) { return 0; }
