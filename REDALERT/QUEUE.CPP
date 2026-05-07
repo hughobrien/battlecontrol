@@ -2511,7 +2511,7 @@ static int Build_Send_Packet(void *buf, int bufsize, int frame_delay,
  * HISTORY:                                                                *
  *   11/21/1995 DRD : Created.                                             *
  *=========================================================================*/
-static int Add_Uncompressed_Events(void *buf, int bufsize, int frame_delay,
+int Add_Uncompressed_Events(void *buf, int bufsize, int frame_delay,
 	int size, int cap)
 {
 	int num = 0;			// # of events processed
@@ -2607,7 +2607,7 @@ static int Add_Uncompressed_Events(void *buf, int bufsize, int frame_delay,
  * HISTORY:                                                                *
  *   11/21/1995 DRD : Created.                                             *
  *=========================================================================*/
-static int Add_Compressed_Events(void *buf, int bufsize, int frame_delay,
+int Add_Compressed_Events(void *buf, int bufsize, int frame_delay,
 	int size, int cap)
 {
 	int num = 0;							// # of events processed
@@ -2959,7 +2959,7 @@ static int Breakup_Receive_Packet(void *buf, int bufsize )
  * HISTORY:                                                                *
  *   11/21/1995 DRD : Created.                                             *
  *=========================================================================*/
-static int Extract_Uncompressed_Events(void *buf, int bufsize)
+int Extract_Uncompressed_Events(void *buf, int bufsize)
 {
 	int count = 0;
 	int pos = 0;
@@ -3039,7 +3039,7 @@ static int Extract_Uncompressed_Events(void *buf, int bufsize)
  * HISTORY:                                                                *
  *   11/21/1995 DRD : Created.                                             *
  *=========================================================================*/
-static int Extract_Compressed_Events(void *buf, int bufsize)
+int Extract_Compressed_Events(void *buf, int bufsize)
 {
 	int pos = 0;						// current buffer parsing position
 	int leftover = bufsize;			// # bytes left to process
