@@ -516,4 +516,48 @@ typedef LPWIN32_FIND_DATAA LPWIN32_FIND_DATA;
 #define SW_RESTORE          9
 #endif
 
+/* TIM-59: FindFirstFile / FindNextFile / FindClose -- Win32 directory
+ * enumeration triplet. SESSION.CPP:1325/1446 walks "*.PKT" / "*.MPR"
+ * with the standard `handle = FindFirstFile(...); while (handle !=
+ * INVALID_HANDLE_VALUE) { ...; if (!FindNextFile(handle, &block))
+ * break; }` shape. The stub returns INVALID_HANDLE_VALUE so the loop
+ * terminates without entering the body; FindNextFile / FindClose are
+ * declared so call sites parse, but never executed. A real port wires
+ * these to opendir/readdir + glob. The WIN32_FIND_DATA payload is
+ * untouched on the failure path. */
+static inline HANDLE FindFirstFileA(LPCSTR, LPWIN32_FIND_DATAA) { return INVALID_HANDLE_VALUE; }
+static inline BOOL   FindNextFileA(HANDLE, LPWIN32_FIND_DATAA)  { return FALSE; }
+static inline BOOL   FindClose(HANDLE)                          { return FALSE; }
+#ifndef FindFirstFile
+#define FindFirstFile FindFirstFileA
+#endif
+#ifndef FindNextFile
+#define FindNextFile  FindNextFileA
+#endif
+
+/* TIM-59: MessageBox / MessageBoxA -- Win32 dialog box. WIN32LIB/DDRAW
+ * .CPP:90+ chain calls MessageBox(MainWindow, text, caption, MB_*) for
+ * DirectDraw error reports; STARTUP / BMP8 / MPMGRW etc. also use it
+ * defensively. Return value is IDOK (engine never branches on it for
+ * the MB_OK paths in our scope). The dialog itself is dormant on
+ * Linux; a later port routes through SDL_ShowSimpleMessageBox or
+ * stderr. Real <winuser.h> arg order: (HWND, LPCSTR text, LPCSTR
+ * caption, UINT type). */
+#ifndef IDOK
+#define IDOK      1
+#endif
+#ifndef IDCANCEL
+#define IDCANCEL  2
+#endif
+#ifndef IDYES
+#define IDYES     6
+#endif
+#ifndef IDNO
+#define IDNO      7
+#endif
+static inline int MessageBoxA(HWND, LPCSTR, LPCSTR, UINT) { return IDOK; }
+#ifndef MessageBox
+#define MessageBox MessageBoxA
+#endif
+
 #endif /* LINUX_STUBS_WINDOWS_H */

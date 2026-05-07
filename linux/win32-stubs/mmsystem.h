@@ -100,6 +100,22 @@ static inline MMRESULT timeEndPeriod(UINT period)   { (void)period; return TIMER
 #define TIME_KILL_SYNCHRONOUS   0x0100
 #endif
 
+/* TIM-59: timeSetEvent / timeKillEvent + LPTIMECALLBACK -- Win32 winmm
+ * multimedia-timer pump. WIN32LIB/TIMERINI.CPP:122 installs a 1ms
+ * periodic callback (Timer_Callback, signature `void CALLBACK (UINT,
+ * UINT, DWORD, DWORD, DWORD)`) and stores the returned timer id in
+ * TimerHandle; line 156 tears it down via timeKillEvent. The periodic
+ * dispatch is dormant under the stub -- a real Linux port wires this
+ * to timer_create+timerfd or a dedicated POSIX thread. The stubs
+ * return 0 (timeSetEvent: 0 == failure, which sets TimerSystemOn =
+ * false at line 123; the caller logs an OutputDebugString diagnostic
+ * but otherwise advances). The LPTIMECALLBACK typedef matches the SDK
+ * exactly so Timer_Callback's `void CALLBACK (UINT, UINT, DWORD,
+ * DWORD, DWORD)` declaration is implicitly convertible. */
+typedef void (CALLBACK *LPTIMECALLBACK)(UINT, UINT, DWORD, DWORD, DWORD);
+static inline MMRESULT timeSetEvent(UINT, UINT, LPTIMECALLBACK, DWORD, UINT) { return 0; }
+static inline MMRESULT timeKillEvent(UINT) { return TIMERR_NOERROR; }
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
