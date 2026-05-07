@@ -1,0 +1,25 @@
+# TIM-147 pass-43N: symbol-count verification at -c
+#
+# Method: compile each of the four -DWIN32 enable targets with the same
+# include / shim flags, but using -c instead of -fsyntax-only, then count
+# defined symbols via `nm --defined-only`. Same shape as pass-43M's
+# symbol-counts artifact; pass-43N's contribution is the INTERNET +
+# TCPIP delta (CCDDE/STATS already banked at +53 in 43M).
+
+# Whole-body-elided targets ----------------------------------------------
+
+#                  baseline (-c, no -DWIN32)     post-pass-43N (-c, -DWIN32)
+# TU              size       defined-symbols     size       defined-symbols    delta
+# CCDDE.CPP         800           0                8104       19              +19  (banked 43M)
+# STATS.CPP         800           0               10992       34              +34  (banked 43M)
+# INTERNET.CPP      808           0               25208       62              +62  (NEW 43N)
+# TCPIP.CPP         800           0               22056       65              +65  (NEW 43N)
+#                                                                            -----
+# Net new at-c defined-symbols across cluster A (TIM-147+TIM-143):           +180
+
+# Compile floor: 299 / 2 / 301 (43M) -> 301 / 0 / 301 (43N).
+# All four whole-body-elided TUs now graduate cleanly behind the
+# A1+A2+A3 shim adds (FindWindow, accept/inet_addr/inet_ntoa/
+# INADDR_NONE/IPPROTO_TCP/TCP_NODELAY/PF_INET/h_addr,
+# WSAAsyncGetHostByAddr/WSAAsyncGetHostByName/WSAGETASYNCERROR/
+# WSAECONNRESET) plus a one-line LP64-cast fix in INTERNET.CPP:295.

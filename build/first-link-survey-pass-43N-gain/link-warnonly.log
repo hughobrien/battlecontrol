@@ -1,0 +1,158 @@
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/ANIM.o: in function `AnimClass::AI()':
+ANIM.CPP:(.text+0x16cc): warning: undefined reference to `GetSystemTimeAsFileTime'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43N-gain/obj/CCDDE.o: in function `DDEServerClass::DDEServerClass()':
+CCDDE.CPP:(.text+0x81): warning: undefined reference to `Instance_Class::Instance_Class(char*, char*)'
+/usr/bin/ld.bfd: CCDDE.CPP:(.text+0xb3): warning: undefined reference to `Instance_Class::Enable_Callback(int)'
+/usr/bin/ld.bfd: CCDDE.CPP:(.text+0xdb): warning: undefined reference to `Instance_Class::Test_Server_Running(void*)'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43N-gain/obj/CCDDE.o: in function `DDEServerClass::Enable()':
+CCDDE.CPP:(.text+0x149): warning: undefined reference to `Instance_Class::Enable_Callback(int)'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43N-gain/obj/CCDDE.o: in function `DDEServerClass::Disable()':
+CCDDE.CPP:(.text+0x183): warning: undefined reference to `Instance_Class::Enable_Callback(int)'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43N-gain/obj/CCDDE.o: in function `DDEServerClass::~DDEServerClass()':
+CCDDE.CPP:(.text+0x1bf): warning: undefined reference to `Instance_Class::~Instance_Class()'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43N-gain/obj/CCDDE.o: in function `Send_Data_To_DDE_Server(char*, int, int)':
+CCDDE.CPP:(.text+0x47a): warning: undefined reference to `Instance_Class::Open_Poke_Connection(void*)'
+/usr/bin/ld.bfd: CCDDE.CPP:(.text+0x526): warning: undefined reference to `Instance_Class::Poke_Server(unsigned char*, unsigned int)'
+/usr/bin/ld.bfd: CCDDE.CPP:(.text+0x54d): warning: undefined reference to `Instance_Class::Close_Poke_Connection()'
+/usr/bin/ld.bfd: CCDDE.CPP:(.text+0x579): warning: undefined reference to `Instance_Class::Close_Poke_Connection()'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/CONQUER.o: in function `CC_Draw_Shape(void const*, int, int, int, WindowNumberType, ShapeFlags_Type, void const*, void const*, DirType)':
+CONQUER.CPP:(.text+0x3a2b): warning: undefined reference to `Buffer_Frame_To_Page'
+/usr/bin/ld.bfd: CONQUER.CPP:(.text+0x3a96): warning: undefined reference to `Buffer_Frame_To_Page'
+/usr/bin/ld.bfd: CONQUER.CPP:(.text+0x3afc): warning: undefined reference to `Buffer_Frame_To_Page'
+/usr/bin/ld.bfd: CONQUER.CPP:(.text+0x3b49): warning: undefined reference to `Buffer_Frame_To_Page'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/DIALOG.o: in function `GraphicViewPortClass::Print(char const*, int, int, int, int)':
+DIALOG.CPP:(.text._ZN20GraphicViewPortClass5PrintEPKciiii[_ZN20GraphicViewPortClass5PrintEPKciiii]+0x5a): warning: undefined reference to `Buffer_Print'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/DLLInterface.o: in function `Debug_Write_Shape(char const*, void const*, int, int, void const*)':
+DLLInterface.cpp:(.text+0x26bc): warning: undefined reference to `Buffer_Frame_To_Page'
+/usr/bin/ld.bfd: DLLInterface.cpp:(.text+0x26fe): warning: undefined reference to `Buffer_Frame_To_Page'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/DLLInterfaceEditor.o: in function `CNC_Editor_Get_Cell_Texture_Buffer':
+DLLInterfaceEditor.cpp:(.text+0xc6e): warning: undefined reference to `SafeArrayCreate'
+/usr/bin/ld.bfd: DLLInterfaceEditor.cpp:(.text+0xc94): warning: undefined reference to `SafeArrayAccessData'
+/usr/bin/ld.bfd: DLLInterfaceEditor.cpp:(.text+0xe60): warning: undefined reference to `SafeArrayUnaccessData'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/DLLInterfaceEditor.o: in function `CNC_Editor_Get_Template_Data':
+DLLInterfaceEditor.cpp:(.text+0xfc1): warning: undefined reference to `SafeArrayCreate'
+/usr/bin/ld.bfd: DLLInterfaceEditor.cpp:(.text+0xfde): warning: undefined reference to `SafeArrayAccessData'
+/usr/bin/ld.bfd: DLLInterfaceEditor.cpp:(.text+0x1078): warning: undefined reference to `SafeArrayUnaccessData'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/EVENT.o: in function `EventClass::Execute()':
+EVENT.CPP:(.text+0xdcf): warning: undefined reference to `GetSystemTimeAsFileTime'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/EXPAND.o: in function `Expansion_Dialog(bool)':
+EXPAND.CPP:(.text+0x725): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: EXPAND.CPP:(.text+0x72f): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/GAMEDLG.o: in function `GameControlsClass::Process()':
+GAMEDLG.CPP:(.text+0x4f1): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: GAMEDLG.CPP:(.text+0x4fb): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/GETCPU.o: in function `Get_CPU_Type(int&, int&, char*, int)':
+GETCPU.CPP:(.text+0x18): warning: undefined reference to `Detect_MMX_Availability'
+/usr/bin/ld.bfd: GETCPU.CPP:(.text+0x25): warning: undefined reference to `CPUType'
+/usr/bin/ld.bfd: GETCPU.CPP:(.text+0x35): warning: undefined reference to `VendorID'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/GOPTIONS.o: in function `GameOptionsClass::Process()':
+GOPTIONS.CPP:(.text+0x82b): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: GOPTIONS.CPP:(.text+0x835): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/INIT.o: in function `Select_Game(bool)':
+INIT.CPP:(.text+0x122b): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: INIT.CPP:(.text+0x1240): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/KEYBOARD.o: in function `WWKeyboardClass::Message_Handler(void*, unsigned int, unsigned int, long)':
+KEYBOARD.CPP:(.text+0x76a): warning: undefined reference to `Stop_Execution'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/LCWPIPE.o: in function `LCWPipe::Put(void const*, int)':
+LCWPIPE.CPP:(.text+0x46b): warning: undefined reference to `LCW_Comp'
+/usr/bin/ld.bfd: LCWPIPE.CPP:(.text+0x4f6): warning: undefined reference to `LCW_Comp'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/LCWPIPE.o: in function `LCWPipe::Flush()':
+LCWPIPE.CPP:(.text+0x6d8): warning: undefined reference to `LCW_Comp'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/LCWSTRAW.o: in function `LCWStraw::Get(void*, int)':
+LCWSTRAW.CPP:(.text+0x40d): warning: undefined reference to `LCW_Comp'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/LOADDLG.o: in function `LoadOptionsClass::Process()':
+LOADDLG.CPP:(.text+0x63a): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: LOADDLG.CPP:(.text+0x644): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/MENUS.o: in function `Main_Menu(unsigned long)':
+MENUS.CPP:(.text+0x10e7): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: MENUS.CPP:(.text+0x10f1): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/MPGSET.o: in function `MPGSettings::Dialog()':
+MPGSET.CPP:(.text+0x78d): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/MPGSET.o:MPGSET.CPP:(.text+0x797): warning: more undefined references to `AllSurfaces' follow
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/MPMGRD.o: in function `MPlayerManClass::MPlayerManClass()':
+MPMGRD.CPP:(.text+0x46): warning: undefined reference to `LPCGetMPAddr()'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/MPMGRD.o: in function `MPlayerManClass::Find_Num_Connections()':
+MPMGRD.CPP:(.text+0x7de): warning: undefined reference to `GetGameDef'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/MSGBOX.o: in function `WWMessageBox::Process(char const*, char const*, char const*, char const*, bool)':
+MSGBOX.CPP:(.text+0x6a7): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: MSGBOX.CPP:(.text+0x6b1): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/MSGBOX.o: in function `GraphicViewPortClass::To_Buffer(int, int, int, int, void*, long)':
+MSGBOX.CPP:(.text._ZN20GraphicViewPortClass9To_BufferEiiiiPvl[_ZN20GraphicViewPortClass9To_BufferEiiiiPvl]+0x5f): warning: undefined reference to `Buffer_To_Buffer'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/MiscAsm.o: in function `Set_Palette_Range':
+MiscAsm.cpp:(.text+0x190): warning: undefined reference to `Set_DD_Palette'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/QUEUE.o: in function `Process_Reconnect_Dialog(CDTimerClass<SystemTimerClass>*, long*, int, int, int)':
+QUEUE.CPP:(.text+0x1f1c): warning: undefined reference to `Net_Reconnect_Dialog(int, int, int, unsigned long)'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/QUEUE.o: in function `Handle_Timeout(ConnManClass*, long*, unsigned short*, unsigned short*)':
+QUEUE.CPP:(.text+0x1fbb): warning: undefined reference to `Reconnect_Modem()'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/RADAR.o: in function `RadarClass::Set_Radar_Position(short)':
+RADAR.CPP:(.text+0x3424): warning: undefined reference to `OverlappedVideoBlits'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/SCENARIO.o: in function `BGMessageBox(char const*, int, int)':
+SCENARIO.CPP:(.text+0x346d): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: SCENARIO.CPP:(.text+0x3477): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: SCENARIO.CPP:(.text+0x36c2): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: SCENARIO.CPP:(.text+0x36cc): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/SCORE.o: in function `Animate_Score_Objs()':
+SCORE.CPP:(.text+0x37dd): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/SCORE.o:SCORE.CPP:(.text+0x37e7): warning: more undefined references to `AllSurfaces' follow
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/SCORE.o: in function `GraphicViewPortClass::Print(int, int, int, int, int)':
+SCORE.CPP:(.text._ZN20GraphicViewPortClass5PrintEiiiii[_ZN20GraphicViewPortClass5PrintEiiiii]+0x6e): warning: undefined reference to `Buffer_Print'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/SOUNDDLG.o: in function `SoundControlsClass::Process()':
+SOUNDDLG.CPP:(.text+0x89c): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: SOUNDDLG.CPP:(.text+0x8a6): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/SPECIAL.o: in function `Fetch_Password(int, int, int)':
+SPECIAL.CPP:(.text+0x779): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: SPECIAL.CPP:(.text+0x783): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/SPECIAL.o: in function `Fetch_Difficulty(bool)':
+SPECIAL.CPP:(.text+0xc57): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/SPECIAL.o:SPECIAL.CPP:(.text+0xc61): warning: more undefined references to `AllSurfaces' follow
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/STARTUP.o: in function `DLL_Startup(char const*)':
+STARTUP.CPP:(.text+0x4b7): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: STARTUP.CPP:(.text+0x501): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: STARTUP.CPP:(.text+0x50e): warning: undefined reference to `Set_Video_Mode(void*, int, int, int)'
+/usr/bin/ld.bfd: STARTUP.CPP:(.text+0x52d): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: STARTUP.CPP:(.text+0x53f): warning: undefined reference to `Set_Video_Mode(void*, int, int, int)'
+/usr/bin/ld.bfd: STARTUP.CPP:(.text+0x56e): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: STARTUP.CPP:(.text+0x57b): warning: undefined reference to `Set_Video_Mode(void*, int, int, int)'
+/usr/bin/ld.bfd: STARTUP.CPP:(.text+0x598): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: STARTUP.CPP:(.text+0xa2f): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/STARTUP.o: in function `Emergency_Exit(int)':
+STARTUP.CPP:(.text+0xe5b): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43N-gain/obj/TCPIP.o: in function `TcpipManagerClass::Write(void*, int)':
+TCPIP.CPP:(.text+0x7ac): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: TCPIP.CPP:(.text+0x7cc): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43N-gain/obj/TCPIP.o:TCPIP.CPP:(.text+0x90f): warning: more undefined references to `MainWindow' follow
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/TURRET.o: in function `TurretClass::~TurretClass()':
+TURRET.CPP:(.text+0xf): warning: undefined reference to `vtable for TurretClass'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/TURRET.o: in function `TurretClass::TurretClass()':
+TURRET.CPP:(.text+0x78): warning: undefined reference to `vtable for TurretClass'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/TURRET.o: in function `TurretClass::TurretClass(UnitType, HousesType)':
+TURRET.CPP:(.text+0xb4): warning: undefined reference to `vtable for TurretClass'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/VISUDLG.o: in function `VisualControlsClass::Process()':
+VISUDLG.CPP:(.text+0x597): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: VISUDLG.CPP:(.text+0x5a1): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WINSTUB.o: in function `Create_Main_Window(void*, int, int, int)':
+WINSTUB.CPP:(.text+0x10b): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WINSTUB.o: in function `Memory_Error_Handler()':
+WINSTUB.CPP:(.text+0x570): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WSPROTO.o: in function `WinsockInterfaceClass::Start_Listening()':
+WSPROTO.CPP:(.text+0x28c): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WSPROTO.o: in function `WinsockInterfaceClass::WriteTo(void*, int, void*)':
+WSPROTO.CPP:(.text+0x7a4): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WSPROTO.o: in function `WinsockInterfaceClass::Broadcast(void*, int)':
+WSPROTO.CPP:(.text+0x84f): warning: undefined reference to `MainWindow'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WSPUDP.o:WSPUDP.CPP:(.text+0x726): warning: more undefined references to `MainWindow' follow
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WIN32LIB/DrawMisc.o: in function `Set_Palette_Range(void*)':
+DrawMisc.cpp:(.text+0x329): warning: undefined reference to `Set_DD_Palette'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WIN32LIB/GBUFFER.o: in function `GraphicBufferClass::DD_Init(GBC_Enum)':
+GBUFFER.CPP:(.text+0x3de): warning: undefined reference to `DirectDrawObject'
+/usr/bin/ld.bfd: GBUFFER.CPP:(.text+0x424): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: GBUFFER.CPP:(.text+0x42c): warning: undefined reference to `SurfaceMonitorClass::Add_DD_Surface(IDirectDrawSurface*)'
+/usr/bin/ld.bfd: GBUFFER.CPP:(.text+0x445): warning: undefined reference to `PaletteSurface'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WIN32LIB/GBUFFER.o: in function `GraphicBufferClass::Un_Init()':
+GBUFFER.CPP:(.text+0x648): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: GBUFFER.CPP:(.text+0x650): warning: undefined reference to `SurfaceMonitorClass::Restore_Surfaces()'
+/usr/bin/ld.bfd: GBUFFER.CPP:(.text+0x66d): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: GBUFFER.CPP:(.text+0x675): warning: undefined reference to `SurfaceMonitorClass::Remove_DD_Surface(IDirectDrawSurface*)'
+/usr/bin/ld.bfd: /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/build/first-link-survey-pass-43L/obj/REDALERT/WIN32LIB/GBUFFER.o: in function `GraphicBufferClass::Lock()':
+GBUFFER.CPP:(.text+0xae9): warning: undefined reference to `AllSurfaces'
+/usr/bin/ld.bfd: GBUFFER.CPP:(.text+0xaf1): warning: undefined reference to `SurfaceMonitorClass::Restore_Surfaces()'

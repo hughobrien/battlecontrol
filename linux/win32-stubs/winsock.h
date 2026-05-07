@@ -431,4 +431,143 @@ static inline int WSAGetLastError(void) { return 0; }
 #define WSAGETSELECTERROR(lParam) HIWORD(lParam)
 #endif
 
+/* TIM-147 pass-43N (cluster A2): TCP/IP Berkeley/Winsock1 surface for
+ * TCPIP.CPP. The TCPIP.CPP body sits behind `#ifdef WIN32`; pass-43M
+ * surfaced 8 sites (accept, inet_addr/inet_ntoa, INADDR_NONE,
+ * IPPROTO_TCP, TCP_NODELAY, PF_INET, hostent::h_addr) when the TU is
+ * brought online. Issue spec proposed pulling <sys/socket.h> /
+ * <netinet/in.h> / <netinet/tcp.h> / <arpa/inet.h> / <netdb.h>; that
+ * route conflicts with the in_addr / sockaddr_in / sockaddr forward
+ * / hostent shapes already shipped above (see TIM-53/56/59/77 notes
+ * lines 94, 166, 290, 372). 295 sibling TUs already parse against
+ * those opaque shapes, and re-rooting them under POSIX headers would
+ * cascade across the whole Winsock-using corpus. Smaller route taken
+ * here: direct shims/macros matching the existing file idiom. Result
+ * is byte-for-byte identical at every existing call site, only the
+ * 8 new TCPIP.CPP sites become visible. */
+
+/* IPPROTO_TCP / TCP_NODELAY -- Berkeley socket-option payload for the
+ * Nagle-disable knob. TCPIP.CPP:416 calls
+ *   setsockopt(s, IPPROTO_TCP, TCP_NODELAY, ...)
+ * to disable coalescing on the connect socket. Standard <winsock.h>
+ * values (IPPROTO_TCP=6 from RFC1700; TCP_NODELAY=0x0001). The
+ * setsockopt shim above is a 0-return no-op, so the values only need
+ * to parse. */
+#ifndef IPPROTO_TCP
+#define IPPROTO_TCP 6
+#endif
+#ifndef TCP_NODELAY
+#define TCP_NODELAY 0x0001
+#endif
+
+/* PF_INET -- protocol-family alias of AF_INET. TCPIP.CPP:431 passes
+ * PF_INET into WSAAsyncGetHostByAddr's family arg. Standard
+ * <winsock.h> convention: PF_* mirrors AF_*. */
+#ifndef PF_INET
+#define PF_INET AF_INET
+#endif
+
+/* INADDR_NONE -- sentinel returned by inet_addr() when the dotted-quad
+ * input is unparseable. TCPIP.CPP:846 compares
+ *   if (Server.Addr.s_addr == INADDR_NONE) ...
+ * to fall back to a hostname lookup. Standard <winsock.h> value is the
+ * all-ones 32-bit pattern. */
+#ifndef INADDR_NONE
+#define INADDR_NONE ((unsigned long)0xFFFFFFFF)
+#endif
+
+/* inet_addr / inet_ntoa -- text<->binary IPv4 conversion. TCPIP.CPP
+ * :844 calls inet_addr(PlanetWestwoodIPAddress) to parse a dotted-quad
+ * profile entry; :558 calls inet_ntoa(Server.Addr) to format a server
+ * address back to text for logging. Real <winsock.h>:
+ *   unsigned long inet_addr(const char* cp);
+ *   char*         inet_ntoa(struct in_addr in);
+ * The dormant-socket invariant (socket() / accept() return
+ * INVALID_SOCKET) means neither call ever drives a real packet path;
+ * inet_addr returns INADDR_NONE so the engine takes the WSAAsync
+ * hostname-resolution branch, and inet_ntoa returns a stable
+ * "0.0.0.0" string. */
+static inline unsigned long inet_addr(const char*) { return INADDR_NONE; }
+static inline char* inet_ntoa(struct in_addr)
+{
+    static char buf[16] = "0.0.0.0";
+    return buf;
+}
+
+/* accept -- TCP listener completion. TCPIP.CPP:407:
+ *   ConnectSocket = accept(ListenSocket, (LPSOCKADDR)&addr, &addrsize);
+ * The caller immediately checks `if (ConnectSocket == INVALID_SOCKET)
+ * return FALSE`, so the inert INVALID_SOCKET return matches the
+ * dormant-socket invariant established by the socket() / bind() shims
+ * above. Real <winsock.h>:
+ *   SOCKET accept(SOCKET s, struct sockaddr* addr, int* addrlen);
+ * Linux <sys/socket.h> uses socklen_t* for the length pointer; we keep
+ * the Win32 winsock.h signature verbatim (int*) because TCPIP.CPP types
+ * its addrsize as plain int. */
+static inline SOCKET accept(SOCKET, struct sockaddr*, int*) { return INVALID_SOCKET; }
+
+/* hostent::h_addr -- Winsock convention macro aliasing the first slot
+ * of h_addr_list. TCPIP.CPP:556/557 do
+ *   memcpy(&dest, hentry->h_addr, 4);
+ * Real <winsock.h> has `#define h_addr h_addr_list[0]` in the SDK
+ * header. The hostent struct above already carries `char** h_addr_list`
+ * (TIM-77, line 380); the macro turns the field reference into the
+ * canonical first-address dereference. Scope is winsock.h-only --
+ * TUs that don't include this header are unaffected. */
+#ifndef h_addr
+#define h_addr h_addr_list[0]
+#endif
+
+/* TIM-147 pass-43N (cluster A3): Win32 async-DNS shape for TCPIP.CPP.
+ * 4 sites surfaced: WSAAsyncGetHostByAddr, WSAAsyncGetHostByName,
+ * WSAGETASYNCERROR, WSAECONNRESET. Real <winsock.h> wires these to a
+ * background thread that posts WM_USER+x messages back to the caller's
+ * HWND when the async-resolve completes. The Win32 message-pump
+ * universe is dormant on the Linux port (no HWND, no pump -- see
+ * TIM-71 / TIM-77 / TIM-80 cluster). Link-only stubs land here so the
+ * TU compiles + links; runtime correctness for async hostname
+ * resolution is umbrella territory and gets folded into the SDL2
+ * event-loop port in a later pass.
+ *
+ * TODO (port-runtime): replace these with a real getaddrinfo()-driven
+ * resolver wired to an SDL_USEREVENT or self-pipe so TCPIP.CPP's
+ * WM_HOSTBYADDRESS / WM_HOSTBYNAME callbacks actually fire. Until
+ * then the engine's connect-by-hostname path is non-functional under
+ * the stub (consistent with the dormant-socket invariant). */
+
+/* Real <winsock.h>:
+ *   HANDLE WSAAsyncGetHostByAddr(HWND hWnd, unsigned int wMsg,
+ *       const char* addr, int len, int type, char* buf, int buflen);
+ *   HANDLE WSAAsyncGetHostByName(HWND hWnd, unsigned int wMsg,
+ *       const char* name, char* buf, int buflen);
+ * Returning 0 (null task handle) signals "no async request in flight"
+ * to the caller; TCPIP.CPP uses Async only as a cancel-target argument
+ * to WSACancelAsyncRequest, which the existing shim already accepts. */
+static inline HANDLE WSAAsyncGetHostByAddr(HWND, unsigned int, const char*, int, int, char*, int)
+{ return (HANDLE)0; }
+static inline HANDLE WSAAsyncGetHostByName(HWND, unsigned int, const char*, char*, int)
+{ return (HANDLE)0; }
+
+/* WSAGETASYNCERROR -- companion to WSAGETSELECTEVENT/ERROR. Real
+ * <winsock.h> macro that unpacks the high half of an async-completion
+ * lParam; TCPIP.CPP:525/537/554 use it to read the resolver's status
+ * code. HIWORD lives in windows.h (force-included via msvc-compat.h
+ * before this header), so the macro resolves correctly. */
+#ifndef WSAGETASYNCERROR
+#define WSAGETASYNCERROR(lParam) HIWORD(lParam)
+#endif
+
+/* WSAECONNRESET -- Winsock equivalent of POSIX ECONNRESET ("connection
+ * reset by peer"). TCPIP.CPP:668 compares
+ *   if (rc != 0 && rc != WSAECONNRESET) ...
+ * to suppress the connection-reset case while still treating other
+ * non-zero recv errors as fatal. Mapping to the platform errno keeps
+ * the comparison meaningful when sockets are eventually wired to real
+ * Linux fds; the standalone integer used by Windows (10054) would
+ * decouple the comparison from anything the real recv() emits. */
+#include <errno.h>
+#ifndef WSAECONNRESET
+#define WSAECONNRESET ECONNRESET
+#endif
+
 #endif /* LINUX_STUBS_WINSOCK_H_INCLUDED */
