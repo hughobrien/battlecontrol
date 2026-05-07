@@ -120,4 +120,65 @@ static inline MMRESULT timeKillEvent(UINT) { return TIMERR_NOERROR; }
 } /* extern "C" */
 #endif
 
+/* ------------------------------------------------------------------
+ * TIM-89: HMMIO + mmio* multimedia-file-I/O cluster.
+ *
+ * WINSTUB.CPP:753-763 (Assert_Failure) opens ASSERT.TXT via mmioOpen,
+ * writes the assertion-log line via mmioWrite, then mmioClose. The
+ * SDK signatures live in real <mmsystem.h>; engine-side this is a
+ * cosmetic diagnostic path -- losing the assert log is acceptable on
+ * Linux where stderr/glog plumbing already covers asserts.
+ *
+ * Constants are the canonical Win32 SDK hex values. The variadic-
+ * template stubs follow the TIM-74/TIM-75/TIM-85 pattern: smallest
+ * shape that lets the parser advance, returning the safe-default
+ * (mmioOpen -> NULL handle, others -> 0). The handle is an opaque
+ * struct pointer matching how real mmsystem.h declares HMMIO via
+ * DECLARE_HANDLE.
+ *
+ * Sits outside the extern "C" block so the variadic templates remain
+ * in C++ scope (matches windows.h GetVolumeInformation pattern).
+ * ------------------------------------------------------------------ */
+#ifndef _MMSYSTEM_MMIO_DEFINED
+#define _MMSYSTEM_MMIO_DEFINED
+
+struct HMMIO__;
+typedef struct HMMIO__* HMMIO;
+
+/* Canonical Win32 SDK mmsystem.h values. */
+#ifndef MMIO_READ
+#define MMIO_READ        0x00000000
+#endif
+#ifndef MMIO_WRITE
+#define MMIO_WRITE       0x00000001
+#endif
+#ifndef MMIO_READWRITE
+#define MMIO_READWRITE   0x00000002
+#endif
+#ifndef MMIO_CREATE
+#define MMIO_CREATE      0x00001000
+#endif
+#ifndef MMIO_PARSE
+#define MMIO_PARSE       0x00000100
+#endif
+#ifndef MMIO_DELETE
+#define MMIO_DELETE      0x00000200
+#endif
+#ifndef MMIO_EXIST
+#define MMIO_EXIST       0x00004000
+#endif
+#ifndef MMIO_ALLOCBUF
+#define MMIO_ALLOCBUF    0x00010000
+#endif
+
+#ifdef __cplusplus
+template <typename... Args> HMMIO mmioOpen(Args&&...)  { return (HMMIO)0; }
+template <typename... Args> long  mmioClose(Args&&...) { return 0; }
+template <typename... Args> long  mmioRead(Args&&...)  { return 0; }
+template <typename... Args> long  mmioWrite(Args&&...) { return 0; }
+template <typename... Args> long  mmioSeek(Args&&...)  { return 0; }
+#endif /* __cplusplus */
+
+#endif /* _MMSYSTEM_MMIO_DEFINED */
+
 #endif /* LINUX_STUBS_MMSYSTEM_H_INCLUDED */
