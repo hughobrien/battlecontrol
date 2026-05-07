@@ -55,12 +55,158 @@
 
 #include	"monoc.h"
 
+// TIM-145 pass-43E: SDL pump migrated here from KEYBOARD.CPP. KEY.CPP
+// is the canonical TU per the link-side dedup catalogued in TIM-144
+// (KEY.H reaches FUNCTION.H/JSHELL.H, so most consumer TUs see this
+// class definition). The header forward-declares the extern "C"
+// entry point for DDRAW.CPP::Wait_Vert_Blank.
+#ifndef _MSC_VER
+#include <SDL2/SDL.h>
+#include "sdl_input.h"
+
+// TIM-145 pass-43C: storage for the cursor cells GetCursorPos reads
+// from. Declared extern "C" in linux/win32-stubs/windows.h. Updated
+// by the SDL_MOUSEMOTION drain below.
+extern "C" {
+int SDL_Cursor_X = 0;
+int SDL_Cursor_Y = 0;
+}
+#endif
+
 //void Message_Loop(void);
 
-//WWKeyboardClass * _Kbd = NULL;
+WWKeyboardClass * _Kbd = NULL;
 
 
 #define	ARRAY_SIZE(x)		int(sizeof(x)/sizeof(x[0]))
+
+
+#ifndef _MSC_VER
+// TIM-145 pass-43A: map an SDL_Keycode to the Westwood/Win32 VK_
+// code the engine already uses everywhere. Returns 0 for keysyms
+// with no engine equivalent — the caller drops those events. The
+// VK_* and KEY enums in KEY.H mirror Win32's WM_KEYDOWN wParam, so
+// downstream KN_/KA_ translation needs no mapping changes.
+static unsigned short SDL_Keysym_To_VK(SDL_Keycode k)
+{
+	if (k >= SDLK_a && k <= SDLK_z) return (unsigned short)(VK_A + (k - SDLK_a));
+	if (k >= SDLK_0 && k <= SDLK_9) return (unsigned short)(VK_0 + (k - SDLK_0));
+	if (k >= SDLK_F1 && k <= SDLK_F12) return (unsigned short)(VK_F1 + (k - SDLK_F1));
+
+	switch (k) {
+	case SDLK_ESCAPE:       return VK_ESCAPE;
+	case SDLK_RETURN:       return VK_RETURN;
+	case SDLK_KP_ENTER:     return VK_RETURN;
+	case SDLK_BACKSPACE:    return VK_BACK;
+	case SDLK_TAB:          return VK_TAB;
+	case SDLK_SPACE:        return VK_SPACE;
+	case SDLK_LEFT:         return VK_LEFT;
+	case SDLK_RIGHT:        return VK_RIGHT;
+	case SDLK_UP:           return VK_UP;
+	case SDLK_DOWN:         return VK_DOWN;
+	case SDLK_HOME:         return VK_HOME;
+	case SDLK_END:          return VK_END;
+	case SDLK_PAGEUP:       return VK_PRIOR;
+	case SDLK_PAGEDOWN:     return VK_NEXT;
+	case SDLK_INSERT:       return VK_INSERT;
+	case SDLK_DELETE:       return VK_DELETE;
+	case SDLK_LSHIFT:
+	case SDLK_RSHIFT:       return VK_SHIFT;
+	case SDLK_LCTRL:
+	case SDLK_RCTRL:        return VK_CONTROL;
+	case SDLK_LALT:
+	case SDLK_RALT:         return VK_MENU;
+	case SDLK_PAUSE:        return VK_PAUSE;
+	case SDLK_CAPSLOCK:     return VK_CAPITAL;
+	case SDLK_NUMLOCKCLEAR: return VK_NUMLOCK;
+	case SDLK_SCROLLLOCK:   return VK_SCROLL;
+	case SDLK_PRINTSCREEN:  return VK_PRINT;
+	case SDLK_KP_0:         return VK_NUMPAD0;
+	case SDLK_KP_1:         return VK_NUMPAD1;
+	case SDLK_KP_2:         return VK_NUMPAD2;
+	case SDLK_KP_3:         return VK_NUMPAD3;
+	case SDLK_KP_4:         return VK_NUMPAD4;
+	case SDLK_KP_5:         return VK_NUMPAD5;
+	case SDLK_KP_6:         return VK_NUMPAD6;
+	case SDLK_KP_7:         return VK_NUMPAD7;
+	case SDLK_KP_8:         return VK_NUMPAD8;
+	case SDLK_KP_9:         return VK_NUMPAD9;
+	case SDLK_KP_PLUS:      return VK_ADD;
+	case SDLK_KP_MINUS:     return VK_SUBTRACT;
+	case SDLK_KP_MULTIPLY:  return VK_MULTIPLY;
+	case SDLK_KP_DIVIDE:    return VK_DIVIDE;
+	case SDLK_KP_PERIOD:    return VK_DECIMAL;
+	default:                return 0;
+	}
+}
+
+// TIM-145 pass-43A/B/C: drain SDL keyboard, mouse-button and
+// mouse-motion events. Keys and mouse buttons go through the public
+// WWKeyboardClass::Put API with bits packed manually — Put_Key_Message
+// and Put_Mouse_Message are private members so the free function
+// here can't call them directly. Modifier bits are intentionally
+// not applied to mouse keys (DOS-compat — see KEYBOARD.CPP comment
+// at line 193 in the upstream MSVC source). Motion x/y is captured
+// into SDL_Cursor_X/Y so the GetCursorPos stub in
+// linux/win32-stubs/windows.h returns real positions for the six
+// MOUSEWW.CPP query sites.
+extern "C" void SDL_Process_Input_Events(void)
+{
+	if (_Kbd == NULL) return;
+
+	SDL_PumpEvents();
+
+	SDL_Event events[16];
+	int drained;
+
+	// Keyboard
+	do {
+		drained = SDL_PeepEvents(events, 16, SDL_GETEVENT,
+		                         SDL_KEYDOWN, SDL_KEYUP);
+		for (int i = 0; i < drained; ++i) {
+			const SDL_KeyboardEvent &ke = events[i].key;
+			unsigned short vk = SDL_Keysym_To_VK(ke.keysym.sym);
+			if (vk == 0) continue;
+
+			Uint16 mod = ke.keysym.mod;
+			if (mod & KMOD_SHIFT) vk |= WWKEY_SHIFT_BIT;
+			if (mod & KMOD_CTRL)  vk |= WWKEY_CTRL_BIT;
+			if (mod & KMOD_ALT)   vk |= WWKEY_ALT_BIT;
+			if (events[i].type == SDL_KEYUP) vk |= WWKEY_RLS_BIT;
+
+			_Kbd->Put(vk);
+		}
+	} while (drained == 16);
+
+	// Mouse buttons (Put + Put(x) + Put(y)) and motion (cursor cells).
+	do {
+		drained = SDL_PeepEvents(events, 16, SDL_GETEVENT,
+		                         SDL_MOUSEMOTION, SDL_MOUSEBUTTONUP);
+		for (int i = 0; i < drained; ++i) {
+			Uint32 type = events[i].type;
+			if (type == SDL_MOUSEBUTTONDOWN || type == SDL_MOUSEBUTTONUP) {
+				const SDL_MouseButtonEvent &be = events[i].button;
+				unsigned short vk = 0;
+				switch (be.button) {
+				case SDL_BUTTON_LEFT:   vk = VK_LBUTTON; break;
+				case SDL_BUTTON_MIDDLE: vk = VK_MBUTTON; break;
+				case SDL_BUTTON_RIGHT:  vk = VK_RBUTTON; break;
+				default: continue;
+				}
+				if (type == SDL_MOUSEBUTTONUP) vk |= WWKEY_RLS_BIT;
+
+				_Kbd->Put(vk);
+				_Kbd->Put((unsigned short)be.x);
+				_Kbd->Put((unsigned short)be.y);
+			}
+			else if (type == SDL_MOUSEMOTION) {
+				SDL_Cursor_X = events[i].motion.x;
+				SDL_Cursor_Y = events[i].motion.y;
+			}
+		}
+	} while (drained == 16);
+}
+#endif
 
 
 /***********************************************************************************************
@@ -79,7 +225,7 @@ WWKeyboardClass::WWKeyboardClass(void) :
 	Head(0),
 	Tail(0)
 {
-//	_Kbd = this;
+	_Kbd = this;
 
 	memset(KeyState, '\0', sizeof(KeyState));
 }
