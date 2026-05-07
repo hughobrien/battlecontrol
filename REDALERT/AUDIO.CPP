@@ -55,6 +55,10 @@
 SFX_Type					SoundType;
 Sample_Type				SampleType;
 
+#ifdef _MSC_VER
+
+// EA Remastered upstream WIN32LIB no-op stubs. Kept verbatim so the MSVC
+// build is byte-for-byte identical to the upstream EA branch.
 int File_Stream_Sample(char const *filename, BOOL real_time_start) { return 1; };
 int File_Stream_Sample_Vol(char const *filename, int volume, BOOL real_time_start) { return 1; };
 void __cdecl Sound_Callback(void) {};
@@ -81,6 +85,140 @@ void Restore_Sound_Buffers(void) {};
 BOOL Set_Primary_Buffer_Format(void) { return 0; };
 BOOL Start_Primary_Sound_Buffer(BOOL forced) { return 0; };
 void Stop_Primary_Sound_Buffer(void) {};
+
+#else // !_MSC_VER
+
+// TIM-148 pass-44B: Linux SDL2 audio substrate. Audio_Init / Sound_End get
+// real bodies that open and close one SDL_AudioDevice; the other 24 WIN32LIB
+// audio entry points stay no-op stubs identical to the MSVC branch above
+// (voice table, ADPCM decode, streaming chunker land in pass-44C/D/E).
+//
+// See the audio-survey document on TIM-148 for the runtime contract pulled
+// from the live consumers (THEME.CPP / SCORE.CPP / STARTUP.CPP) and the
+// rationale for living inside REDALERT/AUDIO.CPP rather than a sibling
+// WIN32LIB/SOUNDIO.CPP. The seam declarations are in
+// linux/win32-stubs/sdl_audio.h (TIM-148 pass-44A, commit 2db00e8).
+#include "sdl_audio.h"
+#include <SDL2/SDL.h>
+#include <cstring>      // memset for the silence callback
+
+static SDL_AudioDeviceID g_audio_device = 0;
+static bool              g_audio_open   = false;
+
+// Silence-only mixer for pass-44B. The real per-voice mix loop lands in
+// pass-44C alongside the voice table. SDL2 invokes this on its audio thread,
+// so any future shared state reached from here will need an SDL audio lock
+// (SDL_LockAudioDevice) -- right now there is no shared state to protect.
+static void Sound_Mixer_Callback(void * /*userdata*/, Uint8 * stream, int len)
+{
+    std::memset(stream, 0, len);
+}
+
+extern "C" {
+
+bool SDL_Audio_Open(int rate, int channels, int bits_per_sample)
+{
+    if (g_audio_open) {
+        return true;
+    }
+
+    // The survey locked 16-bit signed as the only in-scope sample format
+    // (8-bit is dead per the AUD asset analysis). Caller-side rate /
+    // channels are honored as-passed to keep parity with the engine's
+    // existing call shape.
+    if (bits_per_sample != 16) {
+        return false;
+    }
+
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+        return false;
+    }
+
+    SDL_AudioSpec want = {};
+    want.freq     = rate;
+    want.format   = AUDIO_S16SYS;
+    want.channels = static_cast<Uint8>(channels);
+    want.samples  = 1024;     // ~46ms at 22050Hz, inside the 50-100ms budget
+    want.callback = Sound_Mixer_Callback;
+    want.userdata = nullptr;
+
+    SDL_AudioSpec have = {};
+    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(
+        nullptr,                            // default playback device
+        0,                                  // capture = false
+        &want,
+        &have,
+        SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);  // accept driver renegotiation
+
+    if (dev == 0) {
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        return false;
+    }
+
+    g_audio_device = dev;
+    g_audio_open   = true;
+    SDL_PauseAudioDevice(g_audio_device, 0);  // unpaused -> callback fires
+    return true;
+}
+
+void SDL_Audio_Close(void)
+{
+    if (!g_audio_open) {
+        return;     // idempotent: safe to call before Open or twice
+    }
+    SDL_PauseAudioDevice(g_audio_device, 1);
+    SDL_CloseAudioDevice(g_audio_device);
+    g_audio_device = 0;
+    g_audio_open   = false;
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+}
+
+bool SDL_Audio_Is_Open(void)
+{
+    return g_audio_open;
+}
+
+} // extern "C"
+
+// WIN32LIB audio entry points. Audio_Init / Sound_End route to the SDL2
+// helpers above; the rest stay no-op stubs symmetric with the MSVC branch.
+// `window` and `reverse_channels` are Win32-isms with no Linux analogue.
+BOOL Audio_Init(HWND window, int bits_per_sample, BOOL stereo, int rate, int reverse_channels)
+{
+    return SDL_Audio_Open(rate, stereo ? 2 : 1, bits_per_sample) ? TRUE : FALSE;
+}
+
+void Sound_End(void)
+{
+    SDL_Audio_Close();
+}
+
+int File_Stream_Sample(char const *filename, BOOL real_time_start) { return 1; };
+int File_Stream_Sample_Vol(char const *filename, int volume, BOOL real_time_start) { return 1; };
+void __cdecl Sound_Callback(void) {};
+void __cdecl far maintenance_callback(void) {};
+void *Load_Sample(char const *filename) { return NULL; };
+long Load_Sample_Into_Buffer(char const *filename, void *buffer, long size) { return 0; }
+long Sample_Read(int fh, void *buffer, long size) { return 0; };
+void Free_Sample(void const *sample) {};
+void Stop_Sample(int handle) {};
+BOOL Sample_Status(int handle) { return 0; };
+BOOL Is_Sample_Playing(void const * sample) { return 0; };
+void Stop_Sample_Playing(void const * sample) {};
+int Play_Sample(void const *sample, int priority, int volume, signed short panloc) { return 1; };
+int Play_Sample_Handle(void const *sample, int priority, int volume, signed short panloc, int id) { return 1; };
+int Set_Sound_Vol(int volume) { return 0; };
+int Set_Score_Vol(int volume) { return 0; };
+void Fade_Sample(int handle, int ticks) {};
+int Get_Free_Sample_Handle(int priority) { return 1; };
+int Get_Digi_Handle(void) { return 1; }
+long Sample_Length(void const *sample) { return 0; };
+void Restore_Sound_Buffers(void) {};
+BOOL Set_Primary_Buffer_Format(void) { return 0; };
+BOOL Start_Primary_Sound_Buffer(BOOL forced) { return 0; };
+void Stop_Primary_Sound_Buffer(void) {};
+
+#endif // _MSC_VER
 
 
 /***************************************************************************
