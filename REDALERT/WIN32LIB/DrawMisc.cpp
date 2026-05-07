@@ -1437,7 +1437,7 @@ BOOL __cdecl Linear_Blit_To_Linear(	void *this_object, void * dest, int x_pixel,
 		;it is probably the most commontly implemented algorithm both in software
 		;and hardware for clipping lines, rectangles, and convex polygons against
 		;a rectagular clipping window. For reference see
-		;"COMPUTER GRAPHICS principles and practice by Foley, Vandam, Feiner, Hughes
+		;"COMPUTER GRAPHICS principles and practice by Foley, Vandam, Feiner, Hughes\
 		; pages 113 to 177".
 		; Briefly consist in computing the Sutherland code for both end point of
 		; the rectangle to find out if the rectangle is:
