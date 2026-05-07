@@ -819,6 +819,20 @@ static inline void GetSystemTime(LPSYSTEMTIME) {}
  * diagnostic only and the timestamp is cosmetic. The eventual port
  * wires this to localtime_r/clock_gettime alongside GetSystemTime. */
 static inline void GetLocalTime(LPSYSTEMTIME) {}
+/* TIM-92: pass-40K STARTUP first-error drain -- GetModuleFileName.
+ * STARTUP.CPP:280 (main entry) calls it with the process HMODULE to
+ * populate path_to_exe[132], which is then assigned to argv[0]. Inert
+ * stub returns 0 (no chars written) and writes a NUL terminator at
+ * offset 0 so argv[0] points at "" rather than uninitialised stack --
+ * same safety contract as TIM-91 _splitpath / _makepath shims.
+ * Canonical SDK signature:
+ *   `DWORD GetModuleFileNameA(HMODULE, LPSTR, DWORD)`.
+ * The eventual port resolves the binary path via /proc/self/exe
+ * (readlink) on Linux. */
+static inline DWORD GetModuleFileName(HMODULE, LPSTR lpFilename, DWORD nSize) {
+    if (lpFilename && nSize > 0) lpFilename[0] = '\0';
+    return 0;
+}
 #ifdef __cplusplus
 }
 #endif
