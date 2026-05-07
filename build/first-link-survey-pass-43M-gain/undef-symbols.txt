@@ -1,0 +1,53 @@
+AllSurfaces
+Buffer_Frame_To_Page
+Buffer_Print
+Buffer_To_Buffer
+CPUType
+Check_From_WChat(char*)
+ConnectionLost
+Detect_MMX_Availability
+DirectDrawObject
+GameStatisticsPacketSent
+GetGameDef
+GetSystemTimeAsFileTime
+Instance_Class::Close_Poke_Connection()
+Instance_Class::Enable_Callback(int)
+Instance_Class::Instance_Class(char*, char*)
+Instance_Class::Open_Poke_Connection(void*)
+Instance_Class::Poke_Server(unsigned char*, unsigned int)
+Instance_Class::Test_Server_Running(void*)
+Instance_Class::~Instance_Class()
+LCW_Comp
+LPCGetMPAddr()
+MainWindow
+Net_Reconnect_Dialog(int, int, int, unsigned long)
+OverlappedVideoBlits
+PaletteSurface
+PlanetWestwoodIPAddress
+PlanetWestwoodIsHost
+PlanetWestwoodPortNumber
+Read_Game_Options(char*)
+Reconnect_Modem()
+SafeArrayAccessData
+SafeArrayCreate
+SafeArrayUnaccessData
+Server
+Set_DD_Palette
+Set_Video_Mode(void*, int, int, int)
+ShowCommand
+Spawn_WChat(bool)
+SpawnedFromWChat
+Stop_Execution
+SurfaceMonitorClass::Add_DD_Surface(IDirectDrawSurface*)
+SurfaceMonitorClass::Remove_DD_Surface(IDirectDrawSurface*)
+SurfaceMonitorClass::Restore_Surfaces()
+TcpipManagerClass::Close()
+TcpipManagerClass::Init()
+TcpipManagerClass::Read(void*, int)
+TcpipManagerClass::Set_Host_Address(char*)
+TcpipManagerClass::Start_Client()
+TcpipManagerClass::Start_Server()
+TcpipManagerClass::Write(void*, int)
+VendorID
+Winsock
+vtable for TurretClass
