@@ -74,6 +74,32 @@ static inline MMRESULT timeBeginPeriod(UINT period) { (void)period; return TIMER
 static inline MMRESULT timeEndPeriod(UINT period)   { (void)period; return TIMERR_NOERROR; }
 #endif
 
+/* TIM-56: multimedia-timer event-type macros. WIN32LIB/TIMERINI.CPP:122
+ * passes `TIME_PERIODIC | TIME_KILL_SYNCHRONOUS` as the fuEvent flags
+ * argument to timeSetEvent. Standard SDK values from <mmsystem.h>
+ * (https://learn.microsoft.com/windows/win32/api/timeapi/nf-timeapi-timesetevent).
+ * The actual periodic-timer dispatch is dormant in this stub --
+ * timeSetEvent is itself stubbed below as a no-op returning 0 -- but
+ * the bitwise-OR call site needs the integer constants to parse. */
+#ifndef TIME_ONESHOT
+#define TIME_ONESHOT            0x0000
+#endif
+#ifndef TIME_PERIODIC
+#define TIME_PERIODIC           0x0001
+#endif
+#ifndef TIME_CALLBACK_FUNCTION
+#define TIME_CALLBACK_FUNCTION  0x0000
+#endif
+#ifndef TIME_CALLBACK_EVENT_SET
+#define TIME_CALLBACK_EVENT_SET 0x0010
+#endif
+#ifndef TIME_CALLBACK_EVENT_PULSE
+#define TIME_CALLBACK_EVENT_PULSE 0x0020
+#endif
+#ifndef TIME_KILL_SYNCHRONOUS
+#define TIME_KILL_SYNCHRONOUS   0x0100
+#endif
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

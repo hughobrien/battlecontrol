@@ -347,4 +347,173 @@ typedef struct tagPALETTEENTRY {
 #define DLL_THREAD_DETACH  3
 #endif
 
+/* TIM-56: WIN32_FIND_DATA -- Win32 directory-enumeration record. Real
+ * <fileapi.h> shape: dwFileAttributes + three FILETIMEs + size halves +
+ * two reserved DWORDs + cFileName[MAX_PATH] + cAlternateFileName[14].
+ * SESSION.CPP:1325/1446 declares one on the stack, calls FindFirstFile/
+ * FindNextFile, and reads block.dwFileAttributes (line 1328) and
+ * block.cAlternateFileName / block.cFileName (lines 1331-1332). Layout
+ * matches the SDK so any sizeof / pointer-cast through engine code
+ * stays well-defined; the file-enumeration path itself is dormant under
+ * the stub (FindFirstFile resolves to the no-op declaration in
+ * win32-stubs/fileapi.h-equivalent surface, which a later port replaces
+ * with opendir/readdir). */
+#ifndef _WIN32_FIND_DATA_DEFINED
+#define _WIN32_FIND_DATA_DEFINED
+typedef struct _WIN32_FIND_DATAA {
+    DWORD    dwFileAttributes;
+    FILETIME ftCreationTime;
+    FILETIME ftLastAccessTime;
+    FILETIME ftLastWriteTime;
+    DWORD    nFileSizeHigh;
+    DWORD    nFileSizeLow;
+    DWORD    dwReserved0;
+    DWORD    dwReserved1;
+    char     cFileName[MAX_PATH];
+    char     cAlternateFileName[14];
+} WIN32_FIND_DATAA, *PWIN32_FIND_DATAA, *LPWIN32_FIND_DATAA;
+typedef WIN32_FIND_DATAA  WIN32_FIND_DATA;
+typedef PWIN32_FIND_DATAA PWIN32_FIND_DATA;
+typedef LPWIN32_FIND_DATAA LPWIN32_FIND_DATA;
+#endif
+
+/* TIM-56: FILE_ATTRIBUTE_* bitflags read out of WIN32_FIND_DATA.
+ * dwFileAttributes. SESSION.CPP:1328/1448 masks against the
+ * DIRECTORY|HIDDEN|SYSTEM|TEMPORARY set. RAWFILE.CPP and CONQUER.CPP
+ * pass FILE_ATTRIBUTE_NORMAL/READONLY to CreateFile. Standard SDK
+ * values from <fileapi.h>; they're compile-time bit constants only. */
+#ifndef FILE_ATTRIBUTE_READONLY
+#define FILE_ATTRIBUTE_READONLY  0x00000001
+#endif
+#ifndef FILE_ATTRIBUTE_HIDDEN
+#define FILE_ATTRIBUTE_HIDDEN    0x00000002
+#endif
+#ifndef FILE_ATTRIBUTE_SYSTEM
+#define FILE_ATTRIBUTE_SYSTEM    0x00000004
+#endif
+#ifndef FILE_ATTRIBUTE_DIRECTORY
+#define FILE_ATTRIBUTE_DIRECTORY 0x00000010
+#endif
+#ifndef FILE_ATTRIBUTE_ARCHIVE
+#define FILE_ATTRIBUTE_ARCHIVE   0x00000020
+#endif
+#ifndef FILE_ATTRIBUTE_NORMAL
+#define FILE_ATTRIBUTE_NORMAL    0x00000080
+#endif
+#ifndef FILE_ATTRIBUTE_TEMPORARY
+#define FILE_ATTRIBUTE_TEMPORARY 0x00000100
+#endif
+
+/* TIM-56: MessageBox style flags. WIN32LIB/DDRAW.CPP:90+ and many
+ * STARTUP.CPP / BMP8.CPP / MPMGRW.CPP sites pass MB_OK |
+ * MB_ICONEXCLAMATION (et al.) as the fourth argument. Real <winuser.h>
+ * defines them as a packed bit set: button group in low nibble, icon
+ * group in 0xF0, modality / default button in higher bits. We are not
+ * dispatching any actual dialog; the macros just need to be integer
+ * constants so the bitwise-OR call sites parse. Values match the SDK
+ * (https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-messageboxa). */
+#ifndef MB_OK
+#define MB_OK                0x00000000L
+#endif
+#ifndef MB_OKCANCEL
+#define MB_OKCANCEL          0x00000001L
+#endif
+#ifndef MB_ABORTRETRYIGNORE
+#define MB_ABORTRETRYIGNORE  0x00000002L
+#endif
+#ifndef MB_YESNOCANCEL
+#define MB_YESNOCANCEL       0x00000003L
+#endif
+#ifndef MB_YESNO
+#define MB_YESNO             0x00000004L
+#endif
+#ifndef MB_RETRYCANCEL
+#define MB_RETRYCANCEL       0x00000005L
+#endif
+#ifndef MB_ICONHAND
+#define MB_ICONHAND          0x00000010L
+#endif
+#ifndef MB_ICONSTOP
+#define MB_ICONSTOP          MB_ICONHAND
+#endif
+#ifndef MB_ICONERROR
+#define MB_ICONERROR         MB_ICONHAND
+#endif
+#ifndef MB_ICONQUESTION
+#define MB_ICONQUESTION      0x00000020L
+#endif
+#ifndef MB_ICONEXCLAMATION
+#define MB_ICONEXCLAMATION   0x00000030L
+#endif
+#ifndef MB_ICONWARNING
+#define MB_ICONWARNING       MB_ICONEXCLAMATION
+#endif
+#ifndef MB_ICONASTERISK
+#define MB_ICONASTERISK      0x00000040L
+#endif
+#ifndef MB_ICONINFORMATION
+#define MB_ICONINFORMATION   MB_ICONASTERISK
+#endif
+#ifndef MB_DEFBUTTON1
+#define MB_DEFBUTTON1        0x00000000L
+#endif
+#ifndef MB_DEFBUTTON2
+#define MB_DEFBUTTON2        0x00000100L
+#endif
+#ifndef MB_DEFBUTTON3
+#define MB_DEFBUTTON3        0x00000200L
+#endif
+#ifndef MB_APPLMODAL
+#define MB_APPLMODAL         0x00000000L
+#endif
+#ifndef MB_SYSTEMMODAL
+#define MB_SYSTEMMODAL       0x00001000L
+#endif
+#ifndef MB_TASKMODAL
+#define MB_TASKMODAL         0x00002000L
+#endif
+
+/* TIM-56: ShowWindow nCmdShow values. STARTUP.CPP:180 declares
+ * `int command_show = SW_HIDE;` and CCDDE.CPP / INTERNET.CPP /
+ * NETDLG.CPP / WOLAPIOB.CPP call ShowWindow(...) with SW_RESTORE,
+ * SW_MINIMIZE, SW_SHOW, SW_SHOWMAXIMIZED, etc. Real <winuser.h> values.
+ * The actual ShowWindow path is dormant on Linux (no HWND universe);
+ * the values are only consumed as integer parameters. */
+#ifndef SW_HIDE
+#define SW_HIDE             0
+#endif
+#ifndef SW_SHOWNORMAL
+#define SW_SHOWNORMAL       1
+#endif
+#ifndef SW_NORMAL
+#define SW_NORMAL           1
+#endif
+#ifndef SW_SHOWMINIMIZED
+#define SW_SHOWMINIMIZED    2
+#endif
+#ifndef SW_SHOWMAXIMIZED
+#define SW_SHOWMAXIMIZED    3
+#endif
+#ifndef SW_MAXIMIZE
+#define SW_MAXIMIZE         3
+#endif
+#ifndef SW_SHOWNOACTIVATE
+#define SW_SHOWNOACTIVATE   4
+#endif
+#ifndef SW_SHOW
+#define SW_SHOW             5
+#endif
+#ifndef SW_MINIMIZE
+#define SW_MINIMIZE         6
+#endif
+#ifndef SW_SHOWMINNOACTIVE
+#define SW_SHOWMINNOACTIVE  7
+#endif
+#ifndef SW_SHOWNA
+#define SW_SHOWNA           8
+#endif
+#ifndef SW_RESTORE
+#define SW_RESTORE          9
+#endif
+
 #endif /* LINUX_STUBS_WINDOWS_H */
