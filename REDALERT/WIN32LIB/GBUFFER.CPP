@@ -237,6 +237,18 @@ BOOL GraphicViewPortClass::Change(int x, int y, int w, int h)
  *=========================================================================*/
 void GraphicBufferClass::DD_Init(GBC_Enum flags)
 {
+#ifndef _MSC_VER
+	// TIM-275: non-MSVC offscreen buffers cannot create DD surfaces.
+	// Allocate a plain heap buffer so Lock() succeeds via !IsDirectDraw fast-path.
+	if (!(flags & GBC_VISIBLE)) {
+		if (!Size) Size = Width * Height;
+		Buffer		= new BYTE[Size];
+		Allocated	= TRUE;
+		Offset		= (long)Buffer;
+		IsDirectDraw	= FALSE;
+		return;
+	}
+#endif
 	//
 	// Create the direct draw surface description
 	//
