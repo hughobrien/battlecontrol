@@ -1060,6 +1060,21 @@ void RadarClass::Plot_Radar_Pixel(CELL cell)
 		return;
 	}
 
+#ifndef _MSC_VER
+	{
+		static bool s_radar_diag = false;
+		if (!s_radar_diag) {
+			s_radar_diag = true;
+			int mapped = 0;
+			for (int i = 0; i < MAP_CELL_TOTAL; i++) {
+				if ((*this)[(CELL)i].IsMapped) mapped++;
+			}
+			bool lock_test = LogicPage->Lock();
+			if (lock_test) LogicPage->Unlock();
+			fprintf(stderr, "TIM-275 Plot_Radar_Pixel diag: Lock=%d IsMapped_cells=%d\n", (int)lock_test, mapped);
+		}
+	}
+#endif
 	bool usjamming = false;
 	if (LogicPage->Lock()) {
 		CellClass * cellptr = &(*this)[cell];
