@@ -126,7 +126,10 @@ WinTimerClass::WinTimerClass (UINT freq, BOOL partial)
 	TimerSystemOn = TRUE;
 	if (!partial) {
 		WindowsTimer = this;
-		TickCount.Start();
+		// TIM-255: TickCount is TTimerClass<SystemTimerClass> (GLOBALS.CPP) — it
+		// auto-starts at construction and does not need an explicit Start() here.
+		// Calling TimerClass::Start() on it would read TickType at the wrong
+		// offset (LP64 layout mismatch) and corrupt the object.
 	}
 #else
 	TimerHandle = timeSetEvent ( 1000/freq , 1 , Timer_Callback , 0 , TIME_PERIODIC | TIME_KILL_SYNCHRONOUS);

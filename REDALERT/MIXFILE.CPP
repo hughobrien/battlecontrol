@@ -280,10 +280,11 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 		}
 		straw->Get(&fileheader, sizeof(fileheader));
 #ifndef _MSC_VER
-		{ unsigned char *_fh = (unsigned char *)&fileheader;
-		  fprintf(stderr, "[MIX] ctor: %s fileheader sizeof=%zu raw: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		          filename, sizeof(fileheader),
-		          _fh[0],_fh[1],_fh[2],_fh[3],_fh[4],_fh[5],_fh[6],_fh[7]); fflush(stderr); }
+		{ unsigned char *_fh = (unsigned char *)&fileheader; size_t _sz = sizeof(fileheader);
+		  fprintf(stderr, "[MIX] ctor: %s fileheader sizeof=%zu raw: %02x %02x %02x %02x %02x %02x\n",
+		          filename, _sz,
+		          _fh[0],_fh[1],_fh[2],_fh[3],
+		          _sz>4?_fh[4]:0, _sz>5?_fh[5]:0); fflush(stderr); }
 		fprintf(stderr, "[MIX] ctor: %s fileheader done, count=%d size=%d\n",
 			filename, (int)fileheader.count, (int)fileheader.size); fflush(stderr);
 #endif

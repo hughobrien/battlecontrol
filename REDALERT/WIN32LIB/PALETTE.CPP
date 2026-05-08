@@ -180,7 +180,13 @@ void Fade_Palette_To(void *palette1, unsigned int delay, void (*callback)() )
 	Determine_Bump_Rate(palette1, delay, &ticksper, &jump);
 
 	tickaccum = 0;							// init accumulated elapsed time
+#ifdef _MSC_VER
 	timer = TickCount.Time(); 				// timer = current time
+#else
+	// TIM-255: TickCount is TTimerClass<SystemTimerClass>; WIN32LIB sees the
+	// wrong TimerClass type via TIMER.H. Use the raw system tick counter instead.
+	timer = (WindowsTimer ? (long)WindowsTimer->Get_System_Tick_Count() : 0);
+#endif
 	do {
 		changed = FALSE;
 
@@ -194,7 +200,11 @@ void Fade_Palette_To(void *palette1, unsigned int delay, void (*callback)() )
 		.................. Wait for time increment to elapse ..................
 		*/
 		if (changed) {
+#ifdef _MSC_VER
 			while (TickCount.Time() < (int)timer) {
+#else
+			while ((WindowsTimer ? (long)WindowsTimer->Get_System_Tick_Count() : 0) < (int)timer) {
+#endif
 				/*
 				................. Update callback while waiting .................
 				*/

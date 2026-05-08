@@ -1191,6 +1191,13 @@ void __cdecl Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondat
 	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
 	unsigned char *icon_src = base + (unsigned int)iicons + icon * icon_sz;
 	unsigned char tf = (itrans != 0) ? base[(unsigned int)itrans + icon] : 0;
+	// TIM-255: WINDOWHEIGHT = MapCellHeight * ICON_PIXEL_H can exceed vp height
+	// when RESFACTOR=2 and the map has >10 visible rows (each 48px). Clamp so no
+	// write escapes the pixel buffer.
+	if (min_y < 0) min_y = 0;
+	if (min_x < 0) min_x = 0;
+	if (max_y > (int)vp->Get_Height()) max_y = (int)vp->Get_Height();
+	if (max_x > (int)vp->Get_Width())  max_x = (int)vp->Get_Width();
 	for (int row = 0; row < icon_h; row++) {
 		int py = y_pixel + row;
 		if (py < min_y || py >= max_y) continue;

@@ -171,7 +171,12 @@ extern	WinTimerClass	*WindowsTimer;
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////// externs  //////////////////////////////////////////
 #ifndef FUNCTION_H
+#ifdef _MSC_VER
+// TIM-255: on Linux TickCount is TTimerClass<SystemTimerClass> (GLOBALS.CPP/EXTERNS.H).
+// WIN32LIB code must NOT reference TickCount via this wrong-type extern on Linux;
+// use Get_System_Tick_Count() via WindowsTimer instead.
 extern TimerClass					TickCount;
+#endif
 #endif
 extern CountDownTimerClass		CountDown;
 
