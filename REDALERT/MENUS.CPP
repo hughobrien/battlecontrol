@@ -757,13 +757,21 @@ int Main_Menu(unsigned long )
 		Call_Back();
 
 #ifndef _MSC_VER
-		/* TIM-206: synthetic keypress test — after 5 s inject VK_RETURN to verify
-		 * the menu navigation path works without a real keyboard attached. */
+		/* TIM-206: synthetic left-click on BUTTON_START after 5 s.
+		 * ToggleClass buttons only respond to LEFTPRESS/LEFTRELEASE (not KEYBOARD),
+		 * so inject a mouse-click pair.  Coordinates are the centre of startbtn
+		 * (RESFACTOR=2, no expansions): x=204+118=322, y=174+9=183. */
 		static bool _injected = false;
 		if (!_injected && TickCount - starttime > 5*60) {
-			fprintf(stderr, "[MENU] synthetic VK_RETURN injected at tick %lu\n",
-			        (unsigned long)TickCount); fflush(stderr);
-			Keyboard->Put(KN_RETURN);
+			const unsigned short _sx = 322, _sy = 183;
+			fprintf(stderr, "[MENU] synthetic LCLICK at (%u,%u)\n",
+			        (unsigned)_sx, (unsigned)_sy); fflush(stderr);
+			Keyboard->Put(KN_LMOUSE);
+			Keyboard->Put(_sx);
+			Keyboard->Put(_sy);
+			Keyboard->Put((unsigned short)(KN_LMOUSE | KN_RLSE_BIT));
+			Keyboard->Put(_sx);
+			Keyboard->Put(_sy);
 			_injected = true;
 		}
 #endif

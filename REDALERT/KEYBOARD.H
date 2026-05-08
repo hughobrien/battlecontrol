@@ -83,6 +83,7 @@ class WWKeyboardClass
 		/*   Keyboard Class.																	*/
 		int MouseQX;
 		int MouseQY;
+		static bool Is_Mouse_Key(unsigned short key);
 
 	private:
 
@@ -104,7 +105,6 @@ class WWKeyboardClass
 		bool Put_Element(unsigned short val);
 		bool Is_Buffer_Full(void) const;
 		bool Is_Buffer_Empty(void) const;
-		static bool Is_Mouse_Key(unsigned short key);
 		void Fill_Buffer_From_System(void);
 		bool Put_Key_Message(unsigned short vk_key, bool release = false);
 
