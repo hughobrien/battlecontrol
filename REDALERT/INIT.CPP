@@ -3275,12 +3275,14 @@ static void Init_Bootstrap_Mixfiles(void)
 	fprintf(stderr, "[RA] Bootstrap_Mix: LORES.MIX cache=%s\n", ok ? "OK" : "FAIL"); fflush(stderr);
 #endif
 	assert(ok);
-	/* TIM-195: WIN32 is defined via wwstd.h so Load_Title_Page uses TITLE.PCX (from
-	 * NCHIRES.MIX / HIRES.MIX) rather than TITLE.CPS. Register both without caching. */
+	/* TIM-172: WIN32 path (wwstd.h pre-defines WIN32) uses TITLE.PCX which lives in
+	 * HIRES.MIX (nested inside REDALERT.MIX). Must cache HIRES.MIX so Offset() can
+	 * find TITLE.PCX. NCHIRES.MIX (12MB, VQ palettes) registered without caching. */
 #ifndef _MSC_VER
 	new MFCD("HIRES.MIX", &FastKey);
+	ok = MFCD::Cache("HIRES.MIX");
+	fprintf(stderr, "[RA] Bootstrap_Mix: HIRES.MIX cache=%s\n", ok ? "OK" : "FAIL"); fflush(stderr);
 	new MFCD("NCHIRES.MIX", &FastKey);
-	fprintf(stderr, "[RA] Bootstrap_Mix: HIRES.MIX + NCHIRES.MIX registered (no cache)\n"); fflush(stderr);
 #endif
 #endif	//WIN32
 

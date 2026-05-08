@@ -122,14 +122,22 @@ sleep 1
 LOG="$PASS_DIR/run.log"
 (cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 30 "$LINK_BIN") > "$LOG" 2>&1
 RUN_RC=$?
+
+# Capture screenshot before killing Xvfb
+SCREENSHOT="$PASS_DIR/screenshot.png"
+import -window root -display :99 "$SCREENSHOT" 2>/dev/null || echo "(screenshot failed)"
 kill -9 "$XVFB_PID" 2>/dev/null || true
 
 echo "Run rc=$RUN_RC (0=clean exit, 124=timeout=alive, 134=abort, 139=SIGSEGV)"
 echo ""
-echo "--- Init_Game milestones ---"
+echo "--- Bootstrap + HIRES.MIX milestones ---"
 grep -E "\[RA\] Init_Game|\[RA\] Bootstrap|\[RA\] Bootstrap_Mix" "$LOG" | head -40
 echo ""
-echo "--- Last 20 lines ---"
-tail -20 "$LOG"
+echo "--- HIRES.MIX / TITLE.PCX ---"
+grep -E "HIRES|TITLE" "$LOG" | head -20
+echo ""
+echo "--- Last 15 lines ---"
+tail -15 "$LOG"
 echo ""
 echo "Full log: $LOG ($(wc -l < "$LOG") lines)"
+[[ -f "$SCREENSHOT" ]] && echo "Screenshot: $SCREENSHOT"
