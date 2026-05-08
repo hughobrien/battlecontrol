@@ -182,8 +182,17 @@ unsigned short			Hard_Error_Occured = 0;
 WWMouseClass *			WWMouse = NULL;
 GraphicBufferClass	SysMemPage(DEFAULT_SCREEN_WIDTH, 200, (void*)NULL);
 WinTimerClass *		WindowsTimer=NULL;
+/* TIM-250: classic 640×480 mode. The Remastered build used 3072×3072 for
+   its high-resolution virtual canvas; the Linux classic port uses the
+   standard RA resolution. STARTUP.CPP's SeenBuff Attach is patched to
+   match (see #ifndef _MSC_VER guard there). */
+#ifndef _MSC_VER
+int						ScreenWidth=640;
+int						ScreenHeight=480;
+#else
 int						ScreenWidth=3072;
 int						ScreenHeight=3072;
+#endif
 GraphicBufferClass	ModeXBuff;
 bool						InMovie = FALSE;	//Are we currently playing a VQ movie?
 HANDLE					hInstance;
