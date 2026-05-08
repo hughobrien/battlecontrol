@@ -179,6 +179,17 @@ extern "C" void SDL_Window_Raise(void)
     if (SDL_VideoWindow == nullptr) return;
     SDL_RaiseWindow(SDL_VideoWindow);
 }
+
+// TIM-152 pass-46A: opaque accessor over the file-static SDL_VideoWindow.
+// Declared in linux/win32-stubs/sdl_window.h. Returns NULL before
+// Set_Video_Mode has run and after Reset_Video_Mode has fired, matching
+// the Win32 contract where `MainWindow` is only valid between window
+// create and destroy. Returned as `void*` to keep <SDL2/SDL.h> out of
+// consumer TUs.
+extern "C" void * SDL_Get_Main_Window(void)
+{
+    return SDL_VideoWindow;
+}
 #endif
 
 LPDIRECTDRAW		DirectDrawObject=NULL;	// Pointer to the direct draw object
