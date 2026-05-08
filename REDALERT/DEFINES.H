@@ -547,7 +547,7 @@ typedef union {
 	} Sub;
 } LEPTON_COMPOSITE;
 
-typedef unsigned long	COORDINATE;
+typedef uint32_t	COORDINATE;
 typedef union {
 	COORDINATE Coord;
 	struct {
