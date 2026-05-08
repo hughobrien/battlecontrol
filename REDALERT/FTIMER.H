@@ -134,7 +134,7 @@ class BasicTimerClass {
 
 	protected:
 		T Timer;			// Timer regulator (ticks at constant rate).
-		unsigned long Started;	// Time started.
+		uint32_t Started;	// TIM-242: LP64 fix — was unsigned long (8 bytes), frame counts fit in 32 bits.
 };
 
 
@@ -283,7 +283,7 @@ class TTimerClass : public BasicTimerClass<T> {
 		using BasicTimerClass<T>::Timer;
 
 	private:
-		unsigned long Accumulated;				//	Total accumulated ticks.
+		uint32_t Accumulated;			// TIM-242: LP64 fix — was unsigned long.
 };
 
 
@@ -517,7 +517,7 @@ class CDTimerClass : public BasicTimerClass<T> {
 		using BasicTimerClass<T>::Timer;
 
 	private:
-		unsigned long DelayTime;			// Ticks remaining before countdown timer expires.
+		uint32_t DelayTime;			// TIM-242: LP64 fix — was unsigned long.
 		bool WasStarted;
 };
 
