@@ -98,6 +98,8 @@ int SDL_Get_Primary_Pitch(void)
 // winex11 driver does for the same separation.
 static bool SDL_QuitRequested = false;
 
+extern bool GameInFocus;
+
 static void SDL_Process_Window_Events(void)
 {
     SDL_PumpEvents();
@@ -112,10 +114,12 @@ static void SDL_Process_Window_Events(void)
             case SDL_WINDOWEVENT_FOCUS_LOST:
             case SDL_WINDOWEVENT_MINIMIZED:
                 AllSurfaces.Set_Surface_Focus(FALSE);
+                GameInFocus = false;
                 break;
             case SDL_WINDOWEVENT_FOCUS_GAINED:
             case SDL_WINDOWEVENT_RESTORED:
                 AllSurfaces.Set_Surface_Focus(TRUE);
+                GameInFocus = true;
                 break;
             default:
                 break;
@@ -999,6 +1003,9 @@ void Wait_Vert_Blank(void)
 	if (!SDL_FirstPresentDone) {
 		SDL_ShowWindow(SDL_VideoWindow);
 		SDL_FirstPresentDone = true;
+		/* TIM-226: SDL_WINDOW_HIDDEN means no FOCUS_GAINED fires before the
+		 * first show; set GameInFocus here so Main_Loop renders immediately. */
+		GameInFocus = true;
 		// TIM-172: save first frame as BMP for offline verification (bypasses X11 capture)
 		{
 			const char* bmp_path = "/tmp/redalert-frame0.bmp";
