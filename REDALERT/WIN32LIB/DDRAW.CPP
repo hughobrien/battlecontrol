@@ -53,6 +53,7 @@
 #include <SDL2/SDL.h>
 #include <climits>      // TIM-141 commit 2: Get_Free_Video_Memory uses INT_MAX
 #include "sdl_input.h"  // TIM-145 pass-43A: SDL_Process_Input_Events()
+#include "sdl_window.h" // TIM-152 pass-46B: SDL_Set_Main_Window registration
 static SDL_Window*   SDL_VideoWindow    = nullptr;
 static SDL_Renderer* SDL_VideoRenderer  = nullptr;
 static SDL_Surface*  SDL_PrimarySurface = nullptr;
@@ -180,16 +181,14 @@ extern "C" void SDL_Window_Raise(void)
     SDL_RaiseWindow(SDL_VideoWindow);
 }
 
-// TIM-152 pass-46A: opaque accessor over the file-static SDL_VideoWindow.
-// Declared in linux/win32-stubs/sdl_window.h. Returns NULL before
-// Set_Video_Mode has run and after Reset_Video_Mode has fired, matching
-// the Win32 contract where `MainWindow` is only valid between window
-// create and destroy. Returned as `void*` to keep <SDL2/SDL.h> out of
-// consumer TUs.
-extern "C" void * SDL_Get_Main_Window(void)
-{
-    return SDL_VideoWindow;
-}
+// TIM-152 pass-46B: SDL_Get_Main_Window body moved to
+// linux/win32-stubs/sdl_window.cpp so the substrate owns the lifecycle
+// (and the weak `MainWindow` / `ShowCommand` shims live next to it).
+// Set_Video_Mode below registers `SDL_VideoWindow` with the substrate
+// via SDL_Set_Main_Window after creation; Reset_Video_Mode unregisters
+// before destroy. The substrate's lazy fall-back create never fires in
+// practice because Set_Video_Mode is always reached before any
+// SDL_Get_Main_Window() consumer.
 #endif
 
 LPDIRECTDRAW		DirectDrawObject=NULL;	// Pointer to the direct draw object
@@ -607,18 +606,27 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 	// primary surface so the rest of the engine has something to talk to
 	// once the GBUFFER consumers migrate (TIM-141 commit 2-3).
 	if (SDL_VideoWindow == nullptr) {
-		if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
-			if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0) {
+		// TIM-152 pass-46B: adopt a window the substrate already owns
+		// (rare — would only fire if SDL_Get_Main_Window() ran before
+		// us). Fall through to the create-and-register path otherwise.
+		SDL_VideoWindow = static_cast<SDL_Window *>(SDL_Get_Main_Window());
+		if (SDL_VideoWindow != nullptr) {
+			SDL_SetWindowSize(SDL_VideoWindow, w, h);
+		} else {
+			if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
+				if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0) {
+					return FALSE;
+				}
+			}
+			SDL_VideoWindow = SDL_CreateWindow(
+				"Red Alert",
+				SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+				w, h,
+				SDL_WINDOW_HIDDEN);  // hidden until the engine drives a frame
+			if (SDL_VideoWindow == nullptr) {
 				return FALSE;
 			}
-		}
-		SDL_VideoWindow = SDL_CreateWindow(
-			"Red Alert",
-			SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-			w, h,
-			SDL_WINDOW_HIDDEN);  // hidden until the engine drives a frame
-		if (SDL_VideoWindow == nullptr) {
-			return FALSE;
+			SDL_Set_Main_Window(SDL_VideoWindow);
 		}
 		SDL_VideoRenderer = SDL_CreateRenderer(
 			SDL_VideoWindow, -1,
@@ -752,6 +760,10 @@ void Reset_Video_Mode(void)
 		SDL_VideoRenderer = nullptr;
 	}
 	if (SDL_VideoWindow) {
+		// TIM-152 pass-46B: unregister with the substrate before
+		// destroy so any later SDL_Get_Main_Window() caller sees the
+		// teardown rather than a dangling pointer.
+		SDL_Set_Main_Window(nullptr);
 		SDL_DestroyWindow(SDL_VideoWindow);
 		SDL_VideoWindow = nullptr;
 	}
