@@ -792,6 +792,21 @@ void SidebarClass::Draw_It(bool complete)
 			CC_Draw_Shape(SidebarMiddleShape, shape, SIDE_X * RESFACTOR, (8+80)*RESFACTOR, WINDOW_MAIN, SHAPE_WIN_REL);
 			CC_Draw_Shape(SidebarBottomShape, shape, SIDE_X * RESFACTOR, (8+80+50)*RESFACTOR, WINDOW_MAIN, SHAPE_WIN_REL);
 
+			// TIM-277: sidebar shapes were designed for 640x400; fill the bottom gap at 640x480.
+			// Buffer_Fill_Rect uses exclusive-right/bottom boundaries ([sx,dx) x [sy,dy)).
+			{
+				int sb_design_bottom = (SIDE_Y + SIDE_HEIGHT) * RESFACTOR; // (77+123)*2 = 400
+				int screen_h = SeenBuff.Get_Height();                       // 480
+				if (screen_h > sb_design_bottom) {
+					LogicPage->Fill_Rect(
+						SIDE_X * RESFACTOR,                    // x0 = 480
+						sb_design_bottom,                       // y0 = 400
+						(SIDE_X + SIDEBAR_WID) * RESFACTOR,    // x1 = 640 (exclusive → covers 480-639)
+						screen_h,                               // y1 = 480 (exclusive → covers 400-479)
+						LTGREY);
+				}
+			}
+
 			Repair.Draw_Me(true);
 			Upgrade.Draw_Me(true);
 			Zoom.Draw_Me(true);
