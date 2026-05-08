@@ -403,7 +403,10 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			 * Apply_XOR_Delta reads LCW bytes as huge XOR commands → heap corruption. */
 			LCW_Uncompress(Add_Long_To_Pointer(dataptr, offset[0] & 0x00FFFFFFL), effective_buffptr, buffsize);
 		} else {
-			Apply_Delta(effective_buffptr, Add_Long_To_Pointer(ptr, offdiff));
+			/* TIM-224: plain delta frames in RA also use LCW encoding, not XOR.
+			 * Same root cause as TIM-206 (KF_DELTA): 0x80... LCW bytes misread as
+			 * huge XOR skip commands, advancing `t` past the end of the buffer. */
+			LCW_Uncompress(Add_Long_To_Pointer(ptr, offdiff), effective_buffptr, buffsize);
 		}
 
 		if ( (frameflags & KF_DELTA) ) {
@@ -495,7 +498,16 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 
 		} else {
 
-
+#ifndef _MSC_VER
+			{
+				uintptr_t bsb_used = (uintptr_t)BigShapeBufferPtr - (uintptr_t)BigShapeBufferStart;
+				if (bsb_used + keyfr->height + sizeof(ShapeHeaderType) + (unsigned)buffsize + 4096 >= BigShapeBufferLength) {
+					/* signal for realloc on next Sync_Delay/Main_Loop tick */
+					ReallocShapeBufferFlag = TRUE;
+					return(0);
+				}
+			}
+#endif
 			return_value=(unsigned long)BigShapeBufferPtr;
 			temp_shape_ptr = BigShapeBufferPtr + keyfr->height+sizeof(ShapeHeaderType);
 			/*

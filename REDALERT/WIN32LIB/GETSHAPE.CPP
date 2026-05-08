@@ -197,7 +197,7 @@ VOID * cdecl Extract_Shape(VOID const *buffer, int shape)
 {
 	ShapeBlock_Type *block = (ShapeBlock_Type*) buffer;
 //PG	int numshapes;		// Number of shapes
-	long offset;			// Offset of shape data, from start of block
+	int32_t offset;			// Offset of shape data, from start of block (TIM-222: was long)
 	char *bytebuf = (char*) buffer;
 
 	/*
