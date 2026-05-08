@@ -176,6 +176,9 @@ extern "C" void SDL_Process_Input_Events(void)
 			if (mod & KMOD_CTRL)  vk |= WWKEY_CTRL_BIT;
 			if (mod & KMOD_ALT)   vk |= WWKEY_ALT_BIT;
 			if (events[i].type == SDL_KEYUP) vk |= WWKEY_RLS_BIT;
+			/* TIM-206: GadgetClass::Input() compares against KN_* constants which
+			 * include WWKEY_VK_BIT (0x1000); add it here so keyboard events match. */
+			vk |= WWKEY_VK_BIT;
 
 			_Kbd->Put(vk);
 		}
@@ -196,6 +199,10 @@ extern "C" void SDL_Process_Input_Events(void)
 				case SDL_BUTTON_RIGHT:  vk = VK_RBUTTON; break;
 				default: continue;
 				}
+				/* TIM-206: must include WWKEY_VK_BIT so buffer value equals
+				 * KN_LMOUSE/KN_RMOUSE (0x1001/0x1002) for GadgetClass comparisons.
+				 * Is_Mouse_Key() masks to &0xFF so it still recognises VK_LBUTTON. */
+				vk |= WWKEY_VK_BIT;
 				if (type == SDL_MOUSEBUTTONUP) vk |= WWKEY_RLS_BIT;
 
 				_Kbd->Put(vk);

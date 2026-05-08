@@ -530,7 +530,10 @@ KeyNumType GadgetClass::Input(void)
 	**	know the position of the mouse at the exact instant when the click occurred
 	**	rather the the mouse position at the time we get around to this function.
 	*/
-	if (((key&0xFF) == KN_LMOUSE) || ((key&0xFF) == KN_RMOUSE)) {
+	/* TIM-206: original compared (key&0xFF)==KN_LMOUSE which is always false because
+	 * KN_LMOUSE=0x1001 never fits in a byte.  Inline the Is_Mouse_Key() logic:
+	 * mask to the low byte and check against the raw VK button constants. */
+	if (((key&0xFF) == VK_LBUTTON) || ((key&0xFF) == VK_RBUTTON) || ((key&0xFF) == VK_MBUTTON)) {
 	   mousex = Keyboard->MouseQX;
 	   mousey = Keyboard->MouseQY;
 	} else {
