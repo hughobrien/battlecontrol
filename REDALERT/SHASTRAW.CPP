@@ -65,7 +65,13 @@ int SHAStraw::Get(void * source, int slen)
 	}
 
 	int counter = Straw::Get(source, slen);
+#ifndef _MSC_VER
+	fprintf(stderr, "[SHA] SHAStraw::Get: counter=%d source=%p calling Hash\n", counter, source); fflush(stderr);
+#endif
 	SHA.Hash(source, counter);
+#ifndef _MSC_VER
+	fprintf(stderr, "[SHA] SHAStraw::Get: Hash done\n"); fflush(stderr);
+#endif
 	return(counter);
 }
 

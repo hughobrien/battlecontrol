@@ -511,6 +511,11 @@ bool MixFileClass<T>::Cache(Buffer const * buffer)
 		**	Fetch the whole mixfile data in one step. If the number of bytes retrieved
 		**	does not equal that requested, then this indicates a serious error.
 		*/
+
+#ifndef _MSC_VER
+		fprintf(stderr, "[MIX] Cache(%s): before straw->Get Data=%p DataSize=%ld\n",
+		        Filename, Data, DataSize); fflush(stderr);
+#endif
 		long actual = straw->Get(Data, DataSize);
 #ifndef _MSC_VER
 		fprintf(stderr, "[MIX] Cache(%s): DataStart=%ld DataSize=%ld actual=%ld\n",
@@ -531,7 +536,13 @@ bool MixFileClass<T>::Cache(Buffer const * buffer)
 		if (IsDigest) {
 			char digest1[20];
 			char digest2[20];
+#ifndef _MSC_VER
+			fprintf(stderr,"[MIX] Cache(%s): before sha.Result\n",Filename); fflush(stderr);
+#endif
 			sha.Result(digest2);
+#ifndef _MSC_VER
+			fprintf(stderr,"[MIX] Cache(%s): before fstraw.Get digest\n",Filename); fflush(stderr);
+#endif
 			fstraw.Get(digest1, sizeof(digest1));
 #ifndef _MSC_VER
 			{ int _dm = memcmp(digest1, digest2, sizeof(digest1));
