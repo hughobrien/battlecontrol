@@ -721,6 +721,24 @@ bool Select_Game(bool fade)
 #endif	//WIN32
 #endif
 
+#ifndef _MSC_VER
+		/* TIM-206: bypass menu entirely when RA_AUTOSTART is set. */
+		if (getenv("RA_AUTOSTART")) {
+			fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI (EASY)\n"); fflush(stderr);
+			Scen.CDifficulty = DIFF_EASY;
+			Scen.Difficulty = DIFF_EASY;
+			Scen.CarryOverMoney = 0;
+			BuildLevel = 10;
+			IsTanyaDead = false;
+			SaveTanya = false;
+			Whom = HOUSE_GOOD;
+			Scen.Set_Scenario_Name("SCG01EA.INI");
+			Session.Type = GAME_NORMAL;
+			selection = SEL_START_NEW_GAME;
+			process = false;
+		}
+#endif
+
 		while (process) {
 
 			/*
@@ -908,23 +926,6 @@ bool Select_Game(bool fade)
 				**	SEL_START_NEW_GAME: Play the game
 				*/
 				case SEL_START_NEW_GAME:
-#ifndef _MSC_VER
-					/* TIM-206: skip difficulty+faction dialogs in headless test runs. */
-					if (getenv("RA_AUTOSTART")) {
-						fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI (EASY)\n"); fflush(stderr);
-						Scen.CDifficulty = DIFF_EASY;
-						Scen.Difficulty = DIFF_EASY;
-						Scen.CarryOverMoney = 0;
-						BuildLevel = 10;
-						IsTanyaDead = false;
-						SaveTanya = false;
-						Whom = HOUSE_GOOD;
-						Scen.Set_Scenario_Name("SCG01EA.INI");
-						Session.Type = GAME_NORMAL;
-						process = false;
-						break;
-					}
-#endif
 					if (Special.IsFromInstall) {
 						Scen.CDifficulty = DIFF_NORMAL;
 						Scen.Difficulty = DIFF_NORMAL;
