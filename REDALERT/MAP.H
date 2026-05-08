@@ -115,7 +115,7 @@ class MapClass: public GScreenClass
 		/*
 		**	This is the total value of all harvestable Tiberium on the map.
 		*/
-		long TotalValue;
+		int32_t TotalValue;		// TIM-243: LP64 fix — was long (8 bytes), ore values fit in 32 bits.
 
 		CellClass & operator [] (COORDINATE coord) {return(Array[Coord_Cell(coord)]);};
 		CellClass & operator [] (CELL cell) {return(Array[cell]);};
