@@ -54,7 +54,14 @@ typedef struct {
 } KeyFrameHeaderType;
 
 #define	INITIAL_BIG_SHAPE_BUFFER_SIZE	8000000
+#ifndef _MSC_VER
+/* TIM-206 pass-58: LP64 theater buffer — ShapeHeaderType is 4B larger and
+ * there is no Reallocate_Theater_Shape_Buffer path on Linux; bump to 32MB
+ * so a single scenario's theater shapes don't overflow the buffer. */
+#define	THEATER_BIG_SHAPE_BUFFER_SIZE 32000000
+#else
 #define	THEATER_BIG_SHAPE_BUFFER_SIZE 4000000
+#endif
 #define	UNCOMPRESS_MAGIC_NUMBER			56789
 
 unsigned	BigShapeBufferLength = INITIAL_BIG_SHAPE_BUFFER_SIZE;
@@ -318,6 +325,19 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 		}
 	}
 
+	/* TIM-212: decompress directly into BigShapeBuffer destination to prevent _ShapeBuffer
+	** heap overlap. On LP64 Linux, new unsigned char[SHAPE_BUFFER_SIZE] can land at the same
+	** address as a game-object field (ClassHospital.PrimaryWeapon = 0x5acc5c0), causing
+	** Apply_XOR_Delta to corrupt it. Precompute the BigShapeBuffer target and decompress
+	** there directly; the memcpy below becomes a no-op and is removed. */
+	char *effective_buffptr = (char*)buffptr;
+	if (UseBigShapeBuffer) {
+		char *bptr = IsTheaterShape ? TheaterShapeBufferPtr : BigShapeBufferPtr;
+		char *tsp = bptr + keyfr->height + sizeof(ShapeHeaderType);
+		if (3 & (uintptr_t)tsp) tsp = (char*)((uintptr_t)(tsp + 3) & ~(uintptr_t)3);
+		effective_buffptr = tsp;
+	}
+
 	// calc buff size
 	buffsize = keyfr->width * keyfr->height;
 
@@ -334,7 +354,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 		if (keyfr->flags & 1 ) {
 			ptr = (char *)Add_Long_To_Pointer( ptr, 768L );
 		}
-		length = LCW_Uncompress( ptr, buffptr, buffsize );
+		length = LCW_Uncompress( ptr, effective_buffptr, buffsize );
 	} else {	// key delta or delta
 
 		if ( (frameflags & KF_DELTA) ) {
@@ -360,11 +380,20 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 		off16 = (unsigned long)lockptr & 0x00003FFFL;
 #endif
 
-		length = LCW_Uncompress( ptr, buffptr, buffsize );
+		length = LCW_Uncompress( ptr, effective_buffptr, buffsize );
 
 		if (length > buffsize) {
 			return(0);
 		}
+
+#ifndef _MSC_VER
+		/* TIM-206 pass-58: narrow LCW vs Apply_Delta for slot 0 frame 23 corruption */
+		if (keyfr->y == 0 && framenumber == 23) {
+			fprintf(stderr, "[BF] POST-LCW23: K0[24]=%p length=%lu\n",
+				(void*)*(KeyFrameSlots[0]+24), (unsigned long)length);
+			fflush(stderr);
+		}
+#endif
 
 #ifndef FIXIT_SCORE_CRASH
 		if ( ((offset[2] & 0x00FFFFFFL) - offcurr) >= (0x00010000L - off16) ) {
@@ -377,8 +406,30 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 		}
 #endif
 
+#ifndef _MSC_VER
+		/* TIM-206 pass-58: log delta offset calculation for slot 0 frame 23 */
+		if (keyfr->y == 0 && framenumber == 23) {
+			void *delta23 = Add_Long_To_Pointer(ptr, offdiff);
+			fprintf(stderr, "[BF] PRE-APPDELTA23: flags=0x%02x off0=0x%08x off1=0x%08x offcurr=0x%lx offdiff=0x%lx ptr=%p delta=%p\n",
+				(unsigned)(unsigned char)frameflags,
+				(unsigned)offset[0], (unsigned)offset[1],
+				(unsigned long)offcurr, (unsigned long)offdiff,
+				(void*)ptr, delta23);
+			fflush(stderr);
+		}
+#endif
+
 		length = buffsize;
-		Apply_Delta(buffptr, Add_Long_To_Pointer(ptr, offdiff));
+		Apply_Delta(effective_buffptr, Add_Long_To_Pointer(ptr, offdiff));
+
+#ifndef _MSC_VER
+		/* TIM-206 pass-58: check K0[24] immediately after Apply_Delta for frame 23 */
+		if (keyfr->y == 0 && framenumber == 23) {
+			fprintf(stderr, "[BF] POST-APPDELTA23: K0[24]=%p\n",
+				(void*)*(KeyFrameSlots[0]+24));
+			fflush(stderr);
+		}
+#endif
 
 		if ( (frameflags & KF_DELTA) ) {
 			// adjust to delta after the keydelta
@@ -388,6 +439,28 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 
 			while (currframe <= framenumber) {
 				offdiff = (offset[subframe] & 0x00FFFFFFL) - offcurr;
+
+#ifndef _MSC_VER
+				/* TIM-206 pass-58: probe each loop iteration for slot 0 frame 23 */
+				if (keyfr->y == 0 && framenumber == 23) {
+					void *delta_loop = Add_Long_To_Pointer(ptr, offdiff);
+					const unsigned char *db = (const unsigned char*)delta_loop;
+					fprintf(stderr, "[BF] LOOP23 cf=%d sf=%d off[sf]=0x%08x offcurr=0x%lx offdiff=0x%lx K0[24]=%p delta=%p buffptr=%p buffsz=%d\n",
+						(int)currframe, (int)subframe, (unsigned)offset[subframe],
+						(unsigned long)offcurr, (unsigned long)offdiff,
+						(void*)*(KeyFrameSlots[0]+24),
+						delta_loop, buffptr, (int)buffsize);
+					fprintf(stderr, "[BF] LOOP23 delta_bytes: %02x %02x %02x %02x  %02x %02x %02x %02x  %02x %02x %02x %02x  %02x %02x %02x %02x\n",
+						db[0],db[1],db[2],db[3],db[4],db[5],db[6],db[7],
+						db[8],db[9],db[10],db[11],db[12],db[13],db[14],db[15]);
+					/* interpret as signed-16 commands */
+					const short *dcmds = (const short*)delta_loop;
+					fprintf(stderr, "[BF] LOOP23 cmds: [0]=%d [1]=%d [2]=%d [3]=%d [4]=%d [5]=%d [6]=%d [7]=%d\n",
+						(int)dcmds[0],(int)dcmds[1],(int)dcmds[2],(int)dcmds[3],
+						(int)dcmds[4],(int)dcmds[5],(int)dcmds[6],(int)dcmds[7]);
+					fflush(stderr);
+				}
+#endif
 
 #ifndef FIXIT_SCORE_CRASH
 				if ( ((offset[subframe+2] & 0x00FFFFFFL) - offcurr) >= (0x00010000L - off16) ) {
@@ -401,7 +474,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 #endif
 
 				length = buffsize;
-				Apply_Delta(buffptr, Add_Long_To_Pointer(ptr, offdiff));
+				Apply_Delta(effective_buffptr, Add_Long_To_Pointer(ptr, offdiff));
 
 				currframe++;
 				subframe += 2;
@@ -431,6 +504,18 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			/*
 			** Shape is a theater specific shape
 			*/
+#ifndef _MSC_VER
+			/* TIM-206 pass-58: guard against theater buffer overflow. */
+			{
+				uintptr_t used = (uintptr_t)TheaterShapeBufferPtr - (uintptr_t)TheaterShapeBufferStart;
+				if (used + keyfr->height + sizeof(ShapeHeaderType) + 4096 >= TheaterShapeBufferLength) {
+					fprintf(stderr, "[BF] THEATER BUF OVERFLOW (used=%lu len=%u) — skipping frame\n",
+						(unsigned long)used, TheaterShapeBufferLength);
+					fflush(stderr);
+					return(0);
+				}
+			}
+#endif
 			return_value = (unsigned long) TheaterShapeBufferPtr;
 			temp_shape_ptr = TheaterShapeBufferPtr + keyfr->height+sizeof(ShapeHeaderType);
 			/*
@@ -439,8 +524,6 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			if (3 & (uintptr_t)temp_shape_ptr) {
 				temp_shape_ptr = (char *) ((uintptr_t)(temp_shape_ptr + 3) & ~(uintptr_t)3);
 			}
-
-			memcpy (temp_shape_ptr , buffptr , length);
 			((ShapeHeaderType *)TheaterShapeBufferPtr)->draw_flags = -1;						//Flag that headers need to be generated
 			((ShapeHeaderType *)TheaterShapeBufferPtr)->shape_data = temp_shape_ptr - (uintptr_t)TheaterShapeBufferStart;		//pointer to old raw shape data
 			((ShapeHeaderType *)TheaterShapeBufferPtr)->shape_buffer = 1;	//Theater buffer
@@ -466,7 +549,6 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			if (3 & (uintptr_t)temp_shape_ptr) {
 				temp_shape_ptr = (char *) ((uintptr_t)(temp_shape_ptr + 3) & ~(uintptr_t)3);
 			}
-			memcpy (temp_shape_ptr , buffptr , length);
 			((ShapeHeaderType *)BigShapeBufferPtr)->draw_flags = -1;						//Flag that headers need to be generated
 			((ShapeHeaderType *)BigShapeBufferPtr)->shape_data = temp_shape_ptr - (uintptr_t)BigShapeBufferStart;		//pointer to old raw shape data
 			((ShapeHeaderType *)BigShapeBufferPtr)->shape_buffer = 0;	//Normal Big Shape Buffer
