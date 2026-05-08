@@ -64,7 +64,8 @@ extern BOOL Remove_Timer_Interrupt(VOID);
 BOOL	TimerSystemOn	= FALSE;
 
 // Global timers that the library or user can count on existing.
-TimerClass					TickCount(BT_SYSTEM);
+// TIM-157: TickCount definition removed — canonical owner is GLOBALS.CPP
+// (TTimerClass<SystemTimerClass>); EXTERNS.H is the extern declaration.
 CountDownTimerClass		CountDown(BT_SYSTEM, 0);
 
 
