@@ -2803,6 +2803,17 @@ static void Init_Color_Remaps(void)
 
 	GadgetClass::Set_Color_Scheme(&ColorRemaps[PCOLOR_DIALOG_BLUE]);
 //	GadgetClass::Set_Color_Scheme(&ColorRemaps[PCOLOR_BLUE]);
+#ifndef _MSC_VER
+	{
+		RemapControlType &s = ColorRemaps[PCOLOR_DIALOG_BLUE];
+		fprintf(stderr, "[RA] DIALOG_BLUE: Color=%d BrightColor=%d "
+		        "FontRemap[10..15]=%d,%d,%d,%d,%d,%d\n",
+		        s.Color, s.BrightColor,
+		        s.FontRemap[10], s.FontRemap[11], s.FontRemap[12],
+		        s.FontRemap[13], s.FontRemap[14], s.FontRemap[15]);
+		fflush(stderr);
+	}
+#endif
 }
 
 
