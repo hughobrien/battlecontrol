@@ -606,7 +606,10 @@ int main(int argc, char * argv[])
 
 #if (1)	//ST - 1/3/2019 2:11PM
 
-				VisiblePage.Init(ScreenWidth, ScreenHeight, NULL, 0, (GBC_Enum)0);
+				// TIM-172: GBC_VISIBLE binds VisiblePage to SDL_PrimarySurface so
+				// HidPage.Blit(SeenPage) writes directly into the SDL pixel buffer;
+				// Wait_Vert_Blank can then present those pixels to the window.
+				VisiblePage.Init(ScreenWidth, ScreenHeight, NULL, 0, (GBC_Enum)(GBC_VISIBLE | GBC_VIDEOMEM));
 #ifndef _MSC_VER
 				fprintf(stderr, "[RA] STARTUP: VisiblePage.Init done\n"); fflush(stderr);
 #endif

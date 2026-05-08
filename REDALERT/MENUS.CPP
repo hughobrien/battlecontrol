@@ -803,7 +803,12 @@ int Main_Menu(unsigned long )
 			Hide_Mouse();
 			HidPage.Blit(SeenPage);
 			Show_Mouse();
-
+#ifndef _MSC_VER
+			// TIM-172: present SDL_PrimarySurface to window. Without this call
+			// the blit above writes into the SDL pixel buffer but SDL_RenderPresent
+			// never fires, leaving a permanent black screen.
+			Wait_Vert_Blank();
+#endif
 			Set_Logic_Page(SeenBuff);
 			display = false;
 		}

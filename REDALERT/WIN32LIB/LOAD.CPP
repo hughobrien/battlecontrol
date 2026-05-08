@@ -184,6 +184,7 @@ unsigned long __cdecl Load_Uncompress(char const *file, BufferClass& uncomp_buff
 	fd = Open_File(file, READ);					// Open up the file to read from
 	Read_File(fd, (char *) &isize,	2L);		// Read the file size
 	Read_File(fd, uncomp_ptr, 			8L);		// Read the header bytes in.
+	fprintf(stderr, "[LOAD] %s: raw_isize=%u bufsize=%ld\n", file, isize, uncomp_buff.Get_Size());
 	isize -= 8; 										// Remaining data in file.
 
 	/*======================================================================*/
@@ -191,6 +192,7 @@ unsigned long __cdecl Load_Uncompress(char const *file, BufferClass& uncomp_buff
 	/*======================================================================*/
 
 	skipsize = *(((short *)uncomp_ptr) + 3);
+	fprintf(stderr, "[LOAD] %s: skipsize=%u isize_after_hdr=%u\n", file, skipsize, isize);
 
 	if (reserved_data && skipsize) {
 		Read_File(fd, reserved_data, (unsigned long) skipsize);
@@ -216,7 +218,13 @@ unsigned long __cdecl Load_Uncompress(char const *file, BufferClass& uncomp_buff
 	/*======================================================================*/
 	/*	Read in the main compressed part of the file.								*/
 	/*======================================================================*/
-	Read_File(fd, newuncomp_ptr + 8, (unsigned long)isize);
+	long bytes_read = Read_File(fd, newuncomp_ptr + 8, (unsigned long)isize);
+	fprintf(stderr, "[LOAD] %s: lcw_isize=%u bytes_read=%ld last4=[ %02x %02x %02x %02x ]\n",
+		file, isize, bytes_read,
+		(unsigned char)(newuncomp_ptr[8 + bytes_read - 4]),
+		(unsigned char)(newuncomp_ptr[8 + bytes_read - 3]),
+		(unsigned char)(newuncomp_ptr[8 + bytes_read - 2]),
+		(unsigned char)(newuncomp_ptr[8 + bytes_read - 1]));
 	Close_File(fd);
 
 	/*======================================================================*/
