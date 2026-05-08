@@ -981,18 +981,44 @@ typedef uintptr_t          ULONG_PTR;
  * gated). The typedef just satisfies the parser. */
 typedef INT_PTR (CALLBACK *DLGPROC)(HWND, UINT, WPARAM, LPARAM);
 
-/* CreateFile / CloseHandle -- file-handle open/close. Used unguarded by
- * CONQUER.CPP:4300 (CD volume-detect: opens main.mix to verify CD),
- * BMP8.CPP:52 (loads a .bmp via Win32 file API), and inside `#ifdef
- * WIN32` blocks in RAWFILE.CPP / WINSTUB.CPP / NULLMGR.CPP that we are
- * not pruning. Variadic-template inert stubs return INVALID_HANDLE_VALUE
- * (CreateFile) and FALSE (CloseHandle), same shape as the TIM-85
- * GetVolumeInformation / _dos_* family. The filesystem surface is
- * dormant under the stub -- eventual SDL2/std::fstream port replaces
- * these with real file IO. */
-template <typename... Args> HANDLE CreateFile (Args&&...) { return INVALID_HANDLE_VALUE; }
-template <typename... Args> HANDLE CreateFileA(Args&&...) { return INVALID_HANDLE_VALUE; }
-template <typename... Args> BOOL   CloseHandle(Args&&...) { return FALSE; }
+/* TIM-149 pass-45B forward decl: SECURITY_ATTRIBUTES is fully defined
+ * further down (search for `_SECURITY_ATTRIBUTES`), but CreateFileA's
+ * signature needs to mention LPSECURITY_ATTRIBUTES here. Forward-
+ * declare the struct + typedef pointer; the later full-typedef is
+ * compatible (same struct tag, same pointer-to-incomplete-type
+ * mechanics that Win32 SDK uses). */
+struct _SECURITY_ATTRIBUTES;
+typedef struct _SECURITY_ATTRIBUTES *LPSECURITY_ATTRIBUTES;
+
+/* CreateFile / CloseHandle -- TIM-149 pass-45B: promoted from inert
+ * variadic-template stubs to concrete declarations bound to the POSIX
+ * file-IO substrate. Bodies live in linux/win32-stubs/posix_fileio.cpp;
+ * the substrate uses open(2) / close(2) under the hood and stashes the
+ * int fd inside a heap descriptor cast to HANDLE. INVALID_HANDLE_VALUE
+ * remains the upstream sentinel. The substrate .cpp must be linked
+ * into the final binary for these symbols to resolve at link time --
+ * the link-side workstream (TIM-144) is responsible for adding it to
+ * the source set; under -fsyntax-only (compile-floor measurement) the
+ * declarations alone suffice.
+ *
+ * Real Win32 SDK signatures (from <fileapi.h>):
+ *   HANDLE CreateFileA(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
+ *                      DWORD, DWORD, HANDLE);
+ *   BOOL   CloseHandle(HANDLE);
+ *
+ * `CreateFile` is the canonical SDK macro alias for `CreateFileA`
+ * (or `CreateFileW` under -DUNICODE; engine never builds Unicode). */
+extern "C" HANDLE CreateFileA(LPCSTR              lpFileName,
+                              DWORD               dwDesiredAccess,
+                              DWORD               dwShareMode,
+                              LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                              DWORD               dwCreationDisposition,
+                              DWORD               dwFlagsAndAttributes,
+                              HANDLE              hTemplateFile);
+extern "C" BOOL   CloseHandle(HANDLE hObject);
+#ifndef CreateFile
+#define CreateFile CreateFileA
+#endif
 
 /* DeleteObject -- Win32 GDI cleanup function. BMP8.CPP:24/26 calls it
  * on hBitmap / hPal in the destructor. The GDI universe is dormant
@@ -1078,10 +1104,59 @@ template <typename... Args> BOOL   DeleteObject(Args&&...) { return FALSE; }
  * GMEM_ZEROINIT (0x0040). Engine code only uses the value as a flag
  * passthrough -- no allocator code path inspects the bits under the
  * stub. */
-template <typename... Args> BOOL   ReadFile     (Args&&...) { return FALSE; }
+/* TIM-149 pass-45B: ReadFile / WriteFile / SetFilePointer / GetFileSize
+ * promoted to concrete declarations bound to the POSIX file-IO substrate
+ * (linux/win32-stubs/posix_fileio.cpp). GlobalAlloc/Lock/Unlock retain
+ * their TIM-94 inert variadic-template stubs -- BMP8 DIB allocation is
+ * not on the runtime hot path; future BMP8-specific pass when needed.
+ *
+ * Real Win32 SDK signatures:
+ *   BOOL  ReadFile      (HANDLE, LPVOID, DWORD, LPDWORD, LPOVERLAPPED);
+ *   BOOL  WriteFile     (HANDLE, LPCVOID, DWORD, LPDWORD, LPOVERLAPPED);
+ *   DWORD SetFilePointer(HANDLE, LONG, PLONG, DWORD);
+ *   DWORD GetFileSize   (HANDLE, LPDWORD);
+ *
+ * SetFilePointer's third argument PLONG is `LONG *` in the SDK; spelled
+ * out here to avoid relying on a PLONG typedef being present. */
+extern "C" BOOL  ReadFile      (HANDLE  hFile,
+                                LPVOID  lpBuffer,
+                                DWORD   nNumberOfBytesToRead,
+                                LPDWORD lpNumberOfBytesRead,
+                                LPOVERLAPPED lpOverlapped);
+extern "C" BOOL  WriteFile     (HANDLE       hFile,
+                                const void * lpBuffer,
+                                DWORD        nNumberOfBytesToWrite,
+                                LPDWORD      lpNumberOfBytesWritten,
+                                LPOVERLAPPED lpOverlapped);
+extern "C" DWORD SetFilePointer(HANDLE hFile,
+                                LONG   lDistanceToMove,
+                                LONG * lpDistanceToMoveHigh,
+                                DWORD  dwMoveMethod);
+extern "C" DWORD GetFileSize   (HANDLE  hFile,
+                                LPDWORD lpFileSizeHigh);
+
 template <typename... Args> HANDLE GlobalAlloc  (Args&&...) { return nullptr; }
 template <typename... Args> LPVOID GlobalLock   (Args&&...) { return nullptr; }
 template <typename... Args> BOOL   GlobalUnlock (Args&&...) { return FALSE; }
+
+/* SetFilePointer dwMoveMethod values + sentinel. Canonical from
+ * <winbase.h>. RAWFILE.CPP:1284-1296 maps SEEK_SET/SEEK_CUR/SEEK_END
+ * onto these before calling SetFilePointer. */
+#ifndef FILE_BEGIN
+#define FILE_BEGIN   0
+#endif
+#ifndef FILE_CURRENT
+#define FILE_CURRENT 1
+#endif
+#ifndef FILE_END
+#define FILE_END     2
+#endif
+#ifndef INVALID_SET_FILE_POINTER
+#define INVALID_SET_FILE_POINTER ((DWORD)-1)
+#endif
+#ifndef INVALID_FILE_SIZE
+#define INVALID_FILE_SIZE        ((DWORD)0xFFFFFFFF)
+#endif
 
 #ifndef GHND
 #define GHND 0x0042
