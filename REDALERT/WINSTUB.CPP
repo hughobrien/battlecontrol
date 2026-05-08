@@ -736,6 +736,15 @@ void Assert_Failure (char *expression, int line, char *file)
 
 	sprintf (assertbuf, "assert '%s' failed at line %d in module %s.\n", expression, line, file);
 
+#ifndef _MSC_VER
+	/* TIM-173: MonoClass writes to the DOS mono-card address (0xB0000) which is
+	 * not mapped on Linux.  Skip all Mono/MMIO/dialog handling; print to stderr
+	 * and abort so we get a clean stack trace. */
+	fprintf(stderr, "[ASSERT] %s", assertbuf); fflush(stderr);
+	abort();
+	return;
+#endif
+
 	if (!MonoClass::Is_Enabled()) MonoClass::Enable();
 
 	Mono_Clear_Screen();

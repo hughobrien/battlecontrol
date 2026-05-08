@@ -280,6 +280,10 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 		}
 		straw->Get(&fileheader, sizeof(fileheader));
 #ifndef _MSC_VER
+		{ unsigned char *_fh = (unsigned char *)&fileheader;
+		  fprintf(stderr, "[MIX] ctor: %s fileheader sizeof=%zu raw: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+		          filename, sizeof(fileheader),
+		          _fh[0],_fh[1],_fh[2],_fh[3],_fh[4],_fh[5],_fh[6],_fh[7]); fflush(stderr); }
 		fprintf(stderr, "[MIX] ctor: %s fileheader done, count=%d size=%d\n",
 			filename, (int)fileheader.count, (int)fileheader.size); fflush(stderr);
 #endif
@@ -557,8 +561,8 @@ void MixFileClass<T>::Free(void)
 
 int compfunc(void const * ptr1, void const * ptr2)
 {
-	if (*(long const *)ptr1 < *(long const *)ptr2) return(-1);
-	if (*(long const *)ptr1 > *(long const *)ptr2) return(1);
+	if (*(int const *)ptr1 < *(int const *)ptr2) return(-1);
+	if (*(int const *)ptr1 > *(int const *)ptr2) return(1);
 	return(0);
 }
 
@@ -611,7 +615,7 @@ assert(filename != NULL);//BG
 	char filename_upper[_MAX_PATH];
 	strcpy(filename_upper, filename);
 	strupr(filename_upper);
-	long crc = Calculate_CRC(strupr(filename_upper), strlen(filename_upper));
+	int crc = Calculate_CRC(strupr(filename_upper), strlen(filename_upper));
 	SubBlock key;
 	key.CRC = crc;
 
