@@ -1012,8 +1012,8 @@ void Wait_Vert_Blank(void)
 	SDL_RenderCopy(SDL_VideoRenderer, SDL_PrimaryTexture, nullptr, nullptr);
 	SDL_RenderPresent(SDL_VideoRenderer);
 
-	// TIM-237: save frame 500 as BMP for visual verification (deep into game loop;
-	// init+menu can consume 100-400 presents before Map.Render starts).
+	// TIM-247: save frame 500 as BMP; also log raw indexed-surface samples
+	// and palette to distinguish "all-zero surface" from "bad palette".
 	if (SDL_FirstPresentDone && ++SDL_PresentCount == 500) {
 		const char* bmp500 = "/tmp/redalert-frame500.bmp";
 		int rc500 = SDL_SaveBMP(SDL_PrimaryARGB, bmp500);
@@ -1023,6 +1023,24 @@ void Wait_Vert_Blank(void)
 		for (int i = 0; i < total500 && i < 500000; ++i)
 			if (px500[i] & 0x00FFFFFF) ++nz500;
 		fprintf(stderr, "[RA] frame500 BMP: rc=%d nz_pixels(sample)=%d path=%s\n", rc500, nz500, bmp500);
+		// Diagnose: show raw indexed-surface byte values (non-zero = rendering happened)
+		const uint8_t* idx = (const uint8_t*)SDL_PrimarySurface->pixels;
+		int total_idx = SDL_PrimarySurface->w * SDL_PrimarySurface->h;
+		int nz_idx = 0;
+		for (int i = 0; i < total_idx && i < 500000; ++i)
+			if (idx[i]) ++nz_idx;
+		fprintf(stderr, "[RA] frame500 indexed: nz_bytes=%d (0=surface never written)\n", nz_idx);
+		// Show palette entry 1 (should be non-black if palette is set correctly)
+		SDL_Color* pal = SDL_PrimarySurface->format->palette
+		                 ? SDL_PrimarySurface->format->palette->colors : nullptr;
+		if (pal) {
+			fprintf(stderr, "[RA] frame500 palette[0]=%u,%u,%u pal[1]=%u,%u,%u pal[128]=%u,%u,%u\n",
+				pal[0].r, pal[0].g, pal[0].b,
+				pal[1].r, pal[1].g, pal[1].b,
+				pal[128].r, pal[128].g, pal[128].b);
+		} else {
+			fprintf(stderr, "[RA] frame500 palette: NULL (SDL_PrimarySurface has no palette!)\n");
+		}
 		fflush(stderr);
 	}
 
