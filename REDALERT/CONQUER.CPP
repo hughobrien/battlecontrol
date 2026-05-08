@@ -3398,13 +3398,15 @@ void const * Get_Radar_Icon(void const * shapefile, int shapenum, int frames, in
 		** just need to skip past this set of icons and try to build the
 		** next frame.
 		*/
-#ifdef WIN32
+#if defined(WIN32) && defined(_MSC_VER)
 		void * ptr;
 		if ((ptr = (void *)(Build_Frame(shapefile, shapenum + framelp, SysMemPage.Get_Buffer()))) != NULL) {
 			ptr = Get_Shape_Header_Data(ptr);
-#else	//WIN#@
-		if (Build_Frame(shapefile, shapenum + framelp, HidPage.Get_Buffer()) <= (unsigned long)HidPage.Get_Size() ) {
-#endif	//WIN32
+#else
+		/* TIM-206: Linux port — render into HidPage, read pixels directly. */
+		char * ptr = (char *)HidPage.Get_Buffer();
+		if (Build_Frame(shapefile, shapenum + framelp, ptr) <= (unsigned long)HidPage.Get_Size()) {
+#endif
 
 			/*
 			** Loop through the icon width and the icon height building icons
@@ -3413,7 +3415,6 @@ void const * Get_Radar_Icon(void const * shapefile, int shapenum, int frames, in
 			*/
 			for (int icony = 0; icony < icon_height; icony ++) {
 				for (int iconx = 0; iconx < icon_width; iconx ++) {
-#ifdef WIN32
 
 					for (int y = 0; y < zoomfactor; y++) {
 						for (int x = 0; x < zoomfactor; x++) {
@@ -3422,16 +3423,6 @@ void const * Get_Radar_Icon(void const * shapefile, int shapenum, int frames, in
 							if ((getx < pixel_width) && (gety < pixel_height)) {
 								for (lp = 0; lp < 9; lp ++) {
 									pixel	= *(char *)((char *)ptr + ((gety - _offy[lp]) * pixel_width) + getx-_offx[lp]);
-
-#else	//WIN32
-					for (int y = 0; y < 3; y++) {
-						for (int x = 0; x < 3; x++) {
-							int getx = (iconx * 24) + (x << 3) + 4;
-							int gety = (icony * 24) + (y << 3) + 4;
-							if ((getx < pixel_width) && (gety < pixel_height)) {
-								for (lp = 0; lp < 9; lp ++) {
-									pixel	= *(char *)((char *)HidPage.Get_Buffer(), ((gety - _offy[lp]) * pixel_width) + getx-_offx[lp]);
-#endif	//WIN32
 									if (pixel == LTGREEN) pixel = 0;
 									if (pixel) {
 										break;
