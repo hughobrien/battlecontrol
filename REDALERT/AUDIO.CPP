@@ -55,6 +55,15 @@
 SFX_Type					SoundType;
 Sample_Type				SampleType;
 
+// TIM-148 pass-44E: definition for `extern int StreamLowImpact;` declared at
+// REDALERT/WIN32LIB/AUDIO.H:159. Writers in MAPSEL.CPP and SCORE.CPP toggled
+// this to throttle the music streaming chunker during long-running animation
+// sequences (map-selection screen, score crawl); pass-44E's Sound_Callback
+// honors `StreamLowImpact != 0` by capping refills to one chunk per tick.
+// Definition lives outside the `_MSC_VER` gate because the symbol is referenced
+// by both branches' AUDIO.H consumers.
+int StreamLowImpact = 0;
+
 #ifdef _MSC_VER
 
 // EA Remastered upstream WIN32LIB no-op stubs. Kept verbatim so the MSVC
@@ -127,6 +136,27 @@ static bool              g_audio_open   = false;
 // the mix loop rate-rescales each voice against g_audio_actual_freq.
 static int g_audio_actual_freq     = 0;
 static int g_audio_actual_channels = 0;
+
+// TIM-148 pass-44E: music streaming chunker state. `option (i)` per the
+// CEO ruling: fabricated full-song `pcm_len`, async fill into a calloc'd
+// `sizeof(AUDHeaderType) + UncompSize` buffer routed into VOICE_MUSIC via
+// Play_Sample_Handle. 44C's mix loop is unchanged. Lifecycle:
+// File_Stream_Sample_Vol initializes (closing any prior song),
+// Sound_Callback / maintenance_callback keep the write cursor ahead of the
+// SDL audio thread's read cursor, the chunker tears itself down when the
+// music slot goes inactive (Stop_Sample from THEME.CPP), or EOF is reached.
+static int             g_music_fh           = -1;
+static unsigned char * g_music_blob         = nullptr;
+static unsigned long   g_music_pcm_capacity = 0;       // == AUDHeader.UncompSize
+static unsigned long   g_music_pcm_written  = 0;       // bytes decoded so far
+static int             g_music_source_rate  = 0;       // AUD header Rate (Hz)
+static unsigned char * g_music_scratch      = nullptr; // realloc'd to max-seen chunk.size
+static unsigned long   g_music_scratch_cap  = 0;
+
+// Forward decls so Sound_End (defined below before the AUD struct block) can
+// call Music_Teardown without a re-order.
+static void Music_Teardown(void);
+static int  Music_Decode_Toward(unsigned long target, bool throttle);
 
 // Engine master volumes (0..255). Set_Sound_Vol routes to SFX voices,
 // Set_Score_Vol routes to music + speech voices. Both default to "full"
@@ -318,6 +348,10 @@ BOOL Audio_Init(HWND window, int bits_per_sample, BOOL stereo, int rate, int rev
 
 void Sound_End(void)
 {
+    // pass-44E: chunker teardown happens before SDL_Audio_Close so the file
+    // handle and decoded buffer are released even if the audio device close
+    // path racefully zeros g_voices[].
+    Music_Teardown();
     SDL_Audio_Close();
 }
 
@@ -596,6 +630,88 @@ static void Project_AUD_Header(AUDOnDiskHeader const & disk, AUDHeaderType * dst
     dst->Compression = disk.compression;
 }
 
+// TIM-148 pass-44E: music streaming chunker helpers. The audio thread reads
+// from g_music_blob[..g_music_pcm_written) under the SDL device lock; the
+// engine thread writes to g_music_blob[g_music_pcm_written..) outside the
+// lock. The split is safe because writes only ever extend an append-only
+// front, and the audio thread's read cursor stays behind it by the headroom
+// margin Sound_Callback maintains.
+static void Music_Teardown(void)
+{
+    if (g_music_fh != -1) {
+        Close_File(g_music_fh);
+        g_music_fh = -1;
+    }
+    if (g_music_blob != nullptr) {
+        std::free(g_music_blob);
+        g_music_blob = nullptr;
+    }
+    if (g_music_scratch != nullptr) {
+        std::free(g_music_scratch);
+        g_music_scratch = nullptr;
+    }
+    g_music_pcm_capacity = 0;
+    g_music_pcm_written  = 0;
+    g_music_source_rate  = 0;
+    g_music_scratch_cap  = 0;
+}
+
+// Decode chunks into the music blob's PCM region until either:
+//   - g_music_pcm_written >= target (refill target met)
+//   - g_music_pcm_written >= g_music_pcm_capacity (full song decoded)
+//   - throttle && one chunk completed (StreamLowImpact path)
+//   - clean EOF (Read_File returns 0 -> close fh, return 0)
+//   - format/I/O error (return -1)
+// Returns 1 on progress, 0 on clean EOF, -1 on error.
+static int Music_Decode_Toward(unsigned long target, bool throttle)
+{
+    if (g_music_fh < 0 || g_music_blob == nullptr) return -1;
+
+    int chunks_done = 0;
+    while (g_music_pcm_written < target
+           && g_music_pcm_written < g_music_pcm_capacity) {
+        AUDOnDiskChunkHeader chunk = {};
+        long const got = Read_File(g_music_fh, &chunk, sizeof(chunk));
+        if (got == 0) {
+            Close_File(g_music_fh);
+            g_music_fh = -1;
+            return 0;
+        }
+        if (got != static_cast<long>(sizeof(chunk)))                    return -1;
+        if (chunk.magic != AUD_CHUNK_MAGIC)                             return -1;
+        if (g_music_pcm_written + chunk.out_size > g_music_pcm_capacity)return -1;
+
+        if (chunk.size > 0) {
+            if (chunk.size > g_music_scratch_cap) {
+                unsigned char * grown = static_cast<unsigned char *>(
+                    std::realloc(g_music_scratch, chunk.size));
+                if (grown == nullptr) return -1;
+                g_music_scratch     = grown;
+                g_music_scratch_cap = chunk.size;
+            }
+            if (Read_File(g_music_fh, g_music_scratch, chunk.size)
+                != static_cast<long>(chunk.size)) {
+                return -1;
+            }
+        }
+
+        _SOS_COMPRESS_INFO info = {};
+        info.lpSource  = reinterpret_cast<char *>(g_music_scratch);
+        info.lpDest    = reinterpret_cast<char *>(g_music_blob + sizeof(AUDHeaderType)
+                                                  + g_music_pcm_written);
+        info.wBitSize  = 16;
+        info.wChannels = 1;
+        sosCODECInitStream(&info);
+        unsigned long const decoded = sosCODECDecompressData(&info, chunk.size);
+        if (decoded != chunk.out_size) return -1;
+
+        g_music_pcm_written += decoded;
+        chunks_done += 1;
+        if (throttle && chunks_done >= 1) break;
+    }
+    return 1;
+}
+
 void * Load_Sample(char const * filename)
 {
     if (filename == NULL) return NULL;
@@ -712,15 +828,151 @@ void Free_Sample(void const * sample)
     }
 }
 
-// Remaining 10 entry points stay no-op stubs identical to the MSVC branch.
-// Real bodies land in 44E (File_Stream_Sample_* streaming chunker driving
-// Sample_Read above + Sound_Callback / maintenance_callback background
-// fill via the music voice slot) and 44F (Stop_Sample_Playing tied to the
-// speech path).
-int File_Stream_Sample(char const *filename, BOOL real_time_start) { return 1; };
-int File_Stream_Sample_Vol(char const *filename, int volume, BOOL real_time_start) { return 1; };
-void __cdecl Sound_Callback(void) {};
-void __cdecl far maintenance_callback(void) {};
+// TIM-148 pass-44E: music streaming entry points. File_Stream_Sample[_Vol]
+// publishes a calloc'd full-song buffer into VOICE_MUSIC with a fabricated
+// `pcm_len = UncompSize`; Sound_Callback / maintenance_callback are the
+// engine-thread refill pumps that decode chunks ahead of the SDL audio
+// thread's read cursor. 44C's mix loop is unchanged -- music plays through
+// the same per-voice path as SFX, just into a different slot.
+int File_Stream_Sample_Vol(char const * filename, int volume, BOOL real_time_start)
+{
+    (void)real_time_start;     // pre-fill happens unconditionally; no async-start
+    if (filename == NULL || !g_audio_open) return 0;
+
+    // Replace any prior song. Stop_Sample takes the SDL lock; Music_Teardown
+    // closes the file and frees buffers (no SDL lock needed).
+    if (g_music_fh != -1 || g_music_blob != nullptr) {
+        Stop_Sample(VOICE_MUSIC);
+        Music_Teardown();
+    }
+
+    int fh = Open_File(filename, AUD_FILE_READ_MODE);
+    if (fh == -1) return 0;
+
+    AUDOnDiskHeader disk = {};
+    if (Read_File(fh, &disk, sizeof(disk)) != static_cast<long>(sizeof(disk))) {
+        Close_File(fh);
+        return 0;
+    }
+
+    std::size_t const blob_size = sizeof(AUDHeaderType) + disk.uncomp_size;
+    unsigned char * blob = static_cast<unsigned char *>(std::calloc(1, blob_size));
+    if (blob == nullptr) {
+        Close_File(fh);
+        return 0;
+    }
+
+    Project_AUD_Header(disk, reinterpret_cast<AUDHeaderType *>(blob));
+
+    g_music_fh           = fh;
+    g_music_blob         = blob;
+    g_music_pcm_capacity = disk.uncomp_size;
+    g_music_pcm_written  = 0;
+    g_music_source_rate  = static_cast<int>(disk.rate);
+
+    // Pre-fill ~1 second of PCM headroom synchronously so the audio thread has
+    // slack against any Sound_Callback hiccup. At source_rate Hz S16 mono, 1
+    // second == 2 * source_rate PCM bytes (the mix loop's cursor advances by
+    // 2 * source_rate bytes per second of engine time, regardless of what
+    // actual_freq the device negotiated). Bytes beyond g_music_pcm_written
+    // remain zero (calloc) until refill catches up -- they sound like silence,
+    // not garbage.
+    unsigned long prefill_target =
+        2ul * static_cast<unsigned long>(g_music_source_rate);
+    if (prefill_target > g_music_pcm_capacity) prefill_target = g_music_pcm_capacity;
+
+    int const r = Music_Decode_Toward(prefill_target, /*throttle=*/false);
+    if (r < 0) {
+        Music_Teardown();
+        return 0;
+    }
+
+    // Publish the music slot. priority=255 (won't be evicted by SFX -- though
+    // VOICE_MUSIC is outside the SFX scan range anyway), volume from caller,
+    // pan=0. id=VOICE_MUSIC bypasses Get_Free_Sample_Handle's SFX-only scan;
+    // Play_Sample_Handle accepts ids in [0, VOICE_COUNT).
+    int const id = Play_Sample_Handle(g_music_blob, /*priority=*/255, volume,
+                                       /*panloc=*/0, /*id=*/VOICE_MUSIC);
+    if (id < 0) {
+        Music_Teardown();
+        return 0;
+    }
+
+    return VOICE_MUSIC;
+}
+
+int File_Stream_Sample(char const * filename, BOOL real_time_start)
+{
+    return File_Stream_Sample_Vol(filename, 255, real_time_start);
+}
+
+// Engine-thread music-refill pump. Called once per frame from CONQUER.CPP's
+// Main_Loop, ThemeClass::AI, and a couple of WIN32LIB sites (PALETTE.CPP).
+// Maintains ~1 second of PCM headroom ahead of the SDL audio thread's read
+// cursor. Throttle: when StreamLowImpact != 0 (toggled around long animation
+// sequences in MAPSEL.CPP / SCORE.CPP), refill is capped to one chunk per
+// call so the chunker doesn't steal CPU from the foreground.
+void __cdecl Sound_Callback(void)
+{
+    if (g_music_fh < 0 && g_music_blob == nullptr) return;
+    if (!g_audio_open) {
+        Music_Teardown();
+        return;
+    }
+
+    // Lifecycle check: the music slot can be deactivated externally (THEME's
+    // Stop_Sample(Current) on song change) or naturally (mix loop hit
+    // pcm_len). In either case the chunker is done.
+    SDL_LockAudioDevice(g_audio_device);
+    bool   const slot_active = g_voices[VOICE_MUSIC].active;
+    double const read_cursor = g_voices[VOICE_MUSIC].cursor;
+    SDL_UnlockAudioDevice(g_audio_device);
+
+    if (!slot_active) {
+        Music_Teardown();
+        return;
+    }
+
+    // EOF reached on a previous tick: mix loop is playing out the rest of the
+    // calloc'd buffer (silence beyond g_music_pcm_written). Nothing to refill.
+    if (g_music_fh < 0) return;
+
+    long const headroom        = static_cast<long>(g_music_pcm_written)
+                               - static_cast<long>(read_cursor);
+    long const target_headroom = 2L * static_cast<long>(g_music_source_rate);
+    if (headroom >= target_headroom) return;
+
+    unsigned long const target_written =
+        static_cast<unsigned long>(read_cursor) +
+        static_cast<unsigned long>(target_headroom);
+
+    bool const throttle = (StreamLowImpact != 0);
+    int const r = Music_Decode_Toward(target_written, throttle);
+    if (r < 0) {
+        // Format / I/O error in mid-song. Stop the slot (under lock) and tear
+        // down. The brief flagged this path as rare -- 44D's magic check would
+        // have caught most malformed AUDs at Load time.
+        Stop_Sample(VOICE_MUSIC);
+        Music_Teardown();
+    }
+    // r == 0 (clean EOF): Music_Decode_Toward closed g_music_fh. Slot stays
+    // active; mix loop plays out remaining bytes (real PCM up to
+    // g_music_pcm_written, then zero-fill silence) and eventually hits
+    // pcm_len, deactivating the slot. The next Sound_Callback observes
+    // !slot_active and tears down the blob.
+}
+
+// Original Westwood code had this on a separate cadence. For 44E the simplest
+// correct shape is to forward to Sound_Callback -- both engine call sites
+// (THEME.CPP::AI, CONQUER.CPP::Main_Loop, plus PALETTE.CPP's "should be
+// removed!" historical pumps) want the same refill behavior.
+void __cdecl far maintenance_callback(void)
+{
+    Sound_Callback();
+}
+
+// Remaining 6 entry points stay no-op stubs identical to the MSVC branch.
+// Stop_Sample_Playing pairs with the speech path (44F).
 void Stop_Sample_Playing(void const * sample) {};
 int Get_Digi_Handle(void) { return 1; }
 void Restore_Sound_Buffers(void) {};
