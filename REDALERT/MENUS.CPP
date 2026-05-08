@@ -756,6 +756,18 @@ int Main_Menu(unsigned long )
 		*/
 		Call_Back();
 
+#ifndef _MSC_VER
+		/* TIM-206: synthetic keypress test — after 5 s inject VK_RETURN to verify
+		 * the menu navigation path works without a real keyboard attached. */
+		static bool _injected = false;
+		if (!_injected && TickCount - starttime > 5*60) {
+			fprintf(stderr, "[MENU] synthetic VK_RETURN injected at tick %lu\n",
+			        (unsigned long)TickCount); fflush(stderr);
+			Keyboard->Put(KN_RETURN);
+			_injected = true;
+		}
+#endif
+
 		/*
 		**	Refresh display if needed.
 		*/
@@ -824,6 +836,12 @@ int Main_Menu(unsigned long )
 		**	Get and process player input.
 		*/
 		input = commands->Input();
+#ifndef _MSC_VER
+		if (input != 0) {
+			fprintf(stderr, "[MENU] input=0x%04x curbutton=%d\n",
+			        (unsigned)input, curbutton); fflush(stderr);
+		}
+#endif
 
 #ifndef FIXIT_VERSION_3
 #if defined(WIN32) && !defined(INTERNET_OFF) // Denzil 5/1/98 - No Internet play

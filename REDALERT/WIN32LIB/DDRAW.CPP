@@ -989,7 +989,7 @@ void Wait_Vert_Blank(void)
 	// Palette-aware indexed->ARGB conversion. SDL_BlitSurface honors
 	// SDL_PrimarySurface->format->palette (populated by Set_DD_Palette
 	// at DDRAW.CPP:864-867).
-	SDL_BlitSurface(SDL_PrimarySurface, nullptr, SDL_PrimaryARGB, nullptr);
+	int blit_rc = SDL_BlitSurface(SDL_PrimarySurface, nullptr, SDL_PrimaryARGB, nullptr);
 	SDL_UpdateTexture(SDL_PrimaryTexture, nullptr,
 	                  SDL_PrimaryARGB->pixels, SDL_PrimaryARGB->pitch);
 	SDL_RenderClear(SDL_VideoRenderer);
@@ -999,6 +999,24 @@ void Wait_Vert_Blank(void)
 	if (!SDL_FirstPresentDone) {
 		SDL_ShowWindow(SDL_VideoWindow);
 		SDL_FirstPresentDone = true;
+		// TIM-172: save first frame as BMP for offline verification (bypasses X11 capture)
+		{
+			const char* bmp_path = "/tmp/redalert-frame0.bmp";
+			int save_rc = SDL_SaveBMP(SDL_PrimaryARGB, bmp_path);
+			const uint32_t* px = (const uint32_t*)SDL_PrimaryARGB->pixels;
+			uint32_t first_nz = 0; int nz_idx = -1;
+			int total = SDL_PrimaryARGB->w * SDL_PrimaryARGB->h;
+			for (int pi = 0; pi < total; ++pi) {
+				if (px[pi] & 0x00FFFFFF) { first_nz = px[pi]; nz_idx = pi; break; }
+			}
+			const uint8_t* src = (const uint8_t*)SDL_PrimarySurface->pixels;
+			SDL_Color* pal = SDL_PrimarySurface->format->palette
+			                 ? SDL_PrimarySurface->format->palette->colors : nullptr;
+			fprintf(stderr, "[RA] first SDL frame: blit_rc=%d save_rc=%d bmp=%s nz_idx=%d first_nz=0x%08x idx[0]=%u pal[0]=%u,%u,%u\n",
+				blit_rc, save_rc, bmp_path, nz_idx, first_nz, src[0],
+				pal ? pal[0].r : 0, pal ? pal[0].g : 0, pal ? pal[0].b : 0);
+			fflush(stderr);
+		}
 		fprintf(stderr, "[RA] first SDL frame presented — window now visible\n");
 	}
 	return;
