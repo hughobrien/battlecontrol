@@ -1269,7 +1269,14 @@ void Read_Setup_Options( RawFileClass *config_file )
 		*/
 		VideoBackBufferAllowed = ini.Get_Bool("Options", "VideoBackBuffer", true);
 		AllowHardwareBlitFills = ini.Get_Bool("Options", "HardwareFills", true);
+#ifdef _MSC_VER
+		/* TIM-250: Remastered always uses 3072×3072 virtual canvas regardless
+		   of the INI "Resolution" key (both branches were 3072). Linux classic
+		   mode leaves ScreenHeight at 480 (set in GLOBALS.CPP). */
 		ScreenHeight = ini.Get_Bool("Options", "Resolution", false) ? 3072 : 3072;
+#else
+		ini.Get_Bool("Options", "Resolution", false);  // consume key; ignore on Linux
+#endif
 
 		/*
 		** See if an alternative socket number has been specified
