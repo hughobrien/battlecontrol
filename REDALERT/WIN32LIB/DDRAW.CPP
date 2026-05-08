@@ -121,6 +121,9 @@ static void SDL_Process_Window_Events(void)
                 AllSurfaces.Set_Surface_Focus(TRUE);
                 GameInFocus = true;
                 break;
+            case SDL_WINDOWEVENT_CLOSE:
+                fprintf(stderr, "[SDL] SDL_WINDOWEVENT_CLOSE received\n"); fflush(stderr);
+                break;
             default:
                 break;
             }
@@ -132,6 +135,7 @@ static void SDL_Process_Window_Events(void)
                                  SDL_QUIT, SDL_QUIT);
         if (drained > 0) {
             SDL_QuitRequested = true;
+            fprintf(stderr, "[SDL] SDL_QUIT drained (count=%d)\n", drained); fflush(stderr);
         }
     } while (drained == 16);
 }
