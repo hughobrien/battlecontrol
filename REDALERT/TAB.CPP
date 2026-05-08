@@ -93,8 +93,6 @@ void TabClass::Draw_It(bool complete)
 		return;
 	}
 
-// Disable tab drawing for menu, credits buttons etc. ST - 5/27/2019
-#if (0)
 	/*
 	**	Redraw the top bar imagery if flagged to do so or if the entire display needs
 	**	to be redrawn.
@@ -106,7 +104,6 @@ void TabClass::Draw_It(bool complete)
 		int tab_height = TAB_HEIGHT * RESFACTOR;
 
 		LogicPage->Fill_Rect(0, 0, rightx, tab_height-1, BLACK);
-//		LogicPage->Fill_Rect(0, 0, rightx, tab_height-(2 * RESFACTOR), BLACK);
 
 #ifdef WIN32
 		/*
@@ -121,7 +118,6 @@ void TabClass::Draw_It(bool complete)
 #ifdef WIN32
 		Fancy_Text_Print(TXT_TAB_BUTTON_CONTROLS, (EVA_WIDTH/2) * RESFACTOR, 0, &MetalScheme, TBLACK, TPF_METAL12 | TPF_CENTER | TPF_USE_GRAD_PAL);
 #else
-//			Fancy_Text_Print(TXT_TAB_BUTTON_CONTROLS, (EVA_WIDTH/2) * RESFACTOR, 0, &ColorRemaps[PCOLOR_GREY], TBLACK, TPF_6PT_GRAD|TPF_NOSHADOW|TPF_CENTER|TPF_BRIGHT_COLOR);
 		Fancy_Text_Print(TXT_TAB_BUTTON_CONTROLS, (EVA_WIDTH/2) * RESFACTOR, 0, &ColorRemaps[PCOLOR_GREY], TBLACK, TPF_METAL12|TPF_NOSHADOW|TPF_CENTER|TPF_BRIGHT_COLOR);
 #endif	//WIN32
 		if (IsSidebarActive) {
@@ -136,7 +132,6 @@ void TabClass::Draw_It(bool complete)
 		LogicPage->Unlock();
 	}
 	Credits.Graphic_Logic(complete || IsToRedraw);
-#endif
 	IsToRedraw = false;
 }
 
@@ -305,8 +300,8 @@ void TabClass::Set_Active(int select)
 void TabClass::One_Time(void)
 {
 	SidebarClass::One_Time();
-	RawFileClass file("tabs.shp");
 	TabShape = MFCD::Retrieve("TABS.SHP");
+	fprintf(stderr, "[TAB] One_Time: TABS.SHP=%p\n", TabShape); fflush(stderr);
 }
 
 
