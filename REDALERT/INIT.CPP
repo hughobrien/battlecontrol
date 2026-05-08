@@ -2835,14 +2835,20 @@ static void Init_Color_Remaps(void)
 	ColorRemaps[PCOLOR_TYPE].BrightColor = 15;
 	ColorRemaps[PCOLOR_TYPE].Color = 9;
 
+	// Color (TPF_MEDIUM_COLOR foreground) from PALETTE.CPS col 4, row DIALOG_BLUE
+	// maps to a shade visually indistinguishable from Background on Linux/SDL.
+	// Override to WHITE (15), mirroring the BrightColor hardcode above so that
+	// both normal and pressed button text render as white-on-blue.
+	ColorRemaps[PCOLOR_DIALOG_BLUE].Color = WHITE;
+
 	GadgetClass::Set_Color_Scheme(&ColorRemaps[PCOLOR_DIALOG_BLUE]);
 //	GadgetClass::Set_Color_Scheme(&ColorRemaps[PCOLOR_BLUE]);
 #ifndef _MSC_VER
 	{
 		RemapControlType &s = ColorRemaps[PCOLOR_DIALOG_BLUE];
-		fprintf(stderr, "[RA] DIALOG_BLUE: Color=%d BrightColor=%d "
+		fprintf(stderr, "[RA] DIALOG_BLUE: Color=%d Background=%d BrightColor=%d "
 		        "FontRemap[10..15]=%d,%d,%d,%d,%d,%d\n",
-		        s.Color, s.BrightColor,
+		        s.Color, s.Background, s.BrightColor,
 		        s.FontRemap[10], s.FontRemap[11], s.FontRemap[12],
 		        s.FontRemap[13], s.FontRemap[14], s.FontRemap[15]);
 		fflush(stderr);
