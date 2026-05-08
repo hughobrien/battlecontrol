@@ -42,6 +42,25 @@
 #define ENGLISH 1
 #endif
 
+// TIM-222 pass-64: SIGSEGV backtrace handler — install once in main().
+#ifndef _MSC_VER
+#include <signal.h>
+#include <execinfo.h>
+#include <unistd.h>
+static void crash_handler(int sig)
+{
+    void *buf[64];
+    int n = backtrace(buf, 64);
+    char **syms = backtrace_symbols(buf, n);
+    fprintf(stderr, "\n=== CRASH signal %d backtrace ===\n", sig);
+    for (int i = 0; i < n; i++)
+        fprintf(stderr, "  [%2d] %s\n", i, syms ? syms[i] : "?");
+    fflush(stderr);
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+#endif
+
 #include	"function.h"
 #include	<conio.h>
 #include	<io.h>
@@ -186,6 +205,12 @@ int main(int argc, char * argv[])
 #endif	// WIN32 + _MSC_VER
 
 {
+#ifndef _MSC_VER
+	signal(SIGSEGV, crash_handler);
+	signal(SIGABRT, crash_handler);
+	signal(SIGBUS,  crash_handler);
+#endif
+
 #if defined(WIN32) && defined(_MSC_VER)
 
 	RunningAsDLL = true;
