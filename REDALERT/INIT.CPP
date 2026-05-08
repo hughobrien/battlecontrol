@@ -3718,6 +3718,10 @@ static void Init_Keys(void)
 	ini.Load(file);
 
 	FastKey = ini.Get_PKey(true);
+#ifndef _MSC_VER
+	fprintf(stderr, "[INIT] Init_Keys: FastKey.Plain_Block_Size=%d Crypt_Block_Size=%d\n",
+		FastKey.Plain_Block_Size(), FastKey.Crypt_Block_Size()); fflush(stderr);
+#endif
 #ifdef SCENARIO_EDITOR
 	SlowKey = ini.Get_PKey(false);
 #endif
