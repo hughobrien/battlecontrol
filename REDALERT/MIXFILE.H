@@ -95,7 +95,13 @@ class MixFileClass : public Node<MixFileClass<T>>
 		**	This is the initial file header. It tells how many files are embedded
 		**	within this mixfile and the total size of all embedded files.
 		*/
+		/* TIM-173: MIX disk format is packed (2-byte count + 4-byte size, no gap).
+		 * GCC pads short+int to 8 bytes by default; force packed layout. */
+#ifndef _MSC_VER
+		typedef struct __attribute__((packed)) {
+#else
 		typedef struct {
+#endif
 			short	count;
 			int		size;
 		} FileHeader;

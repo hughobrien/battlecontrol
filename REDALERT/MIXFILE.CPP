@@ -310,6 +310,10 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 	straw->Get(HeaderBuffer, Count * sizeof(SubBlock));
 #ifndef _MSC_VER
 	fprintf(stderr, "[MIX] ctor: %s index read done\n", filename); fflush(stderr);
+	for (int _i = 0; _i < Count && _i < 8; _i++)
+		fprintf(stderr, "[MIX] ctor: %s idx[%d] crc=%08x off=%d sz=%d\n",
+		        filename, _i, (unsigned)HeaderBuffer[_i].CRC,
+		        HeaderBuffer[_i].Offset, HeaderBuffer[_i].Size); fflush(stderr);
 #endif
 
 	/*
@@ -449,6 +453,10 @@ bool MixFileClass<T>::Cache(char const * filename, Buffer const * buffer)
 template<class T>
 bool MixFileClass<T>::Cache(Buffer const * buffer)
 {
+#ifndef _MSC_VER
+	fprintf(stderr,"[MIX] Cache_instance(%s): Data=%p IsDigest=%d IsEncrypted=%d DataSize=%ld DataStart=%ld\n",
+	        Filename ? Filename : "?", Data, (int)IsDigest, (int)IsEncrypted, DataSize, DataStart); fflush(stderr);
+#endif
 	/*
 	**	If the mixfile is already cached, then no action needs to be performed.
 	*/
@@ -494,12 +502,20 @@ bool MixFileClass<T>::Cache(Buffer const * buffer)
 		file.Open(READ);
 		file.Bias(0);
 		file.Bias(DataStart);
+#ifndef _MSC_VER
+		fprintf(stderr, "[MIX] Cache: %s file.Is_Open=%d DataStart=%ld DataSize=%ld\n",
+		        Filename, (int)file.Is_Open(), DataStart, DataSize); fflush(stderr);
+#endif
 
 		/*
 		**	Fetch the whole mixfile data in one step. If the number of bytes retrieved
 		**	does not equal that requested, then this indicates a serious error.
 		*/
 		long actual = straw->Get(Data, DataSize);
+#ifndef _MSC_VER
+		fprintf(stderr, "[MIX] Cache(%s): DataStart=%ld DataSize=%ld actual=%ld\n",
+		        Filename, DataStart, DataSize, actual); fflush(stderr);
+#endif
 		if (actual != DataSize) {
 			delete [] Data;
 			Data = NULL;
@@ -517,6 +533,15 @@ bool MixFileClass<T>::Cache(Buffer const * buffer)
 			char digest2[20];
 			sha.Result(digest2);
 			fstraw.Get(digest1, sizeof(digest1));
+#ifndef _MSC_VER
+			{ int _dm = memcmp(digest1, digest2, sizeof(digest1));
+			  fprintf(stderr,"[MIX] Cache(%s): digest got=%02x%02x%02x%02x... calc=%02x%02x%02x%02x... match=%d\n",
+			          Filename,
+			          (unsigned char)digest1[0],(unsigned char)digest1[1],
+			          (unsigned char)digest1[2],(unsigned char)digest1[3],
+			          (unsigned char)digest2[0],(unsigned char)digest2[1],
+			          (unsigned char)digest2[2],(unsigned char)digest2[3], _dm==0); fflush(stderr); }
+#endif
 			if (memcmp(digest1, digest2, sizeof(digest1)) != 0) {
 				delete [] Data;
 				Data = NULL;
@@ -622,6 +647,10 @@ assert(filename != NULL);//BG
 	/*
 	**	Sweep through all registered mixfiles, trying to find the file in question.
 	*/
+#ifndef _MSC_VER
+	{ int _lc=0; MixFileClass<T>*_lp=List.First(); while(_lp->Is_Valid()){_lc++;_lp=_lp->Next();}
+	  fprintf(stderr,"[MIX] Offset('%s'): crc=%08x list_count=%d\n", filename_upper, (unsigned)crc, _lc); fflush(stderr); }
+#endif
 	ptr = List.First();
 	while (ptr->Is_Valid()) {
 		SubBlock * block;
@@ -630,6 +659,10 @@ assert(filename != NULL);//BG
 		**	Binary search for the file in this mixfile. If it is found, then extract the
 		**	appropriate information and store it in the locations provided and then return.
 		*/
+#ifndef _MSC_VER
+		fprintf(stderr,"[MIX] Offset: checking mixfile Filename=%s Count=%d HeaderBuffer=%p\n",
+		        ptr->Filename ? ptr->Filename : "(null)", ptr->Count, (void*)ptr->HeaderBuffer); fflush(stderr);
+#endif
 		block = (SubBlock *)bsearch(&key, ptr->HeaderBuffer, ptr->Count, sizeof(SubBlock), compfunc);
 		if (block != NULL) {
 			if (mixfile != NULL) *mixfile = ptr;
