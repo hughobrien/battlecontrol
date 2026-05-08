@@ -581,9 +581,20 @@ int Fetch_Difficulty(void)
 		*/
 		Call_Back();
 
+#ifndef _MSC_VER
+		/* TIM-206: synthetic Enter to accept default difficulty for smoke testing. */
+		static bool _diff_injected = false;
+		if (!_diff_injected) {
+			_diff_injected = true;
+			fprintf(stderr, "[DIFF] injecting KN_RETURN to accept default difficulty\n");
+			fflush(stderr);
+			Keyboard->Put(KN_RETURN);
+		}
+#endif
+
 #ifdef WIN32
 		/*
-		** Handle possible surface loss due to a focus switch
+		** Handle possible surface loss due a focus switch
 		*/
 		if (AllSurfaces.SurfacesRestored) {
 			AllSurfaces.SurfacesRestored=FALSE;
