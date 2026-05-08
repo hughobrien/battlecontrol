@@ -555,7 +555,7 @@ bool Read_Scenario(char * name)
 		}
 #endif
 		Fill_In_Data();
-		Map.Set_View_Dimensions(0, 0, Map.MapCellWidth, Map.MapCellHeight);
+		// TIM-268: removed Remastered full-map overview Set_View_Dimensions; sidebar Activate(1) sets correct viewport.
 	} else {
 		
 #if (1)
@@ -743,7 +743,7 @@ void Fill_In_Data(void)
  *=============================================================================================*/
 void Post_Load_Game(int load_multi)
 {
-	Map.Set_View_Dimensions(0, 0, Map.MapCellWidth, Map.MapCellHeight);
+	// TIM-268: removed Remastered full-map Set_View_Dimensions; sidebar Activate(1) owns the viewport.
 	//
 	// Do NOT call Overpass if we're loading a multiplayer game; it calls the
 	// random # generator, which throws the games out of sync if they were
