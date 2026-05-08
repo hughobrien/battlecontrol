@@ -439,7 +439,10 @@ void GScreenClass::Render(void)
 		}
 		Session.Messages.Draw();
 
-		//Blit_Display(); // 5/19/20 SKY - Skip copying to scene page, we can get the data directly from hidden page
+		// TIM-247: re-enable the HidPage→SeenBuff copy. The EA Remastered code
+		// skipped this because their renderer read directly from HidPage, but
+		// our SDL port requires the explicit blit to populate SDL_PrimarySurface.
+		Blit_Display();
 		IsToUpdate = false;
 		IsToRedraw = false;
 
