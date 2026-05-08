@@ -118,8 +118,17 @@ WinTimerClass::WinTimerClass (UINT freq, BOOL partial)
 	//
 	// Install the timer callback event handler
 	//
-	//TimerHandle = timeSetEvent ( 1000/freq , 1 , Timer_Callback , 0 , TIME_PERIODIC);				
+	//TimerHandle = timeSetEvent ( 1000/freq , 1 , Timer_Callback , 0 , TIME_PERIODIC);
 	// Add TIME_KILL_SYNCHRONOUS flag. ST - 2/13/2019 5:07PM
+#ifndef _MSC_VER
+	// TIM-149 pass-45F: timeSetEvent stub returns 0; bypass it and wire
+	// tick count to timeGetTime() in Get_System/User_Tick_Count() instead.
+	TimerSystemOn = TRUE;
+	if (!partial) {
+		WindowsTimer = this;
+		TickCount.Start();
+	}
+#else
 	TimerHandle = timeSetEvent ( 1000/freq , 1 , Timer_Callback , 0 , TIME_PERIODIC | TIME_KILL_SYNCHRONOUS);
 	TimerSystemOn = success = ( TimerHandle !=0 );
 
@@ -133,6 +142,7 @@ WinTimerClass::WinTimerClass (UINT freq, BOOL partial)
 		sprintf (error_str, "Error - timer system failed to start. Error code %d\n", GetLastError());
 		OutputDebugString(error_str);
 	}
+#endif
 }
 
 
@@ -291,7 +301,11 @@ void WinTimerClass::Update_Tick_Count ( void )
 
 unsigned WinTimerClass::Get_System_Tick_Count ( void )
 {
+#ifndef _MSC_VER
+	return (unsigned)((unsigned long long)timeGetTime() * Frequency / 1000ULL);
+#else
 	return ( SysTicks );
+#endif
 }
 
 
@@ -311,5 +325,9 @@ unsigned WinTimerClass::Get_System_Tick_Count ( void )
 
 unsigned WinTimerClass::Get_User_Tick_Count ( void )
 {
+#ifndef _MSC_VER
+	return (unsigned)((unsigned long long)timeGetTime() * Frequency / 1000ULL);
+#else
 	return ( UserTicks );
+#endif
 }
