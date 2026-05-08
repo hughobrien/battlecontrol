@@ -3343,6 +3343,12 @@ void const * Get_Radar_Icon(void const * shapefile, int shapenum, int frames, in
 
 	char * retval = NULL;
 	char * buffer = NULL;
+#ifndef _MSC_VER
+	/* TIM-206: ptr declared at fn scope — #ifdef WIN32 block above only declares it for WIN32,
+	 * leaving it undefined on Linux where the inner pixel loop uses it. */
+	void * ptr = NULL;
+	static char _gri_dummy_buf[4];  /* non-NULL sentinel for Build_Frame null-ptr guard */
+#endif
 
 	/*
 	**	If there is no shape file, then there can be no radar icon imagery.
@@ -3403,7 +3409,13 @@ void const * Get_Radar_Icon(void const * shapefile, int shapenum, int frames, in
 		if ((ptr = (void *)(Build_Frame(shapefile, shapenum + framelp, SysMemPage.Get_Buffer()))) != NULL) {
 			ptr = Get_Shape_Header_Data(ptr);
 #else
-		if (Build_Frame(shapefile, shapenum + framelp, HidPage.Get_Buffer()) <= (unsigned long)HidPage.Get_Size() ) {
+		/* TIM-206: Build_Frame returns the BigShapeBuffer/TheaterShapeBuffer address (not a size);
+		 * pass dummy non-NULL buf so it doesn't early-exit, then extract real pixel ptr. */
+		{
+			unsigned long _bfr = Build_Frame(shapefile, shapenum + framelp, _gri_dummy_buf);
+			ptr = _bfr ? Get_Shape_Header_Data((void*)_bfr) : NULL;
+		}
+		if (ptr) {
 #endif
 
 			/*

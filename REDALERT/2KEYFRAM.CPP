@@ -386,15 +386,6 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			return(0);
 		}
 
-#ifndef _MSC_VER
-		/* TIM-206 pass-58: narrow LCW vs Apply_Delta for slot 0 frame 23 corruption */
-		if (keyfr->y == 0 && framenumber == 23) {
-			fprintf(stderr, "[BF] POST-LCW23: K0[24]=%p length=%lu\n",
-				(void*)*(KeyFrameSlots[0]+24), (unsigned long)length);
-			fflush(stderr);
-		}
-#endif
-
 #ifndef FIXIT_SCORE_CRASH
 		if ( ((offset[2] & 0x00FFFFFFL) - offcurr) >= (0x00010000L - off16) ) {
 
@@ -406,30 +397,14 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 		}
 #endif
 
-#ifndef _MSC_VER
-		/* TIM-206 pass-58: log delta offset calculation for slot 0 frame 23 */
-		if (keyfr->y == 0 && framenumber == 23) {
-			void *delta23 = Add_Long_To_Pointer(ptr, offdiff);
-			fprintf(stderr, "[BF] PRE-APPDELTA23: flags=0x%02x off0=0x%08x off1=0x%08x offcurr=0x%lx offdiff=0x%lx ptr=%p delta=%p\n",
-				(unsigned)(unsigned char)frameflags,
-				(unsigned)offset[0], (unsigned)offset[1],
-				(unsigned long)offcurr, (unsigned long)offdiff,
-				(void*)ptr, delta23);
-			fflush(stderr);
-		}
-#endif
-
 		length = buffsize;
-		Apply_Delta(effective_buffptr, Add_Long_To_Pointer(ptr, offdiff));
-
-#ifndef _MSC_VER
-		/* TIM-206 pass-58: check K0[24] immediately after Apply_Delta for frame 23 */
-		if (keyfr->y == 0 && framenumber == 23) {
-			fprintf(stderr, "[BF] POST-APPDELTA23: K0[24]=%p\n",
-				(void*)*(KeyFrameSlots[0]+24));
-			fflush(stderr);
+		if (frameflags & KF_DELTA) {
+			/* TIM-206: In RA, KF_DELTA key-delta is LCW-encoded (often a 0x80 no-op).
+			 * Apply_XOR_Delta reads LCW bytes as huge XOR commands → heap corruption. */
+			LCW_Uncompress(Add_Long_To_Pointer(dataptr, offset[0] & 0x00FFFFFFL), effective_buffptr, buffsize);
+		} else {
+			Apply_Delta(effective_buffptr, Add_Long_To_Pointer(ptr, offdiff));
 		}
-#endif
 
 		if ( (frameflags & KF_DELTA) ) {
 			// adjust to delta after the keydelta
@@ -439,28 +414,6 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 
 			while (currframe <= framenumber) {
 				offdiff = (offset[subframe] & 0x00FFFFFFL) - offcurr;
-
-#ifndef _MSC_VER
-				/* TIM-206 pass-58: probe each loop iteration for slot 0 frame 23 */
-				if (keyfr->y == 0 && framenumber == 23) {
-					void *delta_loop = Add_Long_To_Pointer(ptr, offdiff);
-					const unsigned char *db = (const unsigned char*)delta_loop;
-					fprintf(stderr, "[BF] LOOP23 cf=%d sf=%d off[sf]=0x%08x offcurr=0x%lx offdiff=0x%lx K0[24]=%p delta=%p buffptr=%p buffsz=%d\n",
-						(int)currframe, (int)subframe, (unsigned)offset[subframe],
-						(unsigned long)offcurr, (unsigned long)offdiff,
-						(void*)*(KeyFrameSlots[0]+24),
-						delta_loop, buffptr, (int)buffsize);
-					fprintf(stderr, "[BF] LOOP23 delta_bytes: %02x %02x %02x %02x  %02x %02x %02x %02x  %02x %02x %02x %02x  %02x %02x %02x %02x\n",
-						db[0],db[1],db[2],db[3],db[4],db[5],db[6],db[7],
-						db[8],db[9],db[10],db[11],db[12],db[13],db[14],db[15]);
-					/* interpret as signed-16 commands */
-					const short *dcmds = (const short*)delta_loop;
-					fprintf(stderr, "[BF] LOOP23 cmds: [0]=%d [1]=%d [2]=%d [3]=%d [4]=%d [5]=%d [6]=%d [7]=%d\n",
-						(int)dcmds[0],(int)dcmds[1],(int)dcmds[2],(int)dcmds[3],
-						(int)dcmds[4],(int)dcmds[5],(int)dcmds[6],(int)dcmds[7]);
-					fflush(stderr);
-				}
-#endif
 
 #ifndef FIXIT_SCORE_CRASH
 				if ( ((offset[subframe+2] & 0x00FFFFFFL) - offcurr) >= (0x00010000L - off16) ) {
@@ -474,7 +427,9 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 #endif
 
 				length = buffsize;
-				Apply_Delta(effective_buffptr, Add_Long_To_Pointer(ptr, offdiff));
+				/* TIM-206: KF_DELTA loop frames in RA use LCW-encoded deltas (not XOR).
+				 * LCW back-references into effective_buffptr recover prior-frame pixels. */
+				LCW_Uncompress(Add_Long_To_Pointer(dataptr, offset[subframe] & 0x00FFFFFFL), effective_buffptr, buffsize);
 
 				currframe++;
 				subframe += 2;
