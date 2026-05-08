@@ -69,14 +69,42 @@ int IRandom(int minval, int maxval)
 
 unsigned char Random(void)
 {
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
-}		 
+	// TIM-164: portable C++ port of the 4-byte LFSR in IRANDOM.ASM.
+	// Operates on the low 4 bytes of RandNumb (stored little-endian).
+	unsigned char *p = (unsigned char *)&RandNumb;
+	unsigned int cf;
+	unsigned int al = p[0];
+	// shr al,1; shr al,1 — capture carry after second shift
+	cf = al & 1; al >>= 1;
+	cf = al & 1; al >>= 1;
+	// rcl p[2],1 then rcl p[1],1 — shift the upper two bytes left through carry
+	unsigned int t;
+	t = ((unsigned int)p[2] << 1) | cf; cf = t >> 8; p[2] = (unsigned char)t;
+	t = ((unsigned int)p[1] << 1) | cf; cf = t >> 8; p[1] = (unsigned char)t;
+	// cmc — complement carry
+	cf ^= 1u;
+	// sbb al, p[0] — subtract with borrow
+	t = (unsigned int)al - (unsigned int)p[0] - cf;
+	cf = (t > 0xFFu) ? 1u : 0u;
+	al = t & 0xFF;
+	// shr al,1 — carry captures LSB for rcr
+	cf = al & 1;
+	// rcr p[0],1 — rotate byte 0 right through carry
+	p[0] = (unsigned char)(((unsigned int)p[0] >> 1) | (cf << 7));
+	return p[0] ^ p[1];
+}
 
 
 
 int Get_Random_Mask(int maxval)
 {
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: portable C++ port of the BSR-based mask builder in IRANDOM.ASM.
+	if (maxval == 0) return 1;
+	unsigned int v = (unsigned int)maxval;
+	int bit = 0;
+	unsigned int tmp = v;
+	while (tmp >>= 1) bit++;
+	return (1 << (bit + 1)) - 1;
 }
 
 
