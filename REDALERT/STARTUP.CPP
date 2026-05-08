@@ -172,17 +172,21 @@ BOOL WINAPI DllMain(HINSTANCE instance, unsigned int fdwReason, void *lpvReserve
  * HISTORY:                                                                                    *
  *   03/20/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
-#ifdef WIN32
+// TIM-159 pass-48A: on Linux, wwstd.h:46 pre-defines WIN32=1 for any TU
+// that transits wwlib32.h, so the original #ifdef WIN32 guard would make
+// STARTUP.CPP export DLL_Startup instead of main().  Gate the DLL entry
+// point on _MSC_VER (only defined by MSVC) so GCC builds get main().
+#if defined(WIN32) && defined(_MSC_VER)
 //int PASCAL WinMain(HINSTANCE, HINSTANCE, char *, int )
 //PG int PASCAL WinMain ( HINSTANCE instance , HINSTANCE , char * command_line , int command_show )
 int DLL_Startup(const char * command_line_in)
 
-#else	//WIN32
+#else	// WIN32 + _MSC_VER
 int main(int argc, char * argv[])
-#endif	//WIN32
+#endif	// WIN32 + _MSC_VER
 
 {
-#ifdef WIN32
+#if defined(WIN32) && defined(_MSC_VER)
 
 	RunningAsDLL = true;
 	int command_show = SW_HIDE;
@@ -219,7 +223,7 @@ int main(int argc, char * argv[])
 #endif
 //printf("in program.\n");getch();
 //printf("ram free = %ld\n",Ram_Free(MEM_NORMAL));getch();
-#ifdef WIN32
+#if defined(WIN32) && defined(_MSC_VER)
 	if (Ram_Free(MEM_NORMAL) < 7000000) {
 #else
 
@@ -233,7 +237,7 @@ int main(int argc, char * argv[])
 #endif
 		printf (TEXT_NO_RAM);
 
-#ifndef WIN32
+#ifndef _MSC_VER
 		printf (TEXT_USE_START_MENU);
 		getch();
 #endif
@@ -258,7 +262,7 @@ int main(int argc, char * argv[])
 		return(EXIT_FAILURE);
 	}
 
-#ifdef WIN32
+#if defined(WIN32) && defined(_MSC_VER)
 
 	if (strstr(command_line, "f:\\projects\\c&c0") != NULL ||
 			strstr(command_line, "F:\\PROJECTS\\C&C0") != NULL) {
@@ -321,7 +325,16 @@ int main(int argc, char * argv[])
 
 	} while ( command_char != 0 && command_char != 13 && argc<20 );
 
-#endif	//WIN32
+#endif	// WIN32 && _MSC_VER
+
+#if defined(WIN32) && !defined(_MSC_VER)
+	// TIM-159 pass-48A: Linux main() path — provide the MSVC-block variables
+	// consumed by the #ifdef WIN32 window/audio init block below.
+	// Create_Main_Window is a no-op stub (WINSTUB.CPP: sets MainWindow=NULL,
+	// returns); command_show is unused by it. ProgramInstance is null on Linux.
+	void * const instance = (void*)ProgramInstance;
+	const int command_show = 1; // SW_SHOWNORMAL — ignored by stub
+#endif
 
 	/*
 	**	Remember the current working directory and drive.

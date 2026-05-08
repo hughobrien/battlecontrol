@@ -122,6 +122,11 @@ for src in "${SOURCES[@]}"; do
         echo "SKIP $rel  # L3 dedup: LZWStraw duplicate (canonical = LZWSTRAW.CPP)" >> "$COMPILE_STATUS"
         continue
     fi
+    if [[ "$rel" == "REDALERT/STUB.CPP" ]]; then
+        skipped=$((skipped + 1))
+        echo "SKIP $rel  # TIM-159: DOS-era placeholder main(); STARTUP.CPP owns main() on Linux" >> "$COMPILE_STATUS"
+        continue
+    fi
 
     base="$(basename "$src" .cpp)"
     base="${base%.CPP}"

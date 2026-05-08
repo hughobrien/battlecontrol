@@ -1750,7 +1750,7 @@ extern "C" int __cdecl Clip_Rect ( int * x , int * y , int * w , int * h , int w
 
 extern "C" int __cdecl Confine_Rect ( int * x , int * y , int w , int h , int width , int height )
 {
-	
+
 /*
 	PROC	Confine_Rect C near
 	uses	ebx, esi,edi
@@ -1761,7 +1761,19 @@ extern "C" int __cdecl Confine_Rect ( int * x , int * y , int w , int h , int wi
 	arg	width :dword
 	arg	height:dword
 */
+#ifndef _MSC_VER
+	// TIM-159 pass-48A: C++ replacement for removed MASM body.
+	// Clamps the rectangle (x,y,w,h) to fit within (0,0,width,height).
+	// Returns 1 if any adjustment was made.
+	int moved = 0;
+	if (*x + w > width) { *x = width - w; moved = 1; }
+	if (*x < 0)         { *x = 0;         moved = 1; }
+	if (*y + h > height) { *y = height - h; moved = 1; }
+	if (*y < 0)          { *y = 0;          moved = 1; }
+	return moved;
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 
