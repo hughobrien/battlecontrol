@@ -133,8 +133,37 @@ void __cdecl Buffer_Draw_Line(void *this_object, int sx, int sy, int dx, int dy,
 	unsigned int y1_pixel = (unsigned int) sy;
 	unsigned int x2_pixel = (unsigned int) dx;
 	unsigned int y2_pixel = (unsigned int) dy;
+	(void)int_color; (void)_one_time_init; (void)_clip_table;
+	(void)clip_var; (void)accum;
 
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: Bresenham line with unsigned clip (handles negative coords via wrap-around check)
+	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+	clip_min_x = 0; clip_max_x = (unsigned int)vp->Get_Width();
+	clip_min_y = 0; clip_max_y = (unsigned int)vp->Get_Height();
+	bpr = (unsigned int)(vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch());
+	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
+	int x = (int)x1_pixel, y = (int)y1_pixel;
+	int ex = (int)x2_pixel, ey = (int)y2_pixel;
+	int xd = ex - x, yd = ey - y;
+	int xstep = xd >= 0 ? 1 : -1;
+	int ystep = yd >= 0 ? 1 : -1;
+	if (xd < 0) xd = -xd;
+	if (yd < 0) yd = -yd;
+	if (xd >= yd) {
+		int err = xd / 2;
+		for (int i = 0; i <= xd; i++, x += xstep) {
+			if ((unsigned int)x < clip_max_x && (unsigned int)y < clip_max_y)
+				buf[y * (int)bpr + x] = color;
+			err -= yd; if (err < 0) { y += ystep; err += xd; }
+		}
+	} else {
+		int err = yd / 2;
+		for (int i = 0; i <= yd; i++, y += ystep) {
+			if ((unsigned int)x < clip_max_x && (unsigned int)y < clip_max_y)
+				buf[y * (int)bpr + x] = color;
+			err -= xd; if (err < 0) { x += xstep; err += yd; }
+		}
+	}
 }
 
 
@@ -688,7 +717,7 @@ void __cdecl Buffer_Fill_Rect(void *thisptr, int sx, int sy, int dx, int dy, uns
 			memset(buf + r * stride + c0, color, c1 > c0 ? c1 - c0 : 0);
 	}
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{ /* TIM-164: replaced */ }
 #endif
 }
 
@@ -714,8 +743,14 @@ void __cdecl Buffer_Fill_Rect(void *thisptr, int sx, int sy, int dx, int dy, uns
 void	__cdecl Buffer_Clear(void *this_object, unsigned char color)
 {
 	unsigned int local_color = color;
-
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	(void)local_color;
+	// TIM-164: memset each row accounting for pitch
+	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+	int w = vp->Get_Width(), h = vp->Get_Height();
+	int stride = w + vp->Get_XAdd() + (int)vp->Get_Pitch();
+	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
+	for (int row = 0; row < h; row++)
+		memset(buf + row * stride, color, (size_t)w);
 }
 
 
@@ -810,7 +845,7 @@ BOOL __cdecl Linear_Blit_To_Linear(	void *this_object, void * dest, int x_pixel,
 	}
 	return TRUE;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{ /* TIM-164: replaced */ }
 #endif
 }
 
@@ -941,7 +976,7 @@ BOOL __cdecl Linear_Scale_To_Linear(void *this_object, void *dest, int src_x, in
 	}
 	return TRUE;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{ /* TIM-164: replaced */ }
 #endif
 }
 
@@ -1013,8 +1048,22 @@ GLOBAL C	Buffer_Draw_Stamp_Clip:near
 */ 
 extern "C" void __cdecl Init_Stamps(unsigned int icondata)
 {
-
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: populate globals from IControl_Type binary layout (Win32 DW/DD offsets).
+	// Offsets: Width@0(2), Height@2(2), Count@4(2), Size@12(4), Icons@16(4), TransFlag@28(4), Map@36(4)
+	LastIconset = icondata;
+	if (!icondata) return;
+	unsigned char *b = (unsigned char*)(uintptr_t)icondata;
+	short iw, ih, ic; int isz, iicons, itrans, imap;
+	memcpy(&iw, b+0, 2); memcpy(&ih, b+2, 2); memcpy(&ic, b+4, 2);
+	memcpy(&isz, b+12, 4); memcpy(&iicons, b+16, 4);
+	memcpy(&itrans, b+28, 4); memcpy(&imap, b+36, 4);
+	IconWidth  = (unsigned int)(unsigned short)iw;
+	IconHeight = (unsigned int)(unsigned short)ih;
+	IconCount  = (unsigned int)(unsigned short)ic;
+	IconSize   = (unsigned int)isz;
+	StampPtr   = icondata + (unsigned int)iicons;
+	IsTrans    = icondata + (unsigned int)itrans;
+	MapPtr     = icondata + (unsigned int)imap;
 }
 
 
@@ -1056,8 +1105,32 @@ void __cdecl Buffer_Draw_Stamp(void const *this_object, void const *icondata, in
 		LOCAL	iwidth:DWORD		; Icon width (here for speedy access).
 		LOCAL	doremap:BYTE		; Should remapping occur?
 */
-		
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: render icon from IControl_Type iconset, honouring per-icon transparency flag.
+	(void)modulo; (void)iwidth; (void)doremap;
+	if (!icondata) return;
+	unsigned char *base = (unsigned char*)(uintptr_t)icondata;
+	short iw, ih; int isz, iicons, itrans;
+	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2);
+	memcpy(&isz, base+12, 4); memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
+	int icon_w = (int)(unsigned short)iw, icon_h = (int)(unsigned short)ih;
+	int icon_sz = (isz > 0) ? (int)(unsigned int)isz : icon_w * icon_h;
+	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
+	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
+	int vw = vp->Get_Width(), vh = vp->Get_Height();
+	unsigned char *icon_src = base + (unsigned int)iicons + icon * icon_sz;
+	unsigned char tf = (itrans != 0) ? base[(unsigned int)itrans + icon] : 0;
+	for (int row = 0; row < icon_h; row++) {
+		int py = y_pixel + row;
+		if (py < 0 || py >= vh) continue;
+		for (int col = 0; col < icon_w; col++) {
+			int px = x_pixel + col;
+			if (px < 0 || px >= vw) continue;
+			unsigned char pixel = icon_src[row * icon_w + col];
+			if (remap) pixel = ((const unsigned char*)remap)[pixel];
+			if (!tf || pixel) buf[py * stride + px] = pixel;
+		}
+	}
 }
 
 
@@ -1104,7 +1177,31 @@ void __cdecl Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondat
 	LOCAL	skip:DWORD		; amount to skip per row of icon data
 	LOCAL	doremap:BYTE		; Should remapping occur?
 */
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: render icon clipped to [min_x,max_x) x [min_y,max_y) bounds.
+	(void)modulo; (void)iwidth; (void)skip; (void)doremap;
+	if (!icondata) return;
+	unsigned char *base = (unsigned char*)(uintptr_t)icondata;
+	short iw, ih; int isz, iicons, itrans;
+	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2);
+	memcpy(&isz, base+12, 4); memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
+	int icon_w = (int)(unsigned short)iw, icon_h = (int)(unsigned short)ih;
+	int icon_sz = (isz > 0) ? (int)(unsigned int)isz : icon_w * icon_h;
+	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
+	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
+	unsigned char *icon_src = base + (unsigned int)iicons + icon * icon_sz;
+	unsigned char tf = (itrans != 0) ? base[(unsigned int)itrans + icon] : 0;
+	for (int row = 0; row < icon_h; row++) {
+		int py = y_pixel + row;
+		if (py < min_y || py >= max_y) continue;
+		for (int col = 0; col < icon_w; col++) {
+			int px = x_pixel + col;
+			if (px < min_x || px >= max_x) continue;
+			unsigned char pixel = icon_src[row * icon_w + col];
+			if (remap) pixel = ((const unsigned char*)remap)[pixel];
+			if (!tf || pixel) buf[py * stride + px] = pixel;
+		}
+	}
 }
 
 
@@ -1186,8 +1283,24 @@ VOID __cdecl Buffer_Remap(void * this_object, int sx, int sy, int width, int hei
 	unsigned int y1_pixel = 0;
 	unsigned int win_width = 0;
 	unsigned int counter_x = 0;
+	(void)x1_pixel; (void)y1_pixel; (void)win_width; (void)counter_x;
 
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: apply 256-byte remap table to a rectangular region of the viewport.
+	if (!remap) return;
+	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
+	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
+	int vw = vp->Get_Width(), vh = vp->Get_Height();
+	const unsigned char *rmap = (const unsigned char*)remap;
+	for (unsigned int row = 0; row < region_height; row++) {
+		int py = (int)(y0_pixel + row);
+		if (py < 0 || py >= vh) continue;
+		for (unsigned int col = 0; col < region_width; col++) {
+			int px = (int)(x0_pixel + col);
+			if (px < 0 || px >= vw) continue;
+			buf[py * stride + px] = rmap[buf[py * stride + px]];
+		}
+	}
 }
 
 
@@ -1303,7 +1416,7 @@ PROC	Apply_XOR_Delta C near
 	}
 	return (unsigned int)(uintptr_t)t;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{ /* TIM-164: replaced */ }
 #endif
 }
 
@@ -1374,7 +1487,7 @@ void __cdecl Apply_XOR_Delta_To_Page_Or_Viewport(void *target, void *delta, int 
 		}
 	}
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{ /* TIM-164: replaced */ }
 #endif
 }
 
@@ -1551,7 +1664,7 @@ void * __cdecl Build_Fading_Table(void const *palette, void const *dest, long in
 		return (void*)dest;
 	}
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{ /* TIM-164: replaced */ }
 #endif
 }
 
@@ -1712,8 +1825,16 @@ PROC Bump_Color C NEAR
 	short short_color = (short) color;
 	short short_desired = (short) desired;
 	bool changed = false;
-	
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+
+	// TIM-164: nudge each RGB component of short_color one step toward short_desired.
+	unsigned char *palette = (unsigned char*)pal;
+	unsigned char *c = palette + (int)short_color   * 3;
+	unsigned char *d = palette + (int)short_desired * 3;
+	for (int i = 0; i < 3; i++) {
+		if      (c[i] < d[i]) { c[i]++; changed = true; }
+		else if (c[i] > d[i]) { c[i]--; changed = true; }
+	}
+	return changed ? TRUE : FALSE;
 }
 
 
@@ -1785,15 +1906,19 @@ CODESEG
 
 void __cdecl Buffer_Put_Pixel(void * this_object, int x_pixel, int y_pixel, unsigned char color)
 {
-			  
 	/*
 	ARG    	this_object:DWORD				; this is a member function
 	ARG	x_pixel:DWORD				; x position of pixel to set
 	ARG	y_pixel:DWORD				; y position of pixel to set
 	ARG    	color:BYTE				; what color should we clear to
 	*/
-	
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: write a single pixel, with bounds check.
+	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+	if (x_pixel < 0 || x_pixel >= vp->Get_Width()) return;
+	if (y_pixel < 0 || y_pixel >= vp->Get_Height()) return;
+	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
+	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
+	buf[y_pixel * stride + x_pixel] = color;
 }
 
 
@@ -1856,8 +1981,7 @@ CODESEG
 */
 
 extern "C" int __cdecl Clip_Rect ( int * x , int * y , int * w , int * h , int width , int height )
-{		
-
+{
 /*
 	PROC	Clip_Rect C near
 	uses	ebx,ecx,edx,esi,edi
@@ -1868,9 +1992,15 @@ extern "C" int __cdecl Clip_Rect ( int * x , int * y , int * w , int * h , int w
 	arg	width:dword
 	arg	height:dword
 */
-
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
-
+	// TIM-164: clip (x,y,w,h) to (0,0,width,height).
+	// Returns 0=inside, >0=clipped, <0=entirely outside.
+	int clipped = 0;
+	if (*x < 0)           { *w += *x; *x = 0; clipped = 1; }
+	if (*y < 0)           { *h += *y; *y = 0; clipped = 1; }
+	if (*x + *w > width)  { *w = width  - *x; clipped = 1; }
+	if (*y + *h > height) { *h = height - *y; clipped = 1; }
+	if (*w <= 0 || *h <= 0) return -1;
+	return clipped;
 	//ENDP	Clip_Rect
 }
 
@@ -1918,7 +2048,7 @@ extern "C" int __cdecl Confine_Rect ( int * x , int * y , int w , int h , int wi
 	if (*y < 0)          { *y = 0;          moved = 1; }
 	return moved;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{ /* TIM-164: replaced */ }
 #endif
 }
 
@@ -2316,8 +2446,26 @@ extern "C" long __cdecl Buffer_To_Page(int x_pixel, int y_pixel, int pixel_width
 	unsigned long dest_ajust_width;
 	unsigned long scr_ajust_width;
 	//unsigned long dest_area;
+	(void)x1_pixel; (void)y1_pixel; (void)scr_x; (void)scr_y;
+	(void)dest_ajust_width; (void)scr_ajust_width;
 
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: copy flat buffer src (pixel_width x pixel_height) into viewport dest at (x_pixel,y_pixel).
+	GraphicViewPortClass *dvp = (GraphicViewPortClass*)dest;
+	int dstride = dvp->Get_Width() + dvp->Get_XAdd() + (int)dvp->Get_Pitch();
+	unsigned char *dbuf = (unsigned char*)(uintptr_t)dvp->Get_Offset();
+	int dw = dvp->Get_Width(), dh = dvp->Get_Height();
+	unsigned char *sbuf = (unsigned char*)src;
+	int sx0 = 0, sy0 = 0, cx = x_pixel, cy = y_pixel;
+	int w = pixel_width, h = pixel_height;
+	if (cx < 0)      { sx0 = -cx; w  += cx; cx = 0; }
+	if (cy < 0)      { sy0 = -cy; h  += cy; cy = 0; }
+	if (cx + w > dw) { w = dw - cx; }
+	if (cy + h > dh) { h = dh - cy; }
+	if (w <= 0 || h <= 0) return 0;
+	for (int row = 0; row < h; row++)
+		memcpy(dbuf + (cy + row) * dstride + cx,
+		       sbuf + (sy0 + row) * pixel_width + sx0, (size_t)w);
+	return 0;
 }
 
 			//ENDP	Buffer_To_Page
@@ -2357,7 +2505,13 @@ extern "C" long __cdecl Buffer_To_Page(int x_pixel, int y_pixel, int pixel_width
 
 extern "C" int __cdecl Buffer_Get_Pixel(void * this_object, int x_pixel, int y_pixel)
 {
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-164: read a single pixel with bounds check.
+	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+	if (x_pixel < 0 || x_pixel >= vp->Get_Width()) return 0;
+	if (y_pixel < 0 || y_pixel >= vp->Get_Height()) return 0;
+	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
+	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
+	return buf[y_pixel * stride + x_pixel];
 }
 
 
