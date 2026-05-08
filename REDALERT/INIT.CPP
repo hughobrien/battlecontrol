@@ -279,6 +279,9 @@ bool Init_Game(int , char * [])
 	**	Register and cache any secondary mixfiles.
 	*/
 	Init_Secondary_Mixfiles();
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: Init_Secondary_Mixfiles done\n"); fflush(stderr);
+#endif
 
 	/*
 	**	This is a special hack to initialize the heaps that must be in place before the
@@ -398,7 +401,13 @@ bool Init_Game(int , char * [])
 	if (!Special.IsFromInstall && !Special.IsFromWChat) {
 		VisiblePage.Clear();
 //		Mono_Printf("Playing Intro\n");
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA] Init_Game: calling Play_Intro\n"); fflush(stderr);
+#endif
 		Play_Intro();
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA] Init_Game: Play_Intro done\n"); fflush(stderr);
+#endif
 		memset(CurrentPalette, 0x01, 768);
 		WhitePalette.Set();
 	} else {
@@ -408,7 +417,13 @@ bool Init_Game(int , char * [])
 	/*
 	**	Initialize the text remap tables.
 	*/
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: calling Init_Color_Remaps\n"); fflush(stderr);
+#endif
 	Init_Color_Remaps();
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: Init_Color_Remaps done\n"); fflush(stderr);
+#endif
 
 	/*
 	**	Get authorization to access the game.
@@ -420,6 +435,9 @@ bool Init_Game(int , char * [])
 	**	Set the logic page to the seenpage.
 	*/
 	Set_Logic_Page(SeenBuff);
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: Set_Logic_Page done, calling Load_Title_Page\n"); fflush(stderr);
+#endif
 
 	/*
 	**	If not automatically launching into the intro, then display the title
@@ -427,6 +445,9 @@ bool Init_Game(int , char * [])
 	*/
 	if (!Special.IsFromInstall) {
 		Load_Title_Page(true);
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA] Init_Game: Load_Title_Page done\n"); fflush(stderr);
+#endif
 
 		Hide_Mouse();
 		Fancy_Text_Print(TXT_STAND_BY, 160*RESFACTOR, 120*RESFACTOR, &ColorRemaps[PCOLOR_DIALOG_BLUE], TBLACK, TPF_CENTER|TPF_TEXT|TPF_DROPSHADOW);
@@ -435,12 +456,18 @@ bool Init_Game(int , char * [])
 		CCPalette.Set(FADE_PALETTE_SLOW);
 		Call_Back();
 	}
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: calling Init_Bulk_Data\n"); fflush(stderr);
+#endif
 
 	/*
 	**	Initialize the bulk data. This takes the longest time and must be performed once
 	**	before the regular game starts.
 	*/
 	Init_Bulk_Data();
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: Init_Bulk_Data done\n"); fflush(stderr);
+#endif
 
 	/*
 	**	Initialize the multiplayer score values
@@ -3248,6 +3275,13 @@ static void Init_Bootstrap_Mixfiles(void)
 	fprintf(stderr, "[RA] Bootstrap_Mix: LORES.MIX cache=%s\n", ok ? "OK" : "FAIL"); fflush(stderr);
 #endif
 	assert(ok);
+	/* TIM-195: WIN32 is defined via wwstd.h so Load_Title_Page uses TITLE.PCX (from
+	 * NCHIRES.MIX / HIRES.MIX) rather than TITLE.CPS. Register both without caching. */
+#ifndef _MSC_VER
+	new MFCD("HIRES.MIX", &FastKey);
+	new MFCD("NCHIRES.MIX", &FastKey);
+	fprintf(stderr, "[RA] Bootstrap_Mix: HIRES.MIX + NCHIRES.MIX registered (no cache)\n"); fflush(stderr);
+#endif
 #endif	//WIN32
 
 	RequiredCD = temp;
