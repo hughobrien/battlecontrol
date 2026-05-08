@@ -84,12 +84,16 @@ typedef enum {
 **	Note that disk based compressed files have an additional two
 **	leading bytes that indicate the size of the entire file.
 */
+/* TIM-173: on-disk format is always 8 bytes (Method=1, pad=1, Size=4, Skip=2).
+ * 'long' is 8 bytes on LP64 and causes 6 bytes of alignment padding before Size,
+ * making sizeof=24 instead of 8 and corrupting all reads. Use int32_t + packed. */
+#include <stdint.h>
 //lint -strong(AJX,CompHeaderType)
-typedef struct {
-	char	Method;		// Compression method (CompressionType).
-	char	pad;			// Reserved pad byte (always 0).
-	long	Size;			// Size of the uncompressed data.
-	short	Skip;			// Number of bytes to skip before data.
+typedef struct __attribute__((packed)) {
+	char		Method;		// Compression method (CompressionType).
+	char		pad;		// Reserved pad byte (always 0).
+	int32_t		Size;		// Size of the uncompressed data (was long: 8 bytes on LP64).
+	short		Skip;		// Number of bytes to skip before data.
 } CompHeaderType;
 
 

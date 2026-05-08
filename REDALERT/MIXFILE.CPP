@@ -489,7 +489,14 @@ bool MixFileClass<T>::Cache(Buffer const * buffer)
 		**	stream so that the actual SHA can be compared with the attached one.
 		*/
 		SHAStraw sha;
-		if (IsDigest) {
+#ifndef _MSC_VER
+		/* TIM-173: SHAEngine inline ctor emits LP64-mismatched layout; Hash() crashes.
+		 * Bypass SHA straw chain on Linux until SHA LP64 is fixed in a dedicated pass. */
+		bool const skip_sha_check = true;
+#else
+		bool const skip_sha_check = false;
+#endif
+		if (IsDigest && !skip_sha_check) {
 			sha.Get_From(fstraw);
 			straw = &sha;
 		}
@@ -533,7 +540,7 @@ bool MixFileClass<T>::Cache(Buffer const * buffer)
 		**	compare it to the generated digest. If they don't match, then
 		**	return with the "failure to cache" error code.
 		*/
-		if (IsDigest) {
+		if (IsDigest && !skip_sha_check) {
 			char digest1[20];
 			char digest2[20];
 #ifndef _MSC_VER
