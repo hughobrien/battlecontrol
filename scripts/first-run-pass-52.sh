@@ -119,49 +119,59 @@ if [[ ! -d "$RUN_DIR" ]]; then
 fi
 
 echo ""
-echo "=== Smoke test from $RUN_DIR (15s timeout — 5s for VK_RETURN injection) ==="
+echo "=== Smoke test from $RUN_DIR (30s timeout — 5s for LCLICK injection) ==="
 pkill Xvfb 2>/dev/null || true
+rm -f /tmp/.X99-lock
 Xvfb :99 -screen 0 1024x768x24 -ac &
 XVFB_PID=$!
 sleep 1
 
 LOG="$PASS_DIR/run.log"
-(cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 15 "$LINK_BIN") > "$LOG" 2>&1
+(cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 30 "$LINK_BIN") > "$LOG" 2>&1
 RUN_RC=$?
 kill -9 "$XVFB_PID" 2>/dev/null || true
 
 echo "Run rc=$RUN_RC (0=clean exit, 124=timeout=alive, 134=abort, 139=SIGSEGV)"
 echo ""
 
-echo "--- DIALOG_BLUE remap probe ---"
-grep "\[RA\] DIALOG_BLUE" "$LOG" || echo "(not found)"
-echo ""
-
 echo "--- Simple_Text_Print calls ([STP]) ---"
-grep "\[STP\]" "$LOG" | head -25 || echo "(none)"
+grep -a "\[STP\]" "$LOG" | head -30 || echo "(none)"
 echo ""
 
-echo "--- Menu input / synthetic keypress ([MENU]) ---"
-grep "\[MENU\]" "$LOG" || echo "(none — VK_RETURN injection may not have fired)"
+echo "--- Menu input / synthetic mouse click ([MENU]) ---"
+grep -a "\[MENU\]" "$LOG" || echo "(none — LCLICK injection may not have fired)"
 echo ""
 
-echo "--- Init_Game milestones ---"
-grep -E "\[RA\] Init_Game|\[RA\] Bootstrap|\[RA\] STARTUP|\[RA\] first SDL frame" "$LOG" | head -20
+echo "--- Difficulty dialog ([DIFF]) ---"
+grep -a "\[DIFF\]" "$LOG" || echo "(none)"
+echo ""
+
+echo "--- Init_Game / mission launch milestones ---"
+grep -aE "\[RA\] Init_Game|\[RA\] Bootstrap|\[RA\] STARTUP|\[RA\] first SDL frame|Scenario|Load_Scenario|Init_Scenario|Game_Main|Map.*init|Alloc.*Heap" "$LOG" | head -25
 echo ""
 
 echo "--- Crash/assert indicators ---"
-grep -E "assert|Assertion|SIGILL|SIGSEGV|abort" "$LOG" | head -10 || echo "(none)"
+grep -aE "assert|Assertion|SIGILL|SIGSEGV|abort|core dump" "$LOG" | head -10 || echo "(none)"
 echo ""
 
-echo "--- Last 15 lines ---"
-tail -15 "$LOG"
+echo "--- Last 20 lines ---"
+tail -20 "$LOG"
 echo ""
 echo "Full log: $LOG ($(wc -l < "$LOG") lines)"
 
-if grep -q "\[MENU\] input=" "$LOG"; then
-    echo "PASS: menu received input event after VK_RETURN injection"
-elif grep -q "\[MENU\] synthetic VK_RETURN injected" "$LOG"; then
-    echo "PARTIAL: VK_RETURN injected but no input= event seen — key may not have reached menu loop"
+# Grade the run
+if grep -qa "\[DIFF\] injecting" "$LOG"; then
+    echo "PASS-A: difficulty dialog injection fired"
+    if grep -qa "Load_Scenario\|Init_Scenario\|Scenario\|Map.*init\|mission" "$LOG"; then
+        echo "PASS-B: mission loading detected — in-game!"
+    else
+        echo "INFO: difficulty injected but mission not detected yet (run longer or more passes needed)"
+    fi
+elif grep -qa "\[MENU\] input=" "$LOG"; then
+    echo "PARTIAL: START button clicked and registered, but difficulty dialog not reached in time"
+    echo "  → increase timeout or reduce debug verbosity"
+elif grep -qa "\[MENU\] synthetic LCLICK" "$LOG"; then
+    echo "PARTIAL: LCLICK injected but no input= event seen"
 else
-    echo "INFO: VK_RETURN not injected yet (run too short?) or menu loop not reached"
+    echo "INFO: LCLICK not injected (run too short?) or menu loop not reached"
 fi
