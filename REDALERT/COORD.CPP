@@ -415,13 +415,24 @@ COORDINATE Coord_Scatter(COORDINATE coord, unsigned distance, bool lock)
 
 int __cdecl calcx(signed short param1, short distance)
 {
+#ifndef _MSC_VER
+	// TIM-160: Watcom pragma aux equivalent: imul bx; shift product right 7 bits
+	// Extracts bits [22:7] of the 32-bit product (param1 * distance) >> 7
+	return ((int)param1 * (int)distance) >> 7;
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 
 int __cdecl calcy(signed short param1, short distance)
 {
+#ifndef _MSC_VER
+	// TIM-160: same as calcx but negated (sine table uses inverted y)
+	return -(((int)param1 * (int)distance) >> 7);
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 

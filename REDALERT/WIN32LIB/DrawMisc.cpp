@@ -671,8 +671,25 @@ void __cdecl Buffer_Fill_Rect(void *thisptr, int sx, int sy, int dx, int dy, uns
 	int VPbpr;
 
 	int local_ebp;	                      // Can't use ebp
+	(void)VPwidth; (void)VPheight; (void)VPxadd; (void)VPbpr; (void)local_ebp;
 
+#ifndef _MSC_VER
+	// TIM-160: fill rectangle (x1_pixel,y1_pixel)..(x2_pixel,y2_pixel) with color
+	{
+		GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+		int stride = vp->Get_Width() + vp->Get_XAdd() + vp->Get_Pitch();
+		unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
+		int w = vp->Get_Width(), h = vp->Get_Height();
+		int r0 = y1_pixel < 0 ? 0 : y1_pixel;
+		int r1 = y2_pixel > h ? h : y2_pixel;
+		int c0 = x1_pixel < 0 ? 0 : x1_pixel;
+		int c1 = x2_pixel > w ? w : x2_pixel;
+		for (int r = r0; r < r1; r++)
+			memset(buf + r * stride + c0, color, c1 > c0 ? c1 - c0 : 0);
+	}
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 
@@ -751,8 +768,50 @@ BOOL __cdecl Linear_Blit_To_Linear(	void *this_object, void * dest, int x_pixel,
 	int	dest_adjust_width;
 	int	source_area;
 	int	dest_area;
-	
+
+#ifndef _MSC_VER
+	// TIM-160: C++ pixel-blit replacing the MASM body.
+	// stride = Width + XAdd + Pitch (Pitch = surface_stride - buffer_width)
+	GraphicViewPortClass *src_vp = (GraphicViewPortClass*)this_object;
+	GraphicViewPortClass *dst_vp = (GraphicViewPortClass*)dest;
+
+	int src_w = src_vp->Get_Width(), src_h = src_vp->Get_Height();
+	int dst_w = dst_vp->Get_Width(), dst_h = dst_vp->Get_Height();
+	int src_stride = src_w + src_vp->Get_XAdd() + src_vp->Get_Pitch();
+	int dst_stride = dst_w + dst_vp->Get_XAdd() + dst_vp->Get_Pitch();
+	unsigned char *src_buf = (unsigned char*)(uintptr_t)src_vp->Get_Offset();
+	unsigned char *dst_buf = (unsigned char*)(uintptr_t)dst_vp->Get_Offset();
+
+	// clip source rect against source bounds
+	x1_pixel = x_pixel; y1_pixel = y_pixel;
+	dest_x1  = dest_x0; dest_y1  = dest_y0;
+	if (x1_pixel < 0) { dest_x1 -= x1_pixel; x1_pixel = 0; }
+	if (y1_pixel < 0) { dest_y1 -= y1_pixel; y1_pixel = 0; }
+	int w = pixel_width  - (x1_pixel - x_pixel);
+	int h = pixel_height - (y1_pixel - y_pixel);
+	if (x1_pixel + w > src_w) w = src_w - x1_pixel;
+	if (y1_pixel + h > src_h) h = src_h - y1_pixel;
+	// clip destination rect against dest bounds
+	if (dest_x1 < 0) { x1_pixel -= dest_x1; w += dest_x1; dest_x1 = 0; }
+	if (dest_y1 < 0) { y1_pixel -= dest_y1; h += dest_y1; dest_y1 = 0; }
+	if (dest_x1 + w > dst_w) w = dst_w - dest_x1;
+	if (dest_y1 + h > dst_h) h = dst_h - dest_y1;
+	if (w <= 0 || h <= 0) return FALSE;
+
+	unsigned char *src_row = src_buf + y1_pixel * src_stride + x1_pixel;
+	unsigned char *dst_row = dst_buf + dest_y1  * dst_stride + dest_x1;
+	if (!trans) {
+		for (int row = 0; row < h; row++, src_row += src_stride, dst_row += dst_stride)
+			memcpy(dst_row, src_row, w);
+	} else {
+		for (int row = 0; row < h; row++, src_row += src_stride, dst_row += dst_stride)
+			for (int col = 0; col < w; col++)
+				if (src_row[col]) dst_row[col] = src_row[col];
+	}
+	return TRUE;
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 
@@ -854,9 +913,36 @@ BOOL __cdecl Linear_Scale_To_Linear(void *this_object, void *dest, int src_x, in
 	int counter_y;
 	int remap_counter;
 	int entry;
-	
-	
+	(void)dst_x0; (void)dst_y0; (void)dst_x1; (void)dst_y1;
+	(void)src_win_width; (void)dst_win_width; (void)dy_intr; (void)dy_frac;
+	(void)dy_acc; (void)dx_frac; (void)counter_x; (void)counter_y;
+	(void)remap_counter; (void)entry;
+
+#ifndef _MSC_VER
+	// TIM-160: nearest-neighbor scale blit replacing the MASM body.
+	if (dst_width <= 0 || dst_height <= 0 || src_width <= 0 || src_height <= 0) return FALSE;
+	{
+		GraphicViewPortClass *svp = (GraphicViewPortClass*)this_object;
+		GraphicViewPortClass *dvp = (GraphicViewPortClass*)dest;
+		int ss = svp->Get_Width() + svp->Get_XAdd() + svp->Get_Pitch();
+		int ds = dvp->Get_Width() + dvp->Get_XAdd() + dvp->Get_Pitch();
+		unsigned char *sb = (unsigned char*)(uintptr_t)svp->Get_Offset();
+		unsigned char *db = (unsigned char*)(uintptr_t)dvp->Get_Offset();
+		for (int iy = 0; iy < dst_height; iy++) {
+			int sy_idx = (iy * src_height) / dst_height;
+			unsigned char *srow = sb + (src_y + sy_idx) * ss + src_x;
+			unsigned char *drow = db + (dst_y + iy)     * ds + dst_x;
+			for (int ix = 0; ix < dst_width; ix++) {
+				unsigned char pixel = srow[(ix * src_width) / dst_width];
+				if (remap) pixel = (unsigned char)((unsigned char*)remap)[(unsigned char)pixel];
+				if (!trans || pixel) drow[ix] = pixel;
+			}
+		}
+	}
+	return TRUE;
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 
@@ -1203,8 +1289,22 @@ PROC	Apply_XOR_Delta C near
 	ARG	target:DWORD 		; pointers.
 	ARG	delta:DWORD		; pointers.
 */
-	
+#ifndef _MSC_VER
+	// TIM-160: Westwood XOR-delta decoder (16-bit commands, 8-bit data bytes).
+	// +cmd: skip cmd target bytes unchanged; -cmd: XOR next |cmd| delta bytes into target.
+	unsigned char *t = (unsigned char*)target;
+	const unsigned char *d = (const unsigned char*)delta;
+	while (true) {
+		short cmd = (short)((unsigned short)d[0] | ((unsigned short)d[1] << 8));
+		d += 2;
+		if (cmd == 0) break;
+		if (cmd > 0) { t += cmd; }
+		else { int n = -cmd; while (n--) *t++ ^= *d++; }
+	}
+	return (unsigned int)(uintptr_t)t;
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 
@@ -1245,8 +1345,37 @@ void __cdecl Apply_XOR_Delta_To_Page_Or_Viewport(void *target, void *delta, int 
 	ARG	nextrow:DWORD		; Page/Buffer width - anim width.
 	ARG	copy:DWORD		; should it be copied or xor'd?
 	*/
-	
+#ifndef _MSC_VER
+	// TIM-160: row-aware XOR/copy delta decoder for viewport-bounded animations.
+	// 'nextrow' = buffer_stride - width (extra bytes to advance at each row wrap).
+	unsigned char *t = (unsigned char*)target;
+	const unsigned char *d = (const unsigned char*)delta;
+	int col = 0;
+	while (true) {
+		short cmd = (short)((unsigned short)d[0] | ((unsigned short)d[1] << 8));
+		d += 2;
+		if (cmd == 0) break;
+		if (cmd > 0) {
+			// skip cmd pixels, advancing past row boundaries
+			int remain = cmd;
+			while (remain > 0) {
+				int space = width - col;
+				int adv = remain < space ? remain : space;
+				t += adv; col += adv; remain -= adv;
+				if (col >= width) { col = 0; t += nextrow; }
+			}
+		} else {
+			int n = -cmd;
+			while (n--) {
+				if (copy == DO_XOR) *t++ ^= *d++;
+				else                *t++ = *d++;
+				if (++col >= width) { col = 0; t += nextrow; }
+			}
+		}
+	}
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 
@@ -1275,11 +1404,8 @@ void __cdecl Apply_XOR_Delta_To_Page_Or_Viewport(void *target, void *delta, int 
 */
 void __cdecl XOR_Delta_Buffer(int nextrow)
 {
-	/*		  
-	ARG	nextrow:DWORD
-	*/
-	
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-160: not called — logic inlined into Apply_XOR_Delta_To_Page_Or_Viewport
+	(void)nextrow;
 }
 
 
@@ -1307,11 +1433,8 @@ void __cdecl XOR_Delta_Buffer(int nextrow)
 */
 void __cdecl Copy_Delta_Buffer(int nextrow)
 {
-	/*		  
-	ARG	nextrow:DWORD
-	*/
-	
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	// TIM-160: not called — logic inlined into Apply_XOR_Delta_To_Page_Or_Viewport
+	(void)nextrow;
 }
 /*
 ;----------------------------------------------------------------------------
@@ -1405,8 +1528,31 @@ void * __cdecl Build_Fading_Table(void const *palette, void const *dest, long in
 	unsigned char idealgreen = 0;		//BYTE	
 	unsigned char idealblue = 0;		//BYTE	
 	unsigned char matchcolor = 0;		//:BYTE		; Tentative match color.
-	
+
+#ifndef _MSC_VER
+	// TIM-160: blend each palette entry toward 'color' by frac/256,
+	// find nearest match across the full 256-entry palette.
+	{
+		const unsigned char *pal = (const unsigned char*)palette;
+		unsigned char *out = const_cast<unsigned char*>((const unsigned char*)dest);
+		int tred = pal[color*3], tgrn = pal[color*3+1], tblu = pal[color*3+2];
+		for (int i = 0; i < 256; i++) {
+			int ired = pal[i*3]   + ((tred - pal[i*3])   * (int)frac >> 8);
+			int igrn = pal[i*3+1] + ((tgrn - pal[i*3+1]) * (int)frac >> 8);
+			int iblu = pal[i*3+2] + ((tblu - pal[i*3+2]) * (int)frac >> 8);
+			int best = 0x7FFFFFFF; matchcolor = (unsigned char)i;
+			for (int j = 0; j < 256; j++) {
+				int dr = pal[j*3]-ired, dg = pal[j*3+1]-igrn, db = pal[j*3+2]-iblu;
+				int d = dr*dr + dg*dg + db*db;
+				if (d < best) { best = d; matchcolor = (unsigned char)j; if (!d) break; }
+			}
+			out[i] = matchcolor;
+		}
+		return (void*)dest;
+	}
+#else
 	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+#endif
 }
 
 
