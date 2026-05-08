@@ -315,7 +315,8 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 		        filename, _i, (unsigned)HeaderBuffer[_i].CRC,
 		        HeaderBuffer[_i].Offset, HeaderBuffer[_i].Size); fflush(stderr);
 	/* TIM-195: dump full index for key secondary MIX files to identify TITLE.PCX location */
-	if (strcmp(filename,"GENERAL.MIX")==0 || strcmp(filename,"LORES.MIX")==0 || strcmp(filename,"CONQUER.MIX")==0) {
+	if (strcmp(filename,"GENERAL.MIX")==0 || strcmp(filename,"LORES.MIX")==0 || strcmp(filename,"CONQUER.MIX")==0
+	    || strcmp(filename,"HIRES.MIX")==0 || strcmp(filename,"NCHIRES.MIX")==0) {
 		for (int _i = 0; _i < Count; _i++)
 			fprintf(stderr, "[MIX] FULL[%s] idx[%d] crc=%08x off=%d sz=%d\n",
 			        filename, _i, (unsigned)HeaderBuffer[_i].CRC,
