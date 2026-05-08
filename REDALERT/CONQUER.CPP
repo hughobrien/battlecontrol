@@ -3398,14 +3398,12 @@ void const * Get_Radar_Icon(void const * shapefile, int shapenum, int frames, in
 		** just need to skip past this set of icons and try to build the
 		** next frame.
 		*/
-#if defined(WIN32) && defined(_MSC_VER)
+#ifdef WIN32
 		void * ptr;
 		if ((ptr = (void *)(Build_Frame(shapefile, shapenum + framelp, SysMemPage.Get_Buffer()))) != NULL) {
 			ptr = Get_Shape_Header_Data(ptr);
 #else
-		/* TIM-206: Linux port — render into HidPage, read pixels directly. */
-		char * ptr = (char *)HidPage.Get_Buffer();
-		if (Build_Frame(shapefile, shapenum + framelp, ptr) <= (unsigned long)HidPage.Get_Size()) {
+		if (Build_Frame(shapefile, shapenum + framelp, HidPage.Get_Buffer()) <= (unsigned long)HidPage.Get_Size() ) {
 #endif
 
 			/*
