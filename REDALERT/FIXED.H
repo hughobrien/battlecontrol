@@ -220,7 +220,9 @@ class fixed
 	private:
 		union {
 			struct {
-#ifdef BIG_ENDIAN
+/* TIM-173: Linux <sys/types.h> defines BIG_ENDIAN=4321 on all platforms; use
+ * compiler-intrinsic byte-order macros to avoid the false big-endian path. */
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 				unsigned short Whole;
 				unsigned short Fraction;
 #else
