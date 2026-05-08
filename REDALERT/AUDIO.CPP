@@ -348,9 +348,14 @@ BOOL Audio_Init(HWND window, int bits_per_sample, BOOL stereo, int rate, int rev
 
 void Sound_End(void)
 {
-    // pass-44E: chunker teardown happens before SDL_Audio_Close so the file
-    // handle and decoded buffer are released even if the audio device close
-    // path racefully zeros g_voices[].
+    // pass-44F: matches the File_Stream_Sample_Vol song-change ordering.
+    // Stop_Sample(VOICE_MUSIC) deactivates the slot under the SDL lock so the
+    // mix loop will skip it; Music_Teardown then frees the buffer safely;
+    // SDL_Audio_Close pauses + closes the device last. Without the leading
+    // Stop_Sample, an in-flight callback could read the freed g_music_blob
+    // through g_voices[VOICE_MUSIC].pcm before SDL_PauseAudioDevice took
+    // effect (UAF window pre-44F).
+    Stop_Sample(VOICE_MUSIC);
     Music_Teardown();
     SDL_Audio_Close();
 }
@@ -971,9 +976,29 @@ void __cdecl far maintenance_callback(void)
     Sound_Callback();
 }
 
-// Remaining 6 entry points stay no-op stubs identical to the MSVC branch.
-// Stop_Sample_Playing pairs with the speech path (44F).
-void Stop_Sample_Playing(void const * sample) {};
+// pass-44F: scan all 8 voices and deactivate every slot whose published
+// sample pointer matches. The original DSAUDIO API stopped *every* voice
+// playing the matching sample (not just the first), so we don't break out
+// on first match -- a sound effect re-triggered into a different slot
+// while the prior copy was still playing should stop both. Mirrors the
+// scan shape of Is_Sample_Playing; mirrors the fade-counter zeroing of
+// Stop_Sample for symmetric lifecycle invariants.
+void Stop_Sample_Playing(void const * sample)
+{
+    if (sample == NULL || !g_audio_open) {
+        return;
+    }
+    SDL_LockAudioDevice(g_audio_device);
+    for (int i = 0; i < VOICE_COUNT; ++i) {
+        if (g_voices[i].active && g_voices[i].sample == sample) {
+            g_voices[i].active                   = false;
+            g_voices[i].fade_remaining_callbacks = 0;
+        }
+    }
+    SDL_UnlockAudioDevice(g_audio_device);
+}
+
+// Remaining 5 entry points stay no-op stubs identical to the MSVC branch.
 int Get_Digi_Handle(void) { return 1; }
 void Restore_Sound_Buffers(void) {};
 BOOL Set_Primary_Buffer_Format(void) { return 0; };
