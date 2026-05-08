@@ -991,13 +991,6 @@ void SidebarClass::Recalc(void)
  *=============================================================================================*/
 bool SidebarClass::Activate(int control)
 {
-	//
-	// We don't want the original sidebar to be visible. ST - 1/31/2019 11:28AM
-	//
-	if (control < 100) {
-		return IsSidebarActive;
-	}
-
 	bool old = IsSidebarActive;
 
 	if (Session.Play)

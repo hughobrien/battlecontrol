@@ -15,7 +15,22 @@
 // MMX/CPU symbols). Mirror the same linkage so the link sees
 // unmangled names. __cdecl is empty on Linux.
 
-class GraphicViewPortClass; // forward decl: same incomplete type as the header.
+#include <cstring>
+#include "GBUFFER.H"
+
+// Shape-buffer globals defined extern "C" in 2KEYFRAM.CPP.
+extern "C" char *BigShapeBufferStart;
+extern "C" char *TheaterShapeBufferStart;
+extern "C" BOOL  UseBigShapeBuffer;
+
+namespace {
+// Matches the tShapeHeaderType typedef in 2KEYFRAM.CPP.
+struct ShapeHdr {
+    unsigned draw_flags;
+    char    *shape_data;   // offset into BigShapeBuffer / TheaterShapeBuffer
+    int      shape_buffer; // 1 = theater buffer, 0 = big shape buffer
+};
+} // namespace
 
 extern "C" {
 
@@ -45,12 +60,56 @@ long Buffer_Print(void * /*thisptr*/, const char * /*str*/, int /*x*/, int /*y*/
     return 0;
 }
 
-// FUNCTION.H — variadic shape-blit; engine ignores return on the NOP path.
-long Buffer_Frame_To_Page(int /*x*/, int /*y*/, int /*w*/, int /*h*/,
-                          void * /*Buffer*/, GraphicViewPortClass & /*view*/,
-                          int /*flags*/, ...)
+// FUNCTION.H — shape blit from BigShapeBuffer into a GraphicViewPort.
+// Replaces the original x86 KEYFBUFF.ASM routine with portable C++.
+// Supports: SHAPE_TRANS (0x0040) skip colour-0 pixels, SHAPE_CENTER (0x0020).
+// Other flags (fading, predator, ghost, remap) are left for a future pass.
+long Buffer_Frame_To_Page(int x, int y, int w, int h,
+                          void *src, GraphicViewPortClass &dest,
+                          int flags, ...)
 {
-    return 0;
+    if (!src || w <= 0 || h <= 0) return 0;
+
+    const unsigned char *pixels;
+    if (UseBigShapeBuffer) {
+        ShapeHdr *hdr = (ShapeHdr*)src;
+        const char *base = hdr->shape_buffer ? TheaterShapeBufferStart : BigShapeBufferStart;
+        if (!base) return 0;
+        // shape_data holds the byte offset; adding (long)base converts to absolute ptr.
+        pixels = (const unsigned char*)(hdr->shape_data + (long)base);
+    } else {
+        pixels = (const unsigned char*)src;
+    }
+    if (!pixels) return 0;
+
+    if (flags & 0x0020) { x -= w / 2; y -= h / 2; } // SHAPE_CENTER
+
+    int vw     = dest.Get_Width();
+    int vh     = dest.Get_Height();
+    int stride = vw + dest.Get_XAdd(); // row stride of the underlying buffer
+
+    // Clip source rect against viewport bounds.
+    int sx0 = 0, sy0 = 0, dw = w, dh = h;
+    if (x < 0)        { sx0 = -x;      dw += x;      x = 0; }
+    if (y < 0)        { sy0 = -y;      dh += y;      y = 0; }
+    if (x + dw > vw)  { dw = vw - x; }
+    if (y + dh > vh)  { dh = vh - y; }
+    if (dw <= 0 || dh <= 0) return 0;
+
+    unsigned char *dst_base = (unsigned char*)dest.Get_Offset();
+    const bool trans = (flags & 0x0040) != 0; // SHAPE_TRANS: skip colour-0
+
+    for (int row = 0; row < dh; row++) {
+        const unsigned char *srow = pixels + (sy0 + row) * w + sx0;
+        unsigned char       *drow = dst_base + (y + row) * stride + x;
+        if (trans) {
+            for (int col = 0; col < dw; col++)
+                if (srow[col]) drow[col] = srow[col];
+        } else {
+            memcpy(drow, srow, dw);
+        }
+    }
+    return 1;
 }
 
 // LCW.H — LCW (RLE-style) compressor used by save-game writers and
