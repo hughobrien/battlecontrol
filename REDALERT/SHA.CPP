@@ -122,6 +122,10 @@ void SHAEngine::Process_Partial(void const * & data, long & length)
  *=============================================================================================*/
 void SHAEngine::Hash(void const * data, long length)
 {
+#ifndef _MSC_VER
+	fprintf(stderr, "[SHA] Hash entry: this=%p data=%p length=%ld IsCached=%d PartialCount=%d\n",
+		(void*)this, data, (long)length, (int)IsCached, PartialCount); fflush(stderr);
+#endif
 	IsCached = false;
 
 	/*
@@ -129,7 +133,13 @@ void SHAEngine::Hash(void const * data, long length)
 	**	result in all of the source data submitted to this routine to be
 	**	consumed at this point.
 	*/
+#ifndef _MSC_VER
+	fprintf(stderr, "[SHA] Hash: calling Process_Partial\n"); fflush(stderr);
+#endif
 	Process_Partial(data, length);
+#ifndef _MSC_VER
+	fprintf(stderr, "[SHA] Hash: Process_Partial done, length=%ld\n", (long)length); fflush(stderr);
+#endif
 
 	/*
 	**	If there is no more source data to process, then bail. Speed reasons.
@@ -143,12 +153,20 @@ void SHAEngine::Hash(void const * data, long length)
 	/* TIM-173: was long const* — advances by 8 bytes/element on LP64, but SHA-1
 	 * processes 32-bit words; use unsigned int const* for correct 4-byte stride. */
 	unsigned int const * source = (unsigned int const *)data;
+#ifndef _MSC_VER
+	if (blocks > 0)
+		fprintf(stderr, "[SHA] Hash: length=%ld blocks=%ld source=%p\n", (long)length, (long)blocks, (void*)source); fflush(stderr);
+#endif
 	for (int bcount = 0; bcount < blocks; bcount++) {
 		Process_Block(source, Acc);
 		Length += (long)SRC_BLOCK_SIZE;
 		source += SRC_BLOCK_SIZE/sizeof(unsigned int);
 		length -= (long)SRC_BLOCK_SIZE;
 	}
+#ifndef _MSC_VER
+	if (blocks > 0)
+		fprintf(stderr, "[SHA] Hash: loop done, remainder=%ld\n", (long)length); fflush(stderr);
+#endif
 
 	/*
 	**	Process any remainder bytes. This data is stored in the source
@@ -228,7 +246,7 @@ int SHAEngine::Result(void * result) const
 	/* TIM-173: sizeof(long)=8 on LP64 → only 5 iterations instead of 5. Fix: use
 	 * sizeof(FinalResult.Long[0]) = sizeof(unsigned int) = 4, always 5 iterations. */
 	for (int index = 0; index < (int)(sizeof(FinalResult)/sizeof(FinalResult.Long[0])); index++) {
-		FinalResult.Long[index] = Reverse_LONG(FinalResult.Long[index]);
+		(unsigned int &)FinalResult.Long[index] = Reverse_LONG(FinalResult.Long[index]);
 	}
 	(bool&)IsCached = true;
 	memcpy(result, &FinalResult, sizeof(FinalResult));
