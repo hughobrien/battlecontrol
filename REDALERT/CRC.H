@@ -37,6 +37,11 @@
 #define CRC_H
 
 #include	<stdlib.h>
+/* TIM-173: CRCEngine must use exactly 32-bit words on all platforms.  On LP64
+ * Linux, 'long' is 64 bits, which changes chunk size (8 vs 4 bytes) and
+ * rotation width, producing CRC values that do not match the Win32-built MIX
+ * index entries.  Use int32_t throughout. */
+#include	<stdint.h>
 
 /*
 **	The "bool" integral type was defined by the C++ comittee in
@@ -64,18 +69,18 @@ class CRCEngine {
 	public:
 
 		// Constructor for CRC engine (it can have an override initial CRC value).
-		CRCEngine(long initial=0) : CRC(initial), Index(0) {
+		CRCEngine(int32_t initial=0) : CRC(initial), Index(0) {
 			StagingBuffer.Composite = 0;
 		};
 
 		// Fetches CRC value.
-		long operator() (void) const {return(Value());};
+		int32_t operator() (void) const {return(Value());};
 
 		// Submits one byte sized datum to the CRC accumulator.
 		void operator() (char datum);
 
 		// Submits an arbitrary buffer to the CRC accumulator.
-		long operator() (void const * buffer, int length);
+		int32_t operator() (void const * buffer, int length);
 
 		// Implicit conversion operator so this object appears like a 'long integer'.
 		operator long(void) const {return(Value());};
@@ -86,9 +91,12 @@ class CRCEngine {
 			return(Index != 0);
 		};
 
-		long Value(void) const {
+		int32_t Value(void) const {
 			if (Buffer_Needs_Data()) {
-				return(_lrotl(CRC, 1) + StagingBuffer.Composite);
+				/* Explicit 32-bit rotate: _lrotl uses unsigned long (64-bit on
+				 * LP64 Linux), giving wrong rotation width.  TIM-173. */
+				uint32_t c = (uint32_t)CRC;
+				return (int32_t)(((c << 1) | (c >> 31)) + (uint32_t)StagingBuffer.Composite);
 			}
 			return(CRC);
 		};
@@ -97,7 +105,7 @@ class CRCEngine {
 		**	Current accumulator of the CRC value. This value doesn't take into
 		**	consideration any pending data in the staging buffer.
 		*/
-		long CRC;
+		int32_t CRC;
 
 		/*
 		**	This is the sub index into the staging buffer used to keep track of
@@ -111,8 +119,8 @@ class CRCEngine {
 		**	in preparation for additional data.
 		*/
 		union {
-			long Composite;
-			char Buffer[sizeof(long)];
+			int32_t Composite;
+			char Buffer[sizeof(int32_t)];
 		} StagingBuffer;
 };
 

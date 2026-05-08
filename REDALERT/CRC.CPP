@@ -59,7 +59,7 @@ void CRCEngine::operator() (char datum)
 {
 	StagingBuffer.Buffer[Index++] = datum;
 
-	if (Index == sizeof(long))  {
+	if (Index == sizeof(int32_t))  {
 		CRC = Value();
 		StagingBuffer.Composite = 0;
 		Index = 0;
@@ -85,7 +85,7 @@ void CRCEngine::operator() (char datum)
  * HISTORY:                                                                                    *
  *   03/02/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
-long CRCEngine::operator() (void const * buffer, int length)
+int32_t CRCEngine::operator() (void const * buffer, int length)
 {
 	if (buffer != NULL && length > 0)  {
 		char const * dataptr = (char const *)buffer;
@@ -104,14 +104,17 @@ long CRCEngine::operator() (void const * buffer, int length)
 		}
 
 		/*
-		**	Perform the fast 'bulk' processing by reading long word sized
-		**	data blocks.
+		**	Perform the fast 'bulk' processing by reading 32-bit word sized
+		**	data blocks. Use int32_t (not long) so chunk size is 4 bytes on
+		**	all platforms (LP64 Linux 'long' is 8 bytes). TIM-173.
 		*/
-		long const * longptr = (long const *)dataptr;
-		int longcount = bytes_left / sizeof(long);		// Whole 'long' elements remaining.
+		int32_t const * longptr = (int32_t const *)dataptr;
+		int longcount = bytes_left / sizeof(int32_t);
 		while (longcount--) {
-			CRC = _lrotl(CRC, 1) + *longptr++;
-			bytes_left -= sizeof(long);
+			/* Explicit 32-bit rotate — _lrotl uses unsigned long (64-bit on LP64). TIM-173. */
+			uint32_t c = (uint32_t)CRC;
+			CRC = (int32_t)(((c << 1) | (c >> 31)) + (uint32_t)*longptr++);
+			bytes_left -= sizeof(int32_t);
 		}
 
 		/*

@@ -59,6 +59,11 @@ typedef int bool;
 #include	<new.h>
 #include	<new>			// TIM-24: standard placement-new operator (the
 							// linux/win32-stubs/new.h shim is empty).
+/* TIM-173: SHA-1 operates on 32-bit words. On LP64 Linux 'long' is 64 bits,
+ * which corrupts SRC_BLOCK_SIZE (128 vs 64), SHADigest::Long (40 vs 20 bytes),
+ * and all per-word operations (rotations, arithmetic, byte-swaps). Use
+ * uint32_t throughout so SHA produces correct 20-byte digests on all platforms. */
+#include	<stdint.h>
 
 
 /*
@@ -91,7 +96,7 @@ class SHAEngine
 	private:
 
 		typedef union {
-			unsigned long Long[5];
+			unsigned int Long[5];  // TIM-197: was unsigned long (8 bytes on LP64)
 			unsigned char Char[20];
 		} SHADigest;
 
@@ -118,13 +123,15 @@ class SHAEngine
 			K4=0xca62c1d6L,		// t=60..79		10^(1/2)/4
 
 			// Source data is grouped into blocks of this size.
-			SRC_BLOCK_SIZE=16*sizeof(long),
+			// TIM-197: fixed constant (was 16*sizeof(long)=128 on LP64; SHA-1 requires 64 bytes)
+			SRC_BLOCK_SIZE=64,
 
 			// Internal processing data is grouped into blocks this size.
-			PROC_BLOCK_SIZE=80*sizeof(long)
+			// TIM-197: fixed constant (was 80*sizeof(long)=640 on LP64; SHA-1 uses 80 x 32-bit words)
+			PROC_BLOCK_SIZE=80*4
 		};
 
-		long Get_Constant(int index) const {
+		unsigned int Get_Constant(int index) const {
 			if (index < 20) return K1;
 			if (index < 40) return K2;
 			if (index < 60) return K3;
@@ -132,26 +139,26 @@ class SHAEngine
 		};
 
 		// Used for 0..19
-		long Function1(long X, long Y, long Z) const {
+		unsigned int Function1(unsigned int X, unsigned int Y, unsigned int Z) const {
 			return(Z ^ ( X & ( Y ^ Z ) ) );
 		};
 
 		// Used for 20..39
-		long Function2(long X, long Y, long Z) const {
+		unsigned int Function2(unsigned int X, unsigned int Y, unsigned int Z) const {
 			return( X ^ Y ^ Z );
 		};
 
 		// Used for 40..59
-		long Function3(long X, long Y, long Z) const {
+		unsigned int Function3(unsigned int X, unsigned int Y, unsigned int Z) const {
 			return( (X & Y) | (Z & (X | Y) ) );
 		};
 
 		// Used for 60..79
-		long Function4(long X, long Y, long Z) const {
+		unsigned int Function4(unsigned int X, unsigned int Y, unsigned int Z) const {
 			return( X ^ Y ^ Z );
 		};
 
-		long Do_Function(int index, long X, long Y, long Z) const {
+		unsigned int Do_Function(int index, unsigned int X, unsigned int Y, unsigned int Z) const {
 			if (index < 20) return Function1(X, Y, Z);
 			if (index < 40) return Function2(X, Y, Z);
 			if (index < 60) return Function3(X, Y, Z);

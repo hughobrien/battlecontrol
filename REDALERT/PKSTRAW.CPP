@@ -204,8 +204,9 @@ int PKStraw::Get(void * source, int length)
 			*/
 			CipherKey->Decrypt(cbuffer, got, Buffer);
 #ifndef _MSC_VER
-			{ fprintf(stderr, "[PKS] RSA-decrypted session key (%d bytes):", got);
-			  for (int _i=0; _i < got && _i < 16; _i++) fprintf(stderr," %02x",(unsigned char)Buffer[_i]);
+			{ fprintf(stderr, "[PKS] RSA-decrypted session key (%d bytes, blowfish key = first %d):",
+			          got, BLOWFISH_KEY_SIZE);
+			  for (int _i=0; _i < BLOWFISH_KEY_SIZE; _i++) fprintf(stderr," %02x",(unsigned char)Buffer[_i]);
 			  fprintf(stderr,"\n"); fflush(stderr); }
 #endif
 			BF.Key(Buffer, BLOWFISH_KEY_SIZE);
