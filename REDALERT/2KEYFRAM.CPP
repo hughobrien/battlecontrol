@@ -231,7 +231,9 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 	char *ptr, *lockptr;//, *uncomp_ptr;
 	unsigned long offcurr, off16, offdiff;
 #endif
-	unsigned long offset[SUBFRAMEOFFS];
+	/* TIM-206: on-disk format is 32-bit offsets; unsigned long is 64-bit on LP64,
+	 * causing Mem_Copy to fill each slot with 8 bytes and misalign offset[1..6]. */
+	uint32_t offset[SUBFRAMEOFFS];
 	KeyFrameHeaderType *keyfr;
 	unsigned short buffsize, currframe, subframe;
 	unsigned long length = 0;
@@ -339,7 +341,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			currframe = (unsigned short)offset[1];
 
 			ptr = (char *)Add_Long_To_Pointer( dataptr, (((unsigned long)currframe << 3) + sizeof(KeyFrameHeaderType)) );
-			Mem_Copy( ptr, &offset[0], (long)(SUBFRAMEOFFS * sizeof(unsigned long)) );
+			Mem_Copy( ptr, &offset[0], (long)(SUBFRAMEOFFS * sizeof(offset[0])) );
 		}
 
 		// key frame
@@ -409,7 +411,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 					Mem_Copy( Add_Long_To_Pointer( dataptr,
 									(((unsigned long)currframe << 3) +
 									sizeof(KeyFrameHeaderType)) ),
-						&offset[0], (long)(SUBFRAMEOFFS * sizeof(unsigned long)) );
+						&offset[0], (long)(SUBFRAMEOFFS * sizeof(offset[0])) );
 					subframe = 0;
 				}
 			}
