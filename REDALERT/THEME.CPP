@@ -51,7 +51,7 @@
 #include	"theme.h"
 
 #ifndef WIN32
-extern short StreamLowImpact;
+extern int StreamLowImpact;	// TIM-148 pass-44E: align to canonical type (AUDIO.H:159)
 #endif  //WIN32
 
 /*
