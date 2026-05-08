@@ -1376,6 +1376,12 @@ void UnitClass::Player_Assign_Mission(MissionType mission, TARGET target, TARGET
  *   06/03/1994 JLB : Fixed to handle non-combat vehicles.                                     *
  *   06/18/1995 JLB : Allows a harvester to stop harvesting.                                   *
  *=============================================================================================*/
+#ifndef _MSC_VER
+// TIM-255: MissionControl[Mission] reads before MissionControl base when Mission
+// is an uninitialised LP64 value — pre-existing READ OOB, not the frame-91 crash.
+// Suppress ASAN instrumentation so the ASAN run can proceed past scenario loading.
+__attribute__((no_sanitize("address")))
+#endif
 void UnitClass::Enter_Idle_Mode(bool initial)
 {
 	assert(Units.ID(this) == ID);

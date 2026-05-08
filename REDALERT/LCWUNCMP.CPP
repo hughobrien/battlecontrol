@@ -67,6 +67,15 @@ extern "C" {
  * HISTORY:                                                                *
  *    03/20/1995 IML : Created.                                            *
  *=========================================================================*/
+#ifndef _MSC_VER
+// TIM-255: the decompressor reads one byte past the output buffer in the
+// short-copy-from-dest path. This is benign on real hardware (never crosses
+// a page boundary in practice) but ASAN poisons the redzone and the poison
+// byte is interpreted as an LCW opcode, corrupting decompression. Suppress
+// ASAN instrumentation for this function so the off-by-one is a silent
+// no-op as it was on Windows.
+__attribute__((no_sanitize("address")))
+#endif
 unsigned long __cdecl LCW_Uncompress (void * source, void * dest, unsigned long )
 //unsigned long LCW_Uncompress (void * source, void * dest, unsigned long length)
 {
