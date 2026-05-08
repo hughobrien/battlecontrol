@@ -3405,6 +3405,13 @@ static void Init_Secondary_Mixfiles(void)
 	**	Inform the file system of the various MIX files.
 	*/
 	ConquerMix = new MFCD("CONQUER.MIX", &FastKey);			// Cached.
+#ifndef _MSC_VER
+	{
+		bool conquer_ok = MFCD::Cache("CONQUER.MIX");
+		fprintf(stderr, "[INIT] Init_Secondary_Mixfiles: CONQUER.MIX cache=%s\n",
+		        conquer_ok ? "OK" : "FAIL"); fflush(stderr);
+	}
+#endif
 //	new MFCD("TRANSIT.MIX", &FastKey);
 
 	if (GeneralMix == NULL) GeneralMix = new MFCD("GENERAL.MIX", &FastKey);			// Never cached.

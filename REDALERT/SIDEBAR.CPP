@@ -253,6 +253,9 @@ void SidebarClass::One_Time(void)
 	if (SidebarShape == NULL) {
 		SidebarShape = (void*)MFCD::Retrieve("SIDEBAR.SHP");
 	}
+#ifndef _MSC_VER
+	fprintf(stderr, "[SIDEBAR] One_Time: SIDEBAR.SHP=%p\n", SidebarShape); fflush(stderr);
+#endif
 }
 
 
@@ -429,6 +432,11 @@ void SidebarClass::Reload_Sidebar(void)
 	SidebarMiddleShape = (void*)MFCD::Retrieve(sb_name);
 	sb_name[4] = '3';
 	SidebarBottomShape = (void*)MFCD::Retrieve(sb_name);
+#ifndef _MSC_VER
+	fprintf(stderr, "[SIDEBAR] Init_IO: base='%s' top=%p mid=%p bot=%p\n",
+	        sidebarnames[houseloaded], SidebarShape, SidebarMiddleShape, SidebarBottomShape);
+	fflush(stderr);
+#endif
 
 #endif
 
