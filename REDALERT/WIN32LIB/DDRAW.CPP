@@ -145,6 +145,13 @@ extern "C" bool SDL_Quit_Requested(void)
     return SDL_QuitRequested;
 }
 
+/* TIM-237: clear the sticky quit flag on game restart so Select_Game
+   restarts (e.g. after SIGTERM from timeout) don't immediately exit. */
+extern "C" void SDL_Clear_Quit(void)
+{
+    SDL_QuitRequested = false;
+}
+
 // TIM-145 pass-43D: SDL window-bring-up accessors that back the
 // ShowWindow / SetForegroundWindow stubs in linux/win32-stubs/
 // windows.h. INIT.CPP:1104-1105 (WChat-spawned launch path) and

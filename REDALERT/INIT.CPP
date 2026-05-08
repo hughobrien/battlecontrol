@@ -105,6 +105,7 @@ static inline char *strrev(char *s) {
 #include <time.h>
 #ifndef _MSC_VER
 #include <unistd.h>
+#include "sdl_quit.h"   /* TIM-237: SDL_Clear_Quit() on game restart */
 #endif
 
 #ifdef DONGLE
@@ -615,6 +616,9 @@ bool Select_Game(bool fade)
 	**	[Re]set any globals that need it, in preparation for a new scenario
 	*/
 	GameActive = true;
+#ifndef _MSC_VER
+	SDL_Clear_Quit();   /* TIM-237: reset sticky quit flag on each game restart */
+#endif
 	DoList.Init();
 	#ifdef MIRROR_QUEUE
 	MirrorList.Init();

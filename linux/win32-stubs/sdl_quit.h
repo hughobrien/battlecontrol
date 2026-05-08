@@ -17,6 +17,7 @@ extern "C" {
 #endif
 
 bool SDL_Quit_Requested(void);
+void SDL_Clear_Quit(void);
 
 #ifdef __cplusplus
 }
