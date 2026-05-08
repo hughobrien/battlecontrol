@@ -666,10 +666,6 @@ assert(filename != NULL);//BG
 	/*
 	**	Sweep through all registered mixfiles, trying to find the file in question.
 	*/
-#ifndef _MSC_VER
-	{ int _lc=0; MixFileClass<T>*_lp=List.First(); while(_lp->Is_Valid()){_lc++;_lp=_lp->Next();}
-	  fprintf(stderr,"[MIX] Offset('%s'): crc=%08x list_count=%d\n", filename_upper, (unsigned)crc, _lc); fflush(stderr); }
-#endif
 	ptr = List.First();
 	while (ptr->Is_Valid()) {
 		SubBlock * block;
@@ -678,10 +674,6 @@ assert(filename != NULL);//BG
 		**	Binary search for the file in this mixfile. If it is found, then extract the
 		**	appropriate information and store it in the locations provided and then return.
 		*/
-#ifndef _MSC_VER
-		fprintf(stderr,"[MIX] Offset: checking mixfile Filename=%s Count=%d HeaderBuffer=%p\n",
-		        ptr->Filename ? ptr->Filename : "(null)", ptr->Count, (void*)ptr->HeaderBuffer); fflush(stderr);
-#endif
 		block = (SubBlock *)bsearch(&key, ptr->HeaderBuffer, ptr->Count, sizeof(SubBlock), compfunc);
 		if (block != NULL) {
 			if (mixfile != NULL) *mixfile = ptr;
