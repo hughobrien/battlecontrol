@@ -128,6 +128,98 @@ PosixFileDesc * desc_from_handle(HANDLE h)
     return static_cast<PosixFileDesc *>(h);
 }
 
+// TIM-149 pass-45C: case-fold fallback for read-only opens.
+//
+// Per the runtime-path-survey §2: engine code asks for asset blobs by
+// uppercase literal name (`"REDALERT.MIX"`, `"LOCAL.MIX"`,
+// `"RULES.INI"`, ...) but Linux is case-sensitive. The mixfile registry
+// already uppercases for CRC computation (MIXFILE.CPP:543 strupr), but
+// the on-disk lookup goes through this substrate. If the actual file on
+// disk is `redalert.mix` or any other case variant, the literal-name
+// open will fail with ENOENT.
+//
+// Fallback strategy (fires only after the literal-as-passed open fails
+// with ENOENT, and only on read-style opens -- writes/creates use the
+// caller's exact path):
+//   1. As-is              -- already attempted; we got here because it failed
+//   2. Basename uppercase -- engine's preferred convention
+//   3. Basename lowercase -- typical Linux distribution convention
+//
+// Only the basename is folded -- the directory portion is left exactly
+// as the caller passed it. Rationale: directories on Linux installs are
+// usually under the user's control (e.g. `~/.local/share/redalert/`)
+// and may legitimately contain case-sensitive subdirectory names; the
+// engine never stamps directory casing into its asset literals. Asset
+// blob basenames, by contrast, all originate from upstream Westwood
+// code as uppercase literals and have only one realistic Linux-disk
+// rendering (uppercase or lowercase).
+//
+// Mixed-case basenames (e.g. `MyConfig.ini` from a save dialog) are not
+// addressed here; if a caller provides mixed case and the file exists
+// only under that exact rendering, the literal-as-passed open hits it
+// directly. If the file exists under uppercase or lowercase but not
+// the mixed rendering, the fallback finds it -- and that's a
+// best-effort win, not a correctness contract.
+int try_open_case_folded(const char *filename, int flags, mode_t mode)
+{
+    // Find the last '/' (or '\\' for Windows-style paths the engine
+    // sometimes hands us). Everything after is the basename.
+    char const *last_sep = filename;
+    char const *p = filename;
+    while (*p) {
+        if (*p == '/' || *p == '\\') last_sep = p + 1;
+        ++p;
+    }
+
+    size_t const dir_len = static_cast<size_t>(last_sep - filename);
+    size_t const base_len = static_cast<size_t>(p - last_sep);
+    if (base_len == 0) return -1; // No basename to fold.
+
+    // Allocate scratch on the stack -- engine paths comfortably fit in
+    // the typical PATH_MAX. If a caller ever exceeds this, fall back
+    // to literal-only (already attempted, so just return -1 here).
+    constexpr size_t SCRATCH = 1024;
+    if (dir_len + base_len + 1 > SCRATCH) return -1;
+
+    char scratch[SCRATCH];
+
+    // Helper: try opening with basename folded by `xform` (toupper or
+    // tolower applied to each char of the basename). Returns the fd
+    // on success, -1 otherwise.
+    auto try_with_xform = [&](int (*xform)(int)) -> int {
+        for (size_t i = 0; i < dir_len; ++i) scratch[i] = filename[i];
+        for (size_t i = 0; i < base_len; ++i) {
+            unsigned char c = static_cast<unsigned char>(last_sep[i]);
+            scratch[dir_len + i] = static_cast<char>(xform(c));
+        }
+        scratch[dir_len + base_len] = '\0';
+        return ::open(scratch, flags, mode);
+    };
+
+    int fd = try_with_xform([](int c) { return c >= 'a' && c <= 'z' ? c - ('a' - 'A') : c; });
+    if (fd >= 0) return fd;
+    if (errno != ENOENT) return -1;
+
+    fd = try_with_xform([](int c) { return c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c; });
+    return fd;
+}
+
+// True for opens that should fall through to case-fold on ENOENT. Only
+// read paths qualify -- creates/writes must hit the exact filename the
+// caller asked for so save files don't get spuriously redirected to a
+// pre-existing case-fold match.
+bool is_readonly_open(DWORD desired_access, DWORD creation_disposition)
+{
+    if ((desired_access & GENERIC_WRITE) != 0) return false;
+    if (creation_disposition == CREATE_NEW       ||
+        creation_disposition == CREATE_ALWAYS    ||
+        creation_disposition == OPEN_ALWAYS      ||
+        creation_disposition == TRUNCATE_EXISTING) {
+        return false;
+    }
+    return true;
+}
+
 } // namespace
 
 extern "C" {
@@ -151,7 +243,19 @@ void *RA_PosixFile_CreateFileA(const char *filename,
     // matches Westwood's de facto behavior on Win9x/NT.
     mode_t const mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
-    int const fd = ::open(filename, flags, mode);
+    int fd = ::open(filename, flags, mode);
+
+    // TIM-149 pass-45C: case-fold fallback. If the literal-as-passed
+    // open failed with ENOENT and this is a read-style open (no
+    // GENERIC_WRITE, no create/truncate disposition), retry with the
+    // basename uppercased then lowercased. See try_open_case_folded
+    // for the rationale + invariants.
+    if (fd < 0 && errno == ENOENT &&
+        is_readonly_open(static_cast<DWORD>(desired_access),
+                         static_cast<DWORD>(creation_disposition))) {
+        fd = try_open_case_folded(filename, flags, mode);
+    }
+
     if (fd < 0) {
         return INVALID_HANDLE_VALUE;
     }
