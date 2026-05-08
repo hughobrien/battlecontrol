@@ -908,6 +908,23 @@ bool Select_Game(bool fade)
 				**	SEL_START_NEW_GAME: Play the game
 				*/
 				case SEL_START_NEW_GAME:
+#ifndef _MSC_VER
+					/* TIM-206: skip difficulty+faction dialogs in headless test runs. */
+					if (getenv("RA_AUTOSTART")) {
+						fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI (EASY)\n"); fflush(stderr);
+						Scen.CDifficulty = DIFF_EASY;
+						Scen.Difficulty = DIFF_EASY;
+						Scen.CarryOverMoney = 0;
+						BuildLevel = 10;
+						IsTanyaDead = false;
+						SaveTanya = false;
+						Whom = HOUSE_GOOD;
+						Scen.Set_Scenario_Name("SCG01EA.INI");
+						Session.Type = GAME_NORMAL;
+						process = false;
+						break;
+					}
+#endif
 					if (Special.IsFromInstall) {
 						Scen.CDifficulty = DIFF_NORMAL;
 						Scen.Difficulty = DIFF_NORMAL;
@@ -950,6 +967,13 @@ bool Select_Game(bool fade)
 						if (AntsEnabled)  {
 							Scen.Set_Scenario_Name("SCA01EA.INI");
 						} else {
+#endif
+#ifndef _MSC_VER
+							/* TIM-206: inject KN_RETURN to auto-select Allies (curbutton=0)
+							 * for smoke test mission launch — avoids blocking on faction dialog. */
+							fprintf(stderr, "[INIT] injecting KN_RETURN for faction select (Allies)\n");
+							fflush(stderr);
+							Keyboard->Put(KN_RETURN);
 #endif
 #ifdef FIXIT_VERSION_3
 							switch (WWMessageBox().Process(TXT_CHOOSE, TXT_ALLIES, TXT_CANCEL, TXT_SOVIET)) {
@@ -1611,9 +1635,18 @@ bool Select_Game(bool fade)
 		}
 		Show_Mouse();
 //Mono_Printf("About to call Start Scenario with %s\n", Scen.ScenarioName);
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA] Select_Game: calling Start_Scenario('%s')\n", Scen.ScenarioName); fflush(stderr);
+#endif
 		if (!Start_Scenario(Scen.ScenarioName)) {
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] Select_Game: Start_Scenario FAILED\n"); fflush(stderr);
+#endif
 			return(false);
 		}
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA] Select_Game: Start_Scenario OK — in-game phase\n"); fflush(stderr);
+#endif
 		if (Special.IsFromInstall) Show_Mouse();
 		Special.IsFromInstall = false;
 	}
