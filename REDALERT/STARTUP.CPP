@@ -702,6 +702,13 @@ int main(int argc, char * argv[])
 #endif
 			}
 
+#ifndef _MSC_VER
+			/* TIM-250: classic 640×480 Linux path — attach SeenBuff to the actual
+			   video surface dimensions rather than the Remastered 3072×3072 virtual
+			   canvas. ScreenWidth/ScreenHeight were set to 640/480 in GLOBALS.CPP. */
+			SeenBuff.Attach(&VisiblePage, 0, 0, ScreenWidth, ScreenHeight);
+			HidPage.Attach(&HiddenPage, 0, 0, ScreenWidth, ScreenHeight);
+#else
 			ScreenHeight = 3072;
 
 			if (VisiblePage.Get_Height() == 480) {
@@ -711,6 +718,7 @@ int main(int argc, char * argv[])
 				SeenBuff.Attach(&VisiblePage, 0, 0, 3072, 3072);
 				HidPage.Attach(&HiddenPage, 0, 0, 3072, 3072);
 			}
+#endif
 			#endif // MPEGMOVIE - Denzil 6/10/98
 #ifndef _MSC_VER
 			fprintf(stderr, "[RA] STARTUP: SeenBuff attached\n"); fflush(stderr);
