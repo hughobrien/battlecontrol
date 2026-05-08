@@ -2185,17 +2185,17 @@ Mono_Set_Cursor(0,0);
 #endif
 	if (!GameActive) return(!GameActive);
 
-#ifdef WIN32
+#ifdef _MSC_VER
 	/*
 	** Call the focus loss handler
 	*/
 	Check_For_Focus_Loss();
+#endif
 
 	/*
-	** Allocate extra memory for uncompressed shapes as needed
+	** Allocate extra memory for uncompressed shapes as needed (portable — Resize_Alloc uses realloc)
 	*/
 	Reallocate_Big_Shape_Buffer();
-#endif
 
 	/*
 	** Sync-bug trapping code
@@ -2266,7 +2266,8 @@ Mono_Set_Cursor(0,0);
 	**	Update the display, unless we're inside a dialog.
 	*/
 	if (!Session.Play) {
-#ifdef WIN32
+#ifdef _MSC_VER
+		/* TIM-231: GameInFocus is set by WM_ACTIVATEAPP — always 0 on Linux */
 		if (SpecialDialog == SDLG_NONE && GameInFocus) {
 			WWMouse->Erase_Mouse(&HidPage, TRUE);
 #else
