@@ -631,6 +631,17 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 		SDL_VideoRenderer = SDL_CreateRenderer(
 			SDL_VideoWindow, -1,
 			SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+		// TIM-173 pass-46A: fall back to software renderer if hardware/vsync
+		// unavailable (e.g. under Xvfb/Mesa with no vsync support). Without
+		// the fallback, SDL_VideoRenderer stays nullptr and the present pump
+		// in Wait_Vert_Blank never fires.
+		if (SDL_VideoRenderer == nullptr) {
+			SDL_VideoRenderer = SDL_CreateRenderer(
+				SDL_VideoWindow, -1,
+				SDL_RENDERER_SOFTWARE);
+		}
+		fprintf(stderr, "[RA] SDL window %dx%d renderer=%p\n",
+		        w, h, (void *)SDL_VideoRenderer);
 		// Indexed 8-bit primary surface; palette is filled in by
 		// Set_DD_Palette and applied via SDL_SetPaletteColors.
 		SDL_PrimarySurface = SDL_CreateRGBSurfaceWithFormat(
@@ -988,6 +999,7 @@ void Wait_Vert_Blank(void)
 	if (!SDL_FirstPresentDone) {
 		SDL_ShowWindow(SDL_VideoWindow);
 		SDL_FirstPresentDone = true;
+		fprintf(stderr, "[RA] first SDL frame presented — window now visible\n");
 	}
 	return;
 #else

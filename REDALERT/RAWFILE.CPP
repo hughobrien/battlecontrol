@@ -50,6 +50,20 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+/* TIM-173: RAWFILE.CPP does not include FUNCTION.H/wwstd.h, so WIN32 is
+ * not auto-defined by wwstd.h:46 the way it is in every other engine TU.
+ * Without WIN32, HANDLE_TYPE collapses to int (4 bytes) while all other
+ * TUs see HANDLE = void* (8 bytes). The resulting ODR struct-layout mismatch
+ * places RawFileClass::Filename at the wrong offset, corrupting pointer reads
+ * and causing SIGSEGV. Defining WIN32 here forces this TU to use the same
+ * layout (HANDLE_TYPE = void*) and the CreateFile/ReadFile/CloseHandle path
+ * provided by posix_fileio.cpp instead of the inert _dos_open stubs. */
+#ifndef _MSC_VER
+#  ifndef WIN32
+#    define WIN32 1
+#  endif
+#endif
+
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<string.h>
@@ -147,6 +161,17 @@ RawFileClass::RawFileClass(char const * filename) :
  *=============================================================================================*/
 char const * RawFileClass::Set_Name(char const * filename)
 {
+#ifndef _MSC_VER
+	if (filename && strstr(filename, "REDALERT.MIX")) {
+		const unsigned char *p = (const unsigned char*)this;
+		fprintf(stderr, "[RFC] Set_Name: this=%p sz=%zu filename=%s Allocated=%d Filename=%p\n",
+			(void*)this, sizeof(RawFileClass), filename, (int)Allocated, (void*)Filename);
+		/* Dump first 56 bytes to check raw object layout */
+		fprintf(stderr, "[RFC] raw bytes:");
+		for (int _i=0; _i<56; _i++) fprintf(stderr, " %02x", p[_i]);
+		fprintf(stderr, "\n"); fflush(stderr);
+	}
+#endif
 	if (Filename != NULL && Allocated) {
 		free((char *)Filename);
 		((char *&)Filename) = 0;
@@ -157,11 +182,21 @@ char const * RawFileClass::Set_Name(char const * filename)
 
 	Bias(0);
 
+#ifndef _MSC_VER
+	if (filename && strstr(filename, "REDALERT.MIX")) {
+		fprintf(stderr, "[RFC] Set_Name: about to strdup\n"); fflush(stderr);
+	}
+#endif
 	((char *&)Filename) = strdup(filename);
 	if (Filename == NULL) {
 		Error(ENOMEM, false, filename);
 	}
 	Allocated = true;
+#ifndef _MSC_VER
+	if (strstr(Filename, "REDALERT.MIX")) {
+		fprintf(stderr, "[RFC] Set_Name: done, Filename=%p='%s'\n", (void*)Filename, Filename); fflush(stderr);
+	}
+#endif
 	return(Filename);
 }
 
@@ -560,6 +595,23 @@ long RawFileClass::Read(void * buffer, long size)
 		bytesread = 0;
 
 		SetErrorMode(SEM_FAILCRITICALERRORS);
+#ifndef _MSC_VER
+		/* TIM-173: LP64 fix — DWORD is uint32_t (4 bytes), long is 8 bytes;
+		 * the original &(unsigned long&)bytesread type-pun only worked on
+		 * Win32 where long==DWORD==4 bytes. Use a DWORD temp here. */
+		{ DWORD _rb = 0;
+		if (!ReadFile(Handle, buffer, (DWORD)size, &_rb, NULL)) {
+			size -= (long)_rb;
+			total += (long)_rb;
+			Error(GetLastError(), true, Filename);
+			SetErrorMode(0);
+			continue;
+		}
+		SetErrorMode(0);
+		size -= (long)_rb;
+		total += (long)_rb;
+		if (_rb == 0) break; }
+#else
 		if (!ReadFile(Handle, buffer, size, &(unsigned long&)bytesread, NULL)) {
 			size -= bytesread;
 			total += bytesread;
@@ -571,6 +623,7 @@ long RawFileClass::Read(void * buffer, long size)
 		size -= bytesread;
 		total += bytesread;
 		if (bytesread == 0) break;
+#endif
 	}
 	bytesread = total;
 
@@ -674,9 +727,18 @@ long RawFileClass::Write(void const * buffer, long size)
 	}
 
 #ifdef WIN32
+	/* TIM-173: LP64 fix — same DWORD temp pattern as Read above. */
+#ifndef _MSC_VER
+	{ DWORD _wb = 0;
+	if (!WriteFile(Handle, buffer, (DWORD)size, &_wb, NULL)) {
+		Error(GetLastError(), false, Filename);
+	}
+	bytesread = (long)_wb; }
+#else
 	if (!WriteFile(Handle, buffer, size, &(unsigned long&)bytesread, NULL)) {
 		Error(GetLastError(), false, Filename);
 	}
+#endif
 
 #else
 

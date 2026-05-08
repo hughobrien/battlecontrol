@@ -1973,7 +1973,7 @@ int XMP_Mod_Mult(digit * prod, const digit * multiplicand, const digit * multipl
 				*/
 				if (!(*dmph & SEMI_UPPER_MOST_BIT)) {
 					unsigned short * dmp = dmpl;
-					if (XMP_Sub((unsigned long *)dmp, (unsigned long *)dmp, _scratch_modulus, false, precision)) {
+					if (XMP_Sub((digit *)dmp, (digit *)dmp, _scratch_modulus, false, precision)) {
 						(*dmph)--;
 					}
 				}

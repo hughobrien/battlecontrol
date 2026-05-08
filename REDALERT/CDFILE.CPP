@@ -575,13 +575,29 @@ void CDFileClass::Clear_Search_Drives(void)
  *=============================================================================================*/
 char const * CDFileClass::Set_Name(char const *filename)
 {
+#ifndef _MSC_VER
+	if (filename && strstr(filename, "REDALERT.MIX")) {
+		fprintf(stderr, "[CDF] Set_Name: filename=%s IsDisabled=%d First=%p\n",
+			filename, (int)IsDisabled, (void*)First); fflush(stderr);
+	}
+#endif
 	/*
 	**	Try to find the file in the current directory first. If it can be found, then
 	**	just return with the normal file name setting process. Do the same if there is
 	**	no multi-drive search path.
 	*/
 	BufferIOFileClass::Set_Name(filename);
+#ifndef _MSC_VER
+	if (filename && strstr(filename, "REDALERT.MIX")) {
+		fprintf(stderr, "[CDF] Set_Name: BufIO::Set_Name done\n"); fflush(stderr);
+	}
+#endif
 	if (IsDisabled || !First || BufferIOFileClass::Is_Available()) return(File_Name());
+#ifndef _MSC_VER
+	if (filename && strstr(filename, "REDALERT.MIX")) {
+		fprintf(stderr, "[CDF] Set_Name: scanning search paths\n"); fflush(stderr);
+	}
+#endif
 
 	/*
 	**	Attempt to find the file first. Check the current directory. If not found there, then

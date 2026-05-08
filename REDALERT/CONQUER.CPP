@@ -4456,6 +4456,12 @@ int Get_CD_Index(int cd_drive, int)
 #if (1) //ST - 5/13/2019
 bool Force_CD_Available(int cd)
 {
+#ifndef _MSC_VER
+	// TIM-173 pass-46A: no game assets on Linux — skip CD/asset loading entirely.
+	// MixFileClass constructors will check Is_Available() themselves and return
+	// gracefully when the MIX files aren't present.
+	return true;
+#endif
 	static int _last = -1;
 
 	if (_last != cd || cd == ALWAYS_RELOAD_CD) {

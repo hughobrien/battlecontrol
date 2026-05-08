@@ -832,6 +832,52 @@ static inline BOOL  PostMessage(HWND, UINT, WPARAM, LPARAM)        { return FALS
  * behaviour change, just enough surface for the parser to walk through
  * the dormant Win32 branches. */
 
+/* TIM-173: SetErrorMode / SEM_FAILCRITICALERRORS — Win32 error-mode control
+ * used by RawFileClass::Read/Write to suppress critical-error dialogs during
+ * file I/O (no-disk, no-CD scenarios). On Linux the POSIX I/O substrate has
+ * no equivalent; stub as a no-op returning 0 (the Windows default error mode).
+ * Called at RAWFILE.CPP:576/584/691. */
+#ifndef SEM_FAILCRITICALERRORS
+#  define SEM_FAILCRITICALERRORS 0x0001U
+#endif
+#ifndef SEM_NOOPENFILEERRORBOX
+#  define SEM_NOOPENFILEERRORBOX 0x8000U
+#endif
+static inline UINT SetErrorMode(UINT) { return 0; }
+
+/* TIM-173: Win32 file-management API stubs used by RAWFILE.CPP Win32 branches.
+ *
+ * DeleteFile(LPCSTR) — RAWFILE.CPP:1048 Delete(). Maps to POSIX remove().
+ * Returns TRUE (1) on success, FALSE (0) on failure (sets errno).
+ *
+ * BY_HANDLE_FILE_INFORMATION / GetFileInformationByHandle / FileTimeToDosDateTime /
+ * DosDateTimeToFileTime / SetFileTime — RAWFILE.CPP:1109-1193 Get/Set_Date_Time().
+ * These are used only for save-game timestamp metadata; they are not on any
+ * hot path for asset loading. Stub as inert returns-false so Get/Set_Date_Time
+ * yield 0 / false without crashing. */
+#include <cstdio>   /* remove() */
+static inline BOOL DeleteFileA(LPCSTR lpFileName)
+{
+    if (!lpFileName) return FALSE;
+    return (::remove(lpFileName) == 0) ? TRUE : FALSE;
+}
+#ifndef DeleteFile
+#  define DeleteFile DeleteFileA
+#endif
+
+typedef struct _BY_HANDLE_FILE_INFORMATION {
+    DWORD    dwFileAttributes;
+    FILETIME ftCreationTime, ftLastAccessTime, ftLastWriteTime;
+    DWORD    dwVolumeSerialNumber;
+    DWORD    nFileSizeHigh, nFileSizeLow;
+    DWORD    nNumberOfLinks;
+    DWORD    nFileIndexHigh, nFileIndexLow;
+} BY_HANDLE_FILE_INFORMATION;
+static inline BOOL GetFileInformationByHandle(HANDLE, BY_HANDLE_FILE_INFORMATION *) { return FALSE; }
+static inline BOOL FileTimeToDosDateTime(const FILETIME *, WORD *d, WORD *t) { if(d)*d=0; if(t)*t=0; return TRUE; }
+static inline BOOL DosDateTimeToFileTime(WORD, WORD, FILETIME *ft) { if(ft){ft->dwLowDateTime=0;ft->dwHighDateTime=0;} return TRUE; }
+static inline BOOL SetFileTime(HANDLE, const FILETIME *, const FILETIME *, const FILETIME *) { return TRUE; }
+
 /* TIM-85: LPCTSTR -- Win32 const-TCHAR string pointer. WINSTUB.CPP:499
  * (Window_Dialog_Box) takes an LPCTSTR template name on a Win32-only
  * dialog API. Without UNICODE the SDK defines TCHAR=char, so LPCTSTR
