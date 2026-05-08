@@ -39,6 +39,17 @@
  *   Check_Key -- compatability routine for old 32 bit library                                 *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+// TIM-150: KEYBOARD.CPP retired. KEY.CPP is the canonical
+// WWKeyboardClass implementation — it has the full method set
+// (Put_Mouse_Message, Available_Buffer_Room, bool Message_Handler)
+// plus the TIM-145 SDL pump (SDL_Process_Input_Events,
+// SDL_Keysym_To_VK, _Kbd global). Compiling this file alongside
+// KEY.CPP produced 18 multiple-definition link errors catalogued
+// in TIM-144 / pass-146. Wrapping the body in `#if 0` keeps the
+// file in tree (so upstream merges are noise-free) but emits an
+// empty .o, closing the cascade-stop without renaming.
+#if 0
+
 #include "keyboard.h"
 
 #include	"monoc.h"
@@ -464,3 +475,5 @@ void WWKeyboardClass::Message_Handler(HWND , UINT message, UINT wParam, LONG lPa
 //			break;
 	}
 }
+
+#endif // TIM-150 retire KEYBOARD.CPP body
