@@ -300,7 +300,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			** Allocate and clear the memory for the shape info
 			*/
 			KeyFrameSlots[keyfr->y]= new char *[keyfr->frames];
-			memset (KeyFrameSlots[keyfr->y] , 0 , keyfr->frames*4);
+			memset (KeyFrameSlots[keyfr->y] , 0 , keyfr->frames*sizeof(char*));
 		}
 
 		/*
