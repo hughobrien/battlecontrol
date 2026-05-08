@@ -68,6 +68,7 @@ static SDL_Surface*  SDL_PrimaryARGB    = nullptr;
 static int           SDL_CachedW        = 0;
 static int           SDL_CachedH        = 0;
 static bool          SDL_FirstPresentDone = false;
+static int           SDL_PresentCount     = 0;  // TIM-237: counts presents after game loop starts
 
 // TIM-141 commit 4: typed accessors over the file-static SDL_PrimarySurface
 // for GBUFFER.CPP's GraphicBufferClass::Lock/Unlock. Keeps <SDL.h> out of
@@ -1010,6 +1011,20 @@ void Wait_Vert_Blank(void)
 	SDL_RenderClear(SDL_VideoRenderer);
 	SDL_RenderCopy(SDL_VideoRenderer, SDL_PrimaryTexture, nullptr, nullptr);
 	SDL_RenderPresent(SDL_VideoRenderer);
+
+	// TIM-237: save frame 500 as BMP for visual verification (deep into game loop;
+	// init+menu can consume 100-400 presents before Map.Render starts).
+	if (SDL_FirstPresentDone && ++SDL_PresentCount == 500) {
+		const char* bmp500 = "/tmp/redalert-frame500.bmp";
+		int rc500 = SDL_SaveBMP(SDL_PrimaryARGB, bmp500);
+		const uint32_t* px500 = (const uint32_t*)SDL_PrimaryARGB->pixels;
+		int total500 = SDL_PrimaryARGB->w * SDL_PrimaryARGB->h;
+		int nz500 = 0;
+		for (int i = 0; i < total500 && i < 500000; ++i)
+			if (px500[i] & 0x00FFFFFF) ++nz500;
+		fprintf(stderr, "[RA] frame500 BMP: rc=%d nz_pixels(sample)=%d path=%s\n", rc500, nz500, bmp500);
+		fflush(stderr);
+	}
 
 	if (!SDL_FirstPresentDone) {
 		SDL_ShowWindow(SDL_VideoWindow);
