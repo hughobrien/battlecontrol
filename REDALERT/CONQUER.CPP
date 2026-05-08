@@ -367,9 +367,18 @@ void Main_Game(int argc, char * argv[])
 			/*
 			**	Call the game's main loop
 			*/
+#ifndef _MSC_VER
+			{
+				bool ml_ret = Main_Loop();
+				fprintf(stderr, "[CQ] for-loop: Main_Loop returned %d GameActive=%d\n",
+					(int)ml_ret, (int)GameActive); fflush(stderr);
+				if (ml_ret) break;
+			}
+#else
 			if (Main_Loop()) {
 				break;
 			}
+#endif
 
 			/*
 			**	If the SpecialDialog flag is set, invoke the given special dialog.
@@ -2182,6 +2191,8 @@ Mono_Set_Cursor(0,0);
 	if (SDL_Quit_Requested()) {
 		GameActive = false;
 	}
+	fprintf(stderr, "[ML] enter Frame=%d GameActive=%d SDL_Quit=%d PlayerWins=%d PlayerLoses=%d\n",
+		Frame, (int)GameActive, (int)SDL_Quit_Requested(), (int)PlayerWins, (int)PlayerLoses); fflush(stderr);
 #endif
 	if (!GameActive) return(!GameActive);
 
@@ -2277,7 +2288,13 @@ Mono_Set_Cursor(0,0);
 			if (input) {
 				Keyboard_Process(input);
 			}
+#ifndef _MSC_VER
+			fprintf(stderr, "[ML] before Map.Render Frame=%d\n", Frame); fflush(stderr);
+#endif
 			Map.Render();
+#ifndef _MSC_VER
+			fprintf(stderr, "[ML] after Map.Render Frame=%d\n", Frame); fflush(stderr);
+#endif
 		}
 	}
 
@@ -2344,6 +2361,12 @@ Mono_Set_Cursor(0,0);
 	/*
 	**	Check for player wins or loses according to global event flag.
 	*/
+#ifndef _MSC_VER
+	if (PlayerWins || PlayerLoses || PlayerRestarts) {
+		fprintf(stderr, "[ML] win/lose check Frame=%d PlayerWins=%d PlayerLoses=%d PlayerRestarts=%d\n",
+			Frame, (int)PlayerWins, (int)PlayerLoses, (int)PlayerRestarts); fflush(stderr);
+	}
+#endif
 	if (PlayerWins) {
 
 #ifdef WIN32
