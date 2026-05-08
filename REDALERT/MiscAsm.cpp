@@ -62,7 +62,7 @@ int Distance_Coord(COORDINATE coord1, COORDINATE coord2)
 	if (diff1 > diff2) return diff1 + ((unsigned)diff2 >> 1);
 	return diff2 + ((unsigned)diff1 >> 1);
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -118,7 +118,7 @@ long __cdecl Desired_Facing16(long x1, long y1, long x2, long y2)
 	idx <<= 1; if ((max_val - threshold) < min_val) idx |= 1;
 	return ((long)(unsigned char)_new_facing16[idx]) << 4;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -178,7 +178,7 @@ int __cdecl Desired_Facing256(LONG srcx, LONG srcy, LONG dstx, LONG dsty)
 	composite += frac;
 	return (composite & 0xFF);
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -282,7 +282,7 @@ int __cdecl Desired_Facing8(long x1, long y1, long x2, long y2)
 	idx <<= 1; if (min_val < threshold) idx |= 1;
 	return ((int)(unsigned char)_new_facing8[idx]) << 5;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -529,7 +529,7 @@ unsigned int __cdecl Cardinal_To_Fixed(unsigned base, unsigned cardinal)
 	unsigned long result = ((unsigned long)cardinal << 8) / (unsigned long)base;
 	return (unsigned int)(result > 0xFFFFU ? 0xFFFFU : result);
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -589,7 +589,7 @@ unsigned int __cdecl Fixed_To_Cardinal(unsigned base, unsigned fixed)
 	if (product & 0xFF000000UL) return 0xFFFFU;
 	return (unsigned int)(product >> 8);
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 
 #if (0)
@@ -634,7 +634,7 @@ void __cdecl Set_Bit(void * array, int bit, int value)
 	if (value) a[bit >> 3] |=  (unsigned char)(1 << (bit & 7));
 	else       a[bit >> 3] &= ~(unsigned char)(1 << (bit & 7));
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -645,7 +645,7 @@ int __cdecl Get_Bit(void const * array, int bit)
 	const unsigned char *a = (const unsigned char*)array;
 	return (a[bit >> 3] >> (bit & 7)) & 1;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -658,7 +658,7 @@ int __cdecl First_True_Bit(void const * array)
 	}
 	return -1;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -672,7 +672,7 @@ int __cdecl First_False_Bit(void const * array)
 	}
 	return -1;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -683,7 +683,7 @@ int __cdecl Bound(int original, int min, int max)
 	if (original > max) return max;
 	return original;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -960,7 +960,7 @@ ALLOWED_START	EQU	256-ALLOWED_COUNT
 		return dest;
 	}
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -977,7 +977,7 @@ extern "C" long __cdecl Reverse_Long(long number)
 	n = ((n & 0xFF) << 24) | ((n & 0xFF00) << 8) | ((n >> 8) & 0xFF00) | ((n >> 24) & 0xFF);
 	return (long)n;
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -989,7 +989,7 @@ extern "C" short __cdecl Reverse_Short(short number)
 	unsigned short n = (unsigned short)number;
 	return (short)(((n & 0xFF) << 8) | ((n >> 8) & 0xFF));
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -1002,7 +1002,7 @@ extern "C" long __cdecl Swap_Long(long number)
 	unsigned long n = (unsigned long)number & 0xFFFFFFFFUL;
 	return (long)(((n & 0xFFFF) << 16) | ((n >> 16) & 0xFFFF));
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -1051,7 +1051,7 @@ void __cdecl strtrim(char *buffer)
 	while (*start == ' ' || *start == '\t') start++;
 	if (start != buffer) memmove(buffer, start, strlen(start) + 1);
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
@@ -1107,7 +1107,7 @@ void __cdecl Fat_Put_Pixel(int x, int y, int color, int siz, GraphicViewPortClas
 		}
 	}
 #else
-	{ /* __asm body removed for syntax-only build (TIM-124) */ }
+	{}
 #endif
 }
 
