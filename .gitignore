@@ -15,3 +15,7 @@ CMakeUserPresets.json
 compile_commands.json
 .cache/
 
+
+# Compilation artifacts
+*.o
+a.out
