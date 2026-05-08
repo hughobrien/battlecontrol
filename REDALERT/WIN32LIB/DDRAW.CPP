@@ -644,17 +644,18 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 			}
 			SDL_Set_Main_Window(SDL_VideoWindow);
 		}
+		// TIM-250: always use the software renderer under Linux — the X11
+		// accelerated path (SDL_RENDERER_ACCELERATED) crashes in
+		// SDL_RenderPresent when run under Xvfb at 640×480. Software
+		// rendering is correct and sufficient; vsync is not critical here.
 		SDL_VideoRenderer = SDL_CreateRenderer(
 			SDL_VideoWindow, -1,
-			SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-		// TIM-173 pass-46A: fall back to software renderer if hardware/vsync
-		// unavailable (e.g. under Xvfb/Mesa with no vsync support). Without
-		// the fallback, SDL_VideoRenderer stays nullptr and the present pump
-		// in Wait_Vert_Blank never fires.
+			SDL_RENDERER_SOFTWARE);
+		// If software also fails try accelerated as last resort
 		if (SDL_VideoRenderer == nullptr) {
 			SDL_VideoRenderer = SDL_CreateRenderer(
 				SDL_VideoWindow, -1,
-				SDL_RENDERER_SOFTWARE);
+				SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 		}
 		fprintf(stderr, "[RA] SDL window %dx%d renderer=%p\n",
 		        w, h, (void *)SDL_VideoRenderer);
@@ -1005,6 +1006,17 @@ void Wait_Vert_Blank(void)
 	// Palette-aware indexed->ARGB conversion. SDL_BlitSurface honors
 	// SDL_PrimarySurface->format->palette (populated by Set_DD_Palette
 	// at DDRAW.CPP:864-867).
+	// TIM-250 debug: sanity-check surfaces before blit
+	if (!SDL_PrimarySurface || !SDL_PrimarySurface->pixels ||
+	    !SDL_PrimaryARGB || !SDL_PrimaryARGB->pixels) {
+		fprintf(stderr, "[RA] Wait_Vert_Blank: null surface prim=%p/%p argb=%p/%p\n",
+		        (void*)SDL_PrimarySurface,
+		        SDL_PrimarySurface ? SDL_PrimarySurface->pixels : nullptr,
+		        (void*)SDL_PrimaryARGB,
+		        SDL_PrimaryARGB ? SDL_PrimaryARGB->pixels : nullptr);
+		fflush(stderr);
+		return;
+	}
 	int blit_rc = SDL_BlitSurface(SDL_PrimarySurface, nullptr, SDL_PrimaryARGB, nullptr);
 	SDL_UpdateTexture(SDL_PrimaryTexture, nullptr,
 	                  SDL_PrimaryARGB->pixels, SDL_PrimaryARGB->pitch);
