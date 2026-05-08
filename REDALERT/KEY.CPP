@@ -663,6 +663,13 @@ bool WWKeyboardClass::Is_Buffer_Empty(void) const
  *=============================================================================================*/
 void WWKeyboardClass::Fill_Buffer_From_System(void)
 {
+#ifndef _MSC_VER
+	// TIM-149 pass-45D: drain SDL events so menu/dialog loops that call
+	// Check() without rendering (no Wait_Vert_Blank) still observe input.
+	if (!Is_Buffer_Full()) {
+		SDL_Process_Input_Events();
+	}
+#else
 	if (!Is_Buffer_Full()) {
 		MSG	msg;
 		while (PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE)) {
@@ -673,6 +680,7 @@ void WWKeyboardClass::Fill_Buffer_From_System(void)
 			DispatchMessage(&msg);
 		}
 	}
+#endif
 }
 
 
