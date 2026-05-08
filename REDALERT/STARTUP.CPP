@@ -525,8 +525,13 @@ int main(int argc, char * argv[])
 		}
 
 		if (cfile.Is_Available()) {
-
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: cfile available, IsFromInstall=%d\n", (int)Special.IsFromInstall); fflush(stderr);
+#endif
 			Read_Private_Config_Struct(cfile, &NewConfig);
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: after Read_Private_Config_Struct, IsFromInstall=%d\n", (int)Special.IsFromInstall); fflush(stderr);
+#endif
 
 #ifdef WIN32
 
@@ -534,6 +539,9 @@ int main(int argc, char * argv[])
 			** Set the options as requested by the ccsetup program
 			*/
 			Read_Setup_Options( &cfile );
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: after Read_Setup_Options, IsFromInstall=%d\n", (int)Special.IsFromInstall); fflush(stderr);
+#endif
 
 			Create_Main_Window( instance , command_show , ScreenWidth , ScreenHeight );
 			SoundOn = Audio_Init ( MainWindow , 16 , false , 11025*2 , 0 );
@@ -587,6 +595,9 @@ int main(int argc, char * argv[])
 				//if (Palette) delete Palette;
 				return (EXIT_FAILURE);
 			}
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: video_success=TRUE, entering page init\n"); fflush(stderr);
+#endif
 
 			if (ScreenWidth==320) {
 				VisiblePage.Init( ScreenWidth , ScreenHeight , NULL , 0 , (GBC_Enum)0);
@@ -596,7 +607,13 @@ int main(int argc, char * argv[])
 #if (1)	//ST - 1/3/2019 2:11PM
 
 				VisiblePage.Init(ScreenWidth, ScreenHeight, NULL, 0, (GBC_Enum)0);
+#ifndef _MSC_VER
+				fprintf(stderr, "[RA] STARTUP: VisiblePage.Init done\n"); fflush(stderr);
+#endif
 				HiddenPage.Init(ScreenWidth, ScreenHeight, NULL, 0, (GBC_Enum)0);
+#ifndef _MSC_VER
+				fprintf(stderr, "[RA] STARTUP: HiddenPage.Init done\n"); fflush(stderr);
+#endif
 
 #else
 				VisiblePage.Init( ScreenWidth , ScreenHeight , NULL , 0 , (GBC_Enum)(GBC_VISIBLE | GBC_VIDEOMEM));
@@ -667,8 +684,14 @@ int main(int argc, char * argv[])
 				HidPage.Attach(&HiddenPage, 0, 0, 3072, 3072);
 			}
 			#endif // MPEGMOVIE - Denzil 6/10/98
-			
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: SeenBuff attached\n"); fflush(stderr);
+#endif
+
 			Options.Adjust_Variables_For_Resolution();
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: Options.Adjust_Variables_For_Resolution done\n"); fflush(stderr);
+#endif
 
 			/*
 			** Install the memory error handler
@@ -684,8 +707,14 @@ int main(int argc, char * argv[])
 			// The editor needs to not start the mouse up. - 7/22/2019 JAS 
 			if (!RunningFromEditor)
 			{
+#ifndef _MSC_VER
+				fprintf(stderr, "[RA] STARTUP: WWMouseClass ctor start\n"); fflush(stderr);
+#endif
 				WWMouse = new WWMouseClass(&SeenBuff, 48, 48);
 				MouseInstalled = TRUE;
+#ifndef _MSC_VER
+				fprintf(stderr, "[RA] STARTUP: WWMouseClass ctor done\n"); fflush(stderr);
+#endif
 			}
 
 			//PG CDFileClass::Set_CD_Drive (CDList.Get_First_CD_Drive());
@@ -704,8 +733,33 @@ int main(int argc, char * argv[])
 			/*
 			** See if we should run the intro
 			*/
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: ini.Load start\n"); fflush(stderr);
+#endif
 			INIClass ini;
-			ini.Load(cfile);
+#ifndef _MSC_VER
+			{
+			  /* TIM-172: RawFileClass re-read is unreliable because cfile was already
+			     consumed by Read_Private_Config_Struct + Read_Setup_Options. Use fopen
+			     to read the file into a buffer and feed it through BufferStraw. */
+			  FILE *_pf = fopen("REDALERT.INI","rb");
+			  if (_pf) {
+			    fseek(_pf, 0, SEEK_END); long _fsz = ftell(_pf); fseek(_pf, 0, SEEK_SET);
+			    char *_fbuf = _fsz > 0 ? (char*)malloc(_fsz) : nullptr;
+			    if (_fbuf) { fread(_fbuf, 1, _fsz, _pf); }
+			    fclose(_pf);
+			    if (_fbuf) {
+			      BufferStraw _bstraw(_fbuf, (int)_fsz);
+			      ini.Load(_bstraw);
+			      free(_fbuf);
+			    }
+			  }
+			  char play_intro_val[32]="MISSING"; ini.Get_String("Intro","PlayIntro","MISSING",play_intro_val,31);
+			  fprintf(stderr,"[RA] STARTUP: INI loaded via BufferStraw, PlayIntro_raw=%s\n",play_intro_val); fflush(stderr);
+			}
+#else
+			{ RawFileClass fresh_ini_file("REDALERT.INI"); ini.Load(fresh_ini_file); }
+#endif
 
 			/*
 			**	Check for forced intro movie run disabling. If the conquer
@@ -717,6 +771,9 @@ int main(int argc, char * argv[])
 				Special.IsFromInstall = ini.Get_Bool("Intro", "PlayIntro", true);
 			}
 			SlowPalette = ini.Get_Bool("Options", "SlowPalette", false);
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: after ini.Get_Bool, IsFromInstall=%d\n", (int)Special.IsFromInstall); fflush(stderr);
+#endif
 
 			/*
 			** Regardless of whether we should run it or not, here we're
@@ -725,8 +782,15 @@ int main(int argc, char * argv[])
 			if (Special.IsFromInstall) {
 				BreakoutAllowed = true;
 //				BreakoutAllowed = false;
+#ifdef _MSC_VER
 				ini.Put_Bool("Intro", "PlayIntro", false);
 				ini.Save(cfile);
+#else
+				// TIM-173 pass-46A: On Linux, cfile was opened read-only by Is_Available()
+				// so ini.Save(cfile) would spin writing to a read-only handle.
+				// No intro movies on Linux yet — skip the save and clear the flag.
+				Special.IsFromInstall = false;
+#endif
 			}
 
 #ifndef WOLAPI_INTEGRATION
@@ -735,6 +799,9 @@ int main(int argc, char * argv[])
 			** If WChat has been trying to send us a game start packet then receive it and
 			** flag that we were spawned from WCHat so we dont play the into movie.
 			*/
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: DDEServer.Get_MPlayer_Game_Info start\n"); fflush(stderr);
+#endif
 			if (DDEServer.Get_MPlayer_Game_Info()){
 				Check_From_WChat(NULL);
 			}else{
@@ -743,6 +810,9 @@ int main(int argc, char * argv[])
 				//	DDEServer.Disable();
 				//}
 			}
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: DDEServer.Get_MPlayer_Game_Info done\n"); fflush(stderr);
+#endif
 #endif	//WIN32
 #endif
 			/*
@@ -755,7 +825,12 @@ int main(int argc, char * argv[])
 			}
 
 			Memory_Error_Exit = Print_Error_End_Exit;
-
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: Memory_Error_Exit set\n"); fflush(stderr);
+#endif
+#ifndef _MSC_VER
+			fprintf(stderr, "[RA] STARTUP: calling Main_Game\n"); fflush(stderr);
+#endif
 			Main_Game(argc, argv);
 
 			if (RunningAsDLL) {	//PG

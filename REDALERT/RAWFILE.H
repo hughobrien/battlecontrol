@@ -49,6 +49,14 @@
 
 #define	NULL_HANDLE		INVALID_HANDLE_VALUE
 #define	HANDLE_TYPE		HANDLE
+#elif !defined(_MSC_VER)
+/* TIM-173: Linux/GCC — include the posix windows.h stub so HANDLE and
+ * INVALID_HANDLE_VALUE are defined.  All TUs that include rawfile.h will
+ * use void* for Handle, preventing ODR struct-layout mismatches between TUs
+ * that do and don't get WIN32 via wwstd.h. */
+#include	<windows.h>
+#define	NULL_HANDLE		INVALID_HANDLE_VALUE
+#define	HANDLE_TYPE		HANDLE
 #else
 #define	NULL_HANDLE		-1
 #define	HANDLE_TYPE		int
@@ -265,16 +273,16 @@ inline RawFileClass::RawFileClass(void) :
 	Rights(READ),
 	BiasStart(0),
 	BiasLength(-1),
-	#ifdef WIN32
-	Handle(INVALID_HANDLE_VALUE),
-	#else
-	Handle(-1),
-	#endif
+	Handle(NULL_HANDLE),
 	Filename(0),
 	Date(0),
 	Time(0),
 	Allocated(false)
 {
+#ifndef _MSC_VER
+	fprintf(stderr, "[RFC] default ctor: this=%p sz=%zu Allocated=%d Filename=%p\n",
+		(void*)this, sizeof(RawFileClass), (int)Allocated, (void*)Filename); fflush(stderr);
+#endif
 }
 
 
@@ -322,10 +330,10 @@ inline RawFileClass::~RawFileClass(void)
  *=============================================================================================*/
 inline int RawFileClass::Is_Open(void) const
 {
-#ifdef WIN32
-	return(Handle != INVALID_HANDLE_VALUE);
-#else
+#ifdef _MSC_VER
 	return (Handle >= 0);
+#else
+	return(Handle != INVALID_HANDLE_VALUE);
 #endif
 }
 

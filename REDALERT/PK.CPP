@@ -137,6 +137,10 @@ void PKey::Decode_Modulus(void * buffer)
 {
 	Modulus.DERDecode((unsigned char *)buffer);
 	BitPrecision = Modulus.BitCount()-1;
+#ifndef _MSC_VER
+	fprintf(stderr, "[PK] Decode_Modulus: BitCount=%u BitPrecision=%d PlainBlockSize=%d\n",
+		Modulus.BitCount(), BitPrecision, (BitPrecision > 0) ? (BitPrecision-1)/8 : -1); fflush(stderr);
+#endif
 }
 
 

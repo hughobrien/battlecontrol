@@ -68,7 +68,17 @@
 CCFileClass::CCFileClass(char const * filename) :
 	Position(0)
 {
+#ifndef _MSC_VER
+	if (filename && strstr(filename, "REDALERT.MIX")) {
+		fprintf(stderr, "[CCF] ctor: this=%p filename=%s\n", (void*)this, filename); fflush(stderr);
+	}
+#endif
 	CCFileClass::Set_Name(filename);
+#ifndef _MSC_VER
+	if (filename && strstr(filename, "REDALERT.MIX")) {
+		fprintf(stderr, "[CCF] ctor: Set_Name done, File_Name=%s\n", File_Name() ? File_Name() : "(null)"); fflush(stderr);
+	}
+#endif
 }
 
 

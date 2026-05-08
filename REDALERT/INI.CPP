@@ -1195,8 +1195,17 @@ PKey INIClass::Get_PKey(bool fast) const
 		key.Decode_Exponent(buffer);
 	}
 
-	Get_UUBlock("PublicKey", buffer, sizeof(buffer));
-	key.Decode_Modulus(buffer);
+	{
+		int ub = Get_UUBlock("PublicKey", buffer, sizeof(buffer));
+#ifndef _MSC_VER
+		fprintf(stderr, "[INI] Get_PKey: Get_UUBlock returned %d bytes, first=%02x %02x %02x %02x\n",
+			ub, (unsigned char)buffer[0], (unsigned char)buffer[1],
+			(unsigned char)buffer[2], (unsigned char)buffer[3]); fflush(stderr);
+#else
+		(void)ub;
+#endif
+		key.Decode_Modulus(buffer);
+	}
 
 	return(key);
 }

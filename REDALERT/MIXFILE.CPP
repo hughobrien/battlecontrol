@@ -46,6 +46,9 @@
 
 #include	"buff.h"
 #include	"function.h"
+#ifndef _MSC_VER
+#include <stdio.h>
+#endif
 #include	<direct.h>
 #include	<fcntl.h>
 #include	<io.h>
@@ -179,20 +182,54 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 	**	Check to see if the file is available. If it isn't, then
 	**	no further processing is needed or possible.
 	*/
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor-A: %s before Force_CD_Available(%d)\n", filename, RequiredCD); fflush(stderr);
+#endif
 	if (!Force_CD_Available(RequiredCD)) {
 		Prog_End("MixFileClass Force_CD_Available failed", true);
 		if (!RunningAsDLL) {	//PG
 			Emergency_Exit(EXIT_FAILURE);
 		}
 	}
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor-B: %s after Force_CD_Available, before T file\n", filename); fflush(stderr);
+#endif
 
 	T file(filename);		// Working file object.
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s\n", filename); fflush(stderr);
+	{ const char *_fn = file.File_Name();
+	  fprintf(stderr, "[MIX] ctor: %s File_Name=%p\n", filename, _fn); fflush(stderr);
+	}
+#endif
 	Filename = strdup(file.File_Name());
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s Filename=%p\n", filename, Filename); fflush(stderr);
+#endif
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s B Filename='%s'\n", filename, Filename ? Filename : "(null)"); fflush(stderr);
+#endif
 	FileStraw fstraw(file);
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s C fstraw done\n", filename); fflush(stderr);
+#endif
 	PKStraw pstraw(PKStraw::DECRYPT, CryptRandom);
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s D pstraw done\n", filename); fflush(stderr);
+#endif
 	Straw * straw = &fstraw;
 
-	if (!file.Is_Available()) return;
+	if (!file.Is_Available()) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[MIX] ctor: %s NOT available\n", filename); fflush(stderr);
+#endif
+		return;
+	}
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s available, reading header\n", filename); fflush(stderr);
+	fprintf(stderr, "[MIX] ctor: %s before straw->Get: file.Is_Open=%d file.Handle=%p\n",
+		filename, (int)file.Is_Open(), (void*)file.Get_File_Handle()); fflush(stderr);
+#endif
 
 	/*
 	**	Stuctures used to hold the various file headers.
@@ -209,6 +246,10 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 	**	extended format may have extra options or data layout.
 	*/
 	int got = straw->Get(&alternate, sizeof(alternate));
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s got=%d alt.First=%d alt.Second=0x%04x\n",
+		filename, got, (int)alternate.First, (unsigned)alternate.Second); fflush(stderr);
+#endif
 
 	/*
 	**	Detect if this is an extended mixfile. If so, then see if it is encrypted
@@ -218,13 +259,30 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 	if (alternate.First == 0) {
 		IsDigest = ((alternate.Second & 0x01) != 0);
 		IsEncrypted = ((alternate.Second & 0x02) != 0);
+#ifndef _MSC_VER
+		fprintf(stderr, "[MIX] ctor: %s IsEncrypted=%d IsDigest=%d\n",
+			filename, (int)IsEncrypted, (int)IsDigest); fflush(stderr);
+#endif
 
 		if (IsEncrypted) {
+#ifndef _MSC_VER
+			fprintf(stderr, "[MIX] ctor: %s calling pstraw.Key\n", filename); fflush(stderr);
+#endif
 			pstraw.Key(key);
+#ifndef _MSC_VER
+			fprintf(stderr, "[MIX] ctor: %s calling pstraw.Get_From\n", filename); fflush(stderr);
+#endif
 			pstraw.Get_From(&fstraw);
 			straw = &pstraw;
+#ifndef _MSC_VER
+			fprintf(stderr, "[MIX] ctor: %s calling straw->Get fileheader\n", filename); fflush(stderr);
+#endif
 		}
 		straw->Get(&fileheader, sizeof(fileheader));
+#ifndef _MSC_VER
+		fprintf(stderr, "[MIX] ctor: %s fileheader done, count=%d size=%d\n",
+			filename, (int)fileheader.count, (int)fileheader.size); fflush(stderr);
+#endif
 
 	} else {
 		memmove(&fileheader, &alternate, sizeof(alternate));
@@ -233,13 +291,22 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 
 	Count = fileheader.count;
 	DataSize = fileheader.size;
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s Count=%d DataSize=%d\n", filename, Count, DataSize); fflush(stderr);
+#endif
 //BGMono_Printf("Mixfileclass %s DataSize: %08x   \n",filename,DataSize);Get_Key();
 	/*
 	**	Load up the offset control array. If RAM is exhausted, then the mixfile is invalid.
 	*/
 	HeaderBuffer = new SubBlock [Count];
 	if (HeaderBuffer == NULL) return;
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s HeaderBuffer allocated, reading index\n", filename); fflush(stderr);
+#endif
 	straw->Get(HeaderBuffer, Count * sizeof(SubBlock));
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s index read done\n", filename); fflush(stderr);
+#endif
 
 	/*
 	**	The start of the embedded mixfile data will be at the current file offset.
@@ -249,6 +316,9 @@ MixFileClass<T>::MixFileClass(char const * filename, PKey const * key) :
 	*/
 	DataStart = file.Seek(0, SEEK_CUR) + file.BiasStart;
 //	DataStart = file.Seek(0, SEEK_CUR);
+#ifndef _MSC_VER
+	fprintf(stderr, "[MIX] ctor: %s DataStart=%d, added to list\n", filename, DataStart); fflush(stderr);
+#endif
 
 	/*
 	**	Attach to list of mixfiles.

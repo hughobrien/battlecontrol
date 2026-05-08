@@ -60,8 +60,13 @@ typedef int bool;
 extern unsigned short primeTable[3511];
 
 
-#define	digit	unsigned long
-#define	signeddigit	signed long
+/* TIM-173: LP64 fix — digit must be exactly 32 bits.  On Win32, unsigned long
+ * happened to be 32 bits; on LP64 Linux it is 64 bits, which breaks UNITSIZE,
+ * LOG_UNITSIZE, UPPER_MOST_BIT, and every bit-count/shift calculation.
+ * Use uint32_t so the 32-bit limb assumption holds on all platforms. */
+#include <stdint.h>
+#define	digit	uint32_t
+#define	signeddigit	int32_t
 #define	LOG_UNITSIZE			5
 #define	UNITSIZE					32
 #define	UPPER_MOST_BIT			0x80000000L

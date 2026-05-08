@@ -103,6 +103,9 @@ static inline char *strrev(char *s) {
 #include  "ccdde.h"
 
 #include <time.h>
+#ifndef _MSC_VER
+#include <unistd.h>
+#endif
 
 #ifdef DONGLE
 #include "cbn_.h"
@@ -232,6 +235,9 @@ bool Init_Game(int , char * [])
 	/*
 	**	Initialize the encryption keys.
 	*/
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: calling Init_Keys\n"); fflush(stderr);
+#endif
 	Init_Keys();
 
 	/*
@@ -239,7 +245,13 @@ bool Init_Game(int , char * [])
 	**	performed. This bootstrap process will enable the error message
 	**	handler to function.
 	*/
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: calling Bootstrap\n"); fflush(stderr);
+#endif
 	Bootstrap();
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Init_Game: Bootstrap done\n"); fflush(stderr);
+#endif
 
 	////////////////////////////////////////
 	// The editor needs to not start the mouse up. - 7/22/2019 JAS 
@@ -3105,8 +3117,14 @@ static void Init_CDROM_Access(void)
  *=============================================================================================*/
 static void Init_Bootstrap_Mixfiles(void)
 {
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap_Mix: entered\n"); fflush(stderr);
+#endif
 	int temp = RequiredCD;
 	RequiredCD = -2;
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap_Mix: RequiredCD set\n"); fflush(stderr);
+#endif
 
 #ifdef WOLAPI_INTEGRATION
 	CCFileClass fileWolapiMix( "WOLAPI.MIX" );
@@ -3117,38 +3135,90 @@ static void Init_Bootstrap_Mixfiles(void)
 	}
 #endif
 
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap_Mix: before FIXIT_CSII EXPAND2\n"); fflush(stderr);
+#endif
 #ifdef FIXIT_CSII	//	Ok. ajw
-	CCFileClass file2("EXPAND2.MIX");
-	if (file2.Is_Available()) {
+	/* TIM-172: CCFileClass::Is_Available() uses MFCD::Offset() which is unreliable before
+	   any MFCD is loaded. Use access(2) directly for pre-MFCD filesystem existence checks. */
+#ifndef _MSC_VER
+	if (access("EXPAND2.MIX", F_OK) == 0) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA] Bootstrap_Mix: EXPAND2.MIX found on disk, loading\n"); fflush(stderr);
+#endif
 		new MFCD("EXPAND2.MIX", &FastKey);
 		bool ok = MFCD::Cache("EXPAND2.MIX");
 		assert(ok);
 	}
+#else
+	{
+		CCFileClass file2("EXPAND2.MIX");
+		if (file2.Is_Available()) {
+			new MFCD("EXPAND2.MIX", &FastKey);
+			bool ok = MFCD::Cache("EXPAND2.MIX");
+			assert(ok);
+		}
+	}
+#endif
 #endif
 
 #ifdef FIXIT_CSII	//	Ok. ajw
+	{
 	bool ok1;
  #if 0
-	new MFCD("HIRES1.MIX", &FastKey);
-	ok1 = MFCD::Cache("HIRES1.MIX");
-	assert(ok1);
+	CCFileClass _hires1f("HIRES1.MIX");
+	if (_hires1f.Is_Available()) {
+		new MFCD("HIRES1.MIX", &FastKey);
+		ok1 = MFCD::Cache("HIRES1.MIX");
+		assert(ok1);
+	}
  #else
-	new MFCD("LORES1.MIX", &FastKey);
-	ok1 = MFCD::Cache("LORES1.MIX");
-	assert(ok1);
+#ifndef _MSC_VER
+	if (access("LORES1.MIX", F_OK) == 0) {
+		new MFCD("LORES1.MIX", &FastKey);
+		ok1 = MFCD::Cache("LORES1.MIX");
+		assert(ok1);
+	}
+#else
+	if (RawFileClass("LORES1.MIX").Is_Available()) {
+		new MFCD("LORES1.MIX", &FastKey);
+		ok1 = MFCD::Cache("LORES1.MIX");
+		assert(ok1);
+	}
+#endif
  #endif
+	}
 #endif
 
 #ifdef FIXIT_ANTS	//	Ok. ajw
-	CCFileClass file("EXPAND.MIX");
-	if (file.Is_Available()) {
+#ifndef _MSC_VER
+	if (access("EXPAND.MIX", F_OK) == 0) {
 		new MFCD("EXPAND.MIX", &FastKey);
 		bool ok = MFCD::Cache("EXPAND.MIX");
 		assert(ok);
 	}
+#else
+	{
+		CCFileClass file("EXPAND.MIX");
+		if (file.Is_Available()) {
+			new MFCD("EXPAND.MIX", &FastKey);
+			bool ok = MFCD::Cache("EXPAND.MIX");
+			assert(ok);
+		}
+	}
+#endif
 #endif
 
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap_Mix: before new MFCD REDALERT.MIX\n"); fflush(stderr);
+#endif
 	new MFCD("REDALERT.MIX", &FastKey);
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap_Mix: after new MFCD REDALERT.MIX\n"); fflush(stderr);
+	{ CCFileClass _probe("LOCAL.MIX");
+	  fprintf(stderr, "[RA] Bootstrap_Mix: REDALERT.MIX opened; LOCAL.MIX via CCFile=%s\n",
+	          _probe.Is_Available() ? "YES" : "NO"); fflush(stderr); }
+#endif
 
 	/*
 	**	Bootstrap enough of the system so that the error dialog box can successfully
@@ -3156,6 +3226,9 @@ static void Init_Bootstrap_Mixfiles(void)
 	*/
 	new MFCD("LOCAL.MIX", &FastKey);			// Cached.
 	bool ok = MFCD::Cache("LOCAL.MIX");
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap_Mix: LOCAL.MIX cache=%s\n", ok ? "OK" : "FAIL"); fflush(stderr);
+#endif
 	assert(ok);
 
 #if 0
@@ -3167,6 +3240,9 @@ static void Init_Bootstrap_Mixfiles(void)
 #else
 	new MFCD("LORES.MIX", &FastKey);
 	ok = MFCD::Cache("LORES.MIX");
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap_Mix: LORES.MIX cache=%s\n", ok ? "OK" : "FAIL"); fflush(stderr);
+#endif
 	assert(ok);
 #endif	//WIN32
 
@@ -3281,7 +3357,13 @@ static void Init_Secondary_Mixfiles(void)
  *=============================================================================================*/
 static void Bootstrap(void)
 {
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap: start\n"); fflush(stderr);
+#endif
 	BlackPalette.Set();
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap: BlackPalette.Set done\n"); fflush(stderr);
+#endif
 
 	/*
 	**	Be sure to short circuit the CD-ROM check if there is a CD-ROM override
@@ -3314,12 +3396,25 @@ static void Bootstrap(void)
 	**	on the mixfiles that are necessary to display and error messages and
 	**	process further initialization.
 	*/
+
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap: calling Init_Bootstrap_Mixfiles\n"); fflush(stderr);
+#endif
 	Init_Bootstrap_Mixfiles();
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap: Init_Bootstrap_Mixfiles done\n"); fflush(stderr);
+#endif
 
 	/*
 	**	Initialize the resident font pointers.
 	*/
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap: calling Init_Fonts\n"); fflush(stderr);
+#endif
 	Init_Fonts();
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap: Init_Fonts done\n"); fflush(stderr);
+#endif
 
 #ifndef WIN32
 	/*
