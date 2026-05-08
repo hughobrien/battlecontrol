@@ -466,43 +466,68 @@ using std::max;
 #define UNREFERENCED_PARAMETER(P) ((void)(P))
 #endif
 
-// TIM-91: _splitpath inert shim. MSVC CRT path decomposer; glibc has no
-// equivalent. Three engine call sites: LOADDLG.CPP:760 (reads ext after,
-// `atoi(ext + 1)`), MIXFILE.CPP:320 (reads name + ext), STARTUP.CPP:342
-// (reads drive + path/dir). All callers pass NULL for fields they don't
-// want. Inert no-op zero-terminates each non-NULL output buffer so any
-// caller doing strlen / strcat / atoi sees an empty string rather than
-// uninitialised stack — same safety contract as the _makepath shim,
-// without doing any real path decomposition (the parser only needs the
-// declaration; the runtime path universe is dormant under the stub).
+// TIM-197: _splitpath real implementation. MSVC CRT path decomposer.
+// Three engine call sites: LOADDLG.CPP:760 (reads ext, atoi(ext+1)),
+// MIXFILE.CPP Finder (reads name+ext to reconstruct bare FILENAME.EXT),
+// STARTUP.CPP:342 (in disabled #if(0) block — never executed).
+// The inert no-op broke MFCD::Finder: it always produced name="" ext=""
+// so stricmp("","LOCAL.MIX") never matched → MFCD::Cache always returned
+// false → assert(ok) fired after LOCAL.MIX ctor.
+// Implements MSVC semantics: drive="X:" dir="path\" fname="base" ext=".ext"
 #ifndef _WWLIB_SPLITPATH_DEFINED
 #define _WWLIB_SPLITPATH_DEFINED
-#ifdef __cplusplus
-static inline void _splitpath(const char* /*path*/,
-                              char* drive,
-                              char* dir,
-                              char* fname,
-                              char* ext)
-{
-    if (drive) drive[0] = '\0';
-    if (dir)   dir[0]   = '\0';
-    if (fname) fname[0] = '\0';
-    if (ext)   ext[0]   = '\0';
-}
-#else
+#include <cstring>
 static inline void _splitpath(const char* path,
                               char* drive,
                               char* dir,
                               char* fname,
                               char* ext)
 {
-    (void)path;
     if (drive) drive[0] = '\0';
     if (dir)   dir[0]   = '\0';
     if (fname) fname[0] = '\0';
     if (ext)   ext[0]   = '\0';
+    if (!path || !path[0]) return;
+
+    const char* p = path;
+
+    // Drive: "X:" at start
+    if (path[0] && path[1] == ':') {
+        if (drive) { drive[0] = path[0]; drive[1] = ':'; drive[2] = '\0'; }
+        p = path + 2;
+    }
+
+    // Last directory separator
+    const char* last_sep = NULL;
+    for (const char* q = p; *q; ++q)
+        if (*q == '/' || *q == '\\') last_sep = q;
+
+    const char* name_start = p;
+    if (last_sep) {
+        if (dir) {
+            std::size_t len = (std::size_t)(last_sep - p + 1);
+            std::strncpy(dir, p, len);
+            dir[len] = '\0';
+        }
+        name_start = last_sep + 1;
+    }
+
+    // Last dot in the name part → extension
+    const char* last_dot = NULL;
+    for (const char* q = name_start; *q; ++q)
+        if (*q == '.') last_dot = q;
+
+    if (last_dot) {
+        if (fname) {
+            std::size_t len = (std::size_t)(last_dot - name_start);
+            std::strncpy(fname, name_start, len);
+            fname[len] = '\0';
+        }
+        if (ext) std::strcpy(ext, last_dot); // includes leading '.'
+    } else {
+        if (fname) std::strcpy(fname, name_start);
+    }
 }
-#endif
 #endif // _WWLIB_SPLITPATH_DEFINED
 
 #endif // !_MSC_VER

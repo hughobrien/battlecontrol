@@ -3213,10 +3213,14 @@ static void Init_Bootstrap_Mixfiles(void)
 	fprintf(stderr, "[RA] Bootstrap_Mix: before new MFCD REDALERT.MIX\n"); fflush(stderr);
 #endif
 	new MFCD("REDALERT.MIX", &FastKey);
+	/* TIM-195: load MAIN.MIX before LOCAL.MIX so the virtual-file lookup can
+	 * find LOCAL.MIX embedded inside MAIN.MIX (original Windows installer
+	 * extracted LOCAL.MIX to the install dir; we skip that step on Linux). */
 #ifndef _MSC_VER
-	fprintf(stderr, "[RA] Bootstrap_Mix: after new MFCD REDALERT.MIX\n"); fflush(stderr);
+	new MFCD("MAIN.MIX", &FastKey);
+	fprintf(stderr, "[RA] Bootstrap_Mix: MAIN.MIX pre-loaded for LOCAL.MIX lookup\n"); fflush(stderr);
 	{ CCFileClass _probe("LOCAL.MIX");
-	  fprintf(stderr, "[RA] Bootstrap_Mix: REDALERT.MIX opened; LOCAL.MIX via CCFile=%s\n",
+	  fprintf(stderr, "[RA] Bootstrap_Mix: after REDALERT+MAIN load; LOCAL.MIX via CCFile=%s\n",
 	          _probe.Is_Available() ? "YES" : "NO"); fflush(stderr); }
 #endif
 
