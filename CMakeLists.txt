@@ -110,7 +110,16 @@ set(TD_ALL_SOURCES ${TD_SOURCES_UPPER} ${TD_SOURCES_LOWER})
 # Exclude DLLInterface entry points and WIN32LIB (handled by linux/ stubs).
 list(FILTER TD_ALL_SOURCES EXCLUDE REGEX ".*/DLLInterface[^/]*\\.([Cc][Pp][Pp])$")
 
-add_executable(td ${TD_ALL_SOURCES})
+# TIM-341: comprehensive link stubs for all WIN32LIB and DLL-host symbols.
+set(TD_STUB_SOURCES
+    "${CMAKE_SOURCE_DIR}/linux/td-win32-stubs.cpp"
+    "${CMAKE_SOURCE_DIR}/linux/win32-stubs/kernel32-stub.cpp"
+    "${CMAKE_SOURCE_DIR}/linux/win32-stubs/sdl_window.cpp"
+    # stop-execution-stub.cpp excluded: STARTUP.CPP defines DLL_Startup;
+    # Stop_Execution is in td-win32-stubs.cpp.
+)
+
+add_executable(td ${TD_ALL_SOURCES} ${TD_STUB_SOURCES})
 add_dependencies(td redalert_include_shim)
 
 target_compile_definitions(td PRIVATE
@@ -135,3 +144,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -w             # suppress warnings (errors already suppressed by fpermissive)
     )
 endif()
+
+# TIM-341: SDL2 required by sdl_window.cpp (MainWindow, SDL_Window_Show, ...).
+find_package(SDL2 REQUIRED)
+target_link_libraries(td PRIVATE SDL2::SDL2)
