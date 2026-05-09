@@ -30,6 +30,12 @@ RUN_DIR="$REPO_ROOT/build/run-172"
 
 mkdir -p "$PASS_DIR" "$OBJ_DIR/REDALERT" "$OBJ_DIR/REDALERT/WIN32LIB" "$OBJ_DIR/STUBS"
 
+# Generate the case-folding include shim (idempotent; required on a fresh checkout).
+python3 "$REPO_ROOT/scripts/generate-include-shim.py" \
+    --repo-root "$REPO_ROOT" \
+    --shim-root "$SHIM_DIR" \
+    --quiet
+
 CXX="${CXX:-g++}"
 
 CXXFLAGS=(
