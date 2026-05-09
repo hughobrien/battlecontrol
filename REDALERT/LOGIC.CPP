@@ -418,6 +418,14 @@ void LogicClass::AI(void)
 		Scen.AutoSonarTimer = AUTOSONAR_PERIOD;
 	}
 #endif
+
+#ifndef _MSC_VER
+	// Headless/non-VIC: animations are not rendered or added to the Logic list.
+	// Free all active anim slots each logic tick to prevent pool exhaustion.
+	for (int anim_i = Anims.Count() - 1; anim_i >= 0; anim_i--) {
+		delete Anims.Ptr(anim_i);
+	}
+#endif
 }
 
 
