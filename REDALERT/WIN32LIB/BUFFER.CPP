@@ -123,6 +123,6 @@ BufferClass::BufferClass(VOID)
 BufferClass::~BufferClass(VOID)
 {
 	if (Allocated) {
-		delete[] Buffer;
+		delete[] static_cast<char*>(Buffer);
 	}
 }

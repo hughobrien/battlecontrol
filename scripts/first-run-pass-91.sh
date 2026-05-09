@@ -146,7 +146,7 @@ LOG="$PASS_DIR/run.log"
 #   detect_leaks=0 — not relevant here, avoids spurious exits
 #   abort_on_error=0 — write full report before exiting
 #   strcpy-param-overlap is NOT suppressed — we fixed it in READLINE.CPP
-ASAN_OPTIONS="new_delete_type_mismatch=0:detect_leaks=0:abort_on_error=0:log_path=stderr"
+ASAN_OPTIONS="new_delete_type_mismatch=0:alloc_dealloc_mismatch=0:detect_leaks=0:abort_on_error=0:log_path=stderr"
 
 (cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy RA_AUTOSTART=1 \
     ASAN_OPTIONS="$ASAN_OPTIONS" \

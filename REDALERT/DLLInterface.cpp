@@ -5044,7 +5044,8 @@ void Recalculate_Placement_Distances()
 
 void DLLExportClass::Recalculate_Placement_Distances()
 {
-	if (PlacementType[CurrentLocalPlayerIndex] != NULL) {
+	if (CurrentLocalPlayerIndex >= 0 && CurrentLocalPlayerIndex < MAX_PLAYERS &&
+		PlacementType[CurrentLocalPlayerIndex] != NULL) {
 		Calculate_Placement_Distances(PlacementType[CurrentLocalPlayerIndex], PlacementDistance[CurrentLocalPlayerIndex]);
 	}
 }
