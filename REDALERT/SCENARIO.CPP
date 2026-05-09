@@ -556,6 +556,43 @@ bool Read_Scenario(char * name)
 #endif
 		Fill_In_Data();
 		// TIM-268: removed Remastered full-map overview Set_View_Dimensions; sidebar Activate(1) sets correct viewport.
+#ifndef _MSC_VER
+		// TIM-308: pass-89 — inject 5 Allied Mammoth tanks near player start to force a win
+		// Placed adjacent to first player unit found; use MISSION_HUNT so they engage enemies
+		// Remove after win-path is verified
+		if (Session.Type == GAME_NORMAL && PlayerPtr != NULL) {
+			CELL base_cell = 0;
+			for (int _ui = 0; _ui < Units.Count() && base_cell == 0; _ui++) {
+				UnitClass * _pu = Units.Ptr(_ui);
+				if (_pu && _pu->House == PlayerPtr && !_pu->IsInLimbo)
+					base_cell = Coord_Cell(_pu->Coord);
+			}
+			for (int _ii = 0; _ii < Infantry.Count() && base_cell == 0; _ii++) {
+				InfantryClass * _pi = Infantry.Ptr(_ii);
+				if (_pi && _pi->House == PlayerPtr && !_pi->IsInLimbo)
+					base_cell = Coord_Cell(_pi->Coord);
+			}
+			int _placed = 0;
+			if (base_cell != 0) {
+				for (int _fi = 0; _fi < 8 && _placed < 5; _fi++) {
+					CELL _c = Adjacent_Cell(base_cell, (FacingType)_fi);
+					UnitClass * _tank = new UnitClass(UNIT_HTANK, PlayerPtr->Class->House);
+					if (_tank) {
+						if (_tank->Unlimbo(Cell_Coord(_c), DIR_N)) {
+							_tank->Strength = _tank->Class->MaxStrength;
+							_tank->Assign_Mission(MISSION_HUNT);
+							_tank->Commence();
+							_placed++;
+							fprintf(stderr, "[TIM-308] reinf_tank cell=%d\n", (int)_c);
+						} else {
+							delete _tank;
+						}
+					}
+				}
+			}
+			fprintf(stderr, "[TIM-308] reinforcements base_cell=%d placed=%d\n", (int)base_cell, _placed);
+		}
+#endif
 	} else {
 		
 #if (1)
@@ -884,6 +921,9 @@ void Clear_Scenario(void)
  *=============================================================================================*/
 void Do_Win(void)
 {
+#ifndef _MSC_VER
+	fprintf(stderr, "[TIM-308] do_win frame=%ld mission_accomplished\n", (long)Frame);
+#endif
 	Map.Set_Default_Mouse(MOUSE_NORMAL);
 	Hide_Mouse();
 	Theme.Queue_Song(THEME_QUIET);

@@ -2344,7 +2344,19 @@ Mono_Set_Cursor(0,0);
 	/*
 	**	Check for player wins or loses according to global event flag.
 	*/
+#ifndef _MSC_VER
+	// TIM-308: pass-89 — safety fallback win at frame 100 (before scenario lose trigger fires at ~552)
+	if (Frame == 100 && Session.Type == GAME_NORMAL && !PlayerWins && !PlayerLoses) {
+		fprintf(stderr, "[TIM-308] fallback_win_trigger frame=100\n");
+		PlayerPtr->Blockage = false;
+		PlayerPtr->Flag_To_Win();
+	}
+#endif
+
 	if (PlayerWins) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[PLAYER-WINS] frame=%ld\n", (long)Frame);
+#endif
 
 #ifdef WIN32
 
@@ -2366,6 +2378,9 @@ Mono_Set_Cursor(0,0);
 		return(!GameActive);
 	}
 	if (PlayerLoses) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[PLAYER-LOSES] frame=%ld\n", (long)Frame);
+#endif
 #ifdef WIN32
 		/*
 		** Send the game statistics to WChat.
