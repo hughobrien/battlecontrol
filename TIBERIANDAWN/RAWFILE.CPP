@@ -50,6 +50,11 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+/* TIM-343: WIN32=1 is now forced globally via target_compile_definitions(td)
+ * in CMakeLists.txt, so HANDLE_TYPE is consistently void* (8B) across all TUs.
+ * FUNCTION.H had its #define WIN32 commented out, causing ODR struct-layout
+ * mismatch between RawFileClass instances — fixed at the CMake level. */
+
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<string.h>
@@ -295,9 +300,15 @@ int RawFileClass::Open(int rights)
 		if (Handle == NULL_HANDLE) {
 
 #ifdef WIN32
-//			return(false);
+			/* TIM-343: return false when file does not exist; original port
+			 * had both return(false) and continue commented out, causing
+			 * Open() to always return true even on ENOENT, which leads to
+			 * infinite recursion in Size() on the LP64 Linux path. */
+			#ifndef _MSC_VER
+			return(false);
+			#else
 			Error(GetLastError(), false, Filename);
-//			continue;
+			#endif
 #else
 			/*
 			**	If this flag is set, then some hard error occurred. Just assume that the error
@@ -561,6 +572,22 @@ long RawFileClass::Read(void * buffer, long size)
 		bytesread = 0;
 
 		SetErrorMode(SEM_FAILCRITICALERRORS);
+#ifndef _MSC_VER
+		/* TIM-343: LP64 fix — DWORD is uint32_t (4 bytes), long is 8 bytes on Linux;
+		 * &(unsigned long&)bytesread type-pun only worked on Win32. Use DWORD temp. */
+		{ DWORD _rb = 0;
+		if (!ReadFile(Handle, buffer, (DWORD)size, &_rb, NULL)) {
+			size -= (long)_rb;
+			total += (long)_rb;
+			Error(GetLastError(), true, Filename);
+			SetErrorMode(0);
+			continue;
+		}
+		SetErrorMode(0);
+		size -= (long)_rb;
+		total += (long)_rb;
+		if (_rb == 0) break; }
+#else
 		if (!ReadFile(Handle, buffer, size, &(unsigned long&)bytesread, NULL)) {
 			size -= bytesread;
 			total += bytesread;
@@ -572,6 +599,7 @@ long RawFileClass::Read(void * buffer, long size)
 		size -= bytesread;
 		total += bytesread;
 		if (bytesread == 0) break;
+#endif
 	}
 	bytesread = total;
 
@@ -675,9 +703,19 @@ long RawFileClass::Write(void const * buffer, long size)
 	}
 
 #ifdef WIN32
+#ifndef _MSC_VER
+	/* TIM-343: LP64 fix — use DWORD temp for WriteFile bytes-written out-param. */
+	{ DWORD _wb = 0;
+	  if (!WriteFile(Handle, buffer, (DWORD)size, &_wb, NULL)) {
+		Error(GetLastError(), false, Filename);
+	  }
+	  bytesread = (long)_wb;
+	}
+#else
 	if (!WriteFile(Handle, buffer, size, &(unsigned long&)bytesread, NULL)) {
 		Error(GetLastError(), false, Filename);
 	}
+#endif
 
 #else
 

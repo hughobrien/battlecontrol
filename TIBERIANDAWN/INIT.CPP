@@ -943,6 +943,25 @@ bool Select_Game(bool fade)
 			Set_Logic_Page(SeenBuff);
 		}
 
+#ifndef _MSC_VER
+		/* TIM-343 pass-99: bypass main menu when TD_AUTOSTART is set.
+		 * Starts GDI mission 1 east variation A directly, skipping UI.
+		 * Mirrors RA_AUTOSTART in REDALERT/INIT.CPP (TIM-206). */
+		if (getenv("TD_AUTOSTART")) {
+			fprintf(stderr, "[TD] Select_Game: TD_AUTOSTART active → SCG01EA (GDI m1 easy)\n"); fflush(stderr);
+			Scenario       = 1;
+			ScenPlayer     = SCEN_PLAYER_GDI;
+			ScenDir        = SCEN_DIR_EAST;
+			ScenVar        = SCEN_VAR_A;
+			BuildLevel     = 10;
+			Whom           = HOUSE_GOOD;
+			GameToPlay     = GAME_NORMAL;
+			Set_Scenario_Name(ScenarioName, Scenario, ScenPlayer, ScenDir, ScenVar);
+			fprintf(stderr, "[TD] ScenarioName = %s\n", ScenarioName); fflush(stderr);
+			selection      = SEL_START_NEW_GAME;
+			process        = false;
+		}
+#endif
 
 		while (process) {
 
