@@ -19,3 +19,6 @@ compile_commands.json
 # Compilation artifacts
 *.o
 a.out
+
+# Claude Code worktrees and local config
+.claude/
