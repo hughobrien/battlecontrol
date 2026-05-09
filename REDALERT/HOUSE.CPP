@@ -920,6 +920,16 @@ void HouseClass::AI(void)
 	// Set PlayerPtr to be this house. ST - 8/7/2019 10:12AM
 	Logic_Switch_Player_Context(this);
 
+#ifndef _MSC_VER
+	// TIM-298: after frame 10, force non-human houses into base-building mode so
+	// BuildingClass::Factory_AI() can start production (IsStarted gate).
+	if (Frame == 10 && !IsHuman && !IsBaseBuilding) {
+		fprintf(stderr, "[TIM-298] frame %ld: %s forcing IsBaseBuilding=1 (IQ=%d)\n",
+		        Frame, Class->IniName, (int)IQ);
+		IsBaseBuilding = true;
+	}
+#endif
+
 	/*
 	**	If base building has been turned on by a trigger, then force the house to begin
 	**	production and team creation as well. This is also true if the IQ is high enough to
@@ -6367,6 +6377,10 @@ int HouseClass::AI_Infantry(void)
 		if (bestcount) {
 			int pick = Random_Pick(0, bestcount-1);
 			BuildInfantry = bestlist[pick];
+#ifndef _MSC_VER
+			fprintf(stderr, "[TIM-298] frame %ld: %s AI_Infantry(team) queued type=%d\n",
+			        Frame, Class->IniName, (int)BuildInfantry);
+#endif
 		}
 
 	}
@@ -6450,6 +6464,10 @@ int HouseClass::AI_Infantry(void)
 			for (int index = 0; index < count; index++) {
 				if (pick < typetrack[index].Value) {
 					BuildInfantry = typetrack[index].Type;
+#ifndef _MSC_VER
+					fprintf(stderr, "[TIM-298] frame %ld: %s AI_Infantry(base) queued type=%d\n",
+					        Frame, Class->IniName, (int)BuildInfantry);
+#endif
 					break;
 				}
 				pick -= typetrack[index].Value;
