@@ -2344,22 +2344,6 @@ Mono_Set_Cursor(0,0);
 	/*
 	**	Check for player wins or loses according to global event flag.
 	*/
-#ifndef _MSC_VER
-	/* TIM-303: suppress win/lose conditions until frame 1200 to extend runtime past 1000 */
-	if (PlayerLoses || PlayerWins) {
-		extern long Frame;
-		if (Frame < 1200) {
-			static long last_suppress_frame = -9999;
-			if (Frame - last_suppress_frame >= 100) {
-				last_suppress_frame = Frame;
-				fprintf(stderr, "[TIM-303] mission_end_suppressed frame=%ld wins=%d loses=%d\n",
-				        Frame, (int)PlayerWins, (int)PlayerLoses);
-			}
-			PlayerWins = false;
-			PlayerLoses = false;
-		}
-	}
-#endif
 	if (PlayerWins) {
 
 #ifdef WIN32

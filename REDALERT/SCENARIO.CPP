@@ -2685,36 +2685,6 @@ bool Read_Scenario_INI(char * fname, bool )
 		}
 	}	
 #endif
-#ifndef _MSC_VER
-	/* TIM-303: boost placed unit/infantry/vessel Strength 4x so units take longer to die,
-	 * combined with CONQUER.CPP win/lose suppression to run past frame 1000. */
-	{
-		int boosted_u = 0, boosted_i = 0, boosted_v = 0;
-		for (int idx = 0; idx < Units.Count(); idx++) {
-			UnitClass * u = Units.Ptr(idx);
-			if (u && !u->IsInLimbo && u->Strength > 0) {
-				u->Strength = (short)min((int)u->Strength * 4, 32767);
-				boosted_u++;
-			}
-		}
-		for (int idx = 0; idx < Infantry.Count(); idx++) {
-			InfantryClass * inf = Infantry.Ptr(idx);
-			if (inf && !inf->IsInLimbo && inf->Strength > 0) {
-				inf->Strength = (short)min((int)inf->Strength * 4, 32767);
-				boosted_i++;
-			}
-		}
-		for (int idx = 0; idx < Vessels.Count(); idx++) {
-			VesselClass * v = Vessels.Ptr(idx);
-			if (v && !v->IsInLimbo && v->Strength > 0) {
-				v->Strength = (short)min((int)v->Strength * 4, 32767);
-				boosted_v++;
-			}
-		}
-		fprintf(stderr, "[TIM-303] strength_boost_4x: units=%d infantry=%d vessels=%d\n",
-		        boosted_u, boosted_i, boosted_v);
-	}
-#endif
 	ScenarioInit--;
 	return(true);
 }
