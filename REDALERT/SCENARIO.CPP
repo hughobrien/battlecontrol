@@ -60,6 +60,11 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include	"function.h"
+// TIM-310: pass-90 — per-cycle win-arm frame; set to Frame after each Read_Scenario success.
+// CONQUER.CPP reads this to fire PlayerWins exactly 5 frames into each new cycle.
+#ifndef _MSC_VER
+long g_tim310_restart_frame = -1;
+#endif
 // TIM-61 Fix C: define min/max as macros mirroring Win32 <windef.h>.
 // Replicates the TIM-54 Fix C precedent for the 2-TU min/max ADL
 // residual surfaced by TIM-57 fragmentation. JSHELL.H's free
@@ -557,9 +562,14 @@ bool Read_Scenario(char * name)
 		Fill_In_Data();
 		// TIM-268: removed Remastered full-map overview Set_View_Dimensions; sidebar Activate(1) sets correct viewport.
 #ifndef _MSC_VER
-		// TIM-308: pass-89 — inject 5 Allied Mammoth tanks near player start to force a win
-		// Placed adjacent to first player unit found; use MISSION_HUNT so they engage enemies
-		// Remove after win-path is verified
+		// TIM-310: pass-90 — track restart cycle; arm per-cycle win trigger 5 frames out
+		{
+			static int s_cycle = 0;
+			s_cycle++;
+			g_tim310_restart_frame = Frame;  // signal CONQUER.CPP to force win at Frame+5
+			fprintf(stderr, "[TIM-310] read_scenario_ok cycle=%d frame=%ld\n", s_cycle, (long)Frame);
+		}
+		// TIM-308: pass-89 — inject 5 Allied Mammoth tanks near player start (retained for combat coverage)
 		if (Session.Type == GAME_NORMAL && PlayerPtr != NULL) {
 			CELL base_cell = 0;
 			for (int _ui = 0; _ui < Units.Count() && base_cell == 0; _ui++) {
@@ -815,7 +825,16 @@ void Post_Load_Game(int load_multi)
 void Clear_Scenario(void)
 {
 // TCTCTC -- possibly just use in-place new of scenario object?
-
+#ifndef _MSC_VER
+	// TIM-310: pass-90 — trace each Clear_Scenario call
+	{
+		static int s_clear_count = 0;
+		s_clear_count++;
+		extern long g_tim310_restart_frame;
+		g_tim310_restart_frame = -1;  // disarm win trigger during clear
+		fprintf(stderr, "[TIM-310] clear_scenario #%d frame=%ld\n", s_clear_count, (long)Frame);
+	}
+#endif
 	Scen.MissionTimer = 0;
 	Scen.MissionTimer.Stop();
 	Scen.Timer = 0;
@@ -922,6 +941,11 @@ void Clear_Scenario(void)
 void Do_Win(void)
 {
 #ifndef _MSC_VER
+	{
+		static int s_win_count = 0;
+		s_win_count++;
+		fprintf(stderr, "[TIM-310] do_win #%d frame=%ld\n", s_win_count, (long)Frame);
+	}
 	fprintf(stderr, "[TIM-308] do_win frame=%ld mission_accomplished\n", (long)Frame);
 #endif
 	Map.Set_Default_Mouse(MOUSE_NORMAL);
