@@ -1026,32 +1026,33 @@ void Wait_Vert_Blank(void)
 
 	// TIM-247: save frame 500 as BMP; also log raw indexed-surface samples
 	// and palette to distinguish "all-zero surface" from "bad palette".
-	if (SDL_FirstPresentDone && ++SDL_PresentCount == 500) {
-		const char* bmp500 = "/tmp/redalert-frame500.bmp";
-		int rc500 = SDL_SaveBMP(SDL_PrimaryARGB, bmp500);
-		const uint32_t* px500 = (const uint32_t*)SDL_PrimaryARGB->pixels;
-		int total500 = SDL_PrimaryARGB->w * SDL_PrimaryARGB->h;
-		int nz500 = 0;
-		for (int i = 0; i < total500 && i < 500000; ++i)
-			if (px500[i] & 0x00FFFFFF) ++nz500;
-		fprintf(stderr, "[RA] frame500 BMP: rc=%d nz_pixels(sample)=%d path=%s\n", rc500, nz500, bmp500);
-		// Diagnose: show raw indexed-surface byte values (non-zero = rendering happened)
-		const uint8_t* idx = (const uint8_t*)SDL_PrimarySurface->pixels;
-		int total_idx = SDL_PrimarySurface->w * SDL_PrimarySurface->h;
-		int nz_idx = 0;
-		for (int i = 0; i < total_idx && i < 500000; ++i)
-			if (idx[i]) ++nz_idx;
-		fprintf(stderr, "[RA] frame500 indexed: nz_bytes=%d (0=surface never written)\n", nz_idx);
-		// Show palette entry 1 (should be non-black if palette is set correctly)
-		SDL_Color* pal = SDL_PrimarySurface->format->palette
-		                 ? SDL_PrimarySurface->format->palette->colors : nullptr;
-		if (pal) {
-			fprintf(stderr, "[RA] frame500 palette[0]=%u,%u,%u pal[1]=%u,%u,%u pal[128]=%u,%u,%u\n",
-				pal[0].r, pal[0].g, pal[0].b,
-				pal[1].r, pal[1].g, pal[1].b,
-				pal[128].r, pal[128].g, pal[128].b);
-		} else {
-			fprintf(stderr, "[RA] frame500 palette: NULL (SDL_PrimarySurface has no palette!)\n");
+	// TIM-283: also save frame 1000 for tac-bottom zone audit.
+	if (SDL_FirstPresentDone) ++SDL_PresentCount;
+	if (SDL_FirstPresentDone && (SDL_PresentCount == 500 || SDL_PresentCount == 1000)) {
+		bool is_f500 = (SDL_PresentCount == 500);
+		const char* bmp_path = is_f500 ? "/tmp/redalert-frame500.bmp" : "/tmp/redalert-frame1000.bmp";
+		int bmp_rc = SDL_SaveBMP(SDL_PrimaryARGB, bmp_path);
+		const uint32_t* px = (const uint32_t*)SDL_PrimaryARGB->pixels;
+		int total = SDL_PrimaryARGB->w * SDL_PrimaryARGB->h;
+		int nz = 0;
+		for (int i = 0; i < total; ++i)
+			if (px[i] & 0x00FFFFFF) ++nz;
+		fprintf(stderr, "[RA] frame%d BMP: rc=%d nz_pixels=%d path=%s\n",
+			SDL_PresentCount, bmp_rc, nz, bmp_path);
+		if (is_f500) {
+			const uint8_t* idx = (const uint8_t*)SDL_PrimarySurface->pixels;
+			int total_idx = SDL_PrimarySurface->w * SDL_PrimarySurface->h;
+			int nz_idx = 0;
+			for (int i = 0; i < total_idx; ++i)
+				if (idx[i]) ++nz_idx;
+			fprintf(stderr, "[RA] frame500 indexed: nz_bytes=%d\n", nz_idx);
+			SDL_Color* pal = SDL_PrimarySurface->format->palette
+			                 ? SDL_PrimarySurface->format->palette->colors : nullptr;
+			if (pal)
+				fprintf(stderr, "[RA] frame500 palette[0]=%u,%u,%u pal[1]=%u,%u,%u pal[128]=%u,%u,%u\n",
+					pal[0].r, pal[0].g, pal[0].b,
+					pal[1].r, pal[1].g, pal[1].b,
+					pal[128].r, pal[128].g, pal[128].b);
 		}
 		fflush(stderr);
 	}
