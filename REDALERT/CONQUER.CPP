@@ -2345,11 +2345,20 @@ Mono_Set_Cursor(0,0);
 	**	Check for player wins or loses according to global event flag.
 	*/
 #ifndef _MSC_VER
-	// TIM-308: pass-89 — safety fallback win at frame 100 (before scenario lose trigger fires at ~552)
-	if (Frame == 100 && Session.Type == GAME_NORMAL && !PlayerWins && !PlayerLoses) {
-		fprintf(stderr, "[TIM-308] fallback_win_trigger frame=100\n");
-		PlayerPtr->Blockage = false;
-		PlayerPtr->Flag_To_Win();
+	// TIM-310: pass-90 — per-cycle win trigger: fires 200 frames after each scenario load.
+	// 200 frames = ~13s of real gameplay for stress-testing the restart path.
+	// g_tim310_restart_frame is set to Frame in Read_Scenario() on success; reset to -1 here
+	// after firing so it only triggers once per cycle. Direct PlayerWins=true skips BorrowedTime.
+	{
+		extern long g_tim310_restart_frame;
+		if (g_tim310_restart_frame >= 0 && Frame >= g_tim310_restart_frame + 200
+				&& Session.Type == GAME_NORMAL && !PlayerWins && !PlayerLoses && PlayerPtr != NULL) {
+			fprintf(stderr, "[TIM-310] forcing win at frame=%ld (armed_at=%ld)\n",
+				(long)Frame, (long)g_tim310_restart_frame);
+			g_tim310_restart_frame = -1;
+			PlayerPtr->Blockage = 0;
+			PlayerWins = true;
+		}
 	}
 #endif
 

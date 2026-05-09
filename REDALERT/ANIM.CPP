@@ -510,6 +510,10 @@ void * AnimClass::operator new(size_t)
 	if (ptr != NULL) {
 		((AnimClass *)ptr)->Set_Active();
 	} else {
+#ifndef _MSC_VER
+		fprintf(stderr, "[TIM-311] AnimClass::operator new FAILED avail=%d total=%d frame=%ld\n",
+			Anims.Avail(), Anims.Length(), (long)Frame);
+#endif
 		GlyphX_Debug_Print("AnimClass::operator new FAILED");
 	}
 	return(ptr);
