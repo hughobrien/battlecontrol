@@ -2442,6 +2442,27 @@ Mono_Set_Cursor(0,0);
 	*/
 	Frame++;
 
+#ifndef _MSC_VER
+	// TIM-316: FPS probe — log every 500 frames so the smoke test can measure throughput.
+	{
+		static struct timespec _fps_t0 = {0, 0};
+		static long _fps_base_frame = 0;
+		if (_fps_t0.tv_sec == 0) {
+			clock_gettime(CLOCK_MONOTONIC, &_fps_t0);
+			_fps_base_frame = Frame;
+		} else if ((Frame - _fps_base_frame) % 500 == 0 && Frame > _fps_base_frame) {
+			struct timespec _fps_now;
+			clock_gettime(CLOCK_MONOTONIC, &_fps_now);
+			long elapsed_ms = (long)((_fps_now.tv_sec  - _fps_t0.tv_sec)  * 1000
+			                       + (_fps_now.tv_nsec - _fps_t0.tv_nsec) / 1000000);
+			long frames_done = Frame - _fps_base_frame;
+			double fps = elapsed_ms > 0 ? frames_done * 1000.0 / elapsed_ms : 0.0;
+			fprintf(stderr, "[TIM-316] fps_probe frame=%ld elapsed_ms=%ld fps=%.2f\n",
+			        (long)Frame, elapsed_ms, fps);
+		}
+	}
+#endif
+
 	/*
 	** Is there a memory trasher altering the map??
 	*/
