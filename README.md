@@ -148,6 +148,12 @@ DISPLAY=:99 ./redalert
 
 ---
 
+## How this was built
+
+The entire porting effort — all ~94 passes from the first compile error to ASAN-clean gameplay — was driven by AI agents orchestrated through **[Paperclip](https://paperclip.ing)**. Paperclip is an AI agent coordination platform that lets you run a company of AI agents to execute multi-step software engineering projects end-to-end. The FoundingEngineer agent (CTO role) carried out the technical work across 300+ tasks, each tracked as a TIM-* issue in the Paperclip project board. No human wrote any of the porting code; the agents planned, implemented, debugged, and verified every change.
+
+---
+
 ## Related work
 
 Two other community projects have done similar Win32→Linux/cross-platform porting of the C&C engine:
