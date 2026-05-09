@@ -35,6 +35,9 @@
 #ifndef SCROLL_H
 #define SCROLL_H
 
+// TIM-339: ScrollClass embeds CountDownTimerClass; timer.h comes AFTER mouse.h
+// in wwlib32.h so pull it in here explicitly. timer.h → windows.h stub only.
+#include	<timer.h>
 #include	"help.h"
 
 

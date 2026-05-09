@@ -131,8 +131,9 @@ void Nod_Ending(void)
 	HidPage.Clear();
 	PseudoSeenBuff->Clear();
 
-	void * localpal = Load_Alloc_Data(CCFileClass("SATSEL.PAL"));
-	Load_Uncompress(CCFileClass("SATSEL.CPS"), SysMemPage, SysMemPage);
+	// TIM-339: temporaries can't bind to non-const FileClass&; use named vars.
+	CCFileClass palfile("SATSEL.PAL"); void * localpal = Load_Alloc_Data(palfile);
+	CCFileClass cpsfile("SATSEL.CPS"); Load_Uncompress(cpsfile, SysMemPage, SysMemPage);
 #ifdef NOT_FOR_WIN95
 	memcpy(satpic, HidPage.Get_Buffer(), 64000);
 #else
@@ -167,7 +168,7 @@ void Nod_Ending(void)
 	bool printedtext = false;
 	while (!done) {
 		if (!printedtext && !Is_Sample_Playing(kanefinl)) {
-			printedtext++;
+			printedtext = true; // TIM-339: bool++ forbidden in C++17
 			Alloc_Object(new ScorePrintClass(Text_String(TXT_SEL_TARGET), 0, 180,_tanpal));
 			mouseshown = true;
 			Show_Mouse();
@@ -184,7 +185,7 @@ void Nod_Ending(void)
 					int mousex = _Kbd->MouseQX;
 					int mousey = _Kbd->MouseQY;
 					if (mousey >= 22*2 && mousey <= 177*2) {
-						done++;
+						done = true; // TIM-339: bool++ forbidden in C++17
 						if (mousex <  160*2 && mousey <  100*2) selection = 2;
 						if (mousex <  160*2 && mousey >= 100*2) selection = 3;
 						if (mousex >= 160*2 && mousey >= 100*2) selection = 4;

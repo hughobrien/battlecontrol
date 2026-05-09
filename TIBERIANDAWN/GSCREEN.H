@@ -37,6 +37,9 @@
 
 #include	"function.h"
 #include	"cell.h"
+// TIM-339: GScreenClass uses GadgetClass by reference and as a static pointer.
+// gadget.h → link.h only; no circular dependency.
+#include	"gadget.h"
 
 class GScreenClass : public VectorClass<CellClass>
 {

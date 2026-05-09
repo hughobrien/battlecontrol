@@ -38,6 +38,8 @@
 #include "object.h"
 #include	"fly.h"
 #include	"fuse.h"
+// TIM-339: BulletClass embeds FacingClass by value; include facing.h here.
+#include	"facing.h"
 
 
 class BulletClass :	public ObjectClass,

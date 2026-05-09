@@ -35,8 +35,12 @@
 #ifndef FTIMER_H
 #define FTIMER_H
 
+// TIM-339: TCountDownTimerClass inline methods reference Frame; forward-declare
+// so ftimer.h is self-contained (same fix as RA TIM-20).
+extern long Frame;
+
 /*
-**	This timer class is based around an external tick system. As such, it is inherently 
+**	This timer class is based around an external tick system. As such, it is inherently
 **	in sync with any connected system (through network or modem) that also keeps the external
 **	tick system in sync. The game frame number is a good sync value.
 */

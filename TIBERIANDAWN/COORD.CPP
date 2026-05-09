@@ -400,40 +400,17 @@ COORDINATE Coord_Scatter(COORDINATE coord, unsigned distance, bool lock)
 
 
 
+// TIM-339: replaced MASM __asm{} blocks with portable C++ equivalents.
+// Original asm: 16-bit imul of param1*distance, extract bits[23:8] of
+// the 32-bit product (= product >> 7 arithmetic). calcy negates the result.
 int __cdecl calcx(signed short param1, short distance)
 {
-	__asm {
-				  
-//#pragma aux calcx parm [ax] [bx] \
-	
-		movzx	eax, [param1]
-		mov	bx, [distance]
-		imul 	bx
-		shl	ax,1
-		rcl	dx,1
-		mov	al,ah
-		mov	ah,dl
-		cwd
-	}
+	return (int)((int32_t)param1 * (int32_t)distance >> 7);
 }
-
 
 int __cdecl calcy(signed short param1, short distance)
 {
-	__asm {
-				  
-//#pragma aux calcy parm [ax] [bx] \
-	
-		movzx	eax, [param1]
-		mov	bx, [distance]
-		imul bx
-		shl	ax,1
-		rcl	dx,1
-		mov	al,ah
-		mov	ah,dl
-		cwd
-		neg	eax
-	}
+	return -(int)((int32_t)param1 * (int32_t)distance >> 7);
 }
 
 

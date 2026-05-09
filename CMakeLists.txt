@@ -131,6 +131,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(td PRIVATE
         "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
         -fmax-errors=20
-        -w
+        -fpermissive   # TIM-339: allows extra qualifications + two-phase lookup as warnings
+        -w             # suppress warnings (errors already suppressed by fpermissive)
     )
 endif()

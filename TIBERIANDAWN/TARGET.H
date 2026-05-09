@@ -35,6 +35,11 @@
 #ifndef TARGET_H
 #define TARGET_H
 
+// TIM-339: TARGET.H uses the TARGET typedef in inline helpers; the type is
+// defined in DEFINES.H but reached TARGET.H only via the includer's include
+// order. Pull DEFINES.H in here so TARGET.H is self-contained.
+#include	"defines.h"
+
 /**************************************************************************
 ** When a unit proceeds with carrying out its mission, it can have several
 **	intermediate goals. Each goal (or target if you will) can be one of the

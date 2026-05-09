@@ -38,6 +38,10 @@
 #include	"function.h"
 #include	"power.h"
 #include	"factory.h"
+// TIM-339: SelectClass inherits ControlClass; ShapeButtonClass used as member.
+// shapebtn.h → toggle.h → control.h → gadget.h; no circular dep.
+#include	"control.h"
+#include	"shapebtn.h"
 
 class SidebarClass: public PowerClass
 {

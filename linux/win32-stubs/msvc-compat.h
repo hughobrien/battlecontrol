@@ -19,6 +19,13 @@
 #ifndef LINUX_WIN32_STUBS_MSVC_COMPAT_H
 #define LINUX_WIN32_STUBS_MSVC_COMPAT_H
 
+// TIM-339: CHEAT_KEYS is defined unconditionally in DEFINES.H, but STAGE.H
+// is parsed earlier (via wwlib32.h→MOUSE.H) before DEFINES.H is reached.
+// Pre-define here so StageClass::Debug_Dump is compiled into StageClass.
+#ifndef CHEAT_KEYS
+#define CHEAT_KEYS
+#endif
+
 #if !defined(_MSC_VER)
 
 // TIM-11: Honor DDRAW.H's upstream `#if defined(_WIN32) && !defined(_NO_COM)`
@@ -598,5 +605,11 @@ HRESULT    SafeArrayUnaccessData(SAFEARRAY* psa);
 }
 #endif
 #endif // _TIM135_OLE_AUTOMATION_DEFINED
+
+/* TIM-339: sprintf_s is an MSVC safe-string extension; map to snprintf on Linux. */
+#ifndef _MSC_VER
+#include <stdio.h>
+#define sprintf_s(buf, sz, ...) snprintf((buf), (sz), __VA_ARGS__)
+#endif
 
 #endif // LINUX_WIN32_STUBS_MSVC_COMPAT_H

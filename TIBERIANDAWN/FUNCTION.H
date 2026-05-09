@@ -35,78 +35,84 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
 
+// TIM-339: FUNCTION.H uses HouseClass* at multiple points (lines 325, 633, 634, 983)
+// but house.h (which defines HouseClass) is not pulled in until line 235. Circular
+// includes can cause the compiler to reach these declarations before house.h is seen.
+// Forward-declare so FUNCTION.H is self-contained for pointer uses.
+class HouseClass;
+
 #ifdef NEVER
 Map (screen) class heirarchy.
 
  MapeditClass (most derived class) -- scenario editor
-        ³
+        ï¿½
    MouseClass -- handles mouse animation and display control
-        ³
+        ï¿½
   ScrollClass -- map scroll handler
-        ³
+        ï¿½
     HelpClass -- pop-up help text handler
-        ³
+        ï¿½
      TabClass -- file folder tab screen mode control dispatcher
-        ³
+        ï¿½
  SidebarClass -- displays and controls construction list sidebar
-        ³
+        ï¿½
    PowerClass -- display power production/consumption bargraph
-        ³
+        ï¿½
    RadarClass -- displays and controls radar map
-        ³
+        ï¿½
  DisplayClass -- general tactical map display handler
-        ³
+        ï¿½
      MapClass -- general tactical map data handler
-        ³
+        ï¿½
  GScreenClass (pure virtual base class) -- generic screen control
 
                           AbstractClass
-                                  ³
-                                  ³
-                                  ³
-                                  ³
+                                  ï¿½
+                                  ï¿½
+                                  ï¿½
+                                  ï¿½
                             ObjectClass
-                                  ³
-       ÚÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄ¿
-   AnimClass  ³  TemplateClass    ³        ÃÄ FuseClass     ³    TerrainClass
-              ³                   ³        ÃÄ FlyClass      ³
-              ³                   ³  BulletClass            ³
+                                  ï¿½
+       ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
+   AnimClass  ï¿½  TemplateClass    ï¿½        ï¿½ï¿½ FuseClass     ï¿½    TerrainClass
+              ï¿½                   ï¿½        ï¿½ï¿½ FlyClass      ï¿½
+              ï¿½                   ï¿½  BulletClass            ï¿½
        OverlayClass        MissionClass               SmudgeClass
-                                  ³
+                                  ï¿½
                              RadioClass
-                                  ³
-                                  ÃÄ CrewClass
-                                  ÃÄ FlasherClass
-                                  ÃÄ StageClass
-                                  ÃÄ CargoClass
+                                  ï¿½
+                                  ï¿½ï¿½ CrewClass
+                                  ï¿½ï¿½ FlasherClass
+                                  ï¿½ï¿½ StageClass
+                                  ï¿½ï¿½ CargoClass
                             TechnoClass
-                                  ³
-         ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÁÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
+                                  ï¿½
+         ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
      FootClass                                         BuildingClass
-         ³
-         ÃÄÄÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
-    DriveClass  InfantryClass         ÃÄ FlyClass
-         ³                      AircraftClass
+         ï¿½
+         ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
+    DriveClass  InfantryClass         ï¿½ï¿½ FlyClass
+         ï¿½                      AircraftClass
    TurretClass
-         ³
+         ï¿½
    TarComClass
-         ³
+         ï¿½
      UnitClass
 
 
                             AbstractTypeClass
-                                    ³
+                                    ï¿½
                               ObjectTypeClass
-                                    ³
-             ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÄÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
-             ³                      ³            ³                 ³
-       TechnoTypeClass              ³            ³                 ³
-             ³                BulletTypeClass    ³                 ³
-             ³                           TemplateTypeClass         ³
-    ÚÄÄÄÄÄÄÄÄÁÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÂÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿             TerrainTypeClass
-    ³              ³           ³              ³
-UnitTypeClass      ³   BuildingTypeClass      ³
-                   ³                  InfantryTypeClass
+                                    ï¿½
+             ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿
+             ï¿½                      ï¿½            ï¿½                 ï¿½
+       TechnoTypeClass              ï¿½            ï¿½                 ï¿½
+             ï¿½                BulletTypeClass    ï¿½                 ï¿½
+             ï¿½                           TemplateTypeClass         ï¿½
+    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿             TerrainTypeClass
+    ï¿½              ï¿½           ï¿½              ï¿½
+UnitTypeClass      ï¿½   BuildingTypeClass      ï¿½
+                   ï¿½                  InfantryTypeClass
            AircraftTypeClass
 #endif
 
@@ -140,6 +146,12 @@ typedef int bool;
 #include "compat.h"
 #include	"rawfile.h"
 #include "wwlib32.h"
+// TIM-339: wwlib32.h's <mouse.h> picks up game MOUSE.H (shim order); include
+// WIN32LIB/MOUSE.H directly for Hide_Mouse, Show_Mouse, Get_Mouse_X/Y.
+#include "WIN32LIB/MOUSE.H"
+// TIM-339: wwlib32.h's <audio.h> picks up game AUDIO.H (shim order); include
+// WIN32LIB/AUDIO.H directly for SFX_Type, Sample_Type, Sound_Callback etc.
+#include "WIN32LIB/AUDIO.H"
 #include	"jshell.h"
 
 
@@ -517,7 +529,13 @@ void Load_Recording_Values(void);
 void * Small_Icon(void const * iconptr, int iconnum);
 void Set_Window(int window, int x, int y, int w, int h);
 void * Load_Alloc_Data(FileClass &file);
+// TIM-339: allow temporary FileClass/CCFileClass to bind (C++17 rejects rvalueâ†’non-const-lref).
+inline void * Load_Alloc_Data(FileClass &&file) { return Load_Alloc_Data(file); }
 long Load_Uncompress(FileClass &file, BuffType &uncomp_buff, BuffType &dest_buff, void *reserved_data);
+// TIM-339: same rvalue overload for temporary FileClass at call sites.
+inline long Load_Uncompress(FileClass &&file, BuffType &uncomp_buff, BuffType &dest_buff, void *reserved_data) {
+    return Load_Uncompress(file, uncomp_buff, dest_buff, reserved_data);
+}
 long Translucent_Table_Size(int count);
 void *Build_Translucent_Table(void const *palette, TLucentType const *control, int count, void *buffer);
 void *Conquer_Build_Translucent_Table(void const *palette, TLucentType const *control, int count, void *buffer);
@@ -781,11 +799,12 @@ void Blit_Hid_Page_To_Seen_Buff(void);
 extern bool RunningAsDLL;
 
 
-template<class T> inline T Random_Picky(T a, T b, char *sfile, int line)
+// TIM-339: two-param variant for LP64 mismatch (e.g. unsigned int vs unsigned long)
+template<class T, class U> inline T Random_Picky(T a, U b, char *sfile, int line)
 {
 	sfile = sfile;
 	line = line;
-	return (T)IRandom((int)a, (int)b);	//, sfile, line);
+	return (T)IRandom((int)a, (int)b);
 };
 
 #define Random_Pick(low, high) Random_Picky ( (low), (high), __FILE__, __LINE__)

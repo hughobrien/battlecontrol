@@ -39,6 +39,10 @@
 #include	"mission.h"
 //#include	"flasher.h"
 
+// TIM-339: Transmit_Message default argument names the global `extern long LParam`.
+// Forward-declare it here so RADIO.H is self-contained.
+extern long LParam;
+
 class ObjectClass;
 class TechnoClass;
 
