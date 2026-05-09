@@ -1952,6 +1952,14 @@ void FootClass::Death_Announcement(TechnoClass const * ) const
 {
 	assert(IsActive);
 
+#ifndef _MSC_VER
+	{
+		extern long Frame;
+		fprintf(stderr, "[TIM-301] death_announcement frame=%ld unit=%s\n",
+		        Frame, Techno_Type_Class()->IniName);
+	}
+#endif
+
 	//if (IsOwnedByPlayer) {
 	if ((Session.Type == GAME_GLYPHX_MULTIPLAYER && House->IsHuman) || (Session.Type != GAME_GLYPHX_MULTIPLAYER && IsOwnedByPlayer)) {
 		if (What_Am_I() == RTTI_VESSEL) {

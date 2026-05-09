@@ -172,7 +172,7 @@ const char* NewName[] = {
 	"Scout Ant",	  			"Kundschafter-Ameise",
 	"Warrior Ant",    		"Krieger-Ameise",
 	"Fire Ant",	  				"Feuer-Ameise",
-	"Queen Ant",	  			"Ameisenk”nigin",
+	"Queen Ant",	  			"Ameisenkï¿½nigin",
 	"ATS",						"Angriffs-U-Boot",
 	"Tesla Tank",	  			"Telsapanzer",
 	"Volkov",  					"Modell Volkov",
@@ -188,7 +188,7 @@ const char* NewName[] = {
 #ifdef FRENCH
 const char* NewName[] = {
 	"Scout Ant",	  			"Fourmi de Reconnaissance",
-	"Warrior Ant",    		"Fourmi GuerriŠre",
+	"Warrior Ant",    		"Fourmi Guerriï¿½re",
 	"Fire Ant",	  				"Fourmi Lance-Flammes",
 	"Queen Ant",	  			"Reine des Fourmis",
 	"ATS", 						"SMTA",
@@ -196,9 +196,9 @@ const char* NewName[] = {
 	"Volkov",  					"Volkov",
 	"Chitzkoi", 				"Cyber-Chien",
 	"Stavros",					"Stavros",
-	"F-A Longbow",				"HAA (H‚licoptŠre d'Assaut Avanc‚)",
-	"Civilian Specialist",	"Sp‚cialiste Civil",
-	"Alloy Facility",			"Usine M‚tallurgique",
+	"F-A Longbow",				"HAA (Hï¿½licoptï¿½re d'Assaut Avancï¿½)",
+	"Civilian Specialist",	"Spï¿½cialiste Civil",
+	"Alloy Facility",			"Usine Mï¿½tallurgique",
 	NULL,
 	};
 
@@ -3260,6 +3260,18 @@ BulletClass * TechnoClass::Fire_At(TARGET target, int which)
 
  	bullet = new BulletClass(weapon->Bullet->Type, target, this, firepower, WarheadType(weapon->WarheadPtr->ID), firespeed);
 
+#ifndef _MSC_VER
+	if (bullet != NULL) {
+		extern long Frame;
+		static long last_fire_frame = -9999;
+		if (Frame - last_fire_frame >= 30) {
+			last_fire_frame = Frame;
+			fprintf(stderr, "[TIM-301] fire_at frame=%ld shooter=%s\n",
+			        Frame, Techno_Type_Class()->IniName);
+		}
+	}
+#endif
+
 	if (bullet != NULL) {
 
 		/*
@@ -4031,11 +4043,32 @@ ResultType TechnoClass::Take_Damage(int & damage, int distance, WarheadType warh
 	}
 
 	if (IronCurtainCountDown == 0) {
+#ifndef _MSC_VER
+		int strength_before = Strength;
+#endif
 		result = ObjectClass::Take_Damage(damage, distance, warhead, source, forced);
+#ifndef _MSC_VER
+		if (damage > 0 || result == RESULT_DESTROYED) {
+			extern long Frame;
+			static long last_damage_frame = -9999;
+			if (Frame - last_damage_frame >= 30) {
+				last_damage_frame = Frame;
+				fprintf(stderr, "[TIM-301] take_damage frame=%ld target=%s str_before=%d str_after=%d result=%d\n",
+				        Frame, Techno_Type_Class()->IniName, strength_before, (int)Strength, (int)result);
+			}
+		}
+#endif
 	}
 
 	switch (result) {
 		case RESULT_DESTROYED:
+#ifndef _MSC_VER
+			{
+				extern long Frame;
+				fprintf(stderr, "[TIM-301] unit_destroyed frame=%ld victim=%s\n",
+				        Frame, Techno_Type_Class()->IniName);
+			}
+#endif
 			Transmit_Message(RADIO_OVER_OUT);
 			Stun();
 
