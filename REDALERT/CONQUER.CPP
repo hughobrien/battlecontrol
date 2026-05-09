@@ -2185,19 +2185,6 @@ Mono_Set_Cursor(0,0);
 #endif
 	if (!GameActive) return(!GameActive);
 
-#ifndef _MSC_VER
-	// TIM-288 pass-80: count actual GameActive iterations and report at frame milestones.
-	{
-		static long gameactive_iters = 0;
-		gameactive_iters++;
-		if (Frame == 500 || Frame == 1000) {
-			fprintf(stderr, "[TIM-288] GameActive-iters=%ld at Frame=%ld\n",
-				gameactive_iters, Frame);
-			fflush(stderr);
-		}
-	}
-#endif
-
 #ifdef _MSC_VER
 	/*
 	** Call the focus loss handler
@@ -2429,46 +2416,6 @@ Mono_Set_Cursor(0,0);
 	**	The frame logic has been completed. Increment the frame
 	**	counter.
 	*/
-#ifndef _MSC_VER
-	// TIM-288 pass-80: simulation liveness probe — sample unit positions and
-	// credits at key frames to verify AI/logic ticks are advancing game state.
-	{
-		static const long probe_frames[] = {100, 500, 1000, 2000, -1};
-		static int probe_idx = 0;
-		if (probe_idx >= 0 && Frame == probe_frames[probe_idx]) {
-			long credits = PlayerPtr ? PlayerPtr->Credits : -1L;
-			int n_units    = Units.Count();
-			int n_infantry = Infantry.Count();
-			int logic_count = Logic.Count();
-			long tick = (long)(long)TickCount;
-			// Print summary line
-			fprintf(stderr,
-				"[TIM-288] frame=%ld tick=%ld credits=%ld units=%d infantry=%d logic_objects=%d\n",
-				Frame, tick, credits, n_units, n_infantry, logic_count);
-			// Print all unit coords and missions (TFixedIHeapClass::Ptr iterates active)
-			for (int _i = 0; _i < n_units; _i++) {
-				UnitClass* _u = Units.Ptr(_i);
-				if (_u && !_u->IsInLimbo) {
-					fprintf(stderr,
-						"[TIM-288]   unit[%d] coord=0x%08X mission=%d house=%d\n",
-						_i, (unsigned)_u->Coord, (int)_u->Get_Mission(), (int)_u->Owner());
-				}
-			}
-			// Print first 8 infantry coords and missions
-			for (int _i = 0; _i < n_infantry && _i < 8; _i++) {
-				InfantryClass* _inf = Infantry.Ptr(_i);
-				if (_inf && !_inf->IsInLimbo) {
-					fprintf(stderr,
-						"[TIM-288]   inf[%d] coord=0x%08X mission=%d house=%d\n",
-						_i, (unsigned)_inf->Coord, (int)_inf->Get_Mission(), (int)_inf->Owner());
-				}
-			}
-			fflush(stderr);
-			probe_idx++;
-			if (probe_frames[probe_idx] < 0) probe_idx = -1;
-		}
-	}
-#endif
 	Frame++;
 
 	/*
