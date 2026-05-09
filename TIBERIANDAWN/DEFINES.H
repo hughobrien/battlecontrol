@@ -34,6 +34,9 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
+// TIM-339: DEFINES.H embeds SpecialClass by value in structs (SerialPacketType etc.)
+// so the full definition must be available. SPECIAL.H has no includes of its own.
+#include	"special.h"
 
 //#define PETROGLYPH_EXAMPLE_MOD
 

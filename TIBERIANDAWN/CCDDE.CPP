@@ -50,6 +50,8 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+// TIM-339: DDE is Win32-only; guard entire file like RA's CCDDE.CPP does.
+#ifdef WIN32
 #include <WINDOWS.H>
 #include "ccdde.h"
 #include <stdio.h>
@@ -417,3 +419,5 @@ BOOL Send_Data_To_DDE_Server (char *data, int length, int packet_type)
 
 	return (TRUE);
 }
+
+#endif	// WIN32

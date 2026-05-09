@@ -373,7 +373,7 @@ class GraphicBufferClass : public GraphicViewPortClass, public BufferClass {
 		void DD_Init(GBC_Enum flags);
 		void Init(int w, int h, void *buffer, long size, GBC_Enum flags);
 		void Un_Init(void);
-		void GraphicBufferClass::Attach_DD_Surface (GraphicBufferClass * attach_buffer);
+		void Attach_DD_Surface (GraphicBufferClass * attach_buffer);
 		BOOL Lock(void);
 		BOOL Unlock(void);
 
@@ -1167,6 +1167,11 @@ inline VOID GraphicViewPortClass::Draw_Line(int sx, int sy, int dx, int dy, unsi
  *=========================================================================*/
 inline VOID GraphicViewPortClass::Fill_Rect(int sx, int sy, int dx, int dy, unsigned char color)
 {
+#ifdef _MSC_VER
+	// TIM-339: hardware-blit fast-path retained on MSVC. On Linux,
+	// IDirectDrawSurface is a forward decl, so GetBltStatus/Blt cannot
+	// resolve. Linux always falls through to the CPU-side Buffer_Fill_Rect
+	// path (equivalent at runtime: VideoSurfacePtr is NULL on Linux).
 	if (  AllowHardwareBlitFills
 			&& IsDirectDraw
 			&& ( (dx-sx) * (dy-sy) >= (32*32) )
@@ -1208,7 +1213,9 @@ inline VOID GraphicViewPortClass::Fill_Rect(int sx, int sy, int dx, int dy, unsi
 														NULL,
 														DDBLT_WAIT | DDBLT_ASYNC | DDBLT_COLORFILL,
 														&blit_effects);
-	} else {
+	} else
+#endif
+	{
 		if (Lock()){
 			Buffer_Fill_Rect(this, sx, sy, dx, dy, color);
 			Unlock();

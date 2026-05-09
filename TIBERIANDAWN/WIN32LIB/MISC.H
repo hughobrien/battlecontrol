@@ -243,7 +243,12 @@ long __cdecl Calculate_CRC(void *buffer, long length);
 
 extern WORD __cdecl  Processor(void);
 extern WORD __cdecl Operating_System(void);
+#ifndef __linux__
+// Westwood's random() (DETPROC.ASM) clashes with glibc <stdlib.h> random(void)
+// under C linkage on Linux. The ASM impl is not shipped and there are no
+// callers in TIBERIANDAWN, so the decl is suppressed on Linux. See TIM-339.
 extern unsigned long random ( unsigned long mod )  ;
+#endif
 //extern void  randomize ( void ) ;
 
 extern int __cdecl Clip_Rect ( int * x , int * y , int * dw , int * dh ,

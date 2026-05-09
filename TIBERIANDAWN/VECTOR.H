@@ -59,9 +59,18 @@
 
 #include	<stdlib.h>
 #include	<stddef.h>
+#include	<new>		// TIM-339: placement-new already in <new>; avoid redef
 
-inline void * operator new(size_t , void * pointer) {return(pointer);}
-inline void * operator new[](size_t , void * pointer) {return(pointer);}
+// TIM-339: placement new already provided by <new> above.
+//inline void * operator new(size_t , void * pointer) {return(pointer);}
+//inline void * operator new[](size_t , void * pointer) {return(pointer);}
+
+// TIM-339: bit-array helpers historically declared in JSHELL.H; forward-
+// declaring here avoids dragging the entire JSHELL.H chain in for headers
+// that only need vector.h. Same fix as RA TIM-20.
+int __cdecl Get_Bit(void const * array, int bit);
+int __cdecl First_True_Bit(void const * array);
+int __cdecl First_False_Bit(void const * array);
 
 
 /**************************************************************************
@@ -125,6 +134,15 @@ template<class T>
 class DynamicVectorClass : public VectorClass<T>
 {
 	public:
+		// TIM-339: g++ two-phase name lookup -- inherited members of a
+		// dependent base class must be brought into scope. MSVC accepted
+		// bare references. Same fix as RA TIM-20.
+		using VectorClass<T>::Length;
+		using VectorClass<T>::Resize;
+		using VectorClass<T>::IsAllocated;
+		using VectorClass<T>::VectorMax;
+		using VectorClass<T>::Vector;
+
 		DynamicVectorClass(unsigned size=0, T const * array=0);
 
 		// Change maximum size of vector.
@@ -184,7 +202,9 @@ template<class T, int COUNT, int FIRST = 0, int DEFAULT = FIRST>
 class DynamicVectorArrayClass
 {
 public:
-	static const int COUNT = COUNT;
+	// TIM-339: `static const int COUNT = COUNT` shadows the template
+	// parameter; renamed to Length to match RA TIM-20 fix.
+	static const int Length = COUNT;
 
 	DynamicVectorArrayClass() : Active(DEFAULT) {}
 

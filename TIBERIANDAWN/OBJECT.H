@@ -37,6 +37,10 @@
 
 #include	"abstract.h"
 
+// TIM-339: inline destructors in ObjectClass subclasses reference GameActive.
+// Forward-declare here so object.h and its transitive includers are self-contained.
+extern bool GameActive;
+
 class ObjectClass;
 class TechnoClass;
 class ObjectTypeClass;

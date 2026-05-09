@@ -35,6 +35,12 @@
 #ifndef JSHELL_H
 #define JSHELL_H
 
+// TIM-339: Forward-declare global mouse helpers used by KeyboardClass's
+// Mouse_X/Mouse_Y inline bodies. Defined in WIN32LIB/MOUSE.H but not
+// always parsed before this point (same fix as RA TIM-22).
+int Get_Mouse_X(void);
+int Get_Mouse_Y(void);
+
 /*
 **	Interface class to the keyboard. This insulates the game from library vagaries. Most
 **	notable being the return values are declared as "int" in the library whereas C&C

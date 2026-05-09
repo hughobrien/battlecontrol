@@ -632,7 +632,7 @@ bool Save_Misc_Values(FileClass &file)
 	**	Save currently-selected objects list.
 	**	Save the # of ptrs in the list.
 	*/
-	for (i = 0; i < SelectedObjectsType::COUNT; i++) {
+	for (i = 0; i < SelectedObjectsType::Length; i++) {
 		DynamicVectorClass<ObjectClass *>& selection = CurrentObject.Raw(i);
 		count = selection.Count();
 		if (file.Write(&count, sizeof(count)) != sizeof(count)) {
@@ -724,7 +724,7 @@ bool Load_Misc_Values(FileClass &file)
 		return(false);
 	}
 
-	for (i = 0; i < SelectedObjectsType::COUNT; i++) {
+	for (i = 0; i < SelectedObjectsType::Length; i++) {
 		/*
 		**	Load currently-selected objects list.
 		**	Load the # of ptrs in the list.
@@ -842,7 +842,7 @@ void Code_All_Pointers(void)
 	/*
 	**	Currently-selected objects.
 	*/
-	for (i = 0; i < SelectedObjectsType::COUNT; i++) {
+	for (i = 0; i < SelectedObjectsType::Length; i++) {
 		DynamicVectorClass<ObjectClass *>& selection = CurrentObject.Raw(i);
 		for (j = 0; j < selection.Count(); j++) {
 			selection[j] = (ObjectClass *)selection[j]->As_Target();
@@ -959,7 +959,7 @@ void Decode_All_Pointers(void)
 	/*
 	**	Currently-selected objects.
 	*/
-	for (i = 0; i < SelectedObjectsType::COUNT; i++) {
+	for (i = 0; i < SelectedObjectsType::Length; i++) {
 		DynamicVectorClass<ObjectClass *>& selection = CurrentObject.Raw(i);
 		for (j = 0; j < selection.Count(); j++) {
 			unsigned long target_as_object_ptr = reinterpret_cast<unsigned long>(selection[j]);

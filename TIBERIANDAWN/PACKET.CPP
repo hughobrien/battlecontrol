@@ -454,7 +454,7 @@ bool PacketClass::Get_Field(char *id, void *data, int &length)
 {
 	FieldClass *field = Find_Field(id);
 	if (field) {
-		memcpy (data, field->Data, min(field->Size, length));
+		memcpy (data, field->Data, min((int)field->Size, length)); // TIM-339: mixed types for min
 		length = (int) field->Size;
 	}
 	return((field) ? true : false);

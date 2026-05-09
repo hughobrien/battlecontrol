@@ -1533,4 +1533,39 @@ template <typename... Args> long RegQueryValueA  (Args&&...) { return 1; }
 template <typename... Args> long RegCloseKey     (Args&&...) { return 0; }
 template <typename... Args> long RegDeleteValue  (Args&&...) { return 0; }
 
+/* TIM-339: IsBadReadPtr — Win32 pointer validity check. Always return FALSE (pointer OK) on Linux. */
+static inline int IsBadReadPtr(const void *, unsigned int) { return 0; }
+static inline int IsBadWritePtr(void *, unsigned int) { return 0; }
+
+/* TIM-339: TD INIT.CPP uses LoadLibrary/FreeLibrary to load reslib.dll (resource
+ * DLL for Win32 string resources). On Linux there are no DLLs; return NULL so
+ * hCCLibrary is a no-op NULL handle. */
+static inline HMODULE LoadLibrary(const char *) { return NULL; }
+static inline HMODULE LoadLibraryA(const char *) { return NULL; }
+static inline void    FreeLibrary(HMODULE) {}
+
+/* TIM-339: TD INIT.CPP calls GlobalMemoryStatus to check available RAM before
+ * loading assets. On Linux, report a generous amount so the check passes. */
+typedef struct _MEMORYSTATUS {
+    DWORD dwLength;
+    DWORD dwMemoryLoad;
+    DWORD dwTotalPhys;
+    DWORD dwAvailPhys;
+    DWORD dwTotalPageFile;
+    DWORD dwAvailPageFile;
+    DWORD dwTotalVirtual;
+    DWORD dwAvailVirtual;
+} MEMORYSTATUS, *LPMEMORYSTATUS;
+
+static inline void GlobalMemoryStatus(LPMEMORYSTATUS p) {
+    if (!p) return;
+    p->dwMemoryLoad    = 10;
+    p->dwTotalPhys     = 256 * 1024 * 1024;
+    p->dwAvailPhys     = 128 * 1024 * 1024;
+    p->dwTotalPageFile = 512 * 1024 * 1024;
+    p->dwAvailPageFile = 256 * 1024 * 1024;
+    p->dwTotalVirtual  = 0x7FFFFFFF;
+    p->dwAvailVirtual  = 0x7FFFFFFF;
+}
+
 #endif /* LINUX_STUBS_WINDOWS_H */

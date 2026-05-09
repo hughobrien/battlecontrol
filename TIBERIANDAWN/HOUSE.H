@@ -40,6 +40,11 @@
 #include	"vector.h"
 #include "COORDA.h"
 #include "Credits.h"
+// TIM-339: HOUSE.H embeds SuperClass by value and TFixedIHeapClass by value;
+// both need full definitions. UnitTrackerClass* is pointer-only: forward-declare.
+#include	"super.h"
+#include	"heap.h"
+class UnitTrackerClass;
 
 //extern "C" {
 //unsigned Cardinal_To_Fixed(unsigned base, unsigned cardinal);

@@ -35,6 +35,11 @@
 #ifndef EXTERNS_H
 #define EXTERNS_H
 
+// TIM-339: EXTERNS.H declares WWMouseClass* but the full definition in
+// WIN32LIB/MOUSE.H is unreachable here (shim picks game MOUSE.H first).
+// A forward declaration is sufficient for a pointer-only use.
+class WWMouseClass;
+
 #include	"cell.h"
 
 #ifdef SCENARIO_EDITOR

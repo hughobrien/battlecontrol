@@ -14,6 +14,9 @@
 #ifndef LINUX_STUBS_IO_H_INCLUDED
 #define LINUX_STUBS_IO_H_INCLUDED
 
+/* TIM-339: Windows <io.h> provides unlink(); on Linux it comes from <unistd.h>. */
+#include <unistd.h>
+
 #ifdef __cplusplus
 template <typename... Args> long filelength(Args&&...) { return 0; }
 /* TIM-88: pass-40H. RAWFILE.CPP:1317 calls `lseek(Handle, pos, dir)`

@@ -37,6 +37,9 @@
 
 #include "object.h"
 #include	"monoc.h"
+// TIM-339: MissionClass embeds TCountDownTimerClass; include ftimer.h here
+// since object.h does not transitively pull it in.
+#include	"ftimer.h"
 
 /****************************************************************************
 **	This handles order assignment and tracking. The order is used to guide

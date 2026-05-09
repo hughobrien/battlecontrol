@@ -42,6 +42,9 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+// TIM-339: DDE is Windows-only; exclude on Linux.
+// Note: WIN32 is not defined here (no wwstd.h), so use __linux__ guard.
+#ifndef __linux__
 #include	<windows.h>
 #include	"dde.h"
 
@@ -463,3 +466,5 @@ HDDEDATA CALLBACK Instance_Class::dde_callback(
    }
 #endif
 }
+
+#endif // !__linux__

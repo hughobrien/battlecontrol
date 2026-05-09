@@ -40,6 +40,9 @@ DirType  Direction(COORDINATE coord1, COORDINATE coord2);
 int  Distance(COORDINATE coord1, COORDINATE coord2);
 int  Distance(CELL coord1, CELL coord2);
 COORDINATE  As_Coord(TARGET target);
+// TIM-339: forward-declare Coord_Cell — function.h includes abstract.h so
+// a back-include of function.h would create a circular dependency.
+CELL Coord_Cell(COORDINATE coord);
 
 class AbstractTypeClass;
 

@@ -35,6 +35,8 @@
 #ifndef HELP_H
 #define HELP_H
 
+// TIM-339: HelpClass embeds CountDownTimerClass; make timer.h explicit.
+#include	<timer.h>
 #include	"tab.h"
 
 class HelpClass: public TabClass

@@ -40,6 +40,18 @@
  *   Version_Number -- Determines the version number.                                          *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+// TIM-339: strrev is Watcom/MSVC CRT only; provide a local stub for Linux.
+#ifndef _WIN32
+#include <string.h>
+static inline char *strrev(char *s) {
+    if (!s || !*s) return s;
+    char *p = s, *q = s;
+    while (*q) ++q; --q;
+    while (p < q) { char t = *p; *p++ = *q; *q-- = t; }
+    return s;
+}
+#endif
+
 #include	"function.h"
 #include	"loaddlg.h"
 #include	"tcpip.h"
@@ -283,7 +295,7 @@ bool Init_Game(int , char *[])
 		sprintf(buffer, "Command & Conquer kann Ihren Maustreiber nicht finden..");
 #else
 #ifdef FRENCH
-		sprintf(buffer, "Command & Conquer ne peut pas d‚tecter votre gestionnaire de souris.");
+		sprintf(buffer, "Command & Conquer ne peut pas dï¿½tecter votre gestionnaire de souris.");
 #else
 		sprintf(buffer, "Command & Conquer is unable to detect your mouse driver.");
 #endif
@@ -2059,25 +2071,25 @@ bool Parse_Command_Line(int argc, char *argv[])
 	#ifdef GERMAN
 			puts("Command & Conquer (c) 1995,1996 Westwood Studios\r\n"
 						"Parameter:\r\n"
-//						"  -CD<Pfad> = Suchpfad fr Daten-Dateien festlegen.\r\n"
+//						"  -CD<Pfad> = Suchpfad fï¿½r Daten-Dateien festlegen.\r\n"
 						"  -DESTNET  = Netzwerkkennung des Zielrechners festlegen\r\n"
 						"              (Syntax: DESTNETxx.xx.xx.xx)\r\n"
 						"  -SOCKET   = Kennung des Netzwerk-Sockets (0 - 16383)\n"
 						"  -STEALTH  = Namen im Mehrspieler-Modus verstecken (\"Boss-Modus\")\r\n"
-						"  -MESSAGES = Mitteilungen von auáerhalb des Spiels zulassen\r\n"
+						"  -MESSAGES = Mitteilungen von auï¿½erhalb des Spiels zulassen\r\n"
 	//					"  -ELITE    = Fortgeschrittene KI und Gefechtstechniken.\r\n"
 						"\r\n");
 	#else
 	#ifdef FRENCH
 			puts("Command & Conquer (c) 1995, Westwood Studios\r\n"
-						"ParamŠtres:\r\n"
-//						"  -CD<chemin d'accŠs> = Recherche des fichiers dans le\r\n"
-//						"                        r‚pertoire indiqu‚.\r\n"
-						"  -DESTNET  = Sp‚cifier le num‚ro de r‚seau du systŠme de destination\r\n"
+						"Paramï¿½tres:\r\n"
+//						"  -CD<chemin d'accï¿½s> = Recherche des fichiers dans le\r\n"
+//						"                        rï¿½pertoire indiquï¿½.\r\n"
+						"  -DESTNET  = Spï¿½cifier le numï¿½ro de rï¿½seau du systï¿½me de destination\r\n"
 						"              (Syntaxe: DESTNETxx.xx.xx.xx)\r\n"
-						"  -SOCKET   = ID poste r‚seau (0 … 16383)\r\n"
+						"  -SOCKET   = ID poste rï¿½seau (0 ï¿½ 16383)\r\n"
 						"  -STEALTH  = Cacher les noms en mode multijoueurs (\"Mode Boss\")\r\n"
-						"  -MESSAGES = Autorise les messages ext‚rieurs … ce jeu.\r\n"
+						"  -MESSAGES = Autorise les messages extï¿½rieurs ï¿½ ce jeu.\r\n"
 						"\r\n");
 	#else
 			puts("Command & Conquer (c) 1995, 1996 Westwood Studios\r\n"
@@ -2512,7 +2524,7 @@ bool Parse_Command_Line(int argc, char *argv[])
 
 					default:
 #ifdef GERMAN
-						puts("Ungltiger Parameter.\n");
+						puts("Ungï¿½ltiger Parameter.\n");
 #else
 #ifdef FRENCH
 						puts("Commande d'option invalide.\n");
@@ -2564,9 +2576,9 @@ void Parse_INI_File(void)
 	/*
 	** These arrays store the coded version of the names Geologic, Period, & Jurassic.
 	** Decode them by subtracting 83.  For you curious types, the names look like:
-	** š¸Â¿Âº¼¶
-	** £¸Å¼Â·
-	** ÈÅ´ÆÆ¼¶
+	** ï¿½ï¿½Â¿Âºï¿½ï¿½
+	** ï¿½ï¿½Å¼Â·
+	** ï¿½ï¿½Å´ï¿½Æ¼ï¿½
 	** If these INI entries aren't found, the IsJurassic flag does nothing.
 	*/
 	static char coded_section[] = {154,184,194,191,194,186,188,182,0};
