@@ -90,3 +90,47 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 add_executable(hello_linux linux/hello.cpp)
+
+# ---------------------------------------------------------------------------
+# TIM-337: Tiberian Dawn (`td`) compile target
+#
+# Wires TIBERIANDAWN/ into the build so the compiler can start seeing errors.
+# WIN32LIB sources are excluded (we use our linux/ stubs for implementations).
+# DLLInterface files are excluded (DLL entry points, not needed for standalone).
+#
+# Include path order:
+#   1. include-shim/tiberiandawn + td-win32lib — case-folded symlinks
+#   2. TIBERIANDAWN/ + TIBERIANDAWN/WIN32LIB   — on-disk headers
+#   3. linux/win32-stubs/                       — Win32 stub headers
+# ---------------------------------------------------------------------------
+file(GLOB TD_SOURCES_UPPER "${CMAKE_SOURCE_DIR}/TIBERIANDAWN/*.CPP")
+file(GLOB TD_SOURCES_LOWER "${CMAKE_SOURCE_DIR}/TIBERIANDAWN/*.cpp")
+set(TD_ALL_SOURCES ${TD_SOURCES_UPPER} ${TD_SOURCES_LOWER})
+
+# Exclude DLLInterface entry points and WIN32LIB (handled by linux/ stubs).
+list(FILTER TD_ALL_SOURCES EXCLUDE REGEX ".*/DLLInterface[^/]*\\.([Cc][Pp][Pp])$")
+
+add_executable(td ${TD_ALL_SOURCES})
+add_dependencies(td redalert_include_shim)
+
+target_compile_definitions(td PRIVATE
+    LINUX=1
+    UNIX=1
+    POSIX=1
+)
+
+target_include_directories(td PRIVATE
+    "${RA_SHIM_DIR}/tiberiandawn"
+    "${RA_SHIM_DIR}/td-win32lib"
+    "${CMAKE_SOURCE_DIR}/TIBERIANDAWN"
+    "${CMAKE_SOURCE_DIR}/TIBERIANDAWN/WIN32LIB"
+    "${CMAKE_SOURCE_DIR}/linux/win32-stubs"
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(td PRIVATE
+        "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
+        -fmax-errors=20
+        -w
+    )
+endif()
