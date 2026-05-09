@@ -145,6 +145,14 @@
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 #endif
 
+// TIM-313: Guard MissionControl[] against MISSION_NONE (-1) OOB reads.
+static inline MissionControlClass const & SafeMC(MissionType m)
+{
+	static MissionControlClass const zero_mc = {};
+	if ((int)m < 0 || m >= MISSION_COUNT) return zero_mc;
+	return MissionControl[m];
+}
+
 
 /***************************************************************************
 **	Cloaking control values.
@@ -1552,7 +1560,7 @@ bool TechnoClass::Evaluate_Object(ThreatType method, int mask, int range, Techno
 	**	If the object is in a "harmless" state, then don't bother to consider it
 	**	a threat.
 	*/
-	if (MissionControl[object->Mission].IsNoThreat) {
+	if (SafeMC(object->Mission).IsNoThreat) {
 		BEnd(BENCH_EVAL_OBJECT);
 		return(false);
 	}
@@ -5120,7 +5128,7 @@ void TechnoClass::Base_Is_Attacked(TechnoClass const * enemy)
 			**	Never recruit sticky guard units to defend a base.
 			*/
 			if (!infantry->Is_Weapon_Equipped() ||
-					(!MissionControl[infantry->Mission].IsRecruitable && Session.Type == GAME_NORMAL)) continue;
+					(!SafeMC(infantry->Mission).IsRecruitable && Session.Type == GAME_NORMAL)) continue;
 //					(Mission != MISSION_GUARD_AREA || Session.Type == GAME_NORMAL)) continue;
 
 			/*
@@ -5205,7 +5213,7 @@ void TechnoClass::Base_Is_Attacked(TechnoClass const * enemy)
 			**	Never recruit sticky guard units to defend a base.
 			*/
 			if (!unit->Is_Weapon_Equipped() ||
-				(!MissionControl[unit->Mission].IsRecruitable && Session.Type == GAME_NORMAL)) continue;
+				(!SafeMC(unit->Mission).IsRecruitable && Session.Type == GAME_NORMAL)) continue;
 
 			/*
 			**	Don't allow a response if it doesn't have a weapon that will affect the
@@ -5346,7 +5354,7 @@ bool TechnoClass::Is_Allowed_To_Retaliate(TechnoClass const * source) const
 	/*
 	**	If the mission precludes retaliation, then don't retaliate.
 	*/
-	if (!MissionControl[Mission].IsRetaliate) return(false);
+	if (!SafeMC(Mission).IsRetaliate) return(false);
 
 	/*
 	**	Fixed wing aircraft are not responsive enough to retaliate to damage recieved.
