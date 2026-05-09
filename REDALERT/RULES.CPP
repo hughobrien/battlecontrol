@@ -323,20 +323,18 @@ RulesClass::RulesClass(void) :
  *=============================================================================================*/
 static void Difficulty_Get(CCINIClass & ini, DifficultyClass & diff, char const * section)
 {
-	if (ini.Is_Present(section)) {
-		diff.FirepowerBias = ini.Get_Fixed(section, "FirePower", 1);
-		diff.GroundspeedBias = ini.Get_Fixed(section, "Groundspeed", 1);
-		diff.AirspeedBias = ini.Get_Fixed(section, "Airspeed", 1);
-		diff.ArmorBias = ini.Get_Fixed(section, "Armor", 1);
-		diff.ROFBias = ini.Get_Fixed(section, "ROF", 1);
-		diff.CostBias = ini.Get_Fixed(section, "Cost", 1);
-		diff.RepairDelay = ini.Get_Fixed(section, "RepairDelay", ".02");
-		diff.BuildDelay = ini.Get_Fixed(section, "BuildDelay", ".03");
-		diff.IsBuildSlowdown = ini.Get_Bool(section, "BuildSlowdown", false);
-		diff.BuildSpeedBias = ini.Get_Fixed(section, "BuildTime", 1);
-		diff.IsWallDestroyer = ini.Get_Bool(section, "DestroyWalls", true);
-		diff.IsContentScan = ini.Get_Bool(section, "ContentScan", false);
-	}
+	diff.FirepowerBias = ini.Get_Fixed(section, "FirePower", 1);
+	diff.GroundspeedBias = ini.Get_Fixed(section, "Groundspeed", 1);
+	diff.AirspeedBias = ini.Get_Fixed(section, "Airspeed", 1);
+	diff.ArmorBias = ini.Get_Fixed(section, "Armor", 1);
+	diff.ROFBias = ini.Get_Fixed(section, "ROF", 1);
+	diff.CostBias = ini.Get_Fixed(section, "Cost", 1);
+	diff.RepairDelay = ini.Get_Fixed(section, "RepairDelay", ".02");
+	diff.BuildDelay = ini.Get_Fixed(section, "BuildDelay", ".03");
+	diff.IsBuildSlowdown = ini.Get_Bool(section, "BuildSlowdown", false);
+	diff.BuildSpeedBias = ini.Get_Fixed(section, "BuildTime", 1);
+	diff.IsWallDestroyer = ini.Get_Bool(section, "DestroyWalls", true);
+	diff.IsContentScan = ini.Get_Bool(section, "ContentScan", false);
 }
 
 
@@ -1057,11 +1055,9 @@ bool RulesClass::Objects(CCINIClass & ini)
  *=============================================================================================*/
 bool RulesClass::Difficulty(CCINIClass & ini)
 {
-#if 0
 	Difficulty_Get(ini, Diff[DIFF_EASY], "Easy");
 	Difficulty_Get(ini, Diff[DIFF_NORMAL], "Normal");
 	Difficulty_Get(ini, Diff[DIFF_HARD], "Difficult");
-#endif
 	return(true);
 }
 
