@@ -203,10 +203,10 @@ int DLL_Startup(const char * command_line_in)
 
 	if (Ram_Free(MEM_NORMAL) < 5000000) {
 #ifdef GERMAN
-		printf("Zuwenig Hauptspeicher verfgbar.\n");
+		printf("Zuwenig Hauptspeicher verfï¿½gbar.\n");
 #else
 #ifdef FRENCH
-		printf("M‚moire vive (RAM) insuffisante.\n");
+		printf("Mï¿½moire vive (RAM) insuffisante.\n");
 #else
 		printf("Insufficient RAM available.\n");
 #endif
@@ -322,10 +322,10 @@ int DLL_Startup(const char * command_line_in)
 		Sleep (1000);
 		if (WindowsTimer->Get_System_Tick_Count() == time_test){
 #ifdef FRENCH
-			MessageBox(0, "Error - L'horloge systŠme n'a pas pu s'initialiser en raison de l'instabilit‚ du sytŠme. Vous devez red‚marrer Windows.",  "Command & Conquer" , MB_OK|MB_ICONSTOP);
+			MessageBox(0, "Error - L'horloge systï¿½me n'a pas pu s'initialiser en raison de l'instabilitï¿½ du sytï¿½me. Vous devez redï¿½marrer Windows.",  "Command & Conquer" , MB_OK|MB_ICONSTOP);
 #else
 #ifdef	GERMAN
-			MessageBox(0, "Fehler - das Timer-System konnte aufgrund einer Instabilit„t des Systems nicht initialisiert werden. Bitte starten Sie Windows neu.", "Command & Conquer", MB_OK|MB_ICONSTOP);
+			MessageBox(0, "Fehler - das Timer-System konnte aufgrund einer Instabilitï¿½t des Systems nicht initialisiert werden. Bitte starten Sie Windows neu.", "Command & Conquer", MB_OK|MB_ICONSTOP);
 #else
 			MessageBox(0, "Error - Timer system failed to start due to system instability. You need to restart Windows.", "Command & Conquer", MB_OK|MB_ICONSTOP);
 #endif	//GERMAN
@@ -360,7 +360,7 @@ int DLL_Startup(const char * command_line_in)
 		if (Disk_Space_Available() < INIT_FREE_DISK_SPACE) {
 #ifdef GERMAN
 			char	disk_space_message [512];
-			sprintf (disk_space_message, "Nicht genug Festplattenplatz fr Command & Conquer.\nSie brauchen %d MByte freien Platz auf der Festplatte.", (INIT_FREE_DISK_SPACE) / (1024 * 1024));
+			sprintf (disk_space_message, "Nicht genug Festplattenplatz fï¿½r Command & Conquer.\nSie brauchen %d MByte freien Platz auf der Festplatte.", (INIT_FREE_DISK_SPACE) / (1024 * 1024));
 			MessageBox(NULL, disk_space_message, "Command & Conquer", MB_ICONEXCLAMATION|MB_OK);
 			if ( WindowsTimer )
 				delete WindowsTimer;
@@ -871,3 +871,163 @@ void Read_Setup_Options( RawFileClass *config_file )
 
 	delete [] buffer;
 }
+
+
+#ifndef _MSC_VER
+// TIM-343 pass-99: Linux standalone entry point for the td binary.
+//
+// Analogous to REDALERT/STARTUP.CPP main() (added in TIM-159 pass-48A).
+// Key difference from DLL_Startup: RunningAsDLL is left false so that
+// Main_Game drives its own Select_Game/Main_Loop instead of returning
+// immediately to an external DLL host after one Select_Game call.
+
+#include <signal.h>
+#include <execinfo.h>
+#include <unistd.h>
+
+static void td_crash_handler(int sig)
+{
+    void *buf[64];
+    int n = backtrace(buf, 64);
+    char **syms = backtrace_symbols(buf, n);
+    fprintf(stderr, "\n=== TD CRASH signal %d backtrace ===\n", sig);
+    for (int i = 0; i < n; i++)
+        fprintf(stderr, "  [%2d] %s\n", i, syms ? syms[i] : "?");
+    fflush(stderr);
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+int main(int argc, char * argv[])
+{
+    signal(SIGSEGV, td_crash_handler);
+    signal(SIGABRT, td_crash_handler);
+    signal(SIGBUS,  td_crash_handler);
+
+    fprintf(stderr, "[TD] main: entry (RunningAsDLL stays false for standalone run)\n");
+    fflush(stderr);
+
+    // RunningAsDLL = false is the default (GLOBALS.CPP); do NOT set true here.
+    HINSTANCE instance = ProgramInstance; // null on Linux â€” stub ignores it
+    int command_show = 1;                 // SW_SHOWNORMAL â€” stub ignores it
+
+    if (Ram_Free(MEM_NORMAL) < 5000000) {
+        printf("Insufficient RAM available.\n");
+        return EXIT_FAILURE;
+    }
+
+    fprintf(stderr, "[TD] Parse_Command_Line\n"); fflush(stderr);
+    if (Parse_Command_Line(argc, argv)) {
+
+        fprintf(stderr, "[TD] WinTimerClass\n"); fflush(stderr);
+        WindowsTimer = new WinTimerClass(60, FALSE);
+        fprintf(stderr, "[TD] WinTimerClass done\n"); fflush(stderr);
+
+        RawFileClass cfile("CONQUER.INI");
+
+        if (cfile.Is_Available()) {
+            fprintf(stderr, "[TD] CONQUER.INI found â€” continuing init\n"); fflush(stderr);
+
+            fprintf(stderr, "[TD] Load_Alloc_Data\n"); fflush(stderr);
+#ifndef NOMEMCHECK
+            char * cdata = (char *)Load_Alloc_Data(cfile);
+            fprintf(stderr, "[TD] Read_Private_Config_Struct\n"); fflush(stderr);
+            Read_Private_Config_Struct(cdata, &NewConfig);
+            delete [] cdata;
+#else
+            Read_Private_Config_Struct((char *)Load_Alloc_Data(cfile), &NewConfig);
+#endif
+            fprintf(stderr, "[TD] Read_Setup_Options\n"); fflush(stderr);
+            Read_Setup_Options( &cfile );
+            /* TIM-343: Read_Setup_Options hardcodes 1536 (Remastered DLL
+             * internal logical resolution). Override to classic 640Ã—480 for
+             * standalone Linux binary â€” same workaround as RA TIM-250 pass-69. */
+            ScreenWidth  = 640;
+            ScreenHeight = 480;
+            fprintf(stderr, "[TD] Read_Setup_Options done; ScreenWidth=%d ScreenHeight=%d\n", ScreenWidth, ScreenHeight); fflush(stderr);
+
+            fprintf(stderr, "[TD] Create_Main_Window (%dx%d)\n", ScreenWidth, ScreenHeight); fflush(stderr);
+            Create_Main_Window( instance , command_show , ScreenWidth , ScreenHeight );
+
+            fprintf(stderr, "[TD] Audio_Init\n"); fflush(stderr);
+            SoundOn = Audio_Init ( MainWindow , 16 , false , 11025*2 , 0 );
+
+            Palette = new(MEM_CLEAR) unsigned char[768];
+
+            fprintf(stderr, "[TD] Set_Video_Mode %dx%d\n", ScreenWidth, ScreenHeight); fflush(stderr);
+            BOOL video_success = Set_Video_Mode (MainWindow, ScreenWidth, ScreenHeight, 8);
+
+            if (!video_success) {
+                fprintf(stderr, "[TD] Set_Video_Mode failed\n"); fflush(stderr);
+                if (WindowsTimer) delete WindowsTimer;
+                if (Palette) delete [] Palette;
+                return EXIT_FAILURE;
+            }
+
+            VisiblePage.Init( ScreenWidth , ScreenHeight , NULL , 0 , (GBC_Enum)0);
+            HiddenPage.Init (ScreenWidth , ScreenHeight , NULL , 0 , (GBC_Enum)0);
+
+            if (VisiblePage.Get_Height() == 480){
+                SeenBuff.Attach(&VisiblePage,0, 40, ScreenWidth, ScreenHeight);
+                HidPage.Attach(&HiddenPage, 0, 40, ScreenWidth, ScreenHeight);
+            }else{
+                SeenBuff.Attach(&VisiblePage,0, 0, ScreenWidth, ScreenHeight);
+                HidPage.Attach(&HiddenPage, 0, 0, ScreenWidth, ScreenHeight);
+            }
+
+            Options.Adjust_Variables_For_Resolution();
+
+            WindowList[0][WINDOWWIDTH]  = SeenBuff.Get_Width() >> 3;
+            WindowList[0][WINDOWHEIGHT] = SeenBuff.Get_Height();
+
+            Memory_Error = &Memory_Error_Handler;
+
+            if (MMXAvailable) {
+                Init_MMX();
+            }
+
+            WWMouse = new WWMouseClass(&SeenBuff, 32, 32);
+            MouseInstalled = TRUE;
+
+            char *buffer = (char*)Alloc(64000 , MEM_NORMAL);
+            cfile.Read(buffer, cfile.Size());
+            buffer[cfile.Size()] = '\0';
+
+            char tempbuff[5];
+            WWGetPrivateProfileString("Intro", "PlayIntro", "Yes", tempbuff, 4, buffer);
+            if (stricmp(tempbuff, "No") == 0) {
+                Special.IsFromInstall = false;
+            } else {
+                Special.IsFromInstall = true;
+            }
+
+            SlowPalette = WWGetPrivateProfileInt("Options", "SlowPalette", 1, buffer);
+
+            WWWritePrivateProfileString("Intro", "PlayIntro", "No", buffer);
+            cfile.Write(buffer, strlen(buffer));
+            Free(buffer);
+
+            Memory_Error_Exit = Print_Error_End_Exit;
+            fprintf(stderr, "[TD] entering Main_Game\n"); fflush(stderr);
+            Main_Game(argc, argv);
+            Memory_Error_Exit = Print_Error_Exit;
+
+            fprintf(stderr, "[TD] Main_Game returned\n"); fflush(stderr);
+
+        } else {
+            puts("Run SETUP program first.\n");
+        }
+
+        if (WindowsTimer) {
+            delete WindowsTimer;
+            WindowsTimer = NULL;
+        }
+        if (Palette) {
+            delete [] Palette;
+            Palette = NULL;
+        }
+    }
+
+    return EXIT_SUCCESS;
+}
+#endif  // !_MSC_VER

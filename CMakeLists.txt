@@ -111,10 +111,12 @@ set(TD_ALL_SOURCES ${TD_SOURCES_UPPER} ${TD_SOURCES_LOWER})
 list(FILTER TD_ALL_SOURCES EXCLUDE REGEX ".*/DLLInterface[^/]*\\.([Cc][Pp][Pp])$")
 
 # TIM-341: comprehensive link stubs for all WIN32LIB and DLL-host symbols.
+# TIM-343: add posix_fileio.cpp so CreateFileA/CloseHandle resolve for TD.
 set(TD_STUB_SOURCES
     "${CMAKE_SOURCE_DIR}/linux/td-win32-stubs.cpp"
     "${CMAKE_SOURCE_DIR}/linux/win32-stubs/kernel32-stub.cpp"
     "${CMAKE_SOURCE_DIR}/linux/win32-stubs/sdl_window.cpp"
+    "${CMAKE_SOURCE_DIR}/linux/win32-stubs/posix_fileio.cpp"
     # stop-execution-stub.cpp excluded: STARTUP.CPP defines DLL_Startup;
     # Stop_Execution is in td-win32-stubs.cpp.
 )
@@ -144,6 +146,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -w             # suppress warnings (errors already suppressed by fpermissive)
     )
 endif()
+
+# TIM-343: Force WIN32=1 for all TD TUs so RawFileClass/HANDLE_TYPE gets a
+# consistent void* layout everywhere. FUNCTION.H has the WIN32 define
+# commented out, so without this flag each TU independently sees either
+# int Handle (4B) or HANDLE Handle (8B) depending on include order, causing
+# ODR struct-layout mismatch and SIGSEGV. Same flag approach used in RA via
+# wwstd.h #define WIN32 1 (see memory note project_redalert_wwstd_predefines_win32).
+target_compile_definitions(td PRIVATE WIN32=1)
 
 # TIM-341: SDL2 required by sdl_window.cpp (MainWindow, SDL_Window_Show, ...).
 find_package(SDL2 REQUIRED)

@@ -39,13 +39,9 @@
 #include "WW_WIN.H"              // Window, Change_Window, Window_Hide_Mouse
 #include "CCDDE.H"               // DDEServerClass (TIBERIANDAWN/ level, safe cascade)
 
-// =========================================================================
-// main() — entry point for standalone td binary
-// =========================================================================
-int main(int /*argc*/, char ** /*argv*/)
-{
-    return 0;
-}
+// main() is provided by TIBERIANDAWN/STARTUP.CPP (#ifndef _MSC_VER block,
+// TIM-343 pass-99). Removed stub from here to avoid duplicate-definition
+// link errors now that the real entry point exists in the game source.
 
 // =========================================================================
 // BufferClass — base buffer class (BUFFER.H; ctors/dtor are non-inline)
@@ -706,30 +702,32 @@ void SDL_Window_Raise(void)             {}
 // =========================================================================
 
 WORD Hard_Error_Occured             = 0;
-BOOL CC95AlreadyRunning             = FALSE;
+// CC95AlreadyRunning, DDEServer, DDEServerClass methods, and
+// Send_Data_To_DDE_Server are now defined in CCDDE.CPP (WIN32=1 makes the
+// #ifdef WIN32 body active). Removed stubs to avoid ODR multiple-definition.
 int  GlyphXClientSidebarWidthInLeptons = 0;
 bool ShareAllyVisibility            = false;
 
 // =========================================================================
-// DDEServerClass (DDE is Win32-only; NOP stubs for Linux)
+// Instance_Class — Win32 DDE wrapper (DDE.H / CCDDE.CPP).
+// TIM-343: globally-defined WIN32=1 causes CCDDE.CPP to compile the DDE
+// code path, requiring Instance_Class bodies. Stub everything NOP; TD on
+// Linux doesn't talk to WChat.
 // =========================================================================
+DWORD Instance_Class::id_inst      = 0;
+BOOL  Instance_Class::process_pokes = FALSE;
+char  Instance_Class::ascii_name[32] = {};
+BOOL (*Instance_Class::callback)(LPBYTE, long) = nullptr;
 
-DDEServerClass DDEServer;
-
-DDEServerClass::DDEServerClass()
-    : MPlayerGameInfo(nullptr), MPlayerGameInfoLength(0),
-      IsEnabled(FALSE), LastHeartbeat(0)
-{}
-
-DDEServerClass::~DDEServerClass() { delete[] MPlayerGameInfo; }
-
-char *DDEServerClass::Get_MPlayer_Game_Info()         { return nullptr; }
-BOOL  DDEServerClass::Callback(unsigned char *, long) { return FALSE; }
-void  DDEServerClass::Delete_MPlayer_Game_Info()      {}
-void  DDEServerClass::Enable()                        { IsEnabled = TRUE; }
-void  DDEServerClass::Disable()                       { IsEnabled = FALSE; }
-int   DDEServerClass::Time_Since_Heartbeat()          { return 0; }
-BOOL  Send_Data_To_DDE_Server(char *, int, int)       { return FALSE; }
+Instance_Class::Instance_Class(LPSTR, LPSTR) : dde_error(TRUE) {}
+Instance_Class::~Instance_Class() {}
+BOOL Instance_Class::Enable_Callback(BOOL)          { return FALSE; }
+BOOL Instance_Class::Test_Server_Running(HSZ)        { return FALSE; }
+BOOL Instance_Class::Open_Poke_Connection(HSZ)       { return FALSE; }
+BOOL Instance_Class::Close_Poke_Connection()         { return FALSE; }
+BOOL Instance_Class::Poke_Server(LPBYTE, DWORD)      { return FALSE; }
+BOOL Instance_Class::Register_Server(BOOL (CALLBACK *)(LPBYTE, long)) { return FALSE; }
+HDDEDATA CALLBACK Instance_Class::dde_callback(UINT, UINT, HCONV, HSZ, HSZ, HDDEDATA, DWORD, DWORD) { return nullptr; }
 
 // =========================================================================
 // DLL / GlyphX callback stubs
