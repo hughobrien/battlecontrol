@@ -2786,7 +2786,8 @@ void Write_Scenario_INI(char * fname)
 	**	maintained entries.
 	*/
 	if (CCFileClass(fname).Is_Available()) {
-		ini.Load(CCFileClass(fname), true);
+		CCFileClass scenfile(fname);
+		ini.Load(scenfile, true);
 	}
 
 	static char const * const BASIC = "Basic";

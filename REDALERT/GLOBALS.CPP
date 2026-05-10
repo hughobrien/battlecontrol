@@ -251,7 +251,7 @@ CCINIClass AftermathINI;
 **	This points to the benchmark objects that are allocated only if the
 **	machine is running on a Pentium and this is a debug version.
 */
-//Benchmark * Benches;
+Benchmark * Benches;
 
 
 /***************************************************************************

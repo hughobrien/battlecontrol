@@ -612,4 +612,17 @@ HRESULT    SafeArrayUnaccessData(SAFEARRAY* psa);
 #define sprintf_s(buf, sz, ...) snprintf((buf), (sz), __VA_ARGS__)
 #endif
 
+// TIM-352: CDFileClass-based Write_PCX_File overload for CHEAT_KEYS screenshot
+// code in GADGET.CPP. CDFileClass has no implicit char* conversion so the
+// existing Write_PCX_File(char*,...) declaration doesn't match. This no-op
+// overload satisfies the call; Benches is always NULL so screenshots never fire.
+#ifdef CHEAT_KEYS
+#ifdef __cplusplus
+class CDFileClass;
+class GraphicBufferClass;
+class PaletteClass;
+static inline int Write_PCX_File(CDFileClass&, GraphicBufferClass&, PaletteClass*) { return 0; }
+#endif
+#endif
+
 #endif // LINUX_WIN32_STUBS_MSVC_COMPAT_H
