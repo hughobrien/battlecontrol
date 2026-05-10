@@ -113,13 +113,13 @@ Passes are numbered sequentially (pass-1 through pass-94) and each has a corresp
 
 ```bash
 # Debian / Ubuntu
-sudo apt-get install -y build-essential g++ cmake libsdl2-dev libopenal-dev xvfb
+sudo apt-get install -y build-essential g++ cmake libsdl2-dev xvfb
 
 # Fedora
-sudo dnf install -y @development-tools gcc-c++ cmake SDL2-devel openal-soft-devel
+sudo dnf install -y @development-tools gcc-c++ cmake SDL2-devel
 
 # Arch
-sudo pacman -S --needed base-devel gcc cmake sdl2 openal
+sudo pacman -S --needed base-devel gcc cmake sdl2
 ```
 
 ### Build
