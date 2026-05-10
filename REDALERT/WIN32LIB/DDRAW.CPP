@@ -649,12 +649,13 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 			SDL_Set_Main_Window(SDL_VideoWindow);
 		}
 #ifdef __EMSCRIPTEN__
-		// TIM-377: Emscripten SDL2 uses the WebGL backend; software renderer
-		// is unavailable. PRESENTVSYNC maps to requestAnimationFrame inside
-		// a browser worker thread — omit it here so SDL_RenderPresent returns
-		// immediately and does not stall the audio pump.
+		// TIM-399: Use software renderer — SDL_RENDERER_ACCELERATED requires
+		// OffscreenCanvas + WebGL from a PROXY_TO_PTHREAD Worker, which crashes
+		// with GLctx=undefined (no -sOFFSCREENCANVAS_SUPPORT link flag).
+		// SDL2's software renderer uses the canvas 2D API via Emscripten's
+		// proxy mechanism and avoids WebGL entirely.
 		SDL_VideoRenderer = SDL_CreateRenderer(SDL_VideoWindow, -1,
-		                                       SDL_RENDERER_ACCELERATED);
+		                                       SDL_RENDERER_SOFTWARE);
 		if (SDL_VideoRenderer == nullptr) {
 			SDL_VideoRenderer = SDL_CreateRenderer(SDL_VideoWindow, -1, 0);
 		}
