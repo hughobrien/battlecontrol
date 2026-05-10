@@ -28,7 +28,39 @@ Other modern Linux distros (Ubuntu 24.04+, Fedora 40+, Arch) should work as long
 
 If a dep is ambiguous (e.g. SDL2 vs SDL3, OpenAL vs PulseAudio): we will pick **SDL2** for graphics+audio+input and revisit only if it blocks us. SDL2 is in every distro, has stable Linux packaging, and the porting brief assumes it.
 
-## Install build prerequisites
+## Nix (quickest path)
+
+If you have Nix with flakes enabled, no manual dependency installation is needed.
+
+### Run the game
+
+```sh
+# From your game-data directory (must contain MAIN.MIX):
+cd /path/to/red-alert-data
+nix run github:hughobrien/battlecontrol
+
+# Or pass the data path via env:
+RA_DATA_DIR=/path/to/red-alert-data nix run github:hughobrien/battlecontrol
+```
+
+### Build only
+
+```sh
+nix build github:hughobrien/battlecontrol
+# Binary lands at ./result/bin/redalert
+```
+
+### Dev shell
+
+```sh
+nix develop github:hughobrien/battlecontrol
+# Provides gcc, cmake, ninja, SDL2, pkg-config, etc.
+cmake -S . -B build && cmake --build build -j$(nproc)
+```
+
+---
+
+## Install build prerequisites (non-Nix)
 
 ### Debian / Ubuntu
 
