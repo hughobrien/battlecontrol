@@ -1,8 +1,6 @@
-# Command & Conquer: Red Alert — Linux Port
+# Command & Conquer: Remastered Collection — Linux Port
 
-This is an ongoing Linux port of **Command & Conquer: Red Alert** from the [EA open-source release](https://github.com/electronicarts/CnC_Red_Alert). The upstream repo ships only an MSBuild/MSVC solution targeting Win32; this fork brings the game to a native Linux build using GCC/Clang, CMake, and SDL2.
-
-> **Note on the upstream repo:** EA released the Red Alert source at `electronicarts/CnC_Red_Alert` (not `CnC_Remastered_Collection`, which is a separate repo for the 2020 Remastered Collection and does not contain the original Red Alert source).
+This is an ongoing Linux port of **Command & Conquer: Remastered Collection** (TiberianDawn + RedAlert) from the [EA open-source release](https://github.com/electronicarts/CnC_Remastered_Collection). The upstream repo ships only an MSBuild/MSVC solution targeting Win32; this fork brings both games to a native Linux build using GCC/Clang, CMake, and SDL2.
 
 > **Current status:** The game runs to completion on Linux. A release build sustains ~12 fps, navigates 12 win/loss cycles, and exits cleanly. ASAN-clean. The full rendering pipeline — title screen, main menu, sidebar, radar, tactical map, units — works end-to-end.
 
