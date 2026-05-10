@@ -272,6 +272,10 @@ if(EMSCRIPTEN)
         # it into a Web Worker so it can block without stalling the browser UI thread.
         -sPROXY_TO_PTHREAD=1
         "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"callMain\"]"
+        # TIM-399: include IDBFS so preloader.js can mount FS.filesystems.IDBFS.
+        # Without this flag, IDBFS is absent from ra.js and the preloader throws a
+        # TypeError on FS.mount, silently aborting the Promise chain before callMain.
+        -sFORCE_FILESYSTEM=1
         "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/shell.html"
     )
     # TIM-378: copy preloader.js alongside ra.html so <script src="preloader.js"> resolves.
