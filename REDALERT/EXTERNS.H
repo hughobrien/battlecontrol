@@ -49,6 +49,7 @@
 #include	"options.h"
 #include	"infantry.H"
 #include "DSOUND.H"
+#include "bench.h"
 
 // TIM-68: forward-declare GetCDClass so the `extern GetCDClass CDList;`
 // declaration below parses without requiring playcd.h. The recursive
@@ -169,7 +170,7 @@ extern CCINIClass					RuleINI;
 #ifdef FIXIT_CSII	//	checked - ajw 9/28/98
 extern CCINIClass					AftermathINI;
 #endif
-//extern Benchmark *				Benches;
+extern Benchmark *				Benches;
 extern int							MapTriggerID;
 extern int							LogicTriggerID;
 extern PKey							FastKey;

@@ -122,4 +122,13 @@ int LCW_Comp(void const * /*source*/, void * /*dest*/, int /*length*/)
     return 0;
 }
 
+// WIN32LIB/MISC.H — CPU family detector. Returns 0=286, 1=386, 2=486,
+// 3=Pentium, etc. CHEAT_KEYS code in INIT.CPP gates Benchmark allocation
+// on Processor() >= 2. We return 0 so Benches stays NULL and BStart/BEnd
+// remain no-ops; no Benchmark objects are ever allocated.
+unsigned short Processor(void)
+{
+    return 0;
+}
+
 }  // extern "C"

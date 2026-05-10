@@ -120,4 +120,17 @@ class Benchmark
 
 
 #endif
+
+// TIM-352: no-op stub so extern Benchmark*Benches and BStart/BEnd
+// macros compile on Linux. Benches is always NULL at runtime so
+// Begin()/End() are never called.
+class Benchmark {
+public:
+	void Begin(bool = false) {}
+	void End(void) {}
+	void Reset(void) {}
+	unsigned long Value(void) const { return 0; }
+	unsigned long Count(void) const { return 0; }
+};
+
 #endif

@@ -289,7 +289,7 @@ extern long LParam;
 #include	"ccfile.h"
 #include	"monoc.h"
 #include	"conquer.h"
-//#include	"debug.h"
+#include	"debug.h"
 #include "special.h"
 #include	"defines.h"
 #include	"ccini.h"
