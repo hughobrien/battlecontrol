@@ -421,10 +421,25 @@ void DisplayClass::Init_Theater(TheaterType theater)
 	*/
 	sprintf(fullname, "%s.PAL", Theaters[theater].Root);
 	void const * ptr = MixFileClass::Retrieve(fullname);
-	Mem_Copy((void *)ptr, GamePalette, 768);
-
-
-	Mem_Copy(GamePalette, OriginalPalette, 768);
+#ifndef _MSC_VER
+	/* TIM-343: theater .PAL files ship as loose files on the TD CD, not
+	 * embedded in a mix file.  Fall back to CCFileClass (filesystem) when
+	 * MixFileClass::Retrieve can't find the palette in a cached mix. */
+	static char pal_buf[768];
+	if (!ptr) {
+		CCFileClass palfile(fullname);
+		if (palfile.Is_Available()) {
+			palfile.Open();
+			palfile.Read(pal_buf, 768);
+			palfile.Close();
+			ptr = pal_buf;
+		}
+	}
+#endif
+	if (ptr) {
+		Mem_Copy((void *)ptr, GamePalette, 768);
+		Mem_Copy(GamePalette, OriginalPalette, 768);
+	}
 
 #ifndef _RETRIEVE
 	/*
@@ -529,8 +544,22 @@ void DisplayClass::Init_Theater(TheaterType theater)
 	*/
 	sprintf(fullname, "%s.PAL", Theaters[theater].Root);
 	ptr = MixFileClass::Retrieve(fullname);
-	Mem_Copy((void *)ptr, GamePalette, 768);
-	Mem_Copy(GamePalette, OriginalPalette, 768);
+#ifndef _MSC_VER
+	/* TIM-343: same loose-file fallback as the first palette load above. */
+	if (!ptr) {
+		CCFileClass palfile2(fullname);
+		if (palfile2.Is_Available()) {
+			palfile2.Open();
+			palfile2.Read(pal_buf, 768);
+			palfile2.Close();
+			ptr = pal_buf;
+		}
+	}
+#endif
+	if (ptr) {
+		Mem_Copy((void *)ptr, GamePalette, 768);
+		Mem_Copy(GamePalette, OriginalPalette, 768);
+	}
 #endif
 
 	/*

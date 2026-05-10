@@ -520,7 +520,9 @@ ThemeType ThemeClass::From_Name(char const * name)
 		**	yeild a match, but is not guaranteed to be unique.
 		*/
 		for (theme = THEME_FIRST; theme < THEME_COUNT; theme++) {
-			if (strstr(Text_String(_themes[theme].Fullname), name) != NULL) {
+			const char *s = Text_String(_themes[theme].Fullname);
+			if (!s) continue; // TIM-343: SystemStrings may not be loaded yet
+			if (strstr(s, name) != NULL) {
 				return(theme);
 			}
 		}

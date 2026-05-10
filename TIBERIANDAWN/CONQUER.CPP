@@ -1468,6 +1468,14 @@ void Reallocate_Big_Shape_Buffer(void);
 
 bool Main_Loop()
 {
+#ifndef _MSC_VER
+	/* TIM-343: frame counter for smoke-test (≥10 frames = milestone reached). */
+	static int _td_frame_count = 0;
+	_td_frame_count++;
+	if (_td_frame_count <= 15 || (_td_frame_count % 100) == 0) {
+		fprintf(stderr, "[TD] Main_Loop frame %d\n", _td_frame_count); fflush(stderr);
+	}
+#endif
 	KeyNumType	input;					// Player input.
 	int 			x;
 	int 			y;
