@@ -138,15 +138,6 @@ target_include_directories(td PRIVATE
     "${CMAKE_SOURCE_DIR}/linux/win32-stubs"
 )
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(td PRIVATE
-        "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
-        -fmax-errors=20
-        -fpermissive   # TIM-339: allows extra qualifications + two-phase lookup as warnings
-        -w             # suppress warnings (errors already suppressed by fpermissive)
-    )
-endif()
-
 # TIM-343: Force WIN32=1 for all TD TUs so RawFileClass/HANDLE_TYPE gets a
 # consistent void* layout everywhere. FUNCTION.H has the WIN32 define
 # commented out, so without this flag each TU independently sees either
@@ -155,10 +146,42 @@ endif()
 # wwstd.h #define WIN32 1 (see memory note project_redalert_wwstd_predefines_win32).
 target_compile_definitions(td PRIVATE WIN32=1)
 
-# TIM-341: SDL2 required by sdl_window.cpp (MainWindow, SDL_Window_Show, ...).
-# Emscripten provides SDL2 via -sUSE_SDL=2 at link time; skip find_package for WASM.
-# The `td` target is native-only; skip its SDL2 link under WASM.
-if(NOT EMSCRIPTEN)
+# TIM-400: mirror RA's EMSCRIPTEN block — WASM build gets pthreads + SDL2 port;
+# native build gets SDL2 host library.
+if(EMSCRIPTEN)
+    target_compile_options(td PRIVATE
+        "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
+        -fpermissive
+        -Wno-register
+        -w
+        -pthread
+        -sUSE_SDL=2
+        -sUSE_PTHREADS=1
+    )
+    set_target_properties(td PROPERTIES SUFFIX ".html")
+    target_link_options(td PRIVATE
+        -sUSE_SDL=2
+        -sALLOW_MEMORY_GROWTH=1
+        -sUSE_PTHREADS=1
+        -sPTHREAD_POOL_SIZE=4
+        -sPROXY_TO_PTHREAD=1
+        "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"callMain\"]"
+        "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/shell.html"
+    )
+    add_custom_command(TARGET td POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_SOURCE_DIR}/wasm/preloader.js"
+            "${CMAKE_BINARY_DIR}/preloader.js"
+        COMMENT "Copying preloader.js to ${CMAKE_BINARY_DIR}"
+    )
+else()
+    target_compile_options(td PRIVATE
+        "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
+        -fmax-errors=20
+        -fpermissive   # TIM-339: allows extra qualifications + two-phase lookup as warnings
+        -w             # suppress warnings (errors already suppressed by fpermissive)
+    )
+    # TIM-341: SDL2 required by sdl_window.cpp (MainWindow, SDL_Window_Show, ...).
     find_package(SDL2 REQUIRED)
     target_link_libraries(td PRIVATE SDL2::SDL2)
 endif()

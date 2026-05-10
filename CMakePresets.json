@@ -30,6 +30,11 @@
       "name": "wasm",
       "configurePreset": "wasm",
       "targets": ["ra"]
+    },
+    {
+      "name": "wasm-td",
+      "configurePreset": "wasm",
+      "targets": ["td"]
     }
   ]
 }

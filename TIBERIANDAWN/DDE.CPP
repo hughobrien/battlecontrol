@@ -42,9 +42,10 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-// TIM-339: DDE is Windows-only; exclude on Linux.
+// TIM-339: DDE is Windows-only; exclude on Linux and WASM.
 // Note: WIN32 is not defined here (no wwstd.h), so use __linux__ guard.
-#ifndef __linux__
+// TIM-400: also exclude under Emscripten (__EMSCRIPTEN__ not __linux__).
+#if !defined(__linux__) && !defined(__EMSCRIPTEN__)
 #include	<windows.h>
 #include	"dde.h"
 
@@ -467,4 +468,4 @@ HDDEDATA CALLBACK Instance_Class::dde_callback(
 #endif
 }
 
-#endif // !__linux__
+#endif // !__linux__ && !__EMSCRIPTEN__
