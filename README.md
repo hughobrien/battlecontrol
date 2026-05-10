@@ -164,10 +164,10 @@ A `flake.nix` is provided for Nix users on x86_64-Linux.
 ```bash
 # From a directory containing your Red Alert game data (MAIN.MIX etc.):
 cd /path/to/red-alert-data
-nix run github:owner/repo
+nix run github:hughobrien/battlecontrol
 
 # Or set the data path explicitly:
-RA_DATA_DIR=/path/to/red-alert-data nix run github:owner/repo
+RA_DATA_DIR=/path/to/red-alert-data nix run github:hughobrien/battlecontrol
 ```
 
 The game data is **not** included — you must supply legally-acquired files
@@ -176,7 +176,7 @@ The game data is **not** included — you must supply legally-acquired files
 ### Contributors — drop into a build shell
 
 ```bash
-git clone https://github.com/owner/repo && cd repo
+git clone https://github.com/hughobrien/battlecontrol && cd battlecontrol
 nix develop
 # Now cmake, gcc, clang, SDL2, python3 etc. are all on PATH:
 cmake -S . -B build && cmake --build build -j$(nproc)
@@ -187,7 +187,7 @@ bash scripts/first-run-pass-94.sh
 ### Build the binary without entering the shell
 
 ```bash
-nix build github:owner/repo
+nix build github:hughobrien/battlecontrol
 # Binary lands at ./result/bin/redalert
 ```
 
