@@ -2223,6 +2223,44 @@ Mono_Set_Cursor(0,0);
 	Self_Regulate();
 #endif
 
+#ifndef _MSC_VER
+	/* TIM-363: frame counter + RA_CHEAT injection for automated smoke tests. */
+	static long _ra_frame_count = 0;
+	_ra_frame_count++;
+	if (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0) {
+		fprintf(stderr, "[RA] Main_Loop frame %ld\n", _ra_frame_count); fflush(stderr);
+	}
+	/* RA_CHEAT=1: inject cheat actions at fixed frames.
+	 * Bypasses xdotool since SDL keyboard is not yet fully wired.
+	 * Mirrors Debug_Cheat (level=98) / Debug_Unshroud / Flag_To_Win. */
+	if (getenv("RA_CHEAT") && PlayerPtr) {
+		if (_ra_frame_count == 30) {
+			PlayerPtr->Credits += 10000;
+			fprintf(stderr, "[RA-CHEAT] frame %ld: +10000 credits (total=%d)\n",
+			        _ra_frame_count, (int)PlayerPtr->Credits); fflush(stderr);
+		}
+		if (_ra_frame_count == 35) {
+			/* Debug_Cheat=true → HOUSE.CPP sets level=98 → full tech unlock */
+			Debug_Cheat = true;
+			PlayerPtr->IsRecalcNeeded = true;
+			fprintf(stderr, "[RA-CHEAT] frame %ld: Debug_Cheat=true (tech-level 98)\n",
+			        _ra_frame_count); fflush(stderr);
+		}
+		if (_ra_frame_count == 40) {
+			Debug_Unshroud = true;
+			Map.Flag_To_Redraw(true);
+			fprintf(stderr, "[RA-CHEAT] frame %ld: Debug_Unshroud=true (map revealed)\n",
+			        _ra_frame_count); fflush(stderr);
+		}
+		if (_ra_frame_count == 200) {
+			PlayerPtr->Blockage = false;
+			PlayerPtr->Flag_To_Win();
+			fprintf(stderr, "[RA-CHEAT] frame %ld: Flag_To_Win fired\n",
+			        _ra_frame_count); fflush(stderr);
+		}
+	}
+#endif
+
 	BStart(BENCH_GAME_FRAME);
 
 	/*
