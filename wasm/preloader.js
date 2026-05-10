@@ -201,6 +201,9 @@
     }
   }
 
+  // ?autostart=1 URL param — set once during DOMContentLoaded, read in mountAndLaunch.
+  var autostart = false;
+
   function mountAndLaunch() {
     // Emscripten 4.x+ exports FS via Module["FS"], not as a global variable.
     var FS = Module.FS;
@@ -224,6 +227,14 @@
 
     FS.chdir(GAME_DIR);
     console.log('[preloader] cwd → ' + GAME_DIR);
+
+    // TIM-399: ?autostart=1 injects RA_AUTOSTART into Emscripten ENV so the
+    // game skips the main menu and jumps straight to SCG01EA (used in e2e tests).
+    if (autostart) {
+      Module.ENV = Module.ENV || {};
+      Module.ENV['RA_AUTOSTART'] = '1';
+      console.log('[preloader] RA_AUTOSTART injected via ?autostart=1');
+    }
 
     // Restore any previously persisted saves from IndexedDB, then start game.
     setStatus('Restoring saved games…');
@@ -251,8 +262,14 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    // ?src=<url> param: fetch MIX files from S3 / HTTP instead of local picker.
     var params = new URLSearchParams(window.location.search);
+
+    // ?autostart=1 — skip menu, jump straight to SCG01EA (TIM-399 e2e tests).
+    if (params.get('autostart') === '1') {
+      autostart = true;
+    }
+
+    // ?src=<url> param: fetch MIX files from S3 / HTTP instead of local picker.
     var srcParam = params.get('src');
     if (srcParam) {
       fetchFromUrl(srcParam);
