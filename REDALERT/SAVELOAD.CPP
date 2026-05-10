@@ -326,10 +326,10 @@ bool Save_Game(int id, char const * descr, bool )
 	** network/modem game; otherwise, use 'id' as the file extension.
 	*/
 	if (id==-1) {
-		strcpy(name, NET_SAVE_FILE_NAME);
+		strcpy(name, WASM_SAVE_PREFIX NET_SAVE_FILE_NAME);
 		//save_net = 1;
 	} else {
-		sprintf(name, "SAVEGAME.%03d", id);
+		sprintf(name, WASM_SAVE_PREFIX "SAVEGAME.%03d", id);
 	}
 
 	return Save_Game(name, descr);
@@ -498,10 +498,10 @@ bool Load_Game(int id)
 	** network/modem game; otherwise, use 'id' as the file extension.
 	*/
 	if (id == -1) {
-		strcpy(name, NET_SAVE_FILE_NAME);
+		strcpy(name, WASM_SAVE_PREFIX NET_SAVE_FILE_NAME);
 		//load_net = 1;
 	} else {
-		sprintf(name, "SAVEGAME.%03d", id);
+		sprintf(name, WASM_SAVE_PREFIX "SAVEGAME.%03d", id);
 	}
 	return Load_Game(name);
 }
@@ -1466,7 +1466,7 @@ bool Get_Savefile_Info(int id, char * buf, unsigned * scenp, HousesType * housep
 	/*
 	**	Generate the filename to load
 	*/
-	sprintf(name, "SAVEGAME.%03d", id);
+	sprintf(name, WASM_SAVE_PREFIX "SAVEGAME.%03d", id);
 	BufferIOFileClass file(name);
 
 	FileStraw straw(file);

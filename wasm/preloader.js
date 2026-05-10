@@ -33,6 +33,7 @@
   'use strict';
 
   var GAME_DIR = '/game';
+  var SAVES_DIR = '/saves';
 
   var MIX_FILES = [
     'REDALERT.MIX',
@@ -214,9 +215,39 @@
       console.log('[preloader] mounted ' + GAME_DIR + '/' + name);
     });
 
+    // TIM-396: Mount IDBFS at /saves for persistent save game storage.
+    // All SAVEGAME.NNN files are written here by the game (C++ side uses
+    // WASM_SAVE_PREFIX "/saves/") and persisted to IndexedDB via syncfs.
+    try { FS.mkdir(SAVES_DIR); } catch (ignore) {}
+    FS.mount(FS.filesystems.IDBFS, {}, SAVES_DIR);
+    console.log('[idbfs] mounted ' + SAVES_DIR);
+
     FS.chdir(GAME_DIR);
-    console.log('[preloader] cwd → ' + GAME_DIR + ', calling main()');
-    Module.callMain([]);
+    console.log('[preloader] cwd → ' + GAME_DIR);
+
+    // Restore any previously persisted saves from IndexedDB, then start game.
+    setStatus('Restoring saved games…');
+    FS.syncfs(/*populate=*/true, function (err) {
+      if (err) {
+        console.error('[idbfs] startup sync error:', err);
+      } else {
+        console.log('[idbfs] saves restored from IndexedDB');
+      }
+      setStatus('Starting game…');
+      Module.callMain([]);
+
+      // Flush in-memory /saves to IndexedDB every 5 s so saves survive refresh.
+      setInterval(function () {
+        FS.syncfs(/*populate=*/false, function (syncErr) {
+          if (syncErr) console.error('[idbfs] periodic sync error:', syncErr);
+        });
+      }, 5000);
+
+      // Best-effort flush on page unload (browsers may or may not honour this).
+      window.addEventListener('beforeunload', function () {
+        FS.syncfs(false, function () {});
+      });
+    });
   }
 
   document.addEventListener('DOMContentLoaded', function () {

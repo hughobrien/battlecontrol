@@ -509,6 +509,18 @@ typedef enum DiffType : unsigned char {
 #define NET_SAVE_FILE_NAME		"SAVEGAME.NET"
 #define CONFIG_FILE_NAME		"REDALERT.INI"
 
+/*
+** TIM-396: WASM save persistence. Under Emscripten, save files live in
+** /saves/ (IDBFS-mounted). All SAVEGAME.%03d / SAVEGAME.NET paths are
+** prefixed with WASM_SAVE_PREFIX at the point of use so native Linux
+** builds are unaffected.
+*/
+#ifdef __EMSCRIPTEN__
+#define WASM_SAVE_PREFIX "/saves/"
+#else
+#define WASM_SAVE_PREFIX ""
+#endif
+
 
 /**********************************************************************
 **	Map controls. The map is composed of square elements called 'cells'.
