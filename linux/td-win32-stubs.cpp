@@ -19,6 +19,15 @@
 #include <cstdint>
 #include <ctime>
 #include <algorithm>
+#include <climits>
+#include <cstdio>
+
+// TIM-383: SDL2 graphics + input for TiberiaDawn native Linux play.
+#ifndef _MSC_VER
+#include <SDL2/SDL.h>
+#include "sdl_input.h"   // SDL_Process_Input_Events declaration
+#include "sdl_window.h"  // SDL_Get_Main_Window / SDL_Set_Main_Window
+#endif
 
 // WIN32LIB headers — use explicit "WIN32LIB/" prefix where the header name
 // clashes with a TIBERIANDAWN top-level header (e.g. MOUSE.H).
@@ -42,6 +51,184 @@
 // main() is provided by TIBERIANDAWN/STARTUP.CPP (#ifndef _MSC_VER block,
 // TIM-343 pass-99). Removed stub from here to avoid duplicate-definition
 // link errors now that the real entry point exists in the game source.
+
+// =========================================================================
+// TIM-383: SDL2 state (Linux-only) — graphics, palette, input
+// =========================================================================
+#ifndef _MSC_VER
+
+static SDL_Window*   TD_SDL_Window    = nullptr;
+static SDL_Renderer* TD_SDL_Renderer  = nullptr;
+// Texture + ARGB surface for indexed→ARGB conversion in the present pump.
+static SDL_Texture*  TD_SDL_Texture   = nullptr;
+static SDL_Surface*  TD_SDL_ARGB      = nullptr;
+static int           TD_SDL_CachedW   = 0;
+static int           TD_SDL_CachedH   = 0;
+static bool          TD_SDL_FirstPresent = false;
+static bool          TD_SDL_QuitRequested = false;
+// 256-entry palette populated by Set_DD_Palette; used in Wait_Vert_Blank
+// to colour-convert the indexed pixel buffer.
+static SDL_Color     TD_SDL_Palette[256] = {};
+// Visible pixel buffer registered from STARTUP.CPP after SeenBuff.Attach.
+static unsigned char* TD_SeenPixels = nullptr;
+static int            TD_SeenW = 0, TD_SeenH = 0, TD_SeenPitch = 0;
+
+extern bool GameInFocus;  // GLOBALS.CPP
+
+// Registration helper: STARTUP.CPP calls this after SeenBuff.Attach so
+// Wait_Vert_Blank knows where to read indexed pixels from.
+void SDL_TD_Register_SeenBuff(void* pixels, int w, int h, int pitch)
+{
+    TD_SeenPixels = static_cast<unsigned char*>(pixels);
+    TD_SeenW = w; TD_SeenH = h; TD_SeenPitch = pitch;
+}
+
+// SDL window-event pump: focus transitions + quit capture.
+static void TD_SDL_Process_Window_Events(void)
+{
+    SDL_PumpEvents();
+    SDL_Event ev[16];
+    int n;
+    do {
+        n = SDL_PeepEvents(ev, 16, SDL_GETEVENT, SDL_WINDOWEVENT, SDL_WINDOWEVENT);
+        for (int i = 0; i < n; ++i) {
+            switch (ev[i].window.event) {
+            case SDL_WINDOWEVENT_FOCUS_LOST:
+            case SDL_WINDOWEVENT_MINIMIZED:
+                AllSurfaces.Set_Surface_Focus(FALSE);
+                GameInFocus = false;
+                break;
+            case SDL_WINDOWEVENT_FOCUS_GAINED:
+            case SDL_WINDOWEVENT_RESTORED:
+                AllSurfaces.Set_Surface_Focus(TRUE);
+                GameInFocus = true;
+                break;
+            default: break;
+            }
+        }
+    } while (n == 16);
+    do {
+        n = SDL_PeepEvents(ev, 16, SDL_GETEVENT, SDL_QUIT, SDL_QUIT);
+        if (n > 0) TD_SDL_QuitRequested = true;
+    } while (n == 16);
+}
+
+extern "C" bool SDL_Quit_Requested(void) { return TD_SDL_QuitRequested; }
+extern "C" void SDL_Clear_Quit(void)     { TD_SDL_QuitRequested = false; }
+
+// VK_ keysym map — mirrors RA KEY.CPP SDL_Keysym_To_VK exactly.
+static unsigned short TD_SDL_Keysym_To_VK(SDL_Keycode k)
+{
+    if (k >= SDLK_a && k <= SDLK_z) return (unsigned short)(VK_A + (k - SDLK_a));
+    if (k >= SDLK_0 && k <= SDLK_9) return (unsigned short)(VK_0 + (k - SDLK_0));
+    if (k >= SDLK_F1 && k <= SDLK_F12) return (unsigned short)(VK_F1 + (k - SDLK_F1));
+    switch (k) {
+    case SDLK_ESCAPE:       return VK_ESCAPE;
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER:     return VK_RETURN;
+    case SDLK_BACKSPACE:    return VK_BACK;
+    case SDLK_TAB:          return VK_TAB;
+    case SDLK_SPACE:        return VK_SPACE;
+    case SDLK_LEFT:         return VK_LEFT;
+    case SDLK_RIGHT:        return VK_RIGHT;
+    case SDLK_UP:           return VK_UP;
+    case SDLK_DOWN:         return VK_DOWN;
+    case SDLK_HOME:         return VK_HOME;
+    case SDLK_END:          return VK_END;
+    case SDLK_PAGEUP:       return VK_PRIOR;
+    case SDLK_PAGEDOWN:     return VK_NEXT;
+    case SDLK_INSERT:       return VK_INSERT;
+    case SDLK_DELETE:       return VK_DELETE;
+    case SDLK_LSHIFT:
+    case SDLK_RSHIFT:       return VK_SHIFT;
+    case SDLK_LCTRL:
+    case SDLK_RCTRL:        return VK_CONTROL;
+    case SDLK_LALT:
+    case SDLK_RALT:         return VK_MENU;
+    case SDLK_PAUSE:        return VK_PAUSE;
+    case SDLK_CAPSLOCK:     return VK_CAPITAL;
+    case SDLK_NUMLOCKCLEAR: return VK_NUMLOCK;
+    case SDLK_SCROLLLOCK:   return VK_SCROLL;
+    case SDLK_KP_0:         return VK_NUMPAD0;
+    case SDLK_KP_1:         return VK_NUMPAD1;
+    case SDLK_KP_2:         return VK_NUMPAD2;
+    case SDLK_KP_3:         return VK_NUMPAD3;
+    case SDLK_KP_4:         return VK_NUMPAD4;
+    case SDLK_KP_5:         return VK_NUMPAD5;
+    case SDLK_KP_6:         return VK_NUMPAD6;
+    case SDLK_KP_7:         return VK_NUMPAD7;
+    case SDLK_KP_8:         return VK_NUMPAD8;
+    case SDLK_KP_9:         return VK_NUMPAD9;
+    case SDLK_KP_PLUS:      return VK_ADD;
+    case SDLK_KP_MINUS:     return VK_SUBTRACT;
+    case SDLK_KP_MULTIPLY:  return VK_MULTIPLY;
+    case SDLK_KP_DIVIDE:    return VK_DIVIDE;
+    case SDLK_KP_PERIOD:    return VK_DECIMAL;
+    default:                return 0;
+    }
+}
+
+// SDL cursor position — declared extern "C" in linux/win32-stubs/windows.h
+// for GetCursorPos. Updated by the mouse-motion drain below.
+extern "C" {
+int SDL_Cursor_X = 0;
+int SDL_Cursor_Y = 0;
+}
+
+// SDL keyboard + mouse drain — called from Wait_Vert_Blank each frame.
+// Mirrors RA KEY.CPP SDL_Process_Input_Events.
+extern "C" void SDL_Process_Input_Events(void)
+{
+    if (_Kbd == nullptr) return;
+    SDL_PumpEvents();
+    SDL_Event ev[16];
+    int n;
+
+    // Keyboard
+    do {
+        n = SDL_PeepEvents(ev, 16, SDL_GETEVENT, SDL_KEYDOWN, SDL_KEYUP);
+        for (int i = 0; i < n; ++i) {
+            const SDL_KeyboardEvent& ke = ev[i].key;
+            unsigned short vk = TD_SDL_Keysym_To_VK(ke.keysym.sym);
+            if (vk == 0) continue;
+            Uint16 mod = ke.keysym.mod;
+            if (mod & KMOD_SHIFT) vk |= WWKEY_SHIFT_BIT;
+            if (mod & KMOD_CTRL)  vk |= WWKEY_CTRL_BIT;
+            if (mod & KMOD_ALT)   vk |= WWKEY_ALT_BIT;
+            if (ev[i].type == SDL_KEYUP) vk |= WWKEY_RLS_BIT;
+            vk |= WWKEY_VK_BIT;
+            _Kbd->Put((int)vk);
+        }
+    } while (n == 16);
+
+    // Mouse buttons + motion
+    do {
+        n = SDL_PeepEvents(ev, 16, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEBUTTONUP);
+        for (int i = 0; i < n; ++i) {
+            Uint32 type = ev[i].type;
+            if (type == SDL_MOUSEBUTTONDOWN || type == SDL_MOUSEBUTTONUP) {
+                const SDL_MouseButtonEvent& be = ev[i].button;
+                unsigned short vk = 0;
+                switch (be.button) {
+                case SDL_BUTTON_LEFT:   vk = VK_LBUTTON; break;
+                case SDL_BUTTON_MIDDLE: vk = VK_MBUTTON; break;
+                case SDL_BUTTON_RIGHT:  vk = VK_RBUTTON; break;
+                default: continue;
+                }
+                vk |= WWKEY_VK_BIT;
+                if (type == SDL_MOUSEBUTTONUP) vk |= WWKEY_RLS_BIT;
+                _Kbd->Put((int)vk);
+                _Kbd->Put((int)be.x);
+                _Kbd->Put((int)be.y);
+            } else if (type == SDL_MOUSEMOTION) {
+                SDL_Cursor_X = ev[i].motion.x;
+                SDL_Cursor_Y = ev[i].motion.y;
+            }
+        }
+    } while (n == 16);
+}
+
+#endif // !_MSC_VER
 
 // =========================================================================
 // BufferClass — base buffer class (BUFFER.H; ctors/dtor are non-inline)
@@ -272,29 +459,86 @@ WWKeyboardClass::WWKeyboardClass()
     std::memset(ToggleKeys, 0, sizeof(ToggleKeys));
     std::memset(AsciiRemap, 0, sizeof(AsciiRemap));
     std::memset(VKRemap,    0, sizeof(VKRemap));
+    _Kbd = this;  // TIM-383: register as the global keyboard instance
 }
 
-void  WWKeyboardClass::Clear()     { Head = Tail = 0; }
-BOOL  WWKeyboardClass::Check()     { return Head != Tail; }
-int   WWKeyboardClass::Get()       { return 0; }
-BOOL  WWKeyboardClass::Put(int)    { return FALSE; }
-int   WWKeyboardClass::Check_Num() { return 0; }
-int   WWKeyboardClass::Get_VK()    { return 0; }
+void  WWKeyboardClass::Clear()  { Head = Tail = 0; }
+
+// TIM-383: real ring-buffer check; called from Check_Key() hot path every frame.
+BOOL  WWKeyboardClass::Check()  { return Head != Tail; }
+
+// TIM-383: ring-buffer insertion — same logic as the real KEYBOARD.CPP Put().
+BOOL  WWKeyboardClass::Put(int key)
+{
+    int next = (Tail + 1) & 255;
+    if (next == Head) return FALSE;  // buffer full
+    Buffer[Tail] = (short)key;
+    Tail = next;
+    return TRUE;
+}
+
+// TIM-383: low-level get; updates MouseQX/Y if mouse key.
+int   WWKeyboardClass::Buff_Get(void)
+{
+    while (!Check()) {}
+    int temp = Buffer[Head]; Head = (Head + 1) & 255;
+    if (Is_Mouse_Key(temp)) {
+        MouseQX = Buffer[Head]; Head = (Head + 1) & 255;
+        MouseQY = Buffer[Head]; Head = (Head + 1) & 255;
+    }
+    return temp;
+}
+
+// TIM-383: high-level get; VK bit means no ascii remap needed here.
+int   WWKeyboardClass::Get()
+{
+    int temp = Buff_Get();
+    int bits = temp & 0xFF00;
+    if (!(bits & WWKEY_VK_BIT)) {
+        // ASCII remap: map through AsciiRemap like the real KEYBOARD.CPP.
+        // AsciiRemap is zeroed (no Win32 VkKeyScan) so fall back to raw value.
+        int asc = AsciiRemap[temp & 0x1FF];
+        if (asc) temp = asc | bits;
+    }
+    return temp;
+}
+
+BOOL  WWKeyboardClass::Is_Mouse_Key(int key)
+{
+    key &= 0xFF;
+    return (key == VK_LBUTTON || key == VK_MBUTTON || key == VK_RBUTTON);
+}
+
+int   WWKeyboardClass::Check_Num() { return Check() ? (Buffer[Head] & 0xFF) : 0; }
+int   WWKeyboardClass::Get_VK()    { return Get() & 0xFF; }
 int   WWKeyboardClass::Down(int)   { return 0; }
 void  WWKeyboardClass::AI()        {}
 void  WWKeyboardClass::Message_Handler(HWND, UINT, UINT, LONG) {}
-VOID  WWKeyboardClass::Split(int &, int &, int &, int &, int &, int &) {}
-BOOL  WWKeyboardClass::Is_Mouse_Key(int) { return FALSE; }
+VOID  WWKeyboardClass::Split(int &key, int &shift, int &ctrl, int &alt, int &rls, int &dbl)
+{
+    shift = (key & WWKEY_SHIFT_BIT) != 0;
+    ctrl  = (key & WWKEY_CTRL_BIT)  != 0;
+    alt   = (key & WWKEY_ALT_BIT)   != 0;
+    rls   = (key & WWKEY_RLS_BIT)   != 0;
+    dbl   = (key & WWKEY_DBL_BIT)   != 0;
+    key   = key & 0xFF;
+}
 int   WWKeyboardClass::Option_On(int)    { return 0; }
 int   WWKeyboardClass::Option_Off(int)   { return 0; }
-int   WWKeyboardClass::To_ASCII(int)     { return 0; }
+int   WWKeyboardClass::To_ASCII(int key) { return (key & WWKEY_RLS_BIT) ? 0 : key; }
 int   WWKeyboardClass::Check_ACII()      { return 0; }
 int   WWKeyboardClass::Get_ASCII()       { return 0; }
 int   WWKeyboardClass::Check_Bits()      { return 0; }
 int   WWKeyboardClass::Get_Bits()        { return 0; }
-BOOL  WWKeyboardClass::Put_Key_Message(UINT, BOOL, BOOL) { return FALSE; }
+BOOL  WWKeyboardClass::Put_Key_Message(UINT vk, BOOL release, BOOL /*dbl*/)
+{
+    int bits = WWKEY_VK_BIT;
+    if (release) bits |= WWKEY_RLS_BIT;
+    return Put(vk | bits);
+}
 
 // _Kbd global pointer (used as _Kbd->Get() etc. throughout engine).
+// Set to `this` in the constructor above once Kbd (GLOBALS.CPP) is constructed.
 WWKeyboardClass *_Kbd = nullptr;
 
 // Keyboard free functions — C++ linkage (not extern "C").
@@ -454,14 +698,127 @@ void Fade_Palette_To(void *palette1, unsigned int /*delay*/, void (*callback)())
     if (callback) callback();
 }
 
-extern "C" void Set_DD_Palette(void *palette) { Set_Palette(palette); }
+// TIM-383: update both the engine CurrentPalette and the SDL colour table
+// used by Wait_Vert_Blank for indexed→ARGB conversion.
+extern "C" void Set_DD_Palette(void *palette)
+{
+    Set_Palette(palette);  // keeps CurrentPalette in sync
+#ifndef _MSC_VER
+    if (!palette) return;
+    const unsigned char* p = static_cast<const unsigned char*>(palette);
+    for (int i = 0; i < 256; ++i) {
+        TD_SDL_Palette[i].r = (Uint8)((*p++) << 2);
+        TD_SDL_Palette[i].g = (Uint8)((*p++) << 2);
+        TD_SDL_Palette[i].b = (Uint8)((*p++) << 2);
+        TD_SDL_Palette[i].a = 255;
+    }
+#endif
+}
 
 // =========================================================================
-// Video mode and vertical blank
+// Video mode and vertical blank — TIM-383 SDL2 path
 // =========================================================================
 
-BOOL Set_Video_Mode(HWND /*hwnd*/, int /*w*/, int /*h*/, int /*bpp*/) { return TRUE; }
-extern "C" void Wait_Vert_Blank(void) {}
+BOOL Set_Video_Mode(HWND /*hwnd*/, int w, int h, int /*bpp*/)
+{
+#ifndef _MSC_VER
+    if (TD_SDL_Window != nullptr) return TRUE;  // idempotent
+
+    if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
+        if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0) {
+            fprintf(stderr, "[TD] SDL_InitSubSystem(VIDEO) failed: %s\n", SDL_GetError());
+            fflush(stderr);
+            return FALSE;
+        }
+    }
+    TD_SDL_Window = SDL_CreateWindow(
+        "Tiberian Dawn",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        w, h,
+        SDL_WINDOW_HIDDEN);
+    if (TD_SDL_Window == nullptr) {
+        fprintf(stderr, "[TD] SDL_CreateWindow failed: %s\n", SDL_GetError());
+        fflush(stderr);
+        return FALSE;
+    }
+    SDL_Set_Main_Window(TD_SDL_Window);
+
+    // Software renderer: stable under Xvfb (same as RA TIM-250 choice).
+    TD_SDL_Renderer = SDL_CreateRenderer(TD_SDL_Window, -1, SDL_RENDERER_SOFTWARE);
+    if (TD_SDL_Renderer == nullptr)
+        TD_SDL_Renderer = SDL_CreateRenderer(TD_SDL_Window, -1, SDL_RENDERER_ACCELERATED);
+    fprintf(stderr, "[TD] SDL window %dx%d renderer=%p\n", w, h, (void*)TD_SDL_Renderer);
+    fflush(stderr);
+    return TD_SDL_Renderer != nullptr ? TRUE : FALSE;
+#else
+    return TRUE;
+#endif
+}
+
+// Called by DDRAW.CPP Reset_Video_Mode path (unused in TD but keeps symmetry).
+void Reset_Video_Mode(void)
+{
+#ifndef _MSC_VER
+    if (TD_SDL_Texture) { SDL_DestroyTexture(TD_SDL_Texture); TD_SDL_Texture = nullptr; }
+    if (TD_SDL_ARGB)    { SDL_FreeSurface(TD_SDL_ARGB);       TD_SDL_ARGB    = nullptr; }
+    if (TD_SDL_Renderer){ SDL_DestroyRenderer(TD_SDL_Renderer); TD_SDL_Renderer = nullptr; }
+    if (TD_SDL_Window)  { SDL_DestroyWindow(TD_SDL_Window);   TD_SDL_Window  = nullptr; }
+    SDL_Set_Main_Window(nullptr);
+    TD_SDL_FirstPresent = false;
+    TD_SDL_CachedW = TD_SDL_CachedH = 0;
+#endif
+}
+
+extern "C" void Wait_Vert_Blank(void)
+{
+#ifndef _MSC_VER
+    // Pump window events (focus/quit) then keyboard+mouse input.
+    TD_SDL_Process_Window_Events();
+    SDL_Process_Input_Events();
+
+    // Need registered pixel buffer + live renderer to present.
+    if (TD_SeenPixels == nullptr || TD_SDL_Renderer == nullptr) return;
+
+    int w = TD_SeenW, h = TD_SeenH;
+
+    // Recreate ARGB intermediate + streaming texture if size changed.
+    if (TD_SDL_Texture == nullptr || TD_SDL_ARGB == nullptr ||
+        TD_SDL_CachedW != w || TD_SDL_CachedH != h) {
+        if (TD_SDL_Texture) { SDL_DestroyTexture(TD_SDL_Texture); TD_SDL_Texture = nullptr; }
+        if (TD_SDL_ARGB)    { SDL_FreeSurface(TD_SDL_ARGB);       TD_SDL_ARGB    = nullptr; }
+        TD_SDL_Texture = SDL_CreateTexture(TD_SDL_Renderer,
+            SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+        TD_SDL_ARGB = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
+        TD_SDL_CachedW = w; TD_SDL_CachedH = h;
+        if (!TD_SDL_Texture || !TD_SDL_ARGB) return;
+    }
+
+    // Wrap the registered indexed pixel buffer in a temporary SDL_Surface
+    // so SDL_BlitSurface can perform the palette-aware indexed→ARGB conversion.
+    SDL_Surface* src = SDL_CreateRGBSurfaceWithFormatFrom(
+        TD_SeenPixels, w, h, 8, TD_SeenPitch, SDL_PIXELFORMAT_INDEX8);
+    if (!src) return;
+    SDL_SetPaletteColors(src->format->palette, TD_SDL_Palette, 0, 256);
+
+    SDL_BlitSurface(src, nullptr, TD_SDL_ARGB, nullptr);
+    SDL_FreeSurface(src);
+
+    SDL_UpdateTexture(TD_SDL_Texture, nullptr, TD_SDL_ARGB->pixels, TD_SDL_ARGB->pitch);
+    SDL_RenderClear(TD_SDL_Renderer);
+    SDL_RenderCopy(TD_SDL_Renderer, TD_SDL_Texture, nullptr, nullptr);
+    SDL_RenderPresent(TD_SDL_Renderer);
+
+    if (!TD_SDL_FirstPresent) {
+        SDL_ShowWindow(TD_SDL_Window);
+        TD_SDL_FirstPresent = true;
+        GameInFocus = true;
+        // Save first frame for offline verification (mirrors RA TIM-172 pattern).
+        int rc = SDL_SaveBMP(TD_SDL_ARGB, "/tmp/td-frame0.bmp");
+        fprintf(stderr, "[TD] first SDL frame presented; frame0.bmp rc=%d\n", rc);
+        fflush(stderr);
+    }
+#endif
+}
 
 // =========================================================================
 // DrawBuff C-callable functions (normally from x86 ASM)
@@ -703,11 +1060,30 @@ void Stop_Execution(void)          { }
 
 // =========================================================================
 // SDL_Window_Show / SDL_Window_Raise (declared in windows.h stub)
+// TIM-383: real implementations routed through TD_SDL_Window.
 // =========================================================================
 
 extern "C" {
-void SDL_Window_Show(int /*sw_command*/) {}
-void SDL_Window_Raise(void)             {}
+void SDL_Window_Show(int sw_command)
+{
+#ifndef _MSC_VER
+    if (!TD_SDL_Window) return;
+    switch (sw_command) {
+    case 0:                    SDL_HideWindow(TD_SDL_Window); break;
+    case 2: case 6: case 7:   SDL_MinimizeWindow(TD_SDL_Window); break;
+    case 3:                    SDL_MaximizeWindow(TD_SDL_Window);
+                               SDL_ShowWindow(TD_SDL_Window); break;
+    default:                   SDL_ShowWindow(TD_SDL_Window); break;
+    }
+#endif
+}
+
+void SDL_Window_Raise(void)
+{
+#ifndef _MSC_VER
+    if (TD_SDL_Window) SDL_RaiseWindow(TD_SDL_Window);
+#endif
+}
 }
 
 // =========================================================================

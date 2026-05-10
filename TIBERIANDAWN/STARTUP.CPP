@@ -983,6 +983,25 @@ int main(int argc, char * argv[])
                 HidPage.Attach(&HiddenPage, 0, 0, ScreenWidth, ScreenHeight);
             }
 
+            /* TIM-383: register the visible pixel buffer so Wait_Vert_Blank
+             * can read indexed pixels each frame for the SDL present pump.
+             * SeenBuff.Get_Offset() points to the first game-visible row
+             * (y=40 within VisiblePage, or y=0); stride is Get_Width() since
+             * XAdd is 0 for a plain attached viewport. */
+#ifndef _MSC_VER
+            {
+                extern void SDL_TD_Register_SeenBuff(void*, int, int, int);
+                SDL_TD_Register_SeenBuff(
+                    reinterpret_cast<void*>(SeenBuff.Get_Offset()),
+                    SeenBuff.Get_Width(),
+                    SeenBuff.Get_Height(),
+                    SeenBuff.Get_Width());
+                fprintf(stderr, "[TD] SDL_TD_Register_SeenBuff %dx%d\n",
+                        SeenBuff.Get_Width(), SeenBuff.Get_Height());
+                fflush(stderr);
+            }
+#endif
+
             Options.Adjust_Variables_For_Resolution();
 
             WindowList[0][WINDOWWIDTH]  = SeenBuff.Get_Width() >> 3;

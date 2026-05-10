@@ -1464,11 +1464,19 @@ static void Sync_Delay(void)
  *=============================================================================================*/
 extern void Check_For_Focus_Loss(void);
 void Reallocate_Big_Shape_Buffer(void);
+#ifndef _MSC_VER
+/* TIM-383: SDL_QUIT forwarded from td-win32-stubs.cpp for window-close handling. */
+extern "C" bool SDL_Quit_Requested(void);
+#endif
 
 
 bool Main_Loop()
 {
 #ifndef _MSC_VER
+	/* TIM-383: honor SDL_QUIT (window close) by clearing GameActive. */
+	if (SDL_Quit_Requested()) {
+		GameActive = false;
+	}
 	/* TIM-343: frame counter for smoke-test (≥10 frames = milestone reached). */
 	static int _td_frame_count = 0;
 	_td_frame_count++;

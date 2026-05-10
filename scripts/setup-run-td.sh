@@ -30,7 +30,8 @@ cd "$RUN_DIR"
 
 echo "Linking TD mix files..."
 for f in CCLOCAL.MIX CONQUER.MIX GENERAL.MIX TEMPERAT.MIX TRANSIT.MIX \
-          DESERT.MIX WINTER.MIX LOCAL.MIX SC-000.MIX SC-001.MIX; do
+          DESERT.MIX WINTER.MIX LOCAL.MIX SC-000.MIX SC-001.MIX \
+          DESEICNH.MIX TEMPICNH.MIX WINTICNH.MIX; do
     if [ -f "$TD_DATA/$f" ]; then
         ln -sf "$TD_DATA/$f" "$f"
         echo "  linked $f"
