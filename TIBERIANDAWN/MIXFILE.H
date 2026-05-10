@@ -37,6 +37,9 @@
 
 #include	<wwlib32.h>
 #include	"link.h"
+#ifndef _MSC_VER
+#include <stdint.h>
+#endif
 
 class MixFileClass : public LinkClass 
 {
@@ -54,6 +57,20 @@ class MixFileClass : public LinkClass
 		static bool Offset(char const *filename, void ** realptr = 0, MixFileClass ** mixfile = 0, long * offset = 0, long * size = 0);
 		static void const * Retrieve(char const *filename);
 
+		/* TIM-343: on-disk layout uses int32 fields (LP64 `long` = 8 bytes
+		 * on Linux, but MIX files are 32-bit Win32 format).  Use explicit
+		 * int32_t + packed to match the binary layout exactly. */
+#ifndef _MSC_VER
+		struct SubBlock {
+			int32_t CRC;
+			int32_t Offset;
+			int32_t Size;
+
+			int operator < (SubBlock & two) const {return (CRC < two.CRC);};
+			int operator > (SubBlock & two) const {return (CRC > two.CRC);};
+			int operator == (SubBlock & two) const {return (CRC == two.CRC);};
+		} __attribute__((packed));
+#else
 		struct SubBlock {
 			long CRC;				// CRC code for embedded file.
 			long Offset;			// Offset from start of data section.
@@ -63,18 +80,26 @@ class MixFileClass : public LinkClass
 			int operator > (SubBlock & two) const {return (CRC > two.CRC);};
 			int operator == (SubBlock & two) const {return (CRC == two.CRC);};
 		};
+#endif
 
 	private:
 		static MixFileClass * Finder(char const *filename);
 		long Offset(long crc, long *size = 0);
 
+#ifndef _MSC_VER
+		typedef struct {
+			int16_t	count;
+			int32_t	size;
+		} __attribute__((packed)) FileHeader;
+#else
 		typedef struct {
 			short	count;
 			long	size;
 		} FileHeader;
+#endif
 
 		int Count;							// Number of sub-blocks.
-		long DataSize;						// Size of raw data.
+		int32_t DataSize;				// Size of raw data (int32 — MIX is 32-bit format).
 		SubBlock * Buffer;				// Array of sub blocks (could be in EMS).
 		void *Data;							// Pointer to raw data.
 

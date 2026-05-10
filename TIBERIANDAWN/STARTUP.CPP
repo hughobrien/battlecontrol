@@ -447,8 +447,12 @@ int DLL_Startup(const char * command_line_in)
 				
 #if (1)	//ST - 1/3/2019 2:11PM
 
-				VisiblePage.Init( ScreenWidth , ScreenHeight , NULL , 0 , (GBC_Enum)0);
-				HiddenPage.Init (ScreenWidth , ScreenHeight , NULL , 0 , (GBC_Enum)0);
+				/* TIM-343: allocate at 1536×1536 (Remastered logical resolution).
+				 * STARTUP.CPP:515 sets ScreenHeight=1536 and the Attach calls below
+				 * use 1536×1536 viewport dims.  A 640-wide system-memory buffer
+				 * overruns at stride 1536 in Linear_Blit_To_Linear → SIGSEGV. */
+				VisiblePage.Init(1536, 1536, NULL, 0, (GBC_Enum)0);
+				HiddenPage.Init(1536, 1536, NULL, 0, (GBC_Enum)0);
 
 
 #else				  
@@ -964,10 +968,14 @@ int main(int argc, char * argv[])
                 return EXIT_FAILURE;
             }
 
-            VisiblePage.Init( ScreenWidth , ScreenHeight , NULL , 0 , (GBC_Enum)0);
-            HiddenPage.Init (ScreenWidth , ScreenHeight , NULL , 0 , (GBC_Enum)0);
+            /* TIM-343: The 480-case Attach with y=40 requires a buffer at least
+             * ScreenHeight+40 rows tall.  On Linux standalone we own the alloc,
+             * so just allocate the extra rows and keep the y=40 offset. */
+            int phys_height = (ScreenHeight == 480) ? (ScreenHeight + 40) : ScreenHeight;
+            VisiblePage.Init( ScreenWidth , phys_height , NULL , 0 , (GBC_Enum)0);
+            HiddenPage.Init (ScreenWidth , phys_height , NULL , 0 , (GBC_Enum)0);
 
-            if (VisiblePage.Get_Height() == 480){
+            if (VisiblePage.Get_Height() == (480 + 40)){
                 SeenBuff.Attach(&VisiblePage,0, 40, ScreenWidth, ScreenHeight);
                 HidPage.Attach(&HiddenPage, 0, 40, ScreenWidth, ScreenHeight);
             }else{
