@@ -15,11 +15,8 @@
       align-items: center;
       padding: 8px;
     }
-    #status { font-size: 12px; padding: 4px 0; color: #aaa; }
-    #canvas {
-      display: block;
-      border: 1px solid #333;
-    }
+    #status-line { font-size: 12px; padding: 4px 0; color: #aaa; min-height: 1.4em; }
+    #canvas { display: block; border: 1px solid #333; }
     #output {
       width: 640px;
       height: 120px;
@@ -31,17 +28,58 @@
       box-sizing: border-box;
       margin-top: 4px;
     }
+    /* Preloader overlay — shown until user picks their game folder */
+    #canvas-wrapper { position: relative; width: 640px; }
+    #preloader-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 10;
+    }
+    #open-btn {
+      font-family: monospace;
+      font-size: 14px;
+      padding: 8px 20px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #555;
+      cursor: pointer;
+    }
+    #open-btn:hover:not(:disabled) { background: #3a3a3a; }
+    #open-btn:disabled { opacity: 0.5; cursor: default; }
+    #progress-text { font-size: 12px; color: #888; min-height: 1em; }
+    .overlay-hint { font-size: 11px; color: #666; max-width: 420px; text-align: center; }
   </style>
 </head>
 <body>
-  <div id="status">Loading…</div>
-  <canvas id="canvas" width="640" height="400" oncontextmenu="event.preventDefault()"></canvas>
+  <div id="status-line">Loading…</div>
+  <div id="canvas-wrapper">
+    <canvas id="canvas" width="640" height="400" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="preloader-overlay">
+      <div>C&amp;C Red Alert</div>
+      <button id="open-btn" type="button">Open Game Folder</button>
+      <div id="progress-text"></div>
+      <div class="overlay-hint">
+        Point at your Red Alert data directory containing REDALERT.MIX,
+        LOCAL.MIX, and the other MIX files.
+      </div>
+      <div class="overlay-hint">
+        Requires Chrome or Edge. Firefox: enable
+        <code>dom.fs.enabled</code> in about:config. Safari: not supported.
+      </div>
+    </div>
+  </div>
   <pre id="output"></pre>
   <script>
-    var statusEl = document.getElementById('status');
     var outputEl = document.getElementById('output');
     var Module = {
       canvas: document.getElementById('canvas'),
+      noInitialRun: true,   // preloader.js calls callMain() after files are mounted
       print: function(text) {
         outputEl.textContent += text + '\n';
         outputEl.scrollTop = outputEl.scrollHeight;
@@ -51,21 +89,22 @@
         outputEl.scrollTop = outputEl.scrollHeight;
       },
       setStatus: function(text) {
-        statusEl.textContent = text || 'Ready';
+        var el = document.getElementById('status-line');
+        if (el) el.textContent = text || 'Ready';
       },
       totalDependencies: 0,
       monitorRunDependencies: function(left) {
         this.totalDependencies = Math.max(this.totalDependencies, left);
         Module.setStatus(left
           ? 'Preparing… (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
-          : 'All downloads complete.');
+          : 'WASM loaded — waiting for game folder.');
       }
     };
-    Module.setStatus('Downloading…');
     window.onerror = function(ev) {
       Module.setStatus('JS exception: ' + ev.message);
     };
   </script>
+  <script src="preloader.js"></script>
   {{{ SCRIPT }}}
 </body>
 </html>

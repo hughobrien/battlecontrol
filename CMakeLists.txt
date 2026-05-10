@@ -246,6 +246,13 @@ if(EMSCRIPTEN)
         "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"callMain\"]"
         "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/shell.html"
     )
+    # TIM-378: copy preloader.js alongside ra.html so <script src="preloader.js"> resolves.
+    add_custom_command(TARGET ra POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_SOURCE_DIR}/wasm/preloader.js"
+            "${CMAKE_BINARY_DIR}/preloader.js"
+        COMMENT "Copying preloader.js to ${CMAKE_BINARY_DIR}"
+    )
 else()
     target_compile_options(ra PRIVATE
         "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
