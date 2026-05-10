@@ -22,3 +22,11 @@ a.out
 
 # Claude Code worktrees and local config
 .claude/
+
+# Node / Playwright
+node_modules/
+e2e/screenshots/
+e2e/test-results/
+e2e/report/
+e2e/test-run.log
+playwright-report/
