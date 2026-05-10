@@ -1,20 +1,25 @@
 /**
- * wasm/preloader.js — File System Access API preloader for Red Alert WASM.
+ * wasm/preloader.js — Game-data preloader for Red Alert WASM.
  *
- * Reads game MIX files from the user's local filesystem via the File System
- * Access API and mounts them into Emscripten MEMFS before callMain() fires.
+ * Two load modes, selected automatically:
  *
- * Intended use: loaded in wasm/shell.html (or the TIM-379 full HTML shell)
- * after the Module pre-object is defined with noInitialRun:true.
+ *   ?src=<url>  — S3 / HTTP mode: fetch MIX files from <url>/<FILENAME>.
+ *                 The server / bucket must send permissive CORS headers, e.g.:
+ *                   AllowedOrigins: ["*"]
+ *                   AllowedMethods: ["GET", "HEAD"]
+ *                   AllowedHeaders: ["*"]
+ *                 No folder-picker dialog is shown; fetches begin immediately.
  *
- * Browser support:
- *   Chrome/Edge stable  — full support
- *   Firefox             — behind dom.fs.enabled in about:config
- *   Safari              — not supported
+ *   (no ?src=)  — Local mode: prompt user with showDirectoryPicker() (File
+ *                 System Access API).  Chrome/Edge stable only; Firefox needs
+ *                 dom.fs.enabled; Safari not supported.
+ *
+ * Intended use: loaded in wasm/shell.html after the Module pre-object is
+ * defined with noInitialRun:true.
  *
  * Expected DOM element IDs (defined in the embedding HTML shell):
- *   #preloader-overlay  — wrapper hidden after folder is selected
- *   #open-btn           — button that triggers showDirectoryPicker()
+ *   #preloader-overlay  — wrapper hidden after files are ready
+ *   #open-btn           — button that triggers showDirectoryPicker() (local mode)
  *   #progress-bar-wrap  — container shown while MIX files are loading
  *   #progress-bar       — inner bar whose width% reflects load progress
  *   #progress-text      — inline text showing "N / M"
@@ -41,16 +46,17 @@
   ];
 
   var wasmReady = false;
-  var pendingFiles = null; // Map<string, Uint8Array>, set once folder is read
+  var pendingFiles = null; // Map<string, Uint8Array>, set once files are ready
 
   // Hook into Emscripten runtime init.  noInitialRun:true in the Module
   // pre-definition means callMain() won't fire automatically; we call it
   // manually once both WASM and files are ready.
   Module.onRuntimeInitialized = function () {
     wasmReady = true;
-    setStatus('WASM ready — pick your game folder to start.');
     if (pendingFiles !== null) {
       mountAndLaunch();
+    } else {
+      setStatus('WASM ready — pick your game folder to start.');
     }
   };
 
@@ -66,6 +72,74 @@
     if (bar) bar.style.width = (total > 0 ? Math.round(loaded / total * 100) : 0) + '%';
   }
 
+  function showProgressBar() {
+    var wrap = document.getElementById('progress-bar-wrap');
+    if (wrap) wrap.style.display = 'block';
+  }
+
+  // Normalize a base URL: ensure it ends with exactly one slash.
+  function normalizeBaseUrl(url) {
+    return url.replace(/\/*$/, '/');
+  }
+
+  // S3 / HTTP mode: fetch all MIX files from baseUrl.
+  async function fetchFromUrl(baseUrl) {
+    var base = normalizeBaseUrl(baseUrl);
+
+    // Hide the local-picker UI; S3 mode starts loading immediately.
+    var overlay = document.getElementById('preloader-overlay');
+    if (overlay) overlay.style.display = 'none';
+
+    setStatus('Fetching game data from ' + base + '…');
+    showProgressBar();
+
+    var files = new Map();
+    var loaded = 0;
+    setProgress(0, MIX_FILES.length);
+
+    for (var i = 0; i < MIX_FILES.length; i++) {
+      var name = MIX_FILES[i];
+      var url = base + name;
+      try {
+        var response = await fetch(url);
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.warn('[preloader] ' + name + ' not found at ' + url + ' — skipping');
+          } else {
+            console.error('[preloader] HTTP ' + response.status + ' fetching ' + name);
+          }
+        } else {
+          var buf = await response.arrayBuffer();
+          files.set(name, new Uint8Array(buf));
+          console.log('[preloader] fetched ' + name + ' (' + buf.byteLength + ' bytes)');
+        }
+      } catch (err) {
+        // Network error or CORS rejection — log and skip.
+        // If CORS is the cause, the operator must configure the bucket's
+        // CORS policy (see file header comment).
+        console.error('[preloader] error fetching ' + name + ': ' + err.message);
+      }
+      loaded++;
+      setProgress(loaded, MIX_FILES.length);
+    }
+
+    if (files.size === 0) {
+      setStatus('No MIX files could be fetched from ' + base +
+        '. Check the URL and CORS configuration.');
+      return;
+    }
+
+    setStatus('Fetched ' + files.size + '/' + MIX_FILES.length + ' files — mounting…');
+    pendingFiles = files;
+
+    if (wasmReady) {
+      mountAndLaunch();
+    } else {
+      setStatus('Fetched ' + files.size + '/' + MIX_FILES.length + ' files — waiting for WASM…');
+    }
+  }
+
+  // Local mode: prompt with File System Access API directory picker.
   async function openGameFolder() {
     var btn = document.getElementById('open-btn');
     if (btn) btn.disabled = true;
@@ -83,8 +157,7 @@
     }
 
     setStatus('Reading MIX files…');
-    var wrap = document.getElementById('progress-bar-wrap');
-    if (wrap) wrap.style.display = 'block';
+    showProgressBar();
     var files = new Map();
     var loaded = 0;
     setProgress(0, MIX_FILES.length);
@@ -147,6 +220,15 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    // ?src=<url> param: fetch MIX files from S3 / HTTP instead of local picker.
+    var params = new URLSearchParams(window.location.search);
+    var srcParam = params.get('src');
+    if (srcParam) {
+      fetchFromUrl(srcParam);
+      return;
+    }
+
+    // Local folder-picker mode.
     var btn = document.getElementById('open-btn');
     if (!btn) return;
 
