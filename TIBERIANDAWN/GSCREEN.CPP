@@ -424,7 +424,7 @@ void GScreenClass::Render(void)
 		}
 		Messages.Draw();
 
-		//Blit_Display(); // 5/19/20 SKY - Skip copying to scene page, we can get the data directly from hidden page
+		Blit_Display(); // TIM-404: copy HidPage → SeenBuff so SDL can present the frame
 		IsToUpdate = false;
 		IsToRedraw = false;
 

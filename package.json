@@ -1,9 +1,11 @@
 {
-  "name": "ra-wasm-e2e",
+  "name": "cnc-wasm-e2e",
   "private": true,
   "scripts": {
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:td": "playwright test e2e/td-gameplay.spec.ts",
+    "test:e2e:ra": "playwright test e2e/wasm-gameplay.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.0",

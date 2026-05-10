@@ -2884,7 +2884,9 @@ void CC_Draw_Shape(void const * shapefile, int shapenum, int x, int y, WindowNum
 														WindowList[window][WINDOWWIDTH] << 3,
 														WindowList[window][WINDOWHEIGHT]);
 
-			shape_pointer = (char *)shape_size;
+			/* TIM-404: Build_Frame returns ShapeHeaderType* (BigShapeBuffer ptr) when
+			 * UseBigShapeBuffer; Get_Shape_Header_Data extracts the actual pixel data. */
+			shape_pointer = (char *)Get_Shape_Header_Data((void*)shape_size);
 
 			/*
 			**	Special shadow drawing code (used for aircraft and bullets).

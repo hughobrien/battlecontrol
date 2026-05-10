@@ -1,5 +1,10 @@
 /**
- * wasm/preloader.js — Game-data preloader for Red Alert WASM.
+ * wasm/preloader.js — Game-data preloader for C&C WASM builds (RA + TD).
+ *
+ * Handles both Red Alert (ra.html) and Tiberian Dawn (td.html).
+ * Game is auto-detected from window.location.pathname:
+ *   /td.html  → Tiberian Dawn (CONQUER.MIX, GENERAL.MIX, TEMPERAT.MIX, …)
+ *   anything  → Red Alert     (REDALERT.MIX, LORES.MIX, HIRES.MIX, …)
  *
  * Two load modes, selected automatically:
  *
@@ -14,8 +19,10 @@
  *                 System Access API).  Chrome/Edge stable only; Firefox needs
  *                 dom.fs.enabled; Safari not supported.
  *
- * Intended use: loaded in wasm/shell.html after the Module pre-object is
- * defined with noInitialRun:true.
+ * URL params:
+ *   ?src=<url>     — base URL for MIX file fetch
+ *   ?autostart=1   — skip menu, jump straight to first mission (e2e tests)
+ *                    RA → sets RA_AUTOSTART env; TD → sets TD_AUTOSTART env
  *
  * Expected DOM element IDs (defined in the embedding HTML shell):
  *   #preloader-overlay  — wrapper hidden after files are ready
@@ -35,7 +42,13 @@
   var GAME_DIR = '/game';
   var SAVES_DIR = '/saves';
 
-  var MIX_FILES = [
+  // Auto-detect game from HTML filename in the URL path.
+  // td.html → Tiberian Dawn; anything else → Red Alert.
+  var isTD = window.location.pathname.endsWith('/td.html')
+          || window.location.pathname === '/td.html'
+          || window.location.pathname === 'td.html';
+
+  var RA_MIX_FILES = [
     'REDALERT.MIX',
     'LOCAL.MIX',
     'LORES.MIX',
@@ -46,8 +59,26 @@
     'SPEECH.MIX',
   ];
 
+  // TIM-404: TD asset list — maps to /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1/
+  // CCLOCAL.MIX is required first (fonts + common resources loaded in Init_Game).
+  var TD_MIX_FILES = [
+    'CCLOCAL.MIX',
+    'CONQUER.MIX',
+    'GENERAL.MIX',
+    'LOCAL.MIX',
+    'TEMPERAT.MIX',
+    'SCORES.MIX',
+    'SPEECH.MIX',
+    'SOUNDS.MIX',
+  ];
+
+  var MIX_FILES = isTD ? TD_MIX_FILES : RA_MIX_FILES;
+
   var wasmReady = false;
   var pendingFiles = null; // Map<string, Uint8Array>, set once files are ready
+
+  // ?autostart=1 URL param — set once during DOMContentLoaded, read in mountAndLaunch.
+  var autostart = false;
 
   // Hook into Emscripten runtime init.  noInitialRun:true in the Module
   // pre-definition means callMain() won't fire automatically; we call it
@@ -116,8 +147,6 @@
         }
       } catch (err) {
         // Network error or CORS rejection — log and skip.
-        // If CORS is the cause, the operator must configure the bucket's
-        // CORS policy (see file header comment).
         console.error('[preloader] error fetching ' + name + ': ' + err.message);
       }
       loaded++;
@@ -201,9 +230,6 @@
     }
   }
 
-  // ?autostart=1 URL param — set once during DOMContentLoaded, read in mountAndLaunch.
-  var autostart = false;
-
   function mountAndLaunch() {
     // Emscripten 4.x+ exports FS via Module["FS"], not as a global variable.
     var FS = Module.FS;
@@ -218,24 +244,28 @@
       console.log('[preloader] mounted ' + GAME_DIR + '/' + name);
     });
 
-    // TIM-399: STARTUP.CPP gates the entire init path on cfile.Is_Available()
-    // where cfile = RawFileClass("REDALERT.INI").  Without this file the game
-    // prints "Run SETUP program first." and exits.  The INI content is minimal:
-    // PlayIntro=True triggers IsFromInstall (the Linux path clears it afterwards,
-    // so it is harmless).  If the asset server served the real file it was already
-    // added above; skip if it's already present.
-    if (!pendingFiles.has('REDALERT.INI')) {
-      var iniContent = '[Intro]\nPlayIntro=True\n[Options]\n';
-      var iniBytes = new TextEncoder().encode(iniContent);
-      FS.createDataFile(GAME_DIR, 'REDALERT.INI', iniBytes, true, true, false);
-      console.log('[preloader] synthesized ' + GAME_DIR + '/REDALERT.INI (not in asset bundle)');
+    // Synthesize the required INI config file if not already in the asset bundle.
+    // TIM-399: RA STARTUP.CPP gates init on RawFileClass("REDALERT.INI").Is_Available().
+    // TIM-404: TD STARTUP.CPP gates init on RawFileClass("CONQUER.INI").Is_Available().
+    // PlayIntro=True sets Special.IsFromInstall; the Linux path clears it after reading.
+    if (isTD) {
+      if (!pendingFiles.has('CONQUER.INI')) {
+        var tdIni = '[Intro]\nPlayIntro=True\n[Options]\n';
+        var tdIniBytes = new TextEncoder().encode(tdIni);
+        FS.createDataFile(GAME_DIR, 'CONQUER.INI', tdIniBytes, true, true, false);
+        console.log('[preloader] synthesized ' + GAME_DIR + '/CONQUER.INI');
+      }
+    } else {
+      if (!pendingFiles.has('REDALERT.INI')) {
+        var raIni = '[Intro]\nPlayIntro=True\n[Options]\n';
+        var raIniBytes = new TextEncoder().encode(raIni);
+        FS.createDataFile(GAME_DIR, 'REDALERT.INI', raIniBytes, true, true, false);
+        console.log('[preloader] synthesized ' + GAME_DIR + '/REDALERT.INI');
+      }
     }
 
     // TIM-396: Mount IDBFS at /saves for persistent save game storage.
-    // All SAVEGAME.NNN files are written here by the game (C++ side uses
-    // WASM_SAVE_PREFIX "/saves/") and persisted to IndexedDB via syncfs.
-    // TIM-399: IDBFS requires -sFORCE_FILESYSTEM=1 at build time. If absent
-    // (older build), skip gracefully so callMain still fires.
+    // TIM-399: Guard gracefully — IDBFS requires -sFORCE_FILESYSTEM=1 at build time.
     var idbfsMounted = false;
     if (FS.filesystems && FS.filesystems.IDBFS) {
       try { FS.mkdir(SAVES_DIR); } catch (ignore) {}
@@ -253,32 +283,34 @@
     FS.chdir(GAME_DIR);
     console.log('[preloader] cwd → ' + GAME_DIR);
 
-    // TIM-399: ?autostart=1 injects RA_AUTOSTART into Emscripten ENV so the
-    // game skips the main menu and jumps straight to SCG01EA (used in e2e tests).
+    // TIM-404: ?autostart=1 creates a flag file in MEMFS instead of using Module.ENV.
+    // getenv() crashes under PROXY_TO_PTHREAD (C environ not propagated to worker thread).
+    // A flag file read via RawFileClass works because MEMFS is shared across all threads.
     if (autostart) {
-      Module.ENV = Module.ENV || {};
-      Module.ENV['RA_AUTOSTART'] = '1';
-      console.log('[preloader] RA_AUTOSTART injected via ?autostart=1');
+      var flagFile = isTD ? 'TD_AUTOSTART.FLAG' : 'RA_AUTOSTART.FLAG';
+      try {
+        FS.createDataFile(GAME_DIR, flagFile, new Uint8Array([1]), true, true, false);
+        console.log('[preloader] autostart flag → ' + GAME_DIR + '/' + flagFile);
+      } catch (e) {
+        console.warn('[preloader] could not create autostart flag file:', e.message);
+      }
     }
 
     function launchGame() {
       setStatus('Starting game…');
       Module.callMain([]);
       if (idbfsMounted) {
-        // Flush in-memory /saves to IndexedDB every 5 s so saves survive refresh.
         setInterval(function () {
           FS.syncfs(/*populate=*/false, function (syncErr) {
             if (syncErr) console.error('[idbfs] periodic sync error:', syncErr);
           });
         }, 5000);
-        // Best-effort flush on page unload (browsers may or may not honour this).
         window.addEventListener('beforeunload', function () {
           FS.syncfs(false, function () {});
         });
       }
     }
 
-    // Restore any previously persisted saves from IndexedDB, then start game.
     if (idbfsMounted) {
       setStatus('Restoring saved games…');
       FS.syncfs(/*populate=*/true, function (err) {
@@ -297,7 +329,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     var params = new URLSearchParams(window.location.search);
 
-    // ?autostart=1 — skip menu, jump straight to SCG01EA (TIM-399 e2e tests).
+    // ?autostart=1 — skip menu, jump to first mission (used in e2e tests).
     if (params.get('autostart') === '1') {
       autostart = true;
     }
@@ -321,8 +353,9 @@
       return;
     }
 
+    var gameName = isTD ? 'Tiberian Dawn' : 'Red Alert';
     btn.addEventListener('click', openGameFolder);
-    setStatus('Click "Open Game Folder" to load your Red Alert data files.');
+    setStatus('Click "Open Game Folder" to load your ' + gameName + ' data files.');
   });
 
 })();

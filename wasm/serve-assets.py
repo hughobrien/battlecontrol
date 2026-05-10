@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Minimal asset server for RA MIX files in WASM e2e tests (TIM-399).
+Minimal asset server for C&C MIX files in WASM e2e tests.
 
 Serves a directory with CORS + Cross-Origin-Resource-Policy headers so that
 a COEP-enabled page (served by serve-coop.py) can fetch MIX files from a
@@ -9,8 +9,11 @@ different origin (different port).
 Usage:
     python3 wasm/serve-assets.py <directory> [port]
 
-Example:
+Red Alert example:
     python3 wasm/serve-assets.py /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1 9090
+
+Tiberian Dawn example:
+    python3 wasm/serve-assets.py /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1 9090
 """
 import http.server
 import os

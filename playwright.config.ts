@@ -10,12 +10,8 @@ export default defineConfig({
   use: {
     // Must be http:// for COOP+COEP to work (file:// won't satisfy SharedArrayBuffer)
     baseURL: 'http://localhost:8080',
-    // Capture console output for frame-count detection
-    // Don't capture video by default to keep test fast
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
-    // Chromium flags for SharedArrayBuffer (already satisfied by COOP+COEP headers,
-    // but --enable-features ensures it in older builds)
     // Use headed Chrome on Xvfb :99 so OffscreenCanvas + WebGL work via SwiftShader.
     // Headless shell does not support the PROXY_TO_PTHREAD OffscreenCanvas GL context.
     headless: false,

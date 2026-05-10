@@ -600,13 +600,17 @@ bool Init_Game(int , char *[])
 	}
 
 	Hide_Mouse();
+	fprintf(stderr, "[TD INIT] before Wait_Vert_Blank\n"); fflush(stderr);
 	Wait_Vert_Blank();
+	fprintf(stderr, "[TD INIT] after Wait_Vert_Blank\n"); fflush(stderr);
 	if (!Special.IsFromInstall) {
 		Set_Palette(Palette);
 		Blit_Hid_Page_To_Seen_Buff();
 		Show_Mouse();
 	}
+	fprintf(stderr, "[TD INIT] before Call_Back A\n"); fflush(stderr);
 	Call_Back();
+	fprintf(stderr, "[TD INIT] after Call_Back A\n"); fflush(stderr);
 //	Window_Dialog_Box(hCCLibrary, "DIALOG_1", MainWindow, MakeProcInstance((FARPROC)Start_Game_Proc, hInstance));
 //	if (hCCLibrary) FreeLibrary(hCCLibrary);
 
@@ -617,7 +621,9 @@ bool Init_Game(int , char *[])
 	/*
 	**	Cache the main game data. This operation can take a very long time.
 	*/
+	fprintf(stderr, "[TD INIT] before Cache CONQUER.MIX SampleType=%d\n", (int)SampleType); fflush(stderr);
 	MixFileClass::Cache("CONQUER.MIX");
+	fprintf(stderr, "[TD INIT] after Cache CONQUER.MIX\n"); fflush(stderr);
 	if (SampleType != 0 && !Debug_Quiet) {
 		MixFileClass::Cache("SOUNDS.MIX");
 		if (Special.IsJuvenile) {
@@ -625,7 +631,9 @@ bool Init_Game(int , char *[])
 			MixFileClass::Cache("ZOUNDS.MIX");
 		}
 	}
+	fprintf(stderr, "[TD INIT] before Call_Back B\n"); fflush(stderr);
 	Call_Back();
+	fprintf(stderr, "[TD INIT] after Call_Back B\n"); fflush(stderr);
 #endif
 
 //	malloc(2);
@@ -634,6 +642,7 @@ bool Init_Game(int , char *[])
 	**	Perform any special debug-only processing. This includes preparing the
 	**	monochrome screen.
 	*/
+	fprintf(stderr, "[TD INIT] before Mono_Clear_Screen\n"); fflush(stderr);
 	Mono_Clear_Screen();
 
 #ifdef ONHOLD
@@ -647,13 +656,18 @@ bool Init_Game(int , char *[])
 	/*
 	**	Perform one-time game system initializations.
 	*/
+	fprintf(stderr, "[TD INIT] before Call_Back C\n"); fflush(stderr);
 	Call_Back();
 //	malloc(3);
+	fprintf(stderr, "[TD INIT] before Map.One_Time\n"); fflush(stderr);
 	Map.One_Time();
 //	malloc(4);
+	fprintf(stderr, "[TD INIT] before Logic.One_Time\n"); fflush(stderr);
 	Logic.One_Time();
 //	malloc(5);
+	fprintf(stderr, "[TD INIT] before Options.One_Time\n"); fflush(stderr);
 	Options.One_Time();
+	fprintf(stderr, "[TD INIT] after Options.One_Time\n"); fflush(stderr);
 
 //	malloc(6);
 
@@ -661,17 +675,20 @@ bool Init_Game(int , char *[])
 	BuildingTypeClass::One_Time();
 	BulletTypeClass::One_Time();
 	HouseTypeClass::One_Time();
+	fprintf(stderr, "[TD INIT] HouseTypeClass done\n"); fflush(stderr);
 
 	TemplateTypeClass::One_Time();
 	OverlayTypeClass::One_Time();
 	SmudgeTypeClass::One_Time();
 	TerrainTypeClass::One_Time();
 	UnitTypeClass::One_Time();
+	fprintf(stderr, "[TD INIT] UnitTypeClass done\n"); fflush(stderr);
 
 	InfantryTypeClass::One_Time();
 	AnimTypeClass::One_Time();
 	AircraftTypeClass::One_Time();
 	HouseClass::One_Time();
+	fprintf(stderr, "[TD INIT] HouseClass.One_Time done\n"); fflush(stderr);
 
 	/*
 	**	Speech holding tank buffer. Since speech does not mix, it can be placed
@@ -679,7 +696,17 @@ bool Init_Game(int , char *[])
 	**	be played.
 	*/
 	SpeechBuffer = new char [SPEECH_BUFFER_SIZE];
+	fprintf(stderr, "[TD INIT] SpeechBuffer allocated\n"); fflush(stderr);
+	fprintf(stderr, "[TD INIT] before Call_Back D\n"); fflush(stderr);
 	Call_Back();
+	fprintf(stderr, "[TD INIT] after Call_Back D\n"); fflush(stderr);
+
+	/*
+	**	WWLIB bug: MouseState is in some undefined state; show the mouse until
+	**	it really shows.
+	*/
+	fprintf(stderr, "[TD INIT] before Set_Default_Mouse\n"); fflush(stderr);
+	Map.Set_Default_Mouse(MOUSE_NORMAL, false);
 
 	/*
 	**	WWLIB bug: MouseState is in some undefined state; show the mouse until
@@ -946,8 +973,11 @@ bool Select_Game(bool fade)
 #ifndef _MSC_VER
 		/* TIM-343 pass-99: bypass main menu when TD_AUTOSTART is set.
 		 * Starts GDI mission 1 east variation A directly, skipping UI.
-		 * Mirrors RA_AUTOSTART in REDALERT/INIT.CPP (TIM-206). */
-		if (getenv("TD_AUTOSTART")) {
+		 * Mirrors RA_AUTOSTART in REDALERT/INIT.CPP (TIM-206).
+		 * TIM-404: also check flag file — under PROXY_TO_PTHREAD the C environ
+		 * is not propagated to the worker thread, so the preloader writes a flag
+		 * file (TD_AUTOSTART.FLAG) in the game directory as a fallback. */
+		if (getenv("TD_AUTOSTART") || RawFileClass("TD_AUTOSTART.FLAG").Is_Available()) {
 			fprintf(stderr, "[TD] Select_Game: TD_AUTOSTART active → SCG01EA (GDI m1 easy)\n"); fflush(stderr);
 			Scenario       = 1;
 			ScenPlayer     = SCEN_PLAYER_GDI;

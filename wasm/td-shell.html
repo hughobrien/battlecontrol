@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C&amp;C Tiberian Dawn</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #ccc;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px;
+    }
+    #browser-error {
+      display: none;
+      background: #3a0a0a;
+      border: 1px solid #7a2a2a;
+      color: #e88;
+      font-size: 12px;
+      padding: 8px 16px;
+      max-width: 560px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    #status-line { font-size: 12px; padding: 4px 0; color: #aaa; min-height: 1.4em; }
+    #canvas { display: block; border: 1px solid #333; }
+    #output {
+      width: 640px;
+      height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 11px;
+      background: #111;
+      padding: 4px;
+      box-sizing: border-box;
+      margin-top: 4px;
+    }
+    #canvas-wrapper { position: relative; width: 640px; }
+    #preloader-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 10;
+    }
+    #open-btn {
+      font-family: monospace;
+      font-size: 14px;
+      padding: 8px 20px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #555;
+      cursor: pointer;
+    }
+    #open-btn:hover:not(:disabled) { background: #3a3a3a; }
+    #open-btn:disabled { opacity: 0.5; cursor: default; }
+    #progress-bar-wrap {
+      width: 320px;
+      height: 6px;
+      background: #222;
+      border: 1px solid #444;
+      display: none;
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #3a6a3a;
+      transition: width 0.1s linear;
+    }
+    #progress-text { font-size: 12px; color: #888; min-height: 1em; }
+    .overlay-hint { font-size: 11px; color: #666; max-width: 420px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="browser-error">
+    This browser does not support the File System Access API —
+    use <strong>Chrome</strong> or <strong>Edge</strong> (stable).
+    Firefox: enable <code>dom.fs.enabled</code> in <code>about:config</code>.
+    Safari: not supported.
+  </div>
+  <div id="status-line">Loading…</div>
+  <div id="canvas-wrapper">
+    <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="preloader-overlay">
+      <div>C&amp;C Tiberian Dawn</div>
+      <button id="open-btn" type="button">Open Game Folder</button>
+      <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+      <div id="progress-text"></div>
+      <div class="overlay-hint">
+        Point at your Tiberian Dawn data directory containing CONQUER.MIX,
+        GENERAL.MIX, and the other MIX files.
+      </div>
+    </div>
+  </div>
+  <pre id="output"></pre>
+  <script>
+    var outputEl = document.getElementById('output');
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      noInitialRun: true,
+      print: function(text) {
+        outputEl.textContent += text + '\n';
+        outputEl.scrollTop = outputEl.scrollHeight;
+      },
+      printErr: function(text) {
+        outputEl.textContent += '[err] ' + text + '\n';
+        outputEl.scrollTop = outputEl.scrollHeight;
+      },
+      setStatus: function(text) {
+        var el = document.getElementById('status-line');
+        if (el) el.textContent = text || 'Ready';
+      },
+      totalDependencies: 0,
+      monitorRunDependencies: function(left) {
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        Module.setStatus(left
+          ? 'Preparing… (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
+          : 'WASM loaded — waiting for game folder.');
+      }
+    };
+    window.onerror = function(ev) {
+      Module.setStatus('JS exception: ' + ev.message);
+    };
+  </script>
+  <script src="preloader.js"></script>
+  {{{ SCRIPT }}}
+</body>
+</html>

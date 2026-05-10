@@ -1,0 +1,157 @@
+
+Running 5 tests using 1 worker
+
+Status after overlay hidden: Ready
+  ✘  1 [chromium] › e2e/td-gameplay.spec.ts:86:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 1 · assets load and game starts (31.2s)
+  ✘  2 [chromium] › e2e/td-gameplay.spec.ts:129:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 2 · Start_Scenario fires for SCG01EA (3.0m)
+  ✘  3 [chromium] › e2e/td-gameplay.spec.ts:148:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 3 · game loop runs 100+ frames (4.0m)
+  ✘  4 [chromium] › e2e/td-gameplay.spec.ts:167:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 4 · canvas renders non-black pixels by frame 100 (4.0m)
+  ✘  5 [chromium] › e2e/td-gameplay.spec.ts:186:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 5 · audio outcome documentation (3.0m)
+
+
+  1) [chromium] › e2e/td-gameplay.spec.ts:86:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 1 · assets load and game starts 
+
+    TimeoutError: page.waitForFunction: Timeout 30000ms exceeded.
+
+      32 |  */
+      33 | async function waitForOutput(page: any, substring: string, timeoutMs = 120_000) {
+    > 34 |   await page.waitForFunction(
+         |              ^
+      35 |     (s: string) => {
+      36 |       const el = document.getElementById('output');
+      37 |       return el !== null && el.textContent !== null && el.textContent.includes(s);
+        at waitForOutput (/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:34:14)
+        at /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:123:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--3160d-assets-load-and-game-starts-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e/test-results/td-gameplay-Tiberian-Dawn--3160d-assets-load-and-game-starts-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--3160d-assets-load-and-game-starts-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace e2e/test-results/td-gameplay-Tiberian-Dawn--3160d-assets-load-and-game-starts-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e/td-gameplay.spec.ts:129:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 2 · Start_Scenario fires for SCG01EA 
+
+    TimeoutError: page.waitForFunction: Timeout 180000ms exceeded.
+
+      32 |  */
+      33 | async function waitForOutput(page: any, substring: string, timeoutMs = 120_000) {
+    > 34 |   await page.waitForFunction(
+         |              ^
+      35 |     (s: string) => {
+      36 |       const el = document.getElementById('output');
+      37 |       return el !== null && el.textContent !== null && el.textContent.includes(s);
+        at waitForOutput (/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:34:14)
+        at /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:137:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--79bed--Scenario-fires-for-SCG01EA-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e/test-results/td-gameplay-Tiberian-Dawn--79bed--Scenario-fires-for-SCG01EA-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--79bed--Scenario-fires-for-SCG01EA-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace e2e/test-results/td-gameplay-Tiberian-Dawn--79bed--Scenario-fires-for-SCG01EA-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e/td-gameplay.spec.ts:148:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 3 · game loop runs 100+ frames 
+
+    TimeoutError: page.waitForFunction: Timeout 240000ms exceeded.
+
+      32 |  */
+      33 | async function waitForOutput(page: any, substring: string, timeoutMs = 120_000) {
+    > 34 |   await page.waitForFunction(
+         |              ^
+      35 |     (s: string) => {
+      36 |       const el = document.getElementById('output');
+      37 |       return el !== null && el.textContent !== null && el.textContent.includes(s);
+        at waitForOutput (/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:34:14)
+        at /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:155:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--cb3c2-·-game-loop-runs-100-frames-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e/test-results/td-gameplay-Tiberian-Dawn--cb3c2-·-game-loop-runs-100-frames-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--cb3c2-·-game-loop-runs-100-frames-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace e2e/test-results/td-gameplay-Tiberian-Dawn--cb3c2-·-game-loop-runs-100-frames-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › e2e/td-gameplay.spec.ts:167:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 4 · canvas renders non-black pixels by frame 100 
+
+    TimeoutError: page.waitForFunction: Timeout 240000ms exceeded.
+
+      32 |  */
+      33 | async function waitForOutput(page: any, substring: string, timeoutMs = 120_000) {
+    > 34 |   await page.waitForFunction(
+         |              ^
+      35 |     (s: string) => {
+      36 |       const el = document.getElementById('output');
+      37 |       return el !== null && el.textContent !== null && el.textContent.includes(s);
+        at waitForOutput (/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:34:14)
+        at /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:170:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--446b7-n-black-pixels-by-frame-100-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e/test-results/td-gameplay-Tiberian-Dawn--446b7-n-black-pixels-by-frame-100-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--446b7-n-black-pixels-by-frame-100-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace e2e/test-results/td-gameplay-Tiberian-Dawn--446b7-n-black-pixels-by-frame-100-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › e2e/td-gameplay.spec.ts:186:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 5 · audio outcome documentation 
+
+    TimeoutError: page.waitForFunction: Timeout 180000ms exceeded.
+
+      32 |  */
+      33 | async function waitForOutput(page: any, substring: string, timeoutMs = 120_000) {
+    > 34 |   await page.waitForFunction(
+         |              ^
+      35 |     (s: string) => {
+      36 |       const el = document.getElementById('output');
+      37 |       return el !== null && el.textContent !== null && el.textContent.includes(s);
+        at waitForOutput (/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:34:14)
+        at /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-404/e2e/td-gameplay.spec.ts:198:11
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--9ec41-audio-outcome-documentation-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e/test-results/td-gameplay-Tiberian-Dawn--9ec41-audio-outcome-documentation-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/test-results/td-gameplay-Tiberian-Dawn--9ec41-audio-outcome-documentation-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace e2e/test-results/td-gameplay-Tiberian-Dawn--9ec41-audio-outcome-documentation-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5 failed
+    [chromium] › e2e/td-gameplay.spec.ts:86:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 1 · assets load and game starts 
+    [chromium] › e2e/td-gameplay.spec.ts:129:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 2 · Start_Scenario fires for SCG01EA 
+    [chromium] › e2e/td-gameplay.spec.ts:148:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 3 · game loop runs 100+ frames 
+    [chromium] › e2e/td-gameplay.spec.ts:167:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 4 · canvas renders non-black pixels by frame 100 
+    [chromium] › e2e/td-gameplay.spec.ts:186:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 5 · audio outcome documentation 
