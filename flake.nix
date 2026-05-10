@@ -136,8 +136,8 @@
       # apps.redalert  —  nix run
       #
       # Run from your game-data directory, or set RA_DATA_DIR:
-      #   cd /path/to/red-alert-data && nix run github:owner/repo
-      #   RA_DATA_DIR=/path/to/data   nix run github:owner/repo
+      #   cd /path/to/red-alert-data && nix run github:hughobrien/battlecontrol
+      #   RA_DATA_DIR=/path/to/data   nix run github:hughobrien/battlecontrol
       # -----------------------------------------------------------------------
       apps.${system} = rec {
         redalert = {
