@@ -148,6 +148,59 @@ DISPLAY=:99 ./redalert
 
 ---
 
+## Nix
+
+A `flake.nix` is provided for Nix users on x86_64-Linux.
+
+### One-liner run
+
+```bash
+# From a directory containing your Red Alert game data (MAIN.MIX etc.):
+cd /path/to/red-alert-data
+nix run github:owner/repo
+
+# Or set the data path explicitly:
+RA_DATA_DIR=/path/to/red-alert-data nix run github:owner/repo
+```
+
+The game data is **not** included — you must supply legally-acquired files
+(MAIN.MIX, REDALERT.MIX, and supporting MIX files).
+
+### Contributors — drop into a build shell
+
+```bash
+git clone https://github.com/owner/repo && cd repo
+nix develop
+# Now cmake, gcc, clang, SDL2, python3 etc. are all on PATH:
+cmake -S . -B build && cmake --build build -j$(nproc)
+# Or run the full RA smoke-test script:
+bash scripts/first-run-pass-94.sh
+```
+
+### Build the binary without entering the shell
+
+```bash
+nix build github:owner/repo
+# Binary lands at ./result/bin/redalert
+```
+
+### First-time lock-file generation
+
+On a fresh clone, generate the `flake.lock` pin with:
+
+```bash
+nix flake lock
+```
+
+Commit `flake.lock` to reproduce the exact build environment.
+
+### nixpkgs pin
+
+The flake targets `nixpkgs/nixos-unstable`. The generated `flake.lock` pins
+the exact commit; reproducible builds require committing the lock file.
+
+---
+
 ## How this was built
 
 The entire porting effort — all ~94 passes from the first compile error to ASAN-clean gameplay — was driven by AI agents orchestrated through **[Paperclip](https://paperclip.ing)**. Paperclip is an AI agent coordination platform that lets you run a company of AI agents to execute multi-step software engineering projects end-to-end. The FoundingEngineer agent (CTO role) carried out the technical work across 300+ tasks, each tracked as a TIM-* issue in the Paperclip project board. No human wrote any of the porting code; the agents planned, implemented, debugged, and verified every change.
