@@ -961,6 +961,13 @@ bool Select_Game(bool fade)
 			selection      = SEL_START_NEW_GAME;
 			process        = false;
 		}
+		/* TIM-360: TD_CHEAT=1 sets Debug_Flag without a PARM obfuscated string.
+		 * Enables CHEAT_KEYS processing (M+Shift credits, C tech-unlock, F4 shroud). */
+		if (getenv("TD_CHEAT")) {
+			Debug_Flag     = true;
+			Debug_Playtest = true;
+			fprintf(stderr, "[TD] TD_CHEAT active → Debug_Flag=true Debug_Playtest=true\n"); fflush(stderr);
+		}
 #endif
 
 		while (process) {
