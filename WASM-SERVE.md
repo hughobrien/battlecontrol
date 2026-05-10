@@ -108,9 +108,9 @@ After `cmake --build build-wasm --target ra`, the directory `build-wasm/` contai
 | File | Description |
 |------|-------------|
 | `ra.html` | Entry point (generated from `wasm/shell.html`) |
-| `ra.js` | Emscripten JS glue |
+| `ra.js` | Emscripten JS glue (pthread worker code embedded; no separate .worker.js in Emscripten 5.x) |
 | `ra.wasm` | WebAssembly binary |
-| `ra.worker.js` | pthread worker thread script |
+| `preloader.js` | File System Access API preloader (copied from `wasm/preloader.js`) |
 
 Open `http://localhost:8080/ra.html` in a browser to run the game.
 Game data files must be loaded via the in-page file picker (Emscripten FS) or
