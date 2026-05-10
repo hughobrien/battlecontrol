@@ -1475,6 +1475,38 @@ bool Main_Loop()
 	if (_td_frame_count <= 15 || (_td_frame_count % 100) == 0) {
 		fprintf(stderr, "[TD] Main_Loop frame %d\n", _td_frame_count); fflush(stderr);
 	}
+	/* TIM-360: inject cheat actions at fixed frames when TD_CHEAT=1 is set.
+	 * Bypasses the xdotool path since SDL keyboard input is not yet wired in TD.
+	 * Mirrors the actions of the M+Shift / C / F4 / Alt+W debug keys. */
+	if (getenv("TD_CHEAT") && PlayerPtr) {
+		if (_td_frame_count == 30) {
+			PlayerPtr->Credits += 10000;
+			fprintf(stderr, "[TD-CHEAT] frame %d: +10000 credits (total=%d)\n",
+			        _td_frame_count, (int)PlayerPtr->Credits); fflush(stderr);
+		}
+		if (_td_frame_count == 35) {
+			/* Debug_Cheat=true → HOUSE.CPP uses level=98 → full tech unlock */
+			Debug_Cheat = true;
+			PlayerPtr->IsRecalcNeeded = true;
+			PlayerPtr->Add_Nuke_Piece();
+			PlayerPtr->Add_Nuke_Piece();
+			PlayerPtr->Add_Nuke_Piece();
+			fprintf(stderr, "[TD-CHEAT] frame %d: Debug_Cheat=true + 3 nuke pieces (tech-level 98)\n",
+			        _td_frame_count); fflush(stderr);
+		}
+		if (_td_frame_count == 40) {
+			Debug_Unshroud = true;
+			Map.Flag_To_Redraw(true);
+			fprintf(stderr, "[TD-CHEAT] frame %d: Debug_Unshroud=true (map revealed)\n",
+			        _td_frame_count); fflush(stderr);
+		}
+		if (_td_frame_count == 200) {
+			PlayerPtr->Blockage = false;
+			PlayerPtr->Flag_To_Win();
+			fprintf(stderr, "[TD-CHEAT] frame %d: Flag_To_Win fired\n",
+			        _td_frame_count); fflush(stderr);
+		}
+	}
 #endif
 	KeyNumType	input;					// Player input.
 	int 			x;
