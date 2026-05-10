@@ -11,6 +11,34 @@ CMake, and SDL2.
 The goal is a native Linux executable that can be built from source and run against
 the original game data from the Steam CnC Remastered Collection.
 
+## Why Not Wine?
+
+Wine was considered and ruled out in favour of a native port. The reasons:
+
+- **Open source build chain.** A native port compiles with GCC/Clang/CMake and
+  links only against SDL2 and OpenAL — no proprietary runtime or compatibility
+  layer required. The result can be built and run on any Linux system without a
+  Wine installation.
+
+- **Debuggability.** Wine abstracts the Win32 layer in ways that make crashes
+  and memory bugs harder to trace. A native binary runs under ASAN, Valgrind,
+  and GDB directly without Wine interposing.
+
+- **Control over the platform surface.** The games' real OS dependencies turned
+  out to be narrow: graphics (DirectDraw), audio (DirectSound), input (Win32
+  messages), and file I/O. Replacing each with a thin SDL2 shim gave precise
+  control and predictable behaviour, whereas Wine would silently re-implement
+  the same Win32 semantics with its own quirks.
+
+- **CI compatibility.** Native binaries run headlessly under Xvfb in a standard
+  Linux CI environment without needing a Wine prefix, display driver workarounds,
+  or 32-bit multilib dependencies.
+
+The two references to Wine in the codebase (`REDALERT/WIN32LIB/DDRAW.CPP` and
+`scripts/first-compile-pass41F.sh`) are design-inspiration comments only —
+they note that the SDL2 input event-filtering approach mirrors how Wine's
+winex11 driver isolates window-class events. Wine itself is not used.
+
 ## Build System
 
 The build is driven by `CMakeLists.txt` at the repo root using Ninja.
