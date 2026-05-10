@@ -175,6 +175,12 @@ class TargetClass : public xTargetClass
 		TargetClass(AbstractClass const * ptr);
 		TargetClass(AbstractTypeClass const * ptr);
 		TargetClass(CellClass const * ptr);
+#ifdef __EMSCRIPTEN__
+		// TIM-376: direct single-step conversion from the WASM TARGET_NONE
+		// sentinel, bypassing the two-step _WasmTargetNone→long→TargetClass
+		// path that C++ rejects (two user-defined conversions not allowed).
+		TargetClass(const _WasmTargetNone&) { Target.Target = 0L; }
+#endif
 };
 
 #endif

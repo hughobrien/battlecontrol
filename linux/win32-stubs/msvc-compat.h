@@ -625,4 +625,53 @@ static inline int Write_PCX_File(CDFileClass&, GraphicBufferClass&, PaletteClass
 #endif
 #endif
 
+// TIM-376: Emscripten/WASM-specific compatibility layer.
+//
+// Embedded here (rather than a second force-include) to avoid CMake's
+// deduplication of adjacent "-include" flags collapsing two separate
+// preinclude pairs into a single -include with two paths.
+//
+// Fix 1 — `register` keyword: Clang/C++17 makes it a hard error via
+//   [-Wregister]. GCC accepts it with -fpermissive; Clang does not.
+//   The pragma downgrades the diagnostic to nothing.
+//
+// Fix 2 — random() type conflict: musl's stdlib.h always declares
+//   `long int random(void)`.  WIN32LIB/MISC.H later declares
+//   `unsigned long random(unsigned long mod)` — a conflicting
+//   redeclaration of a C-linkage function, which Clang rejects even
+//   with -fpermissive.  Include <stdlib.h> first to lock in the musl
+//   declaration, then rename every subsequent occurrence of `random`
+//   to `ww_lib_random` via macro.  MISC.H's declaration, IRANDOM.CPP's
+//   definition, and all WW call sites are renamed consistently; the
+//   standard-library `random()` (already declared, no longer subject
+//   to the macro) is unaffected.
+#ifdef __EMSCRIPTEN__
+#pragma clang diagnostic ignored "-Wregister"
+// Fix 3 — narrowing case values: hash macros like PARM_INSTALL (0xD95C68A2)
+//   exceed LONG_MAX on wasm32 (32-bit signed long). Clang's
+//   [-Wc++11-narrowing] is DefaultError and not suppressed by -w.
+#pragma clang diagnostic ignored "-Wc++11-narrowing"
+// Fix 5 — non-POD variadic args: TECHNO.CPP passes StageClass through Printf
+//   variadic arg. Clang makes [-Wnon-pod-varargs] a hard error in C++17.
+#pragma clang diagnostic ignored "-Wnon-pod-varargs"
+// Fix 4 — TARGET_NONE pointer assignment: on WASM ((long)0) cannot be
+//   implicitly assigned to pointer types (C++ hard error, not a warning).
+//   We define a sentinel class with dual conversion operators so that
+//   TARGET_NONE works in both long/TARGET contexts (for integer comparisons
+//   and TargetClass constructor resolution) AND pointer contexts (for the
+//   Code_Pointers / Decode_Pointers null-encoding pattern). DEFINES.H
+//   is patched to use this sentinel via #ifdef __EMSCRIPTEN__.
+#ifdef __cplusplus
+// _WasmTargetNone is in the global namespace (not anonymous) so TARGET.H
+// can forward-declare it and add a TargetClass(_WasmTargetNone) ctor.
+struct _WasmTargetNone {
+    constexpr operator long() const noexcept { return 0L; }
+    template<class T> constexpr operator T*() const noexcept { return nullptr; }
+};
+inline constexpr _WasmTargetNone _wasm_target_none;
+#endif // __cplusplus
+#include <stdlib.h>
+#define random ww_lib_random
+#endif // __EMSCRIPTEN__
+
 #endif // LINUX_WIN32_STUBS_MSVC_COMPAT_H

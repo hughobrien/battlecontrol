@@ -74,7 +74,8 @@ extern MFCD temp;
 template<class T>
 List<MixFileClass<T> > MixFileClass<T>::List;
 
-template class MixFileClass<CCFileClass>;
+// TIM-376: Explicit instantiation moved to end of file (see bottom) so all
+// template body definitions are visible to Clang/wasm-ld at instantiation time.
 
 /***********************************************************************************************
  * MixFileClass::Free -- Uncaches a cached mixfile.                                            *
@@ -715,3 +716,7 @@ void MixFileClass<T>::Free_All(void)
 		ptr = List.First();
 	}
 }
+
+// TIM-376: Explicit instantiation placed here (after all body definitions)
+// so Clang/wasm-ld can see all methods at instantiation time.
+template class MixFileClass<CCFileClass>;

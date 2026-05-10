@@ -203,7 +203,7 @@ struct NoInitClass {
 // WIN32-style TimerClass / CountDownTimerClass definitions — without them,
 // CONQUER.CPP:4277 and INIT.CPP:1141 fail to declare CountDownTimerClass.
 // Carve __linux__ out so the real TIMER.H runs through the wwlib32 cascade.
-#if !defined(WIN32) && !defined(__linux__)
+#if !defined(WIN32) && !defined(__linux__) && !defined(__EMSCRIPTEN__)
 #define TIMER_H
 #endif
 

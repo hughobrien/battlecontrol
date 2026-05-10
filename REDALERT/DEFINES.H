@@ -620,7 +620,14 @@ inline TARGET Build_Target(RTTIType kind, int value)
 }
 
 
+// TIM-376: on WASM/Emscripten ((long)0) cannot be implicitly assigned to
+// pointer types (C++ hard error). A dual-conversion sentinel class defined
+// in linux/win32-stubs/msvc-compat.h handles both long and pointer contexts.
+#ifdef __EMSCRIPTEN__
+#define	TARGET_NONE 	_wasm_target_none
+#else
 #define	TARGET_NONE 	((TARGET)0)
+#endif
 
 
 /*

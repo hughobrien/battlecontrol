@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C&amp;C Red Alert</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #ccc;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px;
+    }
+    #status { font-size: 12px; padding: 4px 0; color: #aaa; }
+    #canvas {
+      display: block;
+      border: 1px solid #333;
+    }
+    #output {
+      width: 640px;
+      height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 11px;
+      background: #111;
+      padding: 4px;
+      box-sizing: border-box;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Loading…</div>
+  <canvas id="canvas" width="640" height="400" oncontextmenu="event.preventDefault()"></canvas>
+  <pre id="output"></pre>
+  <script>
+    var statusEl = document.getElementById('status');
+    var outputEl = document.getElementById('output');
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      print: function(text) {
+        outputEl.textContent += text + '\n';
+        outputEl.scrollTop = outputEl.scrollHeight;
+      },
+      printErr: function(text) {
+        outputEl.textContent += '[err] ' + text + '\n';
+        outputEl.scrollTop = outputEl.scrollHeight;
+      },
+      setStatus: function(text) {
+        statusEl.textContent = text || 'Ready';
+      },
+      totalDependencies: 0,
+      monitorRunDependencies: function(left) {
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        Module.setStatus(left
+          ? 'Preparing… (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
+          : 'All downloads complete.');
+      }
+    };
+    Module.setStatus('Downloading…');
+    window.onerror = function(ev) {
+      Module.setStatus('JS exception: ' + ev.message);
+    };
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>
