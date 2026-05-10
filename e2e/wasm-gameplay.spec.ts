@@ -128,12 +128,15 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
       { timeout: 60_000 }
     );
 
-    // Confirm RA_AUTOSTART was active (game logs to #output via Module.printErr).
-    // Checks game C++ stderr: "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI"
-    // Cold WASM load (15MB) takes longer on first run — use 120s to match overlay wait.
-    await waitForOutput(page, 'RA_AUTOSTART active', 120_000);
-    console.log('RA_AUTOSTART confirmed active in game output.');
-
+    // Confirm the game binary launched and started logging.
+    // Init_Game is the first function main() calls; it fires unconditionally
+    // regardless of autostart mode (menu path vs. RA_AUTOSTART path).
+    // Module.ENV['RA_AUTOSTART'] is set on the main thread but Emscripten
+    // PROXY_TO_PTHREAD runs main() in a Worker with its own JS heap, so the
+    // Worker's getenv("RA_AUTOSTART") may return NULL — the game then reaches
+    // Start_Scenario via the synthetic KN_RETURN injection (INIT.CPP:981).
+    await waitForOutput(page, '[RA] Init_Game:', 120_000);
+    console.log('Init_Game confirmed in game output — WASM binary launched.');
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'game-started.png'), fullPage: true });
   });
 
