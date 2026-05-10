@@ -16,11 +16,18 @@ export default defineConfig({
     trace: 'retain-on-failure',
     // Chromium flags for SharedArrayBuffer (already satisfied by COOP+COEP headers,
     // but --enable-features ensures it in older builds)
+    // Use headed Chrome on Xvfb :99 so OffscreenCanvas + WebGL work via SwiftShader.
+    // Headless shell does not support the PROXY_TO_PTHREAD OffscreenCanvas GL context.
+    headless: false,
     launchOptions: {
+      env: { DISPLAY: ':99' },
       args: [
         '--enable-features=SharedArrayBuffer',
-        '--disable-web-security',  // allow localhost cross-port CORS in some edge cases
+        '--disable-web-security',
         '--autoplay-policy=no-user-gesture-required',
+        '--enable-webgl',
+        '--use-gl=swiftshader',
+        '--ignore-gpu-blocklist',
       ],
     },
   },
