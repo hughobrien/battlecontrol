@@ -9,7 +9,6 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
-#include <SDL2/SDL_image.h>
 
 #include <string>
 #include <vector>
@@ -403,8 +402,6 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "TTF_Init: %s\n", TTF_GetError());
         return 1;
     }
-    IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
-
     SDL_Window* win = SDL_CreateWindow("Red Alert Setup",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         WIN_W, WIN_H, SDL_WINDOW_SHOWN);
@@ -432,7 +429,6 @@ int main(int argc, char* argv[]) {
     // SETUP.BMP from CD1 PLANETWW directory — splash background
     const char* BMP = "/home/hugh/redalert/CD1/PLANETWW/SETUP.BMP";
     SDL_Surface* bmp_surf = SDL_LoadBMP(BMP);
-    if (!bmp_surf) bmp_surf = IMG_Load(BMP);
     if (bmp_surf) {
         app.splash_tex = SDL_CreateTextureFromSurface(ren, bmp_surf);
         app.splash_w   = bmp_surf->w;
@@ -510,7 +506,6 @@ int main(int argc, char* argv[]) {
     SDL_DestroyRenderer(ren);
     SDL_DestroyWindow(win);
     TTF_Quit();
-    IMG_Quit();
     SDL_Quit();
     return 0;
 }
