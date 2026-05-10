@@ -16,7 +16,7 @@ the original game data from the Steam CnC Remastered Collection.
 Wine was considered and ruled out in favour of a native port. The reasons:
 
 - **Open source build chain.** A native port compiles with GCC/Clang/CMake and
-  links only against SDL2 and OpenAL — no proprietary runtime or compatibility
+  links only against SDL2 — no proprietary runtime or compatibility
   layer required. The result can be built and run on any Linux system without a
   Wine installation.
 
