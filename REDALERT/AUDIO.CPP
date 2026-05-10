@@ -272,6 +272,12 @@ extern "C" {
 
 bool SDL_Audio_Open(int rate, int channels, int bits_per_sample)
 {
+#ifdef __EMSCRIPTEN__
+    // Web Audio API cannot be initialized from a PROXY_TO_PTHREAD Worker thread.
+    // SoundOn=false propagates: all callers guard on g_audio_open, so no
+    // further SDL audio calls are made and the game runs silently.
+    return false;
+#endif
     if (g_audio_open) {
         return true;
     }
