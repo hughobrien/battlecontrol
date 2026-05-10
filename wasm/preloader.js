@@ -128,6 +128,9 @@
   }
 
   function mountAndLaunch() {
+    // Emscripten 4.x+ exports FS via Module["FS"], not as a global variable.
+    var FS = Module.FS;
+
     // Create /game in Emscripten MEMFS; ignore EEXIST if called more than once.
     try {
       FS.mkdir(GAME_DIR);
