@@ -158,3 +158,6 @@ target_compile_definitions(td PRIVATE WIN32=1)
 # TIM-341: SDL2 required by sdl_window.cpp (MainWindow, SDL_Window_Show, ...).
 find_package(SDL2 REQUIRED)
 target_link_libraries(td PRIVATE SDL2::SDL2)
+
+# TIM-369: installer experience port
+add_subdirectory(installer)
