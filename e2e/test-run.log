@@ -1,0 +1,7 @@
+
+Running 5 tests using 1 worker
+
+  ✘  1 [chromium] › e2e/td-gameplay.spec.ts:86:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 1 · assets load and game starts (5.8s)
+  ✘  2 [chromium] › e2e/td-gameplay.spec.ts:129:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 2 · Start_Scenario fires for SCG01EA (3.0m)
+  ✘  3 [chromium] › e2e/td-gameplay.spec.ts:148:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 3 · game loop runs 100+ frames (4.0m)
+  ✘  4 [chromium] › e2e/td-gameplay.spec.ts:167:7 › Tiberian Dawn WASM — browser gameplay (TIM-404) › 4 · canvas renders non-black pixels by frame 100 (4.0m)

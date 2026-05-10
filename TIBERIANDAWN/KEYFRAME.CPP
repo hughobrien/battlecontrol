@@ -225,6 +225,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 	char frameflags;
 	unsigned long return_value;
 	char *temp_shape_ptr;
+	char *effective_buffptr;
 
 	//
 	// valid pointer??
@@ -330,6 +331,32 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 		}
 	}
 
+	/* TIM-404/TIM-212: guard BigShapeBuffer overflow and decompress directly into
+	 * the destination slot to avoid a copy from _ShapeBuffer to BigShapeBuffer.
+	 * Uses uintptr_t casts so the arithmetic is correct on both 32-bit WASM and
+	 * 64-bit host builds. */
+#ifndef _MSC_VER
+	if (UseBigShapeBuffer) {
+		char *bptr    = IsTheaterShape ? TheaterShapeBufferPtr : BigShapeBufferPtr;
+		unsigned blen = IsTheaterShape ? TheaterShapeBufferLength : BigShapeBufferLength;
+		char *bstart  = IsTheaterShape ? TheaterShapeBufferStart  : BigShapeBufferStart;
+		uintptr_t used = (uintptr_t)bptr - (uintptr_t)bstart;
+		unsigned needed = keyfr->height + sizeof(ShapeHeaderType) +
+		                  (unsigned)keyfr->width * keyfr->height + 4096u;
+		if (used + needed >= (uintptr_t)blen) {
+			ReallocShapeBufferFlag = TRUE;
+			return(0);
+		}
+	}
+#endif
+	effective_buffptr = (char*)buffptr;
+	if (UseBigShapeBuffer) {
+		char *bptr = IsTheaterShape ? TheaterShapeBufferPtr : BigShapeBufferPtr;
+		char *tsp  = bptr + keyfr->height + sizeof(ShapeHeaderType);
+		if (3 & (uintptr_t)tsp) tsp = (char*)((uintptr_t)(tsp + 3) & ~(uintptr_t)3u);
+		effective_buffptr = tsp;
+	}
+
 	// calc buff size
 	buffsize = keyfr->width * keyfr->height;
 
@@ -346,7 +373,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 		if (keyfr->flags & 1 ) {
 			ptr = (char *)Add_Long_To_Pointer( ptr, 768L );
 		}
-		length = LCW_Uncompress( ptr, buffptr, buffsize );
+		length = LCW_Uncompress( ptr, effective_buffptr, buffsize );
 	} else {	// key delta or delta
 
 		if ( (frameflags & KF_DELTA) ) {
@@ -371,7 +398,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 #ifndef FIXIT_SCORE_CRASH
 		off16 = (unsigned long)lockptr & 0x00003FFFL;
 #endif
-		length = LCW_Uncompress( ptr, buffptr, buffsize );
+		length = LCW_Uncompress( ptr, effective_buffptr, buffsize );
 
 		if (length > buffsize) {
 			return(0);
@@ -387,8 +414,10 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			offdiff = 0;
 		}
 #endif
-		length = buffsize;
-		Apply_Delta(buffptr, Add_Long_To_Pointer(ptr, offdiff));
+		/* TIM-404/TIM-224: delta entries are LCW-compressed full frames, not XOR
+		 * deltas.  Apply_XOR_Delta is a no-op stub on Linux; replace with
+		 * LCW_Uncompress directly into the BigShapeBuffer destination slot. */
+		length = LCW_Uncompress(Add_Long_To_Pointer(ptr, offdiff), effective_buffptr, buffsize);
 
 		if ( (frameflags & KF_DELTA) ) {
 			// adjust to delta after the keydelta
@@ -410,8 +439,7 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 				}
 #endif
 
-				length = buffsize;
-				Apply_Delta(buffptr, Add_Long_To_Pointer(ptr, offdiff));
+				length = LCW_Uncompress(Add_Long_To_Pointer(ptr, offdiff), effective_buffptr, buffsize);
 
 				currframe++;
 				subframe += 2;
@@ -449,7 +477,8 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 				temp_shape_ptr = (char *) ((unsigned)(temp_shape_ptr + 3) & 0xfffffffc);
 			}
 
-			memcpy (temp_shape_ptr , buffptr , length);
+			/* TIM-404/TIM-212: data already decompressed directly into temp_shape_ptr
+			 * (== effective_buffptr) — memcpy from _ShapeBuffer is not needed. */
 			((ShapeHeaderType *)TheaterShapeBufferPtr)->draw_flags = -1;						//Flag that headers need to be generated
 			((ShapeHeaderType *)TheaterShapeBufferPtr)->shape_data = temp_shape_ptr - (unsigned)TheaterShapeBufferStart;		//pointer to old raw shape data
 			((ShapeHeaderType *)TheaterShapeBufferPtr)->shape_buffer = 1;	//Theater buffer
@@ -475,7 +504,8 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 			if (3 & (unsigned)temp_shape_ptr){
 				temp_shape_ptr = (char *) ((unsigned)(temp_shape_ptr + 3) & 0xfffffffc);
 			}
-			memcpy (temp_shape_ptr , buffptr , length);
+			/* TIM-404/TIM-212: data already decompressed directly into temp_shape_ptr
+			 * (== effective_buffptr) — memcpy from _ShapeBuffer is not needed. */
 			((ShapeHeaderType *)BigShapeBufferPtr)->draw_flags = -1;						//Flag that headers need to be generated
 			((ShapeHeaderType *)BigShapeBufferPtr)->shape_data = temp_shape_ptr - (unsigned)BigShapeBufferStart;		//pointer to old raw shape data
 			((ShapeHeaderType *)BigShapeBufferPtr)->shape_buffer = 0;	//Normal Big Shape Buffer

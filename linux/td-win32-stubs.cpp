@@ -249,7 +249,16 @@ GraphicViewPortClass::GraphicViewPortClass(
       Pitch(0), GraphicBuff(graphic_buff), IsDirectDraw(FALSE), LockCount(0)
 {
     if (graphic_buff) {
-        Offset = (long)(graphic_buff->Get_Offset()) + y * (w + 0) + x;
+        /* Match GBUFFER.CPP Attach: clip to buffer bounds and compute XAdd so
+         * that stride = buffer_width always (not viewport width). */
+        int bw = graphic_buff->Get_Width();
+        int bh = graphic_buff->Get_Height();
+        if (x + w > bw) w = bw - x;
+        if (y + h > bh) h = bh - y;
+        Width  = w;
+        Height = h;
+        XAdd   = bw - w;
+        Offset = (long)(graphic_buff->Get_Offset()) + (long)y * bw + x;
     }
 }
 
@@ -263,10 +272,23 @@ GraphicViewPortClass::~GraphicViewPortClass() {}
 void GraphicViewPortClass::Attach(
     GraphicBufferClass *graphic_buff, int x, int y, int w, int h)
 {
+    /* Matches GBUFFER.CPP Attach: guard against self-attach, clip to buffer
+     * bounds, and use buffer_width as stride so XAdd is consistent. */
+    if (this == GraphicBuff) return;
     GraphicBuff = graphic_buff;
-    XPos = x; YPos = y; Width = w; Height = h;
+    XPos = x; YPos = y;
     XAdd = 0; Pitch = 0; IsDirectDraw = FALSE; LockCount = 0;
-    Offset = graphic_buff ? (long)(graphic_buff->Get_Offset()) + y * w + x : 0;
+    if (graphic_buff) {
+        int bw = graphic_buff->Get_Width();
+        int bh = graphic_buff->Get_Height();
+        if (x + w > bw) w = bw - x;
+        if (y + h > bh) h = bh - y;
+        XAdd   = bw - w;
+        Offset = (long)(graphic_buff->Get_Offset()) + (long)y * bw + x;
+    } else {
+        Offset = 0;
+    }
+    Width = w; Height = h;
 }
 
 void GraphicViewPortClass::Draw_Rect(

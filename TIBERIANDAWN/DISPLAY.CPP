@@ -696,9 +696,18 @@ void DisplayClass::Set_View_Dimensions(int x, int y, int width, int height)
 
 	TacPixelX = x;
 	TacPixelY = y;
-	WindowList[WINDOW_TACTICAL][WINDOWX] = x;
+	/* TIM-404: WindowList WINDOWX/WINDOWWIDTH are in 8-pixel byte units;
+	 * CC_Draw_Shape left-shifts them by 3 to get pixel coordinates.
+	 * Lepton_To_Pixel may round up slightly past the buffer edge, so cap
+	 * to SeenBuff.Get_Width() before the >> 3 conversion. */
+	{
+	int _tac_w = Lepton_To_Pixel(TacLeptonWidth);
+	int _buf_w = SeenBuff.Get_Width() - x;
+	if (_tac_w > _buf_w) _tac_w = _buf_w;
+	WindowList[WINDOW_TACTICAL][WINDOWX] = x >> 3;
 	WindowList[WINDOW_TACTICAL][WINDOWY] = y;
-	WindowList[WINDOW_TACTICAL][WINDOWWIDTH] = Lepton_To_Pixel(TacLeptonWidth);
+	WindowList[WINDOW_TACTICAL][WINDOWWIDTH] = _tac_w >> 3;
+	}
 	WindowList[WINDOW_TACTICAL][WINDOWHEIGHT] = Lepton_To_Pixel(TacLeptonHeight);
 	if (Window == WINDOW_TACTICAL) {
 		Change_Window(0);
