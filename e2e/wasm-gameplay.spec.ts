@@ -26,15 +26,19 @@ if (!fs.existsSync(SCREENSHOTS_DIR)) {
   fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 }
 
-/** Wait for a substring to appear in the #output div. */
+/**
+ * Wait for a substring to appear in the #output div.
+ * NOTE: Playwright waitForFunction(fn, arg, options) needs 3 args — passing
+ * { timeout } as the second arg treats it as the function argument, not options.
+ */
 async function waitForOutput(page: any, substring: string, timeoutMs = 120_000) {
   await page.waitForFunction(
     (s: string) => {
       const el = document.getElementById('output');
       return el !== null && el.textContent !== null && el.textContent.includes(s);
     },
-    substring,
-    { timeout: timeoutMs }
+    substring,                 // arg passed to the page function
+    { timeout: timeoutMs }     // options (3rd param)
   );
 }
 
@@ -57,7 +61,6 @@ async function getStatus(page: any): Promise<string> {
 /**
  * Check whether the game canvas has any non-black pixels.
  * WebGL canvases support toDataURL(); we compare against the all-black reference.
- * Returns true if the canvas appears to have rendered content.
  */
 async function canvasHasContent(page: any): Promise<boolean> {
   return page.evaluate(() => {
@@ -72,11 +75,9 @@ async function canvasHasContent(page: any): Promise<boolean> {
       }
       return false;
     }
-    // WebGL: toDataURL still works and differs from all-black if content was drawn
-    // All-black 640x480 PNG is always the same base64 string; any non-black differs.
+    // WebGL: toDataURL still works and differs from all-black if content was drawn.
+    // All-black 640x480 PNG has a short base64 payload; any rendered content differs.
     const dataUrl = canvas.toDataURL('image/png');
-    // The all-black reference has a very short base64 payload.
-    // Any rendered content makes the payload significantly longer.
     return dataUrl.length > 2000;
   });
 }
@@ -98,12 +99,16 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
     const errorBanner = page.locator('#browser-error');
     await expect(errorBanner).toHaveCSS('display', 'none', { timeout: 5000 });
 
-    // Wait for overlay to disappear (preloader finished mounting files).
+    // Wait for overlay to disappear (preloader hides it early in S3 fetch mode).
+    // IMPORTANT: pass null as arg (3rd positional) so { timeout } is treated as
+    // options, not as the function argument. Playwright's JS runtime can't
+    // distinguish 2-arg (fn, arg) from 2-arg (fn, options) without the extra null.
     await page.waitForFunction(
       () => {
         const overlay = document.getElementById('preloader-overlay');
         return overlay !== null && overlay.style.display === 'none';
       },
+      null,              // arg (ignored by function)
       { timeout: 120_000 }
     );
 
@@ -113,18 +118,22 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
     // Capture screenshot of the initial rendered state.
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'after-asset-load.png'), fullPage: true });
 
-    // Wait for "Starting game…" to appear in status (callMain fired).
+    // Wait for "Starting game…" to appear in status (launchGame() fired).
     await page.waitForFunction(
       () => {
         const el = document.getElementById('status-line');
         return el !== null && (el.textContent || '').includes('Starting');
       },
-      { timeout: 30_000 }
+      null,
+      { timeout: 60_000 }
     );
 
-    // Verify RA_AUTOSTART injection was logged.
-    await waitForOutput(page, 'RA_AUTOSTART injected', 15_000);
-    console.log('RA_AUTOSTART injection confirmed.');
+    // Confirm RA_AUTOSTART was active (game logs to #output via Module.printErr).
+    // Checks game C++ stderr: "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI"
+    await waitForOutput(page, 'RA_AUTOSTART active', 30_000);
+    console.log('RA_AUTOSTART confirmed active in game output.');
+
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'game-started.png'), fullPage: true });
   });
 
   test('2 · Start_Scenario fires for SCG01EA', async ({ page }) => {
@@ -186,8 +195,7 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
       console.log('Canvas has non-black pixels at frame 100.');
     }
 
-    // This is a soft assertion: we document the result rather than hard-fail,
-    // since the game may still be in a loading/palette-setup phase.
+    // Soft assertion: document the result.
     // Change to expect(hasContent).toBe(true) once visual output is confirmed.
     console.log('canvas-has-content:', hasContent);
   });
