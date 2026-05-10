@@ -2,6 +2,15 @@
 
 This is an ongoing Linux port of **Command & Conquer: Remastered Collection** (TiberianDawn + RedAlert) from the [EA open-source release](https://github.com/electronicarts/CnC_Remastered_Collection). The upstream repo ships only an MSBuild/MSVC solution targeting Win32; this fork brings both games to a native Linux build using GCC/Clang, CMake, and SDL2.
 
+> **Note — related EA repositories:**
+> EA released three separate C&C source repositories that are easy to confuse:
+>
+> | Repo | Contents | Relationship to this fork |
+> |---|---|---|
+> | [electronicarts/CnC_Remastered_Collection](https://github.com/electronicarts/CnC_Remastered_Collection) | TiberianDawn.dll + RedAlert.dll plugin sources for the **2020 Remastered Collection** | **Upstream of this fork** |
+> | [electronicarts/CnC_Red_Alert](https://github.com/electronicarts/CnC_Red_Alert) | Standalone **original 1996 Red Alert** source (Win32 game) | Separate project — not related to this fork |
+> | [electronicarts/CnC_Tiberian_Dawn](https://github.com/electronicarts/CnC_Tiberian_Dawn) | Standalone **original 1995 Tiberian Dawn** source (MS-DOS game) | Separate project — not related to this fork |
+
 > **Current status:** The game runs to completion on Linux. A release build sustains ~12 fps, navigates 12 win/loss cycles, and exits cleanly. ASAN-clean. The full rendering pipeline — title screen, main menu, sidebar, radar, tactical map, units — works end-to-end.
 
 ---
