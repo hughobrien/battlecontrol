@@ -130,7 +130,8 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
 
     // Confirm RA_AUTOSTART was active (game logs to #output via Module.printErr).
     // Checks game C++ stderr: "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI"
-    await waitForOutput(page, 'RA_AUTOSTART active', 30_000);
+    // Cold WASM load (15MB) takes longer on first run — use 120s to match overlay wait.
+    await waitForOutput(page, 'RA_AUTOSTART active', 120_000);
     console.log('RA_AUTOSTART confirmed active in game output.');
 
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'game-started.png'), fullPage: true });
