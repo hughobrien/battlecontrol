@@ -638,12 +638,27 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 				"Red Alert",
 				SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 				w, h,
+#ifdef __EMSCRIPTEN__
+				SDL_WINDOW_SHOWN);  // canvas is always visible in browser
+#else
 				SDL_WINDOW_HIDDEN);  // hidden until the engine drives a frame
+#endif
 			if (SDL_VideoWindow == nullptr) {
 				return FALSE;
 			}
 			SDL_Set_Main_Window(SDL_VideoWindow);
 		}
+#ifdef __EMSCRIPTEN__
+		// TIM-377: Emscripten SDL2 uses the WebGL backend; software renderer
+		// is unavailable. PRESENTVSYNC maps to requestAnimationFrame inside
+		// a browser worker thread — omit it here so SDL_RenderPresent returns
+		// immediately and does not stall the audio pump.
+		SDL_VideoRenderer = SDL_CreateRenderer(SDL_VideoWindow, -1,
+		                                       SDL_RENDERER_ACCELERATED);
+		if (SDL_VideoRenderer == nullptr) {
+			SDL_VideoRenderer = SDL_CreateRenderer(SDL_VideoWindow, -1, 0);
+		}
+#else
 		// TIM-250: always use the software renderer under Linux — the X11
 		// accelerated path (SDL_RENDERER_ACCELERATED) crashes in
 		// SDL_RenderPresent when run under Xvfb at 640×480. Software
@@ -657,6 +672,7 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 				SDL_VideoWindow, -1,
 				SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 		}
+#endif
 		fprintf(stderr, "[RA] SDL window %dx%d renderer=%p\n",
 		        w, h, (void *)SDL_VideoRenderer);
 		// Indexed 8-bit primary surface; palette is filled in by
@@ -1058,7 +1074,12 @@ void Wait_Vert_Blank(void)
 	}
 
 	if (!SDL_FirstPresentDone) {
+#ifndef __EMSCRIPTEN__
+		// TIM-377: under Emscripten the canvas is always visible (SDL_WINDOW_SHOWN
+		// at create time); SDL_ShowWindow is a no-op there and the SDL_WINDOW_HIDDEN
+		// → show-on-first-present flow only applies to the native Linux build.
 		SDL_ShowWindow(SDL_VideoWindow);
+#endif
 		SDL_FirstPresentDone = true;
 		/* TIM-226: SDL_WINDOW_HIDDEN means no FOCUS_GAINED fires before the
 		 * first show; set GameInFocus here so Main_Loop renders immediately. */

@@ -224,12 +224,18 @@ if(EMSCRIPTEN)
     # (register pragma + random rename) for Emscripten. See TIM-376 notes
     # inside that file. A second -include was avoided because CMake deduplicates
     # adjacent -include flags, collapsing them into one flag with two paths.
+    #
+    # TIM-377: -sUSE_SDL=2 and -sUSE_PTHREADS=1 must also be compile-time flags
+    # so that Emscripten resolves the SDL2 port headers (<SDL2/SDL.h>) and the
+    # pthread headers during compilation, not only at link time.
     target_compile_options(ra PRIVATE
         "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
         -fpermissive
         -Wno-register
         -w
         -pthread
+        -sUSE_SDL=2
+        -sUSE_PTHREADS=1
     )
     set_target_properties(ra PROPERTIES SUFFIX ".js")
     target_link_options(ra PRIVATE

@@ -92,7 +92,11 @@ extern "C" void * SDL_Get_Main_Window(void)
         RA_WINDOW_TITLE,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         RA_DEFAULT_W, RA_DEFAULT_H,
+#ifdef __EMSCRIPTEN__
+        SDL_WINDOW_SHOWN);  // TIM-377: canvas always visible in browser
+#else
         SDL_WINDOW_HIDDEN);
+#endif
 
     return g_main_window;
 }
