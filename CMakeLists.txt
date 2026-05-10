@@ -237,12 +237,17 @@ if(EMSCRIPTEN)
         -sUSE_SDL=2
         -sUSE_PTHREADS=1
     )
-    set_target_properties(ra PROPERTIES SUFFIX ".js")
+    # TIM-381: Output ra.html so --shell-file is honoured (Emscripten only
+    # processes the shell template when the output suffix is .html).
+    set_target_properties(ra PROPERTIES SUFFIX ".html")
     target_link_options(ra PRIVATE
         -sUSE_SDL=2
         -sALLOW_MEMORY_GROWTH=1
         -sUSE_PTHREADS=1
         -sPTHREAD_POOL_SIZE=4
+        # TIM-381: RA has a blocking main() game loop.  PROXY_TO_PTHREAD moves
+        # it into a Web Worker so it can block without stalling the browser UI thread.
+        -sPROXY_TO_PTHREAD=1
         "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"callMain\"]"
         "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/shell.html"
     )
