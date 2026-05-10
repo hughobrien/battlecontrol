@@ -15,6 +15,17 @@
       align-items: center;
       padding: 8px;
     }
+    #browser-error {
+      display: none;
+      background: #3a0a0a;
+      border: 1px solid #7a2a2a;
+      color: #e88;
+      font-size: 12px;
+      padding: 8px 16px;
+      max-width: 560px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
     #status-line { font-size: 12px; padding: 4px 0; color: #aaa; min-height: 1.4em; }
     #canvas { display: block; border: 1px solid #333; }
     #output {
@@ -52,25 +63,41 @@
     }
     #open-btn:hover:not(:disabled) { background: #3a3a3a; }
     #open-btn:disabled { opacity: 0.5; cursor: default; }
+    #progress-bar-wrap {
+      width: 320px;
+      height: 6px;
+      background: #222;
+      border: 1px solid #444;
+      display: none;
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #5a8a3a;
+      transition: width 0.1s linear;
+    }
     #progress-text { font-size: 12px; color: #888; min-height: 1em; }
     .overlay-hint { font-size: 11px; color: #666; max-width: 420px; text-align: center; }
   </style>
 </head>
 <body>
+  <div id="browser-error">
+    This browser does not support the File System Access API —
+    use <strong>Chrome</strong> or <strong>Edge</strong> (stable).
+    Firefox: enable <code>dom.fs.enabled</code> in <code>about:config</code>.
+    Safari: not supported.
+  </div>
   <div id="status-line">Loading…</div>
   <div id="canvas-wrapper">
-    <canvas id="canvas" width="640" height="400" oncontextmenu="event.preventDefault()"></canvas>
+    <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
     <div id="preloader-overlay">
       <div>C&amp;C Red Alert</div>
       <button id="open-btn" type="button">Open Game Folder</button>
+      <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
       <div id="progress-text"></div>
       <div class="overlay-hint">
         Point at your Red Alert data directory containing REDALERT.MIX,
         LOCAL.MIX, and the other MIX files.
-      </div>
-      <div class="overlay-hint">
-        Requires Chrome or Edge. Firefox: enable
-        <code>dom.fs.enabled</code> in about:config. Safari: not supported.
       </div>
     </div>
   </div>
