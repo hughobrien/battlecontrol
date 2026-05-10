@@ -116,6 +116,7 @@
           clang
           python3
           pkg-config
+          emscripten  # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
         ];
 
         buildInputs = with pkgs; [
@@ -128,6 +129,7 @@
         shellHook = ''
           echo "C&C Red Alert — dev shell"
           echo "  cmake -S . -B build && cmake --build build -j\$(nproc)"
+          echo "  emcmake cmake --preset wasm && cmake --build build-wasm --target ra  # WASM"
           echo "  bash scripts/first-run-pass-94.sh   # full RA build + smoke test"
         '';
       };

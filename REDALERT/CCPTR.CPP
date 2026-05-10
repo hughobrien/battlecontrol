@@ -37,40 +37,8 @@
 #include	"function.h"
 
 
- 
-template class CCPtr<AircraftClass>;
-template class CCPtr<AircraftTypeClass>;
-template class CCPtr<AnimClass>;
-template class CCPtr<AnimTypeClass>;
-template class CCPtr<BuildingClass>;
-template class CCPtr<BuildingTypeClass>;
-template class CCPtr<BulletClass>;
-template class CCPtr<BulletTypeClass>;
-template class CCPtr<FactoryClass>;
-template class CCPtr<HouseClass>;
-template class CCPtr<HouseTypeClass>;
-template class CCPtr<InfantryClass>;
-template class CCPtr<InfantryTypeClass>;
-template class CCPtr<OverlayClass>;
-template class CCPtr<OverlayTypeClass>;
-template class CCPtr<SmudgeClass>;
-template class CCPtr<SmudgeTypeClass>;
-template class CCPtr<TeamClass>;
-template class CCPtr<TeamTypeClass>;
-template class CCPtr<TemplateClass>;
-template class CCPtr<TemplateTypeClass>;
-template class CCPtr<TerrainClass>;
-template class CCPtr<TerrainTypeClass>;
-template class CCPtr<TriggerClass>;
-template class CCPtr<TriggerTypeClass>;
-template class CCPtr<UnitClass>;
-template class CCPtr<UnitTypeClass>;
-template class CCPtr<VesselClass>;
-template class CCPtr<VesselTypeClass>;
-template class CCPtr<WarheadTypeClass>;
-template class CCPtr<WeaponTypeClass>;
-
-
+// TIM-376: The static-member definition must come before the explicit
+// instantiations so all members are visible when Clang/wasm-ld instantiates.
 template<class T> FixedIHeapClass* CCPtr<T>::Heap = NULL;
 
 
@@ -109,3 +77,38 @@ bool CCPtr<T>::operator > (CCPtr<T> const & rvalue) const
 {
 	return (stricmp((*this)->Name(), rvalue->Name()) > 0);
 }
+
+// TIM-376: Explicit instantiations moved here so all template body
+// definitions above are visible to Clang/wasm-ld at instantiation time.
+// GCC tolerates forward-declaration order; Clang does not.
+template class CCPtr<AircraftClass>;
+template class CCPtr<AircraftTypeClass>;
+template class CCPtr<AnimClass>;
+template class CCPtr<AnimTypeClass>;
+template class CCPtr<BuildingClass>;
+template class CCPtr<BuildingTypeClass>;
+template class CCPtr<BulletClass>;
+template class CCPtr<BulletTypeClass>;
+template class CCPtr<FactoryClass>;
+template class CCPtr<HouseClass>;
+template class CCPtr<HouseTypeClass>;
+template class CCPtr<InfantryClass>;
+template class CCPtr<InfantryTypeClass>;
+template class CCPtr<OverlayClass>;
+template class CCPtr<OverlayTypeClass>;
+template class CCPtr<SmudgeClass>;
+template class CCPtr<SmudgeTypeClass>;
+template class CCPtr<TeamClass>;
+template class CCPtr<TeamTypeClass>;
+template class CCPtr<TemplateClass>;
+template class CCPtr<TemplateTypeClass>;
+template class CCPtr<TerrainClass>;
+template class CCPtr<TerrainTypeClass>;
+template class CCPtr<TriggerClass>;
+template class CCPtr<TriggerTypeClass>;
+template class CCPtr<UnitClass>;
+template class CCPtr<UnitTypeClass>;
+template class CCPtr<VesselClass>;
+template class CCPtr<VesselTypeClass>;
+template class CCPtr<WarheadTypeClass>;
+template class CCPtr<WeaponTypeClass>;

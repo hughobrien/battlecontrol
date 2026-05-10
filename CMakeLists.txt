@@ -156,8 +156,101 @@ endif()
 target_compile_definitions(td PRIVATE WIN32=1)
 
 # TIM-341: SDL2 required by sdl_window.cpp (MainWindow, SDL_Window_Show, ...).
-find_package(SDL2 REQUIRED)
-target_link_libraries(td PRIVATE SDL2::SDL2)
+# Emscripten provides SDL2 via -sUSE_SDL=2 at link time; skip find_package for WASM.
+# The `td` target is native-only; skip its SDL2 link under WASM.
+if(NOT EMSCRIPTEN)
+    find_package(SDL2 REQUIRED)
+    target_link_libraries(td PRIVATE SDL2::SDL2)
+endif()
 
-# TIM-369: installer experience port
-add_subdirectory(installer)
+# ---------------------------------------------------------------------------
+# TIM-376: ra executable — Red Alert main binary (native Linux + WASM)
+#
+# Source composition mirrors flake.nix / first-run-pass-94.sh:
+#   REDALERT/*.CPP  + REDALERT/WIN32LIB/*.CPP  (upstream game sources)
+#   linux/win32-stubs/*.cpp                     (portable platform layer)
+#
+# Excluded (same as flake.nix):
+#   DTABLE.CPP  — large data-initialiser that takes too long at -O0
+#   ITABLE.CPP  — same
+#   LZWOTRAW.CPP — raw-mode LZW; replaced by portable path
+#   STUB.CPP    — defines a second main(), conflicts with STARTUP.CPP
+#
+# Under Emscripten (EMSCRIPTEN=1):
+#   SDL2 is provided by -sUSE_SDL=2 (Emscripten port, no host library needed)
+#   pthreads enabled via -sUSE_PTHREADS=1 + compile-time -pthread
+#   Output: ra.js + ra.wasm
+#
+# Invoke WASM build as:
+#   emcmake cmake --preset wasm && cmake --build build-wasm --target ra
+# ---------------------------------------------------------------------------
+file(GLOB RA_SOURCES_UPPER "${CMAKE_SOURCE_DIR}/REDALERT/*.CPP")
+file(GLOB RA_SOURCES_LOWER "${CMAKE_SOURCE_DIR}/REDALERT/*.cpp")
+set(RA_ALL_SOURCES ${RA_SOURCES_UPPER} ${RA_SOURCES_LOWER})
+list(FILTER RA_ALL_SOURCES EXCLUDE REGEX ".*/DTABLE\\.CPP$")
+list(FILTER RA_ALL_SOURCES EXCLUDE REGEX ".*/ITABLE\\.CPP$")
+list(FILTER RA_ALL_SOURCES EXCLUDE REGEX ".*/LZWOTRAW\\.CPP$")
+list(FILTER RA_ALL_SOURCES EXCLUDE REGEX ".*/STUB\\.CPP$")
+
+file(GLOB RA_WIN32LIB_SOURCES_UPPER "${CMAKE_SOURCE_DIR}/REDALERT/WIN32LIB/*.CPP")
+file(GLOB RA_WIN32LIB_SOURCES_LOWER "${CMAKE_SOURCE_DIR}/REDALERT/WIN32LIB/*.cpp")
+set(RA_WIN32LIB_SOURCES ${RA_WIN32LIB_SOURCES_UPPER} ${RA_WIN32LIB_SOURCES_LOWER})
+
+file(GLOB RA_STUB_SOURCES "${CMAKE_SOURCE_DIR}/linux/win32-stubs/*.cpp")
+
+add_executable(ra
+    ${RA_ALL_SOURCES}
+    ${RA_WIN32LIB_SOURCES}
+    ${RA_STUB_SOURCES}
+)
+add_dependencies(ra redalert_include_shim)
+
+target_compile_definitions(ra PRIVATE
+    LINUX=1
+    UNIX=1
+    POSIX=1
+)
+
+target_include_directories(ra PRIVATE
+    "${RA_SHIM_DIR}/redalert"
+    "${RA_SHIM_DIR}/win32lib"
+    "${CMAKE_SOURCE_DIR}/REDALERT"
+    "${CMAKE_SOURCE_DIR}/REDALERT/WIN32LIB"
+    "${CMAKE_SOURCE_DIR}/linux/win32-stubs"
+)
+
+if(EMSCRIPTEN)
+    # msvc-compat.h already contains the WASM-specific compat block
+    # (register pragma + random rename) for Emscripten. See TIM-376 notes
+    # inside that file. A second -include was avoided because CMake deduplicates
+    # adjacent -include flags, collapsing them into one flag with two paths.
+    target_compile_options(ra PRIVATE
+        "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
+        -fpermissive
+        -Wno-register
+        -w
+        -pthread
+    )
+    set_target_properties(ra PROPERTIES SUFFIX ".js")
+    target_link_options(ra PRIVATE
+        -sUSE_SDL=2
+        -sALLOW_MEMORY_GROWTH=1
+        -sUSE_PTHREADS=1
+        -sPTHREAD_POOL_SIZE=4
+        "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"callMain\"]"
+        "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/shell.html"
+    )
+else()
+    target_compile_options(ra PRIVATE
+        "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
+        -fmax-errors=20
+        -fpermissive
+        -w
+    )
+    target_link_libraries(ra PRIVATE SDL2::SDL2)
+endif()
+
+# TIM-369: installer experience port (native only — no installer for WASM)
+if(NOT EMSCRIPTEN)
+    add_subdirectory(installer)
+endif()

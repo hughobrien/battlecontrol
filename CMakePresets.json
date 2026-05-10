@@ -1,0 +1,35 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "linux-native",
+      "displayName": "Linux native (RelWithDebInfo, Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "wasm",
+      "displayName": "WebAssembly (Emscripten) — invoke as: emcmake cmake --preset wasm",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-wasm",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      },
+      "description": "emcmake injects CMAKE_TOOLCHAIN_FILE. Do not run cmake --preset wasm directly."
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-native",
+      "configurePreset": "linux-native"
+    },
+    {
+      "name": "wasm",
+      "configurePreset": "wasm",
+      "targets": ["ra"]
+    }
+  ]
+}
