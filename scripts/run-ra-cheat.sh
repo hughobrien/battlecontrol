@@ -155,7 +155,7 @@ fi
 echo "Running RA cheat smoke test (timeout ${TIMEOUT_SECS}s) ..."
 (cd "$RUN_DIR" && DISPLAY="$DISPLAY_NUM" SDL_AUDIODRIVER=dummy \
     RA_AUTOSTART=1 RA_CHEAT=1 \
-    timeout "$TIMEOUT_SECS" "$LINK_BIN") > "$LOG" 2>&1 || true
+    timeout -k 5 "$TIMEOUT_SECS" "$LINK_BIN") > "$LOG" 2>&1 || true
 
 if [ -n "${XVFB_PID:-}" ]; then
     kill "$XVFB_PID" 2>/dev/null || true

@@ -57,7 +57,7 @@ fi
 echo "Running TD cheat smoke test (timeout ${TIMEOUT_SECS}s) ..."
 cd "$RUN_DIR"
 TD_AUTOSTART=1 TD_CHEAT=1 DISPLAY="$DISPLAY_NUM" \
-    timeout "$TIMEOUT_SECS" "$TD_BIN" >"$LOG" 2>&1 || true
+    timeout -k 5 "$TIMEOUT_SECS" "$TD_BIN" >"$LOG" 2>&1 || true
 
 if [ -n "${XVFB_PID:-}" ]; then
     kill "$XVFB_PID" 2>/dev/null || true
