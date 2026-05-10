@@ -48,6 +48,13 @@
 #include <unistd.h>
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <dirent.h>
+#include <sys/stat.h>
+#include <cctype>
+#include <cstring>
+#endif
+
 #include "function.h"
 #include <io.h>				// for unlink
 
@@ -488,7 +495,7 @@ int LoadOptionsClass::Process(void)
 				game_idx = listbtn.Current_Index();
 				game_num = Files[game_idx]->Num;
 				if (WWMessageBox().Process(TXT_DELETE_FILE_QUERY, TXT_YES, TXT_NO)==0) {
-					sprintf(fname, "SAVEGAME.%03d", game_num);
+					sprintf(fname, WASM_SAVE_PREFIX "SAVEGAME.%03d", game_num);
 					unlink(fname);
 					Clear_List(&listbtn);
 					Fill_List(&listbtn);
@@ -622,6 +629,92 @@ void LoadOptionsClass::Clear_List(ListClass * list)
  *=============================================================================================*/
 void LoadOptionsClass::Fill_List(ListClass * list)
 {
+#ifdef __EMSCRIPTEN__
+	/*
+	** TIM-396: WASM save enumeration. Scan /saves/ for SAVEGAME.NNN using
+	** POSIX opendir (Emscripten IDBFS mount). The #if(0) block below is the
+	** original DOS _dos_findfirst path, disabled for all builds.
+	*/
+	Clear_List(list);
+
+	if (Style == SAVE) {
+		FileEntryClass * fdata = new FileEntryClass;
+		strcpy(fdata->Descr, Text_String(TXT_EMPTY_SLOT));
+		fdata->DateTime = 0xffffffff;
+		Files.Add(fdata);
+	}
+
+	DIR* dir = opendir("/saves");
+	if (dir) {
+		struct dirent* ent;
+		while ((ent = readdir(dir)) != nullptr) {
+			const char* name = ent->d_name;
+			// Match "SAVEGAME.NNN" — exactly 12 chars, prefix + 3 decimal digits
+			if (strncasecmp(name, "SAVEGAME.", 9) != 0) continue;
+			const char* ext = name + 9;
+			if (strlen(ext) != 3) continue;
+			bool digits = std::isdigit((unsigned char)ext[0])
+			           && std::isdigit((unsigned char)ext[1])
+			           && std::isdigit((unsigned char)ext[2]);
+			if (!digits) continue;
+
+			int id = atoi(ext);
+			char descr[DESCRIP_MAX+32];
+			unsigned scenario;
+			HousesType house;
+			bool ok = Get_Savefile_Info(id, descr, &scenario, &house);
+
+			FileEntryClass * fdata = new FileEntryClass;
+			fdata->Descr[0] = '\0';
+			if (!ok) {
+				strcpy(fdata->Descr, Text_String(TXT_OLD_GAME));
+			} else {
+				if (house == HOUSE_USSR || house == HOUSE_UKRAINE) {
+					sprintf(fdata->Descr, "(%s) ", Text_String(TXT_SOVIET));
+				} else {
+					sprintf(fdata->Descr, "(%s) ", Text_String(TXT_ALLIES));
+				}
+			}
+			strncat(fdata->Descr, descr, (sizeof(fdata->Descr)-strlen(fdata->Descr))-1);
+			fdata->Valid = ok;
+			fdata->Scenario = scenario;
+			fdata->House = house;
+			fdata->Num = id;
+			// Use mtime for recency-based sort (same order semantics as wr_date/wr_time)
+			struct stat st;
+			char path[64];
+			snprintf(path, sizeof(path), "/saves/SAVEGAME.%03d", id);
+			fdata->DateTime = 0;
+			if (stat(path, &st) == 0) {
+				fdata->DateTime = (unsigned long)st.st_mtime;
+			}
+			Files.Add(fdata);
+		}
+		closedir(dir);
+	}
+
+	// Find the first unused slot number and assign it to the empty-slot entry.
+	if (Style == SAVE) {
+		int id = -1;
+		int i;
+		for (i = 0; i < Files.Count(); i++) {
+			id = -1;
+			for (int j = 0; j < Files.Count(); j++) {
+				if (Files[j]->Num == i) { id = j; break; }
+			}
+			if (id == -1) break;   // i is the first unused number
+		}
+		Files[0]->Num = i;
+	}
+
+	qsort((void *)(&Files[0]), Files.Count(), sizeof(class FileEntryClass *), LoadOptionsClass::Compare);
+
+	for (int i = 0; i < Files.Count(); i++) {
+		list->Add_Item(Files[i]->Descr);
+	}
+	return;
+#endif // __EMSCRIPTEN__
+
 #if(0)		//PG
 	FileEntryClass * fdata;	// for adding entries to 'Files'
 	char descr[DESCRIP_MAX+32];
