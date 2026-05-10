@@ -579,7 +579,20 @@ unsigned long Uncompress_Data(void const *, void *) { return 0; }
 unsigned long Load_Uncompress(char const *, BufferClass &, BufferClass &, void *) { return 0; }
 void *Extract_Shape(void const *, int)         { return nullptr; }
 int   Extract_Shape_Count(void const *)         { return 0; }
-char *Extract_String(void const *, int)         { return nullptr; }
+// TIM-362: real implementation from TIBERIANDAWN/WIN32LIB/DIPTHONG.CPP.
+// The null stub caused vsprintf(buf, nullptr, args) SIGSEGV in Fancy_Text_Print
+// whenever Do_Win called Text_String(TXT_MISSION) / Text_String(TXT_SCENARIO_WON).
+char *Extract_String(void const *data, int string)
+{
+    if (!data || string < 0) return nullptr;
+    // Internet/multiplayer string range (indices 4567+) are inline literals.
+    // The standard CONQUER.ENG file only covers indices 0..4566.
+    if (string >= 4567) return nullptr;
+    // Layout: table of uint16 offsets followed by packed string bytes.
+    // ptr[string] is the byte offset from the start of the block to the string.
+    unsigned short const *ptr = static_cast<unsigned short const *>(data);
+    return const_cast<char *>(static_cast<char const *>(data) + ptr[string]);
+}
 void *Get_Icon_Set_Map(void const *)            { return nullptr; }
 void *Build_Fading_Table(void const *, void const *, long int, long int) { return nullptr; }
 

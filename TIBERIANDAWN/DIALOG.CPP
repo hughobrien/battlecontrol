@@ -608,6 +608,7 @@ void Fancy_Text_Print(int text, unsigned x, unsigned y, unsigned fore, unsigned 
 		**	how to handle EMS pointers.
 		*/
 		char const * tptr = Text_String(text);
+		if (!tptr) tptr = "";   // TIM-362: guard against null string table
 		vsprintf(buffer, tptr, arg);
 		va_end(arg);
 
