@@ -218,6 +218,19 @@
       console.log('[preloader] mounted ' + GAME_DIR + '/' + name);
     });
 
+    // TIM-399: STARTUP.CPP gates the entire init path on cfile.Is_Available()
+    // where cfile = RawFileClass("REDALERT.INI").  Without this file the game
+    // prints "Run SETUP program first." and exits.  The INI content is minimal:
+    // PlayIntro=True triggers IsFromInstall (the Linux path clears it afterwards,
+    // so it is harmless).  If the asset server served the real file it was already
+    // added above; skip if it's already present.
+    if (!pendingFiles.has('REDALERT.INI')) {
+      var iniContent = '[Intro]\nPlayIntro=True\n[Options]\n';
+      var iniBytes = new TextEncoder().encode(iniContent);
+      FS.createDataFile(GAME_DIR, 'REDALERT.INI', iniBytes, true, true, false);
+      console.log('[preloader] synthesized ' + GAME_DIR + '/REDALERT.INI (not in asset bundle)');
+    }
+
     // TIM-396: Mount IDBFS at /saves for persistent save game storage.
     // All SAVEGAME.NNN files are written here by the game (C++ side uses
     // WASM_SAVE_PREFIX "/saves/") and persisted to IndexedDB via syncfs.
