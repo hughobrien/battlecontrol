@@ -104,9 +104,16 @@
   <pre id="output"></pre>
   <script>
     var outputEl = document.getElementById('output');
+    // TIM-399: ?autostart=1 → inject RA_AUTOSTART into Emscripten ENV at module
+    // init time (before onRuntimeInitialized) so getenv("RA_AUTOSTART") works.
+    var _envFromUrl = {};
+    if (new URLSearchParams(window.location.search).get('autostart') === '1') {
+      _envFromUrl['RA_AUTOSTART'] = '1';
+    }
     var Module = {
       canvas: document.getElementById('canvas'),
       noInitialRun: true,   // preloader.js calls callMain() after files are mounted
+      ENV: _envFromUrl,
       print: function(text) {
         outputEl.textContent += text + '\n';
         outputEl.scrollTop = outputEl.scrollHeight;
