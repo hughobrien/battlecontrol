@@ -15,8 +15,11 @@
  * Expected DOM element IDs (defined in the embedding HTML shell):
  *   #preloader-overlay  — wrapper hidden after folder is selected
  *   #open-btn           — button that triggers showDirectoryPicker()
+ *   #progress-bar-wrap  — container shown while MIX files are loading
+ *   #progress-bar       — inner bar whose width% reflects load progress
  *   #progress-text      — inline text showing "N / M"
  *   #status-line        — single-line status message
+ *   #browser-error      — error banner shown on unsupported browsers
  *
  * Emscripten runtime methods required (set via -sEXPORTED_RUNTIME_METHODS):
  *   FS, callMain
@@ -57,8 +60,10 @@
   }
 
   function setProgress(loaded, total) {
-    var el = document.getElementById('progress-text');
-    if (el) el.textContent = loaded + ' / ' + total;
+    var text = document.getElementById('progress-text');
+    if (text) text.textContent = loaded + ' / ' + total;
+    var bar = document.getElementById('progress-bar');
+    if (bar) bar.style.width = (total > 0 ? Math.round(loaded / total * 100) : 0) + '%';
   }
 
   async function openGameFolder() {
@@ -78,6 +83,8 @@
     }
 
     setStatus('Reading MIX files…');
+    var wrap = document.getElementById('progress-bar-wrap');
+    if (wrap) wrap.style.display = 'block';
     var files = new Map();
     var loaded = 0;
     setProgress(0, MIX_FILES.length);
@@ -141,7 +148,9 @@
     if (!btn) return;
 
     if (!window.showDirectoryPicker) {
-      setStatus('File System Access API not available. Use Chrome or Edge (stable).');
+      var errBanner = document.getElementById('browser-error');
+      if (errBanner) errBanner.style.display = 'block';
+      setStatus('File System Access API not available — see the banner above.');
       btn.disabled = true;
       return;
     }
