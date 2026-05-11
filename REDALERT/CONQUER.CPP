@@ -2227,7 +2227,7 @@ Mono_Set_Cursor(0,0);
 	/* TIM-363: frame counter + RA_CHEAT injection for automated smoke tests. */
 	static long _ra_frame_count = 0;
 	_ra_frame_count++;
-	if (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0) {
+	if (getenv("RA_AUTOSTART") && (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0)) {
 		fprintf(stderr, "[RA] Main_Loop frame %ld\n", _ra_frame_count); fflush(stderr);
 	}
 	/* RA_CHEAT=1: inject cheat actions at fixed frames.
@@ -2383,11 +2383,9 @@ Mono_Set_Cursor(0,0);
 	**	Check for player wins or loses according to global event flag.
 	*/
 #ifndef _MSC_VER
-	// TIM-310: pass-90 — per-cycle win trigger: fires 200 frames after each scenario load.
-	// 200 frames = ~13s of real gameplay for stress-testing the restart path.
-	// g_tim310_restart_frame is set to Frame in Read_Scenario() on success; reset to -1 here
-	// after firing so it only triggers once per cycle. Direct PlayerWins=true skips BorrowedTime.
-	{
+	// TIM-310: pass-90 — per-cycle win trigger (smoke test only, gated on RA_AUTOSTART).
+	// Without this gate every user playing via `nix run` would get a forced win after ~13s (TIM-416).
+	if (getenv("RA_AUTOSTART")) {
 		extern long g_tim310_restart_frame;
 		if (g_tim310_restart_frame >= 0 && Frame >= g_tim310_restart_frame + 200
 				&& Session.Type == GAME_NORMAL && !PlayerWins && !PlayerLoses && PlayerPtr != NULL) {
@@ -2402,7 +2400,7 @@ Mono_Set_Cursor(0,0);
 
 	if (PlayerWins) {
 #ifndef _MSC_VER
-		fprintf(stderr, "[PLAYER-WINS] frame=%ld\n", (long)Frame);
+		if (getenv("RA_AUTOSTART")) fprintf(stderr, "[PLAYER-WINS] frame=%ld\n", (long)Frame);
 #endif
 
 #ifdef WIN32
@@ -2481,8 +2479,8 @@ Mono_Set_Cursor(0,0);
 	Frame++;
 
 #ifndef _MSC_VER
-	// TIM-316: FPS probe — log every 500 frames so the smoke test can measure throughput.
-	{
+	// TIM-316: FPS probe — only active under RA_AUTOSTART smoke tests (TIM-416).
+	if (getenv("RA_AUTOSTART")) {
 		static struct timespec _fps_t0 = {0, 0};
 		static long _fps_base_frame = 0;
 		if (_fps_t0.tv_sec == 0) {
