@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <script src="coi-serviceworker.min.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C&amp;C Linux Port — Play in Browser</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #0a0a0a;
+      color: #ccc;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      gap: 32px;
+    }
+    h1 {
+      font-size: 20px;
+      color: #eee;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin: 0;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      margin-top: -20px;
+    }
+    .cards {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .card {
+      border: 1px solid #333;
+      padding: 24px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+      background: #111;
+      transition: border-color 0.15s, background 0.15s;
+      width: 240px;
+    }
+    .card:hover {
+      border-color: #666;
+      background: #1a1a1a;
+    }
+    .card-title {
+      font-size: 16px;
+      color: #eee;
+      text-align: center;
+    }
+    .card-subtitle {
+      font-size: 11px;
+      color: #666;
+      text-align: center;
+    }
+    .card-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border: 1px solid #3a5a3a;
+      color: #5a9a5a;
+      background: #0a1a0a;
+    }
+    .notice {
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+      max-width: 560px;
+      line-height: 1.6;
+      border-top: 1px solid #222;
+      padding-top: 24px;
+    }
+    .notice a { color: #778; }
+    .notice code {
+      background: #1a1a1a;
+      padding: 1px 4px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>Command &amp; Conquer Linux Port</h1>
+  <p class="subtitle">Open-source GPL port running natively in your browser via WebAssembly</p>
+
+  <div class="cards">
+    <a class="card" href="ra.html">
+      <div class="card-title">Red Alert</div>
+      <div class="card-badge">WASM</div>
+      <div class="card-subtitle">Requires original game data</div>
+    </a>
+    <a class="card" href="td.html">
+      <div class="card-title">Tiberian Dawn</div>
+      <div class="card-badge">WASM</div>
+      <div class="card-subtitle">Requires original game data</div>
+    </a>
+  </div>
+
+  <div class="notice">
+    <strong>You need your own game data.</strong> Click a game above and use the
+    "Open Game Folder" button to select your Red Alert or Tiberian Dawn data directory
+    (the folder containing <code>REDALERT.MIX</code> / <code>CONQUER.MIX</code>).
+    Game assets are loaded locally — nothing is uploaded.<br><br>
+    <strong>Browser:</strong> Chrome or Edge required (<code>SharedArrayBuffer</code> +
+    File System Access API). Firefox with <code>dom.fs.enabled</code> may also work.<br><br>
+    Source: <a href="https://github.com/hughobrien/battlecontrol" rel="noopener">github.com/hughobrien/battlecontrol</a>
+    (GPL v3, based on the EA open-source release)
+  </div>
+</body>
+</html>
