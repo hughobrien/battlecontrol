@@ -1,0 +1,71 @@
+name: GitHub Pages Deploy
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'REDALERT/**'
+      - 'TIBDAWN/**'
+      - 'wasm/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    name: Build WASM + deploy to GitHub Pages
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '5.0.6'
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ninja-build cmake
+
+      - name: Configure WASM build
+        run: emcmake cmake --preset wasm
+
+      - name: Build ra.wasm
+        run: cmake --build build-wasm --target ra --parallel
+
+      - name: Build td.wasm
+        run: cmake --build build-wasm --target td --parallel
+
+      - name: Assemble deploy directory
+        run: |
+          cp build-wasm/ra.html  wasm/deploy/ra.html
+          cp build-wasm/ra.js    wasm/deploy/ra.js
+          cp build-wasm/ra.wasm  wasm/deploy/ra.wasm
+          cp build-wasm/td.html  wasm/deploy/td.html
+          cp build-wasm/td.js    wasm/deploy/td.js
+          cp build-wasm/td.wasm  wasm/deploy/td.wasm
+          cp wasm/preloader.js          wasm/deploy/preloader.js
+          cp wasm/coi-serviceworker.min.js wasm/deploy/coi-serviceworker.min.js
+          ls -lh wasm/deploy/
+
+      - name: Inject coi-serviceworker into game HTML
+        # GitHub Pages cannot set COOP/COEP response headers, so we use
+        # coi-serviceworker to inject them via a service worker instead.
+        # The script must load before Emscripten's Module initializes.
+        run: |
+          for f in wasm/deploy/ra.html wasm/deploy/td.html wasm/deploy/index.html; do
+            sed -i 's|<head>|<head>\n  <script src="coi-serviceworker.min.js"></script>|' "$f"
+          done
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: wasm/deploy
+          commit_message: 'deploy: ${{ github.sha }}'
