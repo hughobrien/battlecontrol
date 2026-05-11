@@ -179,8 +179,10 @@ void *  Load_Icon_Set(char const *filename, void *iconsetptr, long buffsize)
 				idata->Width = (short)(((short)sinf.Width)<<3);
 				idata->Height = (short)(((short)sinf.Height)<<3);
 				idata->Allocated = (short)allocated;
-				idata->Icons = (long)iconsetptr + sizeof(IControl_Type);
-				idata->Map = idata->Icons + size;
+				// TIM-423: store as offsets from buffer start so LP64 code can compute
+				// icon_src = base + Icons + icon*(icon_w*icon_h) without pointer truncation.
+				idata->Icons = sizeof(IControl_Type);
+				idata->Map = sizeof(IControl_Type) + size;
 					idata->TransFlag = sizeof(IControl_Type) + size + mapsize;
 				idata->Size = buffsize;
 
@@ -210,7 +212,7 @@ void *  Load_Icon_Set(char const *filename, void *iconsetptr, long buffsize)
 					Read_Iff_Chunk(fh, FORM_TRNS, transptr, transsize);
 					idata = (IControl_Type *)iconsetptr;
 
-				mapptr = (void*)idata->Map;
+				mapptr = (unsigned char*)iconsetptr + idata->Map;
 				Read_Iff_Chunk(fh, FORM_MAP, mapptr, mapsize);
 
 				/*

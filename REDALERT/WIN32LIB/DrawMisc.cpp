@@ -1060,7 +1060,9 @@ extern "C" void __cdecl Init_Stamps(unsigned int icondata)
 	IconWidth  = (unsigned int)(unsigned short)iw;
 	IconHeight = (unsigned int)(unsigned short)ih;
 	IconCount  = (unsigned int)(unsigned short)ic;
-	IconSize   = (unsigned int)isz;
+	// TIM-423: per-icon stride is icon_w*icon_h, not Size (total iconset block size).
+	IconSize   = IconWidth * IconHeight;
+	// TIM-423: Icons field now stores an offset from buffer start (fixed in ICONSET.CPP).
 	StampPtr   = icondata + (unsigned int)iicons;
 	IsTrans    = icondata + (unsigned int)itrans;
 	MapPtr     = icondata + (unsigned int)imap;
@@ -1106,14 +1108,15 @@ void __cdecl Buffer_Draw_Stamp(void const *this_object, void const *icondata, in
 		LOCAL	doremap:BYTE		; Should remapping occur?
 */
 	// TIM-164: render icon from IControl_Type iconset, honouring per-icon transparency flag.
+	// TIM-423: icon_sz = icon_w*icon_h (per-icon stride); iicons is offset from base (LP64 fix).
 	(void)modulo; (void)iwidth; (void)doremap;
 	if (!icondata) return;
 	unsigned char *base = (unsigned char*)(uintptr_t)icondata;
-	short iw, ih; int isz, iicons, itrans;
+	short iw, ih; int iicons, itrans;
 	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2);
-	memcpy(&isz, base+12, 4); memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
+	memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
 	int icon_w = (int)(unsigned short)iw, icon_h = (int)(unsigned short)ih;
-	int icon_sz = (isz > 0) ? (int)(unsigned int)isz : icon_w * icon_h;
+	int icon_sz = icon_w * icon_h;
 	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
 	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
 	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
@@ -1178,14 +1181,15 @@ void __cdecl Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondat
 	LOCAL	doremap:BYTE		; Should remapping occur?
 */
 	// TIM-164: render icon clipped to [min_x,max_x) x [min_y,max_y) bounds.
+	// TIM-423: icon_sz = icon_w*icon_h (per-icon stride); iicons is offset from base (LP64 fix).
 	(void)modulo; (void)iwidth; (void)skip; (void)doremap;
 	if (!icondata) return;
 	unsigned char *base = (unsigned char*)(uintptr_t)icondata;
-	short iw, ih; int isz, iicons, itrans;
+	short iw, ih; int iicons, itrans;
 	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2);
-	memcpy(&isz, base+12, 4); memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
+	memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
 	int icon_w = (int)(unsigned short)iw, icon_h = (int)(unsigned short)ih;
-	int icon_sz = (isz > 0) ? (int)(unsigned int)isz : icon_w * icon_h;
+	int icon_sz = icon_w * icon_h;
 	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
 	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
 	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
