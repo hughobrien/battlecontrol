@@ -1,96 +1,88 @@
-# WASM deployment skeleton
+# WASM deployment
 
-Target host: **Cloudflare Pages** (free tier).
+Two deployment paths are wired up in CI. GitHub Pages is the primary active path
+(no external secrets needed). Cloudflare Pages is the preferred long-term target
+(better headers) but requires a one-time credential setup.
 
-## Provider rationale
+## Active deployment: GitHub Pages
 
-| Requirement | GitHub Pages | Netlify | Cloudflare Pages |
-|---|---|---|---|
-| HTTPS | ✓ | ✓ | ✓ |
-| Custom response headers (COOP/COEP) | ✗ | ✓ | ✓ |
-| Free bandwidth | 100 GB/mo | 100 GB/mo | Unlimited |
-| Max file size | 100 MB | 100 MB | 25 MB |
+**URL:** `https://hughobrien.github.io/battlecontrol/`
 
-GitHub Pages cannot set custom headers — SharedArrayBuffer is blocked outright.
-Netlify and Cloudflare Pages both use the same `_headers` file format (trivial
-to switch between them).  Cloudflare Pages wins on unlimited bandwidth, which
-matters once game assets are in play.
+Workflow: `.github/workflows/gh-pages.yml` — triggers on every push to `master`
+that touches source, `wasm/`, or `CMakeLists.txt`.
+
+COOP/COEP are injected via `coi-serviceworker.min.js` (vendored at
+`wasm/coi-serviceworker.min.js`, MIT license). The service worker auto-reloads
+the page once on first visit to activate; subsequent loads are transparent.
+
+**One-time repo setup** (already done or do once):
+
+1. Push the workflow to `master` — CI will push a `gh-pages` branch on the next run.
+2. In the GitHub repo: **Settings → Pages → Source → Deploy from branch → `gh-pages` / `/ (root)`**.
+
+That's it. No API tokens or external accounts needed.
 
 ## Why COOP + COEP are required
 
 `SharedArrayBuffer` is only available in a cross-origin-isolated context.
-Emscripten's pthread support (used for audio threading and async I/O) depends
-on `SharedArrayBuffer`. Both headers must be present on **every** HTTP response
-from the origin — not just the HTML file.
+Emscripten's pthread support (used for audio threading and async I/O) depends on
+`SharedArrayBuffer`. Both headers must be present on every response from the origin.
 
 ```
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
-Cross-Origin-Resource-Policy: cross-origin
 ```
 
-The `_headers` file in this directory sets all three on `/*`.
+GitHub Pages cannot set these headers directly — hence `coi-serviceworker`. Cloudflare
+Pages / Netlify can set them via the `_headers` file in this directory.
 
-## Deploying to Cloudflare Pages (TIM-407 checklist)
+## Provider comparison
 
-1. Build the WASM artifacts:
-   ```
-   emcmake cmake --preset wasm && cmake --build build-wasm --target ra
-   emcmake cmake --preset wasm && cmake --build build-wasm --target td
-   ```
+| | GitHub Pages | Cloudflare Pages | Netlify |
+|---|---|---|---|
+| HTTPS | ✓ | ✓ | ✓ |
+| Native COOP/COEP headers | ✗ (need SW shim) | ✓ | ✓ |
+| Free tier bandwidth | 100 GB/mo soft | Unlimited | 100 GB/mo |
+| Max file size | 100 MB | 25 MB | 100 MB |
+| Credentials required | GitHub token (built-in) | API token + account ID | Site ID + token |
 
-2. Collect deploy artifacts into this directory:
-   ```
-   cp build-wasm/ra.html   wasm/deploy/
-   cp build-wasm/ra.js     wasm/deploy/
-   cp build-wasm/ra.wasm   wasm/deploy/
-   cp build-wasm/td.html   wasm/deploy/
-   cp build-wasm/td.js     wasm/deploy/
-   cp build-wasm/td.wasm   wasm/deploy/
-   cp wasm/shell.html      wasm/deploy/   # if used as index
-   ```
-   Do **not** commit game asset MIX files — users supply those at runtime via
-   the in-browser file picker.
+## Upgrading to Cloudflare Pages
 
-3. Create a Cloudflare Pages project (one-time):
-   - Dashboard → Workers & Pages → Create application → Pages → Connect to Git
-   - Or: `npx wrangler pages project create cnc-remastered-linux`
+If you want native COOP/COEP headers (no SW shim, works in all security environments):
 
-4. Deploy:
+1. Create a Cloudflare account (free tier).
+2. Create an API token: Dashboard → My Profile → API Tokens →
+   "Edit Cloudflare Workers" template, scoped to Pages.
+3. Find your Account ID in the dashboard right sidebar.
+4. Add to GitHub repo secrets:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+5. Create the Pages project (one-time, from any authenticated machine):
    ```
-   npx wrangler pages deploy wasm/deploy --project-name cnc-remastered-linux
+   npx wrangler pages project create cnc-remastered-linux
    ```
-   Cloudflare Pages reads `_headers` automatically from the published directory root.
+6. Enable `.github/workflows/wasm-deploy.yml` (currently present but requires secrets).
 
-5. Verify headers:
-   ```
-   curl -sI https://<your-project>.pages.dev/ra.html | grep -i cross-origin
-   ```
-   Expected:
-   ```
-   cross-origin-opener-policy: same-origin
-   cross-origin-embedder-policy: require-corp
-   cross-origin-resource-policy: cross-origin
-   ```
+Cloudflare reads `_headers` automatically from the published directory root — no
+code change needed beyond adding the secrets.
 
-## Netlify (alternative)
+## Manual deployment (Cloudflare Pages)
 
-The `_headers` file works identically on Netlify. Deploy with:
-```
-npx netlify deploy --dir wasm/deploy --prod
+```bash
+# Build
+emcmake cmake --preset wasm
+cmake --build build-wasm --target ra --parallel
+cmake --build build-wasm --target td --parallel
+
+# Collect artifacts
+cp build-wasm/ra.{html,js,wasm} build-wasm/td.{html,js,wasm} wasm/deploy/
+cp wasm/preloader.js wasm/deploy/
+
+# Deploy (requires wrangler login or CLOUDFLARE_API_TOKEN set)
+npx wrangler pages deploy wasm/deploy --project-name cnc-remastered-linux
 ```
 
-## Gotchas
-
-- **25 MB per file limit (Cloudflare Pages)**: WASM binaries are ~1-2 MB — well
-  within limits. If future builds include inlined assets and exceed 25 MB,
-  switch to Netlify (100 MB limit) or move large assets to R2/a CDN.
-
-- **`Cross-Origin-Resource-Policy: cross-origin`**: Required so the WASM worker
-  can fetch subresources (`.data` files, audio) that are loaded cross-origin by
-  the Emscripten runtime. Without it, the worker fetch is blocked.
-
-- **GitHub Pages workaround exists but is fragile**: The `coi-serviceworker`
-  trick injects COOP/COEP via a service worker shim. It requires user interaction
-  on first load to register, breaks SSR, and is rejected by some security scanners.
-  Not recommended.
+Verify headers after deploy:
+```bash
+curl -sI https://cnc-remastered-linux.pages.dev/ra.html | grep -i cross-origin
+```
