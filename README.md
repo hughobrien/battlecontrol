@@ -1,5 +1,15 @@
 # Command & Conquer: Remastered Collection — Linux Port
 
+## Play in Browser
+
+**[▶ Play Red Alert](https://hughobrien.github.io/battlecontrol/ra.html)** &nbsp;|&nbsp; **[▶ Play Tiberian Dawn](https://hughobrien.github.io/battlecontrol/td.html)**
+
+No installation needed. You need legally-acquired C&C game data — click **Open Game Folder** and select your local data directory. Works in any browser with [SharedArrayBuffer support](https://caniuse.com/sharedarraybuffer) (Chrome, Edge, Firefox).
+
+![Tiberian Dawn running in browser at frame 100](https://hughobrien.github.io/battlecontrol/screenshots/td-gameplay.png)
+
+---
+
 This is an ongoing Linux port of **Command & Conquer: Remastered Collection** (TiberianDawn + RedAlert) from the [EA open-source release](https://github.com/electronicarts/CnC_Remastered_Collection). The upstream repo ships only an MSBuild/MSVC solution targeting Win32; this fork brings both games to a native Linux build using GCC/Clang, CMake, and SDL2.
 
 > **Note — related EA repositories:**
