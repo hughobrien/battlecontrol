@@ -562,45 +562,50 @@ bool Read_Scenario(char * name)
 		Fill_In_Data();
 		// TIM-268: removed Remastered full-map overview Set_View_Dimensions; sidebar Activate(1) sets correct viewport.
 #ifndef _MSC_VER
-		// TIM-310: pass-90 — track restart cycle; arm per-cycle win trigger 5 frames out
-		{
-			static int s_cycle = 0;
-			s_cycle++;
-			g_tim310_restart_frame = Frame;  // signal CONQUER.CPP to force win at Frame+5
-			fprintf(stderr, "[TIM-310] read_scenario_ok cycle=%d frame=%ld\n", s_cycle, (long)Frame);
-		}
-		// TIM-308: pass-89 — inject 5 Allied Mammoth tanks near player start (retained for combat coverage)
-		if (Session.Type == GAME_NORMAL && PlayerPtr != NULL) {
-			CELL base_cell = 0;
-			for (int _ui = 0; _ui < Units.Count() && base_cell == 0; _ui++) {
-				UnitClass * _pu = Units.Ptr(_ui);
-				if (_pu && _pu->House == PlayerPtr && !_pu->IsInLimbo)
-					base_cell = Coord_Cell(_pu->Coord);
+		// TIM-310/TIM-308: smoke-test probes — only active when RA_AUTOSTART is set.
+		// Without this gate, every user playing via `nix run` would get forced wins after
+		// 200 frames and Mammoth tanks spawned at mission start (TIM-416).
+		if (getenv("RA_AUTOSTART")) {
+			// TIM-310: pass-90 — track restart cycle; arm per-cycle win trigger 5 frames out
+			{
+				static int s_cycle = 0;
+				s_cycle++;
+				g_tim310_restart_frame = Frame;  // signal CONQUER.CPP to force win at Frame+200
+				fprintf(stderr, "[TIM-310] read_scenario_ok cycle=%d frame=%ld\n", s_cycle, (long)Frame);
 			}
-			for (int _ii = 0; _ii < Infantry.Count() && base_cell == 0; _ii++) {
-				InfantryClass * _pi = Infantry.Ptr(_ii);
-				if (_pi && _pi->House == PlayerPtr && !_pi->IsInLimbo)
-					base_cell = Coord_Cell(_pi->Coord);
-			}
-			int _placed = 0;
-			if (base_cell != 0) {
-				for (int _fi = 0; _fi < 8 && _placed < 5; _fi++) {
-					CELL _c = Adjacent_Cell(base_cell, (FacingType)_fi);
-					UnitClass * _tank = new UnitClass(UNIT_HTANK, PlayerPtr->Class->House);
-					if (_tank) {
-						if (_tank->Unlimbo(Cell_Coord(_c), DIR_N)) {
-							_tank->Strength = _tank->Class->MaxStrength;
-							_tank->Assign_Mission(MISSION_HUNT);
-							_tank->Commence();
-							_placed++;
-							fprintf(stderr, "[TIM-308] reinf_tank cell=%d\n", (int)_c);
-						} else {
-							delete _tank;
+			// TIM-308: pass-89 — inject 5 Allied Mammoth tanks near player start (retained for combat coverage)
+			if (Session.Type == GAME_NORMAL && PlayerPtr != NULL) {
+				CELL base_cell = 0;
+				for (int _ui = 0; _ui < Units.Count() && base_cell == 0; _ui++) {
+					UnitClass * _pu = Units.Ptr(_ui);
+					if (_pu && _pu->House == PlayerPtr && !_pu->IsInLimbo)
+						base_cell = Coord_Cell(_pu->Coord);
+				}
+				for (int _ii = 0; _ii < Infantry.Count() && base_cell == 0; _ii++) {
+					InfantryClass * _pi = Infantry.Ptr(_ii);
+					if (_pi && _pi->House == PlayerPtr && !_pi->IsInLimbo)
+						base_cell = Coord_Cell(_pi->Coord);
+				}
+				int _placed = 0;
+				if (base_cell != 0) {
+					for (int _fi = 0; _fi < 8 && _placed < 5; _fi++) {
+						CELL _c = Adjacent_Cell(base_cell, (FacingType)_fi);
+						UnitClass * _tank = new UnitClass(UNIT_HTANK, PlayerPtr->Class->House);
+						if (_tank) {
+							if (_tank->Unlimbo(Cell_Coord(_c), DIR_N)) {
+								_tank->Strength = _tank->Class->MaxStrength;
+								_tank->Assign_Mission(MISSION_HUNT);
+								_tank->Commence();
+								_placed++;
+								fprintf(stderr, "[TIM-308] reinf_tank cell=%d\n", (int)_c);
+							} else {
+								delete _tank;
+							}
 						}
 					}
 				}
+				fprintf(stderr, "[TIM-308] reinforcements base_cell=%d placed=%d\n", (int)base_cell, _placed);
 			}
-			fprintf(stderr, "[TIM-308] reinforcements base_cell=%d placed=%d\n", (int)base_cell, _placed);
 		}
 #endif
 	} else {
@@ -826,13 +831,15 @@ void Clear_Scenario(void)
 {
 // TCTCTC -- possibly just use in-place new of scenario object?
 #ifndef _MSC_VER
-	// TIM-310: pass-90 — trace each Clear_Scenario call
+	// TIM-310: disarm win trigger during clear (always); trace only under RA_AUTOSTART.
 	{
-		static int s_clear_count = 0;
-		s_clear_count++;
 		extern long g_tim310_restart_frame;
-		g_tim310_restart_frame = -1;  // disarm win trigger during clear
-		fprintf(stderr, "[TIM-310] clear_scenario #%d frame=%ld\n", s_clear_count, (long)Frame);
+		g_tim310_restart_frame = -1;
+		if (getenv("RA_AUTOSTART")) {
+			static int s_clear_count = 0;
+			s_clear_count++;
+			fprintf(stderr, "[TIM-310] clear_scenario #%d frame=%ld\n", s_clear_count, (long)Frame);
+		}
 	}
 #endif
 	Scen.MissionTimer = 0;
@@ -941,12 +948,12 @@ void Clear_Scenario(void)
 void Do_Win(void)
 {
 #ifndef _MSC_VER
-	{
+	if (getenv("RA_AUTOSTART")) {
 		static int s_win_count = 0;
 		s_win_count++;
 		fprintf(stderr, "[TIM-310] do_win #%d frame=%ld\n", s_win_count, (long)Frame);
+		fprintf(stderr, "[TIM-308] do_win frame=%ld mission_accomplished\n", (long)Frame);
 	}
-	fprintf(stderr, "[TIM-308] do_win frame=%ld mission_accomplished\n", (long)Frame);
 #endif
 	Map.Set_Default_Mouse(MOUSE_NORMAL);
 	Hide_Mouse();
