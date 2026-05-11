@@ -1,18 +1,18 @@
-# Command & Conquer: Remastered Collection — Linux Port
+# battlecontrol
 
 ## Play in Browser
 
-**[▶ Play Red Alert](https://hughobrien.github.io/battlecontrol/ra.html)** &nbsp;|&nbsp; **[▶ Play Tiberian Dawn](https://hughobrien.github.io/battlecontrol/td.html)**
+**[▶ Play RA](https://hughobrien.github.io/battlecontrol/ra.html)** &nbsp;|&nbsp; **[▶ Play TD](https://hughobrien.github.io/battlecontrol/td.html)**
 
 No installation needed. You need legally-acquired C&C game data — click **Open Game Folder** and select your local data directory. Works in any browser with [SharedArrayBuffer support](https://caniuse.com/sharedarraybuffer) (Chrome, Edge, Firefox).
 
-![Tiberian Dawn running in browser at frame 100](https://hughobrien.github.io/battlecontrol/screenshots/td-gameplay.png)
+![TD gameplay in browser](https://hughobrien.github.io/battlecontrol/screenshots/td-gameplay.png)
 
 ---
 
-This is an ongoing Linux port of **Command & Conquer: Remastered Collection** (TiberianDawn + RedAlert) from the [EA open-source release](https://github.com/electronicarts/CnC_Remastered_Collection). The upstream repo ships only an MSBuild/MSVC solution targeting Win32; this fork brings both games to a native Linux build using GCC/Clang, CMake, and SDL2.
+battlecontrol is a Linux and WebAssembly port of the EA-released game engine sources (RA + TD) from the [EA open-source release](https://github.com/electronicarts/CnC_Remastered_Collection). The upstream repo ships only an MSBuild/MSVC solution targeting Win32; this fork brings both games to a native Linux build using GCC/Clang, CMake, and SDL2.
 
-> **Note — related EA repositories:**
+> **Note — related EA source repositories:**
 > EA released three separate C&C source repositories that are easy to confuse:
 >
 > | Repo | Contents | Relationship to this fork |
@@ -33,7 +33,7 @@ A CMake build system was added alongside the upstream MSVC solution. A `hello_li
 
 ### Phase 2 — Win32 shim layer (TIM-6 to TIM-65)
 
-The Red Alert source was written against Win32/MSVC and assumes a 32-bit ABI throughout. Getting it to compile on 64-bit Linux required building a compatibility shim layer under `linux/win32-stubs/`:
+The RA source was written against Win32/MSVC and assumes a 32-bit ABI throughout. Getting it to compile on 64-bit Linux required building a compatibility shim layer under `linux/win32-stubs/`:
 
 - **Type taxonomy** — `DWORD`, `WORD`, `BOOL`, `HANDLE`, `HWND`, `HINSTANCE`, and the full Win32 primitive hierarchy shimmed as LP64-safe typedefs
 - **Windows.h surface** — `windows.h`, `mmsystem.h`, `winsock.h`, `ddeml.h`, `objbase.h` stubs covering the COM/IUnknown family, WAVEFORMATEX, Winsock 1 types, DDE handles
@@ -150,7 +150,7 @@ cmake --build build-asan -j$(nproc)
 
 ### Run
 
-You need legally-acquired Red Alert game data. Point the binary at your data directory:
+You need legally-acquired RA game data. Point the binary at your data directory:
 
 ```bash
 ./SCRIPTS/run-release.sh          # or see SCRIPTS/ for the current smoke script
@@ -172,7 +172,7 @@ A `flake.nix` is provided for Nix users on x86_64-Linux.
 ### One-liner run
 
 ```bash
-# From a directory containing your Red Alert game data (MAIN.MIX etc.):
+# From a directory containing your RA game data (MAIN.MIX etc.):
 cd /path/to/red-alert-data
 nix run github:hughobrien/battlecontrol
 
@@ -226,7 +226,7 @@ The entire porting effort — all ~94 passes from the first compile error to ASA
 
 ## Related work
 
-Two other community projects have done similar Win32→Linux/cross-platform porting of the C&C engine:
+Two other community projects have done similar Win32→Linux/cross-platform porting of the same engine sources:
 
 - **[Vanilla-Conquer](https://github.com/TheAssemblyArmada/Vanilla-Conquer)** — a unified cross-platform port of Tiberian Dawn and Red Alert from the EA open-source release; targets Linux, macOS, and Windows with CMake + SDL2/OpenAL. The most mature community port and the closest analogue to this work.
 
@@ -281,3 +281,4 @@ This repository is for preservation purposes only and is archived without suppor
 ## License
 
 This repository and its contents are licensed under the GPL v3 license, with additional terms applied. Please see [LICENSE.md](LICENSE.md) for details. 
+
