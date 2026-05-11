@@ -712,19 +712,8 @@ int IRandom(int minval, int maxval)
 
 extern "C" unsigned char CurrentPalette[768] = {};
 
-void Set_Palette(void *palette)   { if (palette) std::memcpy(CurrentPalette, palette, 768); }
-
-void Fade_Palette_To(void *palette1, unsigned int /*delay*/, void (*callback)())
+static void Update_SDL_Palette(const void *palette)
 {
-    if (palette1) std::memcpy(CurrentPalette, palette1, 768);
-    if (callback) callback();
-}
-
-// TIM-383: update both the engine CurrentPalette and the SDL colour table
-// used by Wait_Vert_Blank for indexed→ARGB conversion.
-extern "C" void Set_DD_Palette(void *palette)
-{
-    Set_Palette(palette);  // keeps CurrentPalette in sync
 #ifndef _MSC_VER
     if (!palette) return;
     const unsigned char* p = static_cast<const unsigned char*>(palette);
@@ -735,6 +724,26 @@ extern "C" void Set_DD_Palette(void *palette)
         TD_SDL_Palette[i].a = 255;
     }
 #endif
+}
+
+void Set_Palette(void *palette)
+{
+    if (!palette) return;
+    std::memcpy(CurrentPalette, palette, 768);
+    Update_SDL_Palette(palette);
+}
+
+void Fade_Palette_To(void *palette1, unsigned int /*delay*/, void (*callback)())
+{
+    if (palette1) { std::memcpy(CurrentPalette, palette1, 768); Update_SDL_Palette(palette1); }
+    if (callback) callback();
+}
+
+// TIM-383: update both the engine CurrentPalette and the SDL colour table
+// used by Wait_Vert_Blank for indexed→ARGB conversion.
+extern "C" void Set_DD_Palette(void *palette)
+{
+    Set_Palette(palette);  // also calls Update_SDL_Palette via Set_Palette
 }
 
 // =========================================================================
@@ -912,8 +921,78 @@ BOOL Linear_Blit_To_Linear(void *thisptr, void *dest,
 
 BOOL Linear_Scale_To_Linear(void *, void *, int, int, int, int, int, int, int, int, BOOL, char *) { return FALSE; }
 long Buffer_To_Page(int, int, int, int, void *, void *) { return 0; }
-void Buffer_Draw_Stamp(void const *, void const *, int, int, int, void const *) {}
-void Buffer_Draw_Stamp_Clip(void const *, void const *, int, int, int, void const *, int, int, int, int) {}
+// TIM-419: terrain tile blitting for TD WASM/Linux.
+// IControl_Type::Icons is a real pointer (patched by Load_Icon_Set); TransFlag is an
+// offset into the icondata block. Using struct member access rather than hardcoded byte
+// offsets so LP64 / wasm32 struct layout is handled by the compiler automatically.
+void Buffer_Draw_Stamp(void const *this_object, void const *icondata, int icon,
+                       int x_pixel, int y_pixel, void const *remap)
+{
+    if (!icondata) return;
+    IControl_Type const *ic = (IControl_Type const *)icondata;
+    int icon_w = ic->Width, icon_h = ic->Height;
+    if (icon_w <= 0 || icon_h <= 0 || !ic->Icons) return;
+    int icon_sz = icon_w * icon_h;
+    unsigned char const *icon_src = ic->Icons + icon * icon_sz;
+    unsigned char tf = ic->TransFlag ?
+        ((unsigned char const *)icondata)[ic->TransFlag + icon] : 0;
+    GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+    if (!vp) return;
+    int vw = vp->Get_Width(), vh = vp->Get_Height();
+    int stride = vw + vp->Get_XAdd();
+    unsigned char *buf = (unsigned char*)vp->Get_Offset();
+    for (int row = 0; row < icon_h; row++) {
+        int py = y_pixel + row;
+        if (py < 0 || py >= vh) continue;
+        for (int col = 0; col < icon_w; col++) {
+            int px = x_pixel + col;
+            if (px < 0 || px >= vw) continue;
+            unsigned char pixel = icon_src[row * icon_w + col];
+            if (remap) pixel = ((unsigned char const *)remap)[pixel];
+            if (!tf || pixel) buf[py * stride + px] = pixel;
+        }
+    }
+}
+
+void Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondata, int icon,
+                             int x_pixel, int y_pixel, void const *remap,
+                             int min_x, int min_y, int max_x, int max_y)
+{
+    if (!icondata) return;
+    IControl_Type const *ic = (IControl_Type const *)icondata;
+    int icon_w = ic->Width, icon_h = ic->Height;
+    if (icon_w <= 0 || icon_h <= 0 || !ic->Icons) return;
+    int icon_sz = icon_w * icon_h;
+    unsigned char const *icon_src = ic->Icons + icon * icon_sz;
+    unsigned char tf = ic->TransFlag ?
+        ((unsigned char const *)icondata)[ic->TransFlag + icon] : 0;
+    GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+    if (!vp) return;
+    int vw = vp->Get_Width(), vh = vp->Get_Height();
+    int stride = vw + vp->Get_XAdd();
+    unsigned char *buf = (unsigned char*)vp->Get_Offset();
+    // WindowList WINDOWX/WINDOWWIDTH are in 8-pixel byte units; WINDOWY/WINDOWHEIGHT
+    // are in pixels. Convert to pixel clip bounds: [x0,x1) × [y0,y1).
+    int clip_x0 = min_x << 3;
+    int clip_x1 = (min_x + max_x) << 3;
+    int clip_y0 = min_y;
+    int clip_y1 = min_y + max_y;
+    if (clip_x0 < 0)  clip_x0 = 0;
+    if (clip_y0 < 0)  clip_y0 = 0;
+    if (clip_x1 > vw) clip_x1 = vw;
+    if (clip_y1 > vh) clip_y1 = vh;
+    for (int row = 0; row < icon_h; row++) {
+        int py = y_pixel + row;
+        if (py < clip_y0 || py >= clip_y1) continue;
+        for (int col = 0; col < icon_w; col++) {
+            int px = x_pixel + col;
+            if (px < clip_x0 || px >= clip_x1) continue;
+            unsigned char pixel = icon_src[row * icon_w + col];
+            if (remap) pixel = ((unsigned char const *)remap)[pixel];
+            if (!tf || pixel) buf[py * stride + px] = pixel;
+        }
+    }
+}
 unsigned long LCW_Uncompress(void *, void *, unsigned long) { return 0; }
 unsigned int Apply_XOR_Delta(char *, char *) { return 0; }
 void Apply_XOR_Delta_To_Page_Or_Viewport(void *, void *, int, int, int) {}
