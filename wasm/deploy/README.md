@@ -4,6 +4,52 @@ Two deployment paths are wired up in CI. GitHub Pages is the primary active path
 (no external secrets needed). Cloudflare Pages is the preferred long-term target
 (better headers) but requires a one-time credential setup.
 
+## Local development (nginx)
+
+Run WASM builds locally with native COOP/COEP headers — no service-worker shim, no
+external accounts. Requires Docker.
+
+**Quickstart** (from the repo root, after building WASM artifacts into `wasm/deploy/`):
+
+```bash
+cd wasm/deploy
+docker compose up
+```
+
+Then open <http://localhost:8080/ra.html> or <http://localhost:8080/td.html> in Chrome.
+
+`docker-compose.yml` mounts the current directory as the nginx document root and
+injects COOP/COEP via `nginx.conf`. Stop with `Ctrl-C` or `docker compose down`.
+
+**One-liner** (no compose, from the repo root):
+
+```bash
+docker run --rm -p 8080:80 \
+  -v "$(pwd)/wasm/deploy:/usr/share/nginx/html:ro" \
+  -v "$(pwd)/wasm/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+  nginx:alpine
+```
+
+**Verify headers are correct:**
+
+```bash
+curl -sI http://localhost:8080/ra.html | grep -i cross-origin
+# Expected:
+#   Cross-Origin-Opener-Policy: same-origin
+#   Cross-Origin-Embedder-Policy: require-corp
+#   Cross-Origin-Resource-Policy: cross-origin
+```
+
+**Build WASM first** (if you haven't already):
+
+```bash
+emcmake cmake --preset wasm
+cmake --build build-wasm --target ra --parallel
+cmake --build build-wasm --target td --parallel
+cp build-wasm/ra.{html,js,wasm} build-wasm/td.{html,js,wasm} wasm/deploy/
+cp wasm/preloader.js wasm/deploy/
+```
+
 ## Active deployment: GitHub Pages
 
 **URL:** `https://hughobrien.github.io/battlecontrol/`
