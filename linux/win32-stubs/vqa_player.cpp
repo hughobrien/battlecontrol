@@ -215,12 +215,17 @@ static bool vqa_audio_open(int freq, int channels)
     if (channels < 1 || channels > 2) channels = 1;
     if (freq < 8000 || freq > 48000) freq = 22050;
 
-    // If game audio is already open, close it so SDL can reuse the device.
+    // If game audio is already open, close it so SDL can open the VQA device.
+    // SDL_Audio_Close() calls SDL_QuitSubSystem(SDL_INIT_AUDIO), deiniting the
+    // audio subsystem entirely.  We re-init it unconditionally before calling
+    // SDL_OpenAudioDevice — this also covers the case where game audio hasn't
+    // been opened yet (e.g. ENGLISH.VQA at Play_Intro time). (TIM-496)
     vqa_stole_game_audio = SDL_Audio_Is_Open();
     if (vqa_stole_game_audio) {
         SDL_Audio_Get_Params(&vqa_saved_rate, &vqa_saved_channels, &vqa_saved_bits);
         SDL_Audio_Close();
     }
+    SDL_InitSubSystem(SDL_INIT_AUDIO);
 
     SDL_AudioSpec want = {}, have = {};
     want.freq     = freq;
@@ -231,7 +236,8 @@ static bool vqa_audio_open(int freq, int channels)
                                          SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
     if (!vqa_audio_dev) {
         fprintf(stderr, "[VQA] SDL audio open failed: %s\n", SDL_GetError());
-        // Restore game audio immediately if we failed.
+        // Restore audio state on failure.
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
         if (vqa_stole_game_audio) {
             SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
             vqa_stole_game_audio = false;
@@ -248,7 +254,9 @@ static void vqa_audio_close()
         SDL_CloseAudioDevice(vqa_audio_dev);
         vqa_audio_dev = 0;
     }
-    // Reopen game audio device if we closed it for VQA.
+    // Balance the SDL_InitSubSystem(SDL_INIT_AUDIO) from vqa_audio_open, then
+    // let SDL_Audio_Open re-init the subsystem through its own Init call.
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
     if (vqa_stole_game_audio) {
         SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
         vqa_stole_game_audio = false;

@@ -951,7 +951,8 @@ void Do_Win(void)
 	// TIM-489: in autostart/FPS-audit mode the win/lose sequence blocks the game
 	// loop on a modal dialog.  Return early so the game continues running and the
 	// frame-rate measurement can complete.
-	if (getenv("RA_AUTOSTART")) {
+	// RA_VQA_VERIFY overrides the suppression so VQA playback can be audited (TIM-496).
+	if (getenv("RA_AUTOSTART") && !getenv("RA_VQA_VERIFY")) {
 		fprintf(stderr, "[RA] Do_Win() suppressed (autostart fps audit)\n");
 		return;
 	}
