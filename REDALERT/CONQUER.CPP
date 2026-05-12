@@ -2226,10 +2226,14 @@ Mono_Set_Cursor(0,0);
 #endif
 
 #ifndef _MSC_VER
-	/* TIM-363: frame counter + RA_CHEAT injection for automated smoke tests. */
+	/* TIM-363: frame counter + RA_CHEAT injection for automated smoke tests.
+	 * TIM-471: cache autostart flag once — getenv() returns NULL in WASM worker
+	 * (PROXY_TO_PTHREAD doesn't propagate C environ); check flag file as fallback. */
+	static bool _ra_autostart = getenv("RA_AUTOSTART") != nullptr
+	                             || RawFileClass("RA_AUTOSTART.FLAG").Is_Available();
 	static long _ra_frame_count = 0;
 	_ra_frame_count++;
-	if (getenv("RA_AUTOSTART") && (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0)) {
+	if (_ra_autostart && (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0)) {
 		fprintf(stderr, "[RA] Main_Loop frame %ld\n", _ra_frame_count); fflush(stderr);
 	}
 	/* RA_CHEAT=1: inject cheat actions at fixed frames.
