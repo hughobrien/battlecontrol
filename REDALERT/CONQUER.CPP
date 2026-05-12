@@ -2125,16 +2125,12 @@ static void Sync_Delay(void)
 	**	Delay until the frame timer expires. This forces the game loop to be regulated to a
 	**	speed controlled by the game options slider.
 	*/
-#ifdef __EMSCRIPTEN__
-	// TIM-489: Under WASM/PROXY_TO_PTHREAD any call that proxies to the browser
-	// main thread (SDL palette set, audio callbacks, SDL_RenderPresent) costs
-	// ~30 ms round-trip.  With Color_Cycle/Call_Back in the per-ms-sleep loop
-	// that's ~66 proxied calls per 66 ms frame — the root cause of <1 fps.
-	// Just yield the worker thread; Color_Cycle+Call_Back run once below.
-	while (FrameTimer) {
-		SDL_Delay(1);
-	}
-#else
+#ifndef __EMSCRIPTEN__
+	// TIM-489: Under WASM/PROXY_TO_PTHREAD, Atomics.wait overhead makes any
+	// SDL_Delay call expensive (10-20 ms per call in V8).  Looping here ~66 times
+	// per frame adds 660-1320 ms of overhead, taking fps below 1.  Skip the
+	// 15-fps throttle entirely; -O3 + one SDL_RenderPresent per frame is enough
+	// for the game to reach ≥15fps without artificial throttling.
 	while (FrameTimer) {
 		Color_Cycle();
 		Call_Back();
