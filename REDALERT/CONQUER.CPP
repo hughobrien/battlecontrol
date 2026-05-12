@@ -119,9 +119,6 @@ TcpipManagerClass	Winsock;
 // !_MSC_VER so MSVC sees nothing.
 #ifndef _MSC_VER
 #include "sdl_quit.h"
-#ifdef __EMSCRIPTEN__
-#include <SDL2/SDL.h>   // TIM-489: SDL_Delay for WASM sync-delay yield
-#endif
 #endif
 
 #ifdef WOLAPI_INTEGRATION
