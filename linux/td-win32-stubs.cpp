@@ -66,6 +66,8 @@ static int           TD_SDL_CachedW   = 0;
 static int           TD_SDL_CachedH   = 0;
 static bool          TD_SDL_FirstPresent = false;
 static bool          TD_SDL_QuitRequested = false;
+// Integer scale factor computed in Set_Video_Mode (nearest-integer upscaling).
+static int           TD_SDL_Scale = 1;
 // 256-entry palette populated by Set_DD_Palette; used in Wait_Vert_Blank
 // to colour-convert the indexed pixel buffer.
 static SDL_Color     TD_SDL_Palette[256] = {};
@@ -218,11 +220,11 @@ extern "C" void SDL_Process_Input_Events(void)
                 vk |= WWKEY_VK_BIT;
                 if (type == SDL_MOUSEBUTTONUP) vk |= WWKEY_RLS_BIT;
                 _Kbd->Put((int)vk);
-                _Kbd->Put((int)be.x);
-                _Kbd->Put((int)be.y);
+                _Kbd->Put((int)(be.x / TD_SDL_Scale));
+                _Kbd->Put((int)(be.y / TD_SDL_Scale));
             } else if (type == SDL_MOUSEMOTION) {
-                SDL_Cursor_X = ev[i].motion.x;
-                SDL_Cursor_Y = ev[i].motion.y;
+                SDL_Cursor_X = ev[i].motion.x / TD_SDL_Scale;
+                SDL_Cursor_Y = ev[i].motion.y / TD_SDL_Scale;
             }
         }
     } while (n == 16);
@@ -762,10 +764,25 @@ BOOL Set_Video_Mode(HWND /*hwnd*/, int w, int h, int /*bpp*/)
             return FALSE;
         }
     }
+    // Nearest-integer upscaling: largest N where w*N ≤ display_w AND h*N ≤ display_h.
+    {
+        int scale = 1;
+        SDL_Rect bounds;
+        if (SDL_GetDisplayBounds(0, &bounds) == 0 && bounds.w > 0 && bounds.h > 0) {
+            int sw = bounds.w / w;
+            int sh = bounds.h / h;
+            scale = (sw < sh) ? sw : sh;
+            if (scale < 1) scale = 1;
+        }
+        TD_SDL_Scale = scale;
+    }
+    // Nearest-neighbour pixel filter (must be set before SDL_CreateRenderer).
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+
     TD_SDL_Window = SDL_CreateWindow(
         "Tiberian Dawn",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        w, h,
+        w * TD_SDL_Scale, h * TD_SDL_Scale,
         SDL_WINDOW_HIDDEN);
     if (TD_SDL_Window == nullptr) {
         fprintf(stderr, "[TD] SDL_CreateWindow failed: %s\n", SDL_GetError());
@@ -778,7 +795,8 @@ BOOL Set_Video_Mode(HWND /*hwnd*/, int w, int h, int /*bpp*/)
     TD_SDL_Renderer = SDL_CreateRenderer(TD_SDL_Window, -1, SDL_RENDERER_SOFTWARE);
     if (TD_SDL_Renderer == nullptr)
         TD_SDL_Renderer = SDL_CreateRenderer(TD_SDL_Window, -1, SDL_RENDERER_ACCELERATED);
-    fprintf(stderr, "[TD] SDL window %dx%d renderer=%p\n", w, h, (void*)TD_SDL_Renderer);
+    fprintf(stderr, "[TD] SDL window %dx%d scale=%d renderer=%p\n",
+            w * TD_SDL_Scale, h * TD_SDL_Scale, TD_SDL_Scale, (void*)TD_SDL_Renderer);
     fflush(stderr);
     return TD_SDL_Renderer != nullptr ? TRUE : FALSE;
 #else
