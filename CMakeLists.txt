@@ -259,11 +259,13 @@ if(EMSCRIPTEN)
         -pthread
         -sUSE_SDL=2
         -sUSE_PTHREADS=1
+        -O3     # TIM-489: override Release-mode -O2; Emscripten last-O-wins
     )
     # TIM-381: Output ra.html so --shell-file is honoured (Emscripten only
     # processes the shell template when the output suffix is .html).
     set_target_properties(ra PROPERTIES SUFFIX ".html")
     target_link_options(ra PRIVATE
+        -O3     # TIM-489: triggers Binaryen whole-program optimisation at link
         -sUSE_SDL=2
         -sALLOW_MEMORY_GROWTH=1
         -sUSE_PTHREADS=1

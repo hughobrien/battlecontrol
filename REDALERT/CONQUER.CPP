@@ -2122,6 +2122,12 @@ static void Sync_Delay(void)
 	**	Delay until the frame timer expires. This forces the game loop to be regulated to a
 	**	speed controlled by the game options slider.
 	*/
+#ifndef __EMSCRIPTEN__
+	// TIM-489: Under WASM/PROXY_TO_PTHREAD, Atomics.wait overhead makes any
+	// SDL_Delay call expensive (10-20 ms per call in V8).  Looping here ~66 times
+	// per frame adds 660-1320 ms of overhead, taking fps below 1.  Skip the
+	// 15-fps throttle entirely; -O3 + one SDL_RenderPresent per frame is enough
+	// for the game to reach ≥15fps without artificial throttling.
 	while (FrameTimer) {
 		Color_Cycle();
 		Call_Back();
@@ -2139,6 +2145,7 @@ static void Sync_Delay(void)
 			Map.Render();
 		}
 	}
+#endif
 	Color_Cycle();
 	Call_Back();
 }
@@ -2232,9 +2239,25 @@ Mono_Set_Cursor(0,0);
 	static bool _ra_autostart = getenv("RA_AUTOSTART") != nullptr
 	                             || RawFileClass("RA_AUTOSTART.FLAG").Is_Available();
 	static long _ra_frame_count = 0;
+	static long _ra_t100_ms = 0;  // TIM-489: wall-clock ms at frame 100 for FPS calc
 	_ra_frame_count++;
 	if (_ra_autostart && (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0)) {
-		fprintf(stderr, "[RA] Main_Loop frame %ld\n", _ra_frame_count); fflush(stderr);
+		// TIM-489: include elapsed-since-frame-100 so FPS can be derived from the log.
+		long elapsed_ms = 0;
+		if (_ra_frame_count >= 100) {
+			struct timespec _ts;
+			clock_gettime(CLOCK_MONOTONIC, &_ts);
+			long now_ms = (long)(_ts.tv_sec * 1000L + _ts.tv_nsec / 1000000L);
+			if (_ra_t100_ms == 0) _ra_t100_ms = now_ms;
+			elapsed_ms = now_ms - _ra_t100_ms;
+		}
+		if (elapsed_ms > 0 && _ra_frame_count > 100) {
+			double fps = (_ra_frame_count - 100) * 1000.0 / elapsed_ms;
+			fprintf(stderr, "[RA] Main_Loop frame %ld  fps=%.1f\n", _ra_frame_count, fps);
+		} else {
+			fprintf(stderr, "[RA] Main_Loop frame %ld\n", _ra_frame_count);
+		}
+		fflush(stderr);
 	}
 	// TIM-490: save in-game BMP snapshots for gameplay audit (first cycle only)
 	static bool _tim490_saved = false;
@@ -2407,6 +2430,18 @@ Mono_Set_Cursor(0,0);
 			g_tim310_restart_frame = -1;
 			PlayerPtr->Blockage = 0;
 			PlayerWins = true;
+		}
+	}
+#endif
+
+#ifdef __EMSCRIPTEN__
+	// TIM-489: suppress win/loss during the autostart FPS audit (first 1000 frames)
+	// so Do_Win/Do_Lose don't halt the game loop on a dialog before we measure frame rate.
+	if (_ra_autostart && _ra_frame_count < 1000) {
+		if (PlayerWins || PlayerLoses) {
+			fprintf(stderr, "[RA] suppressing win/loss at frame=%ld (fps audit active)\n", (long)_ra_frame_count);
+			PlayerWins = false;
+			PlayerLoses = false;
 		}
 	}
 #endif
