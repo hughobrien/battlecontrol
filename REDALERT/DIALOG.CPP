@@ -402,16 +402,6 @@ void Simple_Text_Print(char const * text, unsigned x, unsigned y, RemapControlTy
 	int				shadow;				// Requested shadow value.
 	unsigned char	fontpalette[16];	// Working font palette array.
 	int forecolor;
-#ifndef _MSC_VER
-	static int _stp_count = 0;
-	if (text && *text && _stp_count < 20) {
-		_stp_count++;
-		fprintf(stderr, "[STP] '%s' x=%u y=%u flag=%04x fore->Color=%d\n",
-		        text, x, y, (unsigned)flag, fore ? fore->Color : -1);
-		fflush(stderr);
-	}
-#endif
-
 	if (fore == NULL) {
 		fore = &ColorRemaps[PCOLOR_RED];
 	}

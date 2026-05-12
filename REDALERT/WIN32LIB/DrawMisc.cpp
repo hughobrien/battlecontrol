@@ -83,9 +83,19 @@ extern	int	CachedIconsDrawn;
 extern	int	UnCachedIconsDrawn;
 
 
+// ColorXlat[i] = low-nibble slot (nibble value i), ColorXlat[i*16] = high-nibble slot.
+// Both must be updated so Buffer_Print maps gradient font pixels to the right palette indices.
+extern "C" unsigned char ColorXlat[256];
+
 extern "C" void __cdecl Set_Font_Palette_Range(void const *palette, INT start_idx, INT end_idx)
 {
-}		  
+    const unsigned char *pal = static_cast<const unsigned char*>(palette);
+    for (INT i = start_idx; i <= end_idx; i++) {
+        ColorXlat[i] = pal[i];
+        if (i >= 1 && i <= 15)
+            ColorXlat[i * 16] = pal[i];
+    }
+}
 
 
 /*
