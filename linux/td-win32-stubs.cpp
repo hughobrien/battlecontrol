@@ -642,25 +642,55 @@ void  Window_Show_Mouse()                       { Show_Mouse(); }
 // Font globals and functions
 // =========================================================================
 
-// FontHeight has C++ linkage in FONT.H (line 106); not inside extern "C".
-char FontHeight   = 8;
+// C++ linkage (FONT.H: extern char FontHeight / FontWidth / *FontWidthBlockPtr)
+char  FontHeight        = 8;
+char  FontWidth         = 8;
+char *FontWidthBlockPtr = nullptr;
 extern "C" {
-int  FontXSpacing = 0;
-int  FontYSpacing = 0;
-void const *FontPtr = nullptr;
+int        FontXSpacing = 0;
+int        FontYSpacing = 0;
+void const *FontPtr     = nullptr;
 }
 
+// Real Set_Font: extracts FontWidthBlockPtr, FontHeight, FontWidth from the
+// binary font header (matching TIBERIANDAWN/WIN32LIB/SET_FONT.CPP).
 void *Set_Font(void const *fontptr)
 {
-    void const *old = FontPtr; FontPtr = fontptr; return (void*)old;
+    void *old = (void*)FontPtr;
+    if (fontptr) {
+        FontPtr           = fontptr;
+        FontWidthBlockPtr = (char*)fontptr
+                          + *(unsigned short*)((char*)fontptr + FONTWIDTHBLOCK);
+        const char *info  = (const char*)fontptr
+                          + *(unsigned short*)((char*)fontptr + FONTINFOBLOCK);
+        FontHeight        = *(info + FONTINFOMAXHEIGHT);
+        FontWidth         = *(info + FONTINFOMAXWIDTH);
+    }
+    return old;
 }
 
-int Char_Pixel_Width(char /*chr*/) { return (int)FontHeight; }
+// Real Char_Pixel_Width / String_Pixel_Width (from TIBERIANDAWN/WIN32LIB/FONT.CPP).
+int Char_Pixel_Width(char chr)
+{
+    return (int)(unsigned char)*(FontWidthBlockPtr + (unsigned char)chr)
+           + FontXSpacing;
+}
 
 unsigned int String_Pixel_Width(char const *str)
 {
     if (!str) return 0;
-    return (unsigned int)(std::strlen(str) * FontHeight);
+    unsigned int width = 0, largest = 0;
+    while (*str) {
+        if (*str == '\r') {
+            ++str;
+            if (width > largest) largest = width;
+            width = 0;
+        } else {
+            width += (unsigned int)Char_Pixel_Width(*str++);
+        }
+    }
+    if (width > largest) largest = width;
+    return largest;
 }
 
 void Set_Font_Palette_Range(void const *, INT, INT) {}
