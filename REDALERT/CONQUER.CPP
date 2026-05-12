@@ -119,6 +119,9 @@ TcpipManagerClass	Winsock;
 // !_MSC_VER so MSVC sees nothing.
 #ifndef _MSC_VER
 #include "sdl_quit.h"
+#ifdef __EMSCRIPTEN__
+#include <SDL2/SDL.h>   // TIM-489: SDL_Delay for WASM sync-delay yield
+#endif
 #endif
 
 #ifdef WOLAPI_INTEGRATION
@@ -2122,6 +2125,20 @@ static void Sync_Delay(void)
 	**	Delay until the frame timer expires. This forces the game loop to be regulated to a
 	**	speed controlled by the game options slider.
 	*/
+#ifdef __EMSCRIPTEN__
+	// TIM-489: Under WASM/PROXY_TO_PTHREAD, Map.Input() in the sync-wait loop
+	// calls Fill_Buffer_From_System() → Wait_Vert_Blank() → SDL_RenderPresent.
+	// With the software renderer, each present is a ~30 ms round-trip proxied to
+	// the browser main thread.  With 3 iterations per 66 ms frame budget that
+	// wastes ~90 ms/frame and is the root cause of the observed ~6 fps.
+	// The frame was already rendered and presented in Main_Loop; just yield the
+	// worker thread with SDL_Delay(1) until FrameTimer expires.
+	while (FrameTimer) {
+		Color_Cycle();
+		Call_Back();
+		SDL_Delay(1);
+	}
+#else
 	while (FrameTimer) {
 		Color_Cycle();
 		Call_Back();
@@ -2139,6 +2156,7 @@ static void Sync_Delay(void)
 			Map.Render();
 		}
 	}
+#endif
 	Color_Cycle();
 	Call_Back();
 }
@@ -2232,9 +2250,25 @@ Mono_Set_Cursor(0,0);
 	static bool _ra_autostart = getenv("RA_AUTOSTART") != nullptr
 	                             || RawFileClass("RA_AUTOSTART.FLAG").Is_Available();
 	static long _ra_frame_count = 0;
+	static long _ra_t100_ms = 0;  // TIM-489: wall-clock ms at frame 100 for FPS calc
 	_ra_frame_count++;
 	if (_ra_autostart && (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0)) {
-		fprintf(stderr, "[RA] Main_Loop frame %ld\n", _ra_frame_count); fflush(stderr);
+		// TIM-489: include elapsed-since-frame-100 so FPS can be derived from the log.
+		long elapsed_ms = 0;
+		if (_ra_frame_count >= 100) {
+			struct timespec _ts;
+			clock_gettime(CLOCK_MONOTONIC, &_ts);
+			long now_ms = (long)(_ts.tv_sec * 1000L + _ts.tv_nsec / 1000000L);
+			if (_ra_t100_ms == 0) _ra_t100_ms = now_ms;
+			elapsed_ms = now_ms - _ra_t100_ms;
+		}
+		if (elapsed_ms > 0 && _ra_frame_count > 100) {
+			double fps = (_ra_frame_count - 100) * 1000.0 / elapsed_ms;
+			fprintf(stderr, "[RA] Main_Loop frame %ld  fps=%.1f\n", _ra_frame_count, fps);
+		} else {
+			fprintf(stderr, "[RA] Main_Loop frame %ld\n", _ra_frame_count);
+		}
+		fflush(stderr);
 	}
 	// TIM-490: save in-game BMP snapshots for gameplay audit (first cycle only)
 	static bool _tim490_saved = false;

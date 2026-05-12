@@ -155,6 +155,7 @@ test.describe('TIM-480 — RA WASM gameplay audit', () => {
     console.log('[audit] waiting for Start_Scenario OK…');
     await waitForOutput(page, '[RA] Select_Game: Start_Scenario OK', 240_000);
     await waitForOutput(page, '[RA] Main_Loop frame 300', 300_000);
+    const t300 = Date.now();
     console.log('[audit] frame 300 reached — in-game phase confirmed');
 
     // Baseline screenshot
@@ -256,7 +257,9 @@ test.describe('TIM-480 — RA WASM gameplay audit', () => {
     // Wait for frame 600
     console.log('  Waiting for frame 600…');
     await waitForOutput(page, '[RA] Main_Loop frame 600', 300_000);
-    console.log('  Frame 600 reached');
+    const t600 = Date.now();
+    const fps_300_600 = Math.round(300 / ((t600 - t300) / 1000) * 10) / 10;
+    console.log(`  Frame 600 reached — FPS frames 300→600: ${fps_300_600}`);
 
     await page.waitForTimeout(300);
     const mapSnap2 = await canvasRegionPixels(page, 0, 0, 475, 400);
@@ -277,6 +280,9 @@ test.describe('TIM-480 — RA WASM gameplay audit', () => {
     // Wait for frame 900 to check further
     console.log('  Waiting for frame 900…');
     await waitForOutput(page, '[RA] Main_Loop frame 900', 300_000);
+    const t900 = Date.now();
+    const fps_600_900 = Math.round(300 / ((t900 - t600) / 1000) * 10) / 10;
+    console.log(`  Frame 900 reached — FPS frames 600→900: ${fps_600_900}`);
     await page.waitForTimeout(300);
     const mapSnap3 = await canvasRegionPixels(page, 0, 0, 475, 400);
     const mapDiff900 = pixelDiff(mapSnap2, mapSnap3);
@@ -300,6 +306,7 @@ test.describe('TIM-480 — RA WASM gameplay audit', () => {
     // -----------------------------------------------------------------------
     // Summary
     // -----------------------------------------------------------------------
+    const sustainedFps = Math.min(fps_300_600, fps_600_900);
     console.log('\n[audit] ===== SUMMARY =====');
     console.log(`  1. Sidebar renders (fill>${5}%):        ${sidebarHasContent ? 'PASS' : 'FAIL'}`);
     console.log(`  1. Sidebar responds to click:           ${sidebarDiff > 0 ? 'PASS' : 'FAIL (0 diff)'}`);
@@ -308,12 +315,16 @@ test.describe('TIM-480 — RA WASM gameplay audit', () => {
     console.log(`  3. Further movement frames 600→900:     ${mapDiff900 > 500 ? 'PASS' : 'FAIL'}`);
     console.log(`  4. No premature win/loss:               ${!hasVictory && !hasDefeat && !hasEnd ? 'PASS' : 'WARN'}`);
     console.log(`  5. No crash by frame 900:               PASS (if we reached here)`);
+    console.log(`  6. FPS frames 300→600: ${fps_300_600}  FPS frames 600→900: ${fps_600_900}  sustained: ${sustainedFps}`);
+    console.log(`  6. FPS ≥15 target:                      ${sustainedFps >= 15 ? 'PASS' : `FAIL (${sustainedFps} fps)`}`);
 
     // Hard assertions
     expect(sidebarHasContent).toBe(true);
     output = await getOutput(page);
     expect(output).not.toContain('SIGSEGV');
     expect(output).not.toContain('Aborted(');
+    // TIM-489: frame-rate target ≥15 fps sustained in SCG01EA
+    expect(sustainedFps).toBeGreaterThanOrEqual(15);
   });
 });
 
