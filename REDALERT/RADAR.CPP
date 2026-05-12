@@ -553,7 +553,11 @@ void RadarClass::Draw_It(bool forced)
 			} else {
 
 #ifdef WIN32
+#ifndef _MSC_VER
+				GraphicViewPortClass * oldpage = LogicPage;	// Linux: draw directly to SeenBuff; HidPage blit is broken (asm)
+#else
 				GraphicViewPortClass * oldpage	= Set_Logic_Page(HidPage);
+#endif
 #else
 				GraphicBufferClass * oldpage	= Set_Logic_Page(HidPage);
 #endif
@@ -603,11 +607,13 @@ void RadarClass::Draw_It(bool forced)
 				Map.Upgrade.Draw_Me(true);
 				Map.Zoom.Draw_Me(true);
 
+#ifdef _MSC_VER
 				if (oldpage == &SeenBuff) {
 					Hide_Mouse();
 					LogicPage->Blit(SeenBuff, RadX, RadY, RadX, RadY, RadWidth, RadHeight);
 					Show_Mouse();
 				}
+#endif
 
 				Set_Logic_Page(oldpage);
 			}
@@ -1575,7 +1581,11 @@ void RadarClass::Radar_Cursor(int forced)
 	** setup a graphic view port class so we can write all the pixels relative
 	** to 0,0 rather than relative to full screen coordinates.
 	*/
+#ifdef _MSC_VER
 	oldpage = Set_Logic_Page(HidPage);
+#else
+	oldpage = LogicPage;	// Linux: draw directly to current page (SeenBuff); HidPage blit is broken (asm)
+#endif
 	GraphicViewPortClass draw_window(LogicPage->Get_Graphic_Buffer(),
 												RadX + RadOffX + BaseX + LogicPage->Get_XPos(),
 												RadY + RadOffY + BaseY + LogicPage->Get_YPos(),

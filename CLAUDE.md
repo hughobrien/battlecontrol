@@ -30,8 +30,14 @@ Look for a path containing the issue identifier (e.g. `TIM-272`).
   ```
   Example: `EnterWorktree(name: "TIM-272")`
 
-  This creates `.claude/worktrees/TIM-272/` on a new branch `TIM-272` branching
-  from `origin/master`.
+  This creates `.claude/worktrees/TIM-272/` on a new branch `worktree-TIM-272`.
+  After creation, immediately reset to `battlecontrol/master` so the worktree
+  starts from the team's working master, not the upstream EA base:
+
+  ```bash
+  git fetch battlecontrol
+  git reset --hard battlecontrol/master
+  ```
 
 **3 — Confirm you are on the right branch:**
 
@@ -47,7 +53,7 @@ git branch --show-current   # should print TIM-272 (or whatever the issue ID is)
 - Run builds and tests from inside the worktree — build artifacts are local to the
   worktree directory, so concurrent agents don't collide.
 
-## Done workflow (merging back to master)
+## Done workflow (merging back to master via Pull Request)
 
 When the issue is complete, from inside the worktree:
 
@@ -56,11 +62,24 @@ When the issue is complete, from inside the worktree:
 git status
 
 # 2. Sync with any upstream changes other agents may have merged
-git fetch origin
-git rebase origin/master --autostash
+git fetch battlecontrol
+git rebase battlecontrol/master --autostash
 
-# 3. Push your branch to origin for safekeeping
-git push origin HEAD
+# 3. Push your branch
+git push battlecontrol HEAD
+```
+
+Open a PR and enable automerge:
+
+```bash
+# 4. Open a PR (skip if one is already open for this branch)
+gh pr create --repo hughobrien/battlecontrol \
+  --title "TIM-{id}: <short description>" \
+  --body "Closes TIM-{id}" \
+  --base master
+
+# 5. Enable automerge — PR merges automatically once "Compile and link" passes
+gh pr merge --auto --merge
 ```
 
 Then exit the worktree **keeping** the branch:
@@ -69,21 +88,15 @@ Then exit the worktree **keeping** the branch:
 ExitWorktree(action: "keep")
 ```
 
-Now back in `_default` (on branch `master`):
+After GitHub merges the PR automatically, clean up from `_default`:
 
 ```bash
-# 4. Update local master from origin (incorporates other agents' recent merges)
-git pull origin master
+# 6. Pull the merged changes into local master
+git pull battlecontrol master
 
-# 5. Fast-forward merge the issue branch
-git merge TIM-{id} --ff-only
-
-# 6. Push master to origin
-git push origin master
-
-# 7. Remove the worktree directory and delete the branch
+# 7. Remove the worktree directory and delete the local branch
 git worktree remove .claude/worktrees/TIM-{id}
-git branch -d TIM-{id}
+git branch -d worktree-TIM-{id}
 ```
 
 ## Cancellation / abandonment workflow
@@ -92,14 +105,14 @@ From `_default` (after `ExitWorktree(action: "keep")`):
 
 ```bash
 git worktree remove .claude/worktrees/TIM-{id} --force
-git branch -D TIM-{id}
+git branch -D worktree-TIM-{id}
 ```
 
 ## Notes
 
-- New worktrees branch from `origin/master` (the default). The done workflow pushes
-  to `origin/master` before cleanup so the next worktree always starts from a complete
-  state.
+- New worktrees branch from `battlecontrol/master`. After the PR automerges, pull
+  `battlecontrol/master` before cleanup so the next worktree starts from a complete state.
 - Worktrees live at `.claude/worktrees/TIM-{id}/` — this path is gitignored.
+- Local branches created by `EnterWorktree` are named `worktree-TIM-{id}` (not `TIM-{id}`).
 - If `EnterWorktree` is called for a name that already exists as a branch or directory,
   use the `path:` form instead to re-enter the existing worktree.
