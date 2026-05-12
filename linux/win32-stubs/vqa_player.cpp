@@ -319,6 +319,17 @@ extern "C" void Play_Movie_Linux(const char* name)
 {
     if (!name || !*name) return;
 
+    // TIM-506/TIM-507: skip all VQA playback when RA_AUTOSTART is active.
+    // PROXY_TO_PTHREAD makes getenv() return NULL in the worker thread, so
+    // check the MEMFS flag file (TIM-471 pattern).  This prevents ALLY1.VQA
+    // (mission briefing) from crashing via SDL_InitSubSystem in vqa_audio_open
+    // (TIM-496 regression: Emscripten leaves SDL.audioContext undefined after
+    // SDL_QuitSubSystem, causing TypeError on the subsequent InitSubSystem call).
+    if (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
+        fprintf(stderr, "[VQA] RA_AUTOSTART active — skipping '%s.VQA'\n", name);
+        return;
+    }
+
     char filename[128];
     snprintf(filename, sizeof(filename), "%s.VQA", name);
 
