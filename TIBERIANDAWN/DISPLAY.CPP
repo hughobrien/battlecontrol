@@ -1357,7 +1357,6 @@ void DisplayClass::Read_INI(char *buffer)
 	if (Theater == THEATER_NONE) {
 		Theater = THEATER_DESERT;
 	}
-
 	/*
 	** Remove any old theater specific uncompressed shapes
 	*/

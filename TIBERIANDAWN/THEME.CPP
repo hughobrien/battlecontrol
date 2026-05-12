@@ -187,7 +187,21 @@ char const * ThemeClass::Full_Name(ThemeType theme) const
 void ThemeClass::AI(void)
 {
 	if (SampleType && !Debug_Quiet) {
+#ifndef _MSC_VER
+		static int _ai_count = 0;
+		bool _do_play = false;
+		if (++_ai_count <= 10) { fprintf(stderr, "[TD THEME] AI #%d ScoresPresent=%d ScoreVol=%d Pending=%d Current=%d\n",
+			_ai_count, (int)ScoresPresent, (int)Options.ScoreVolume, (int)Pending, (int)Current); fflush(stderr); }
+		if (ScoresPresent && Options.ScoreVolume && Pending != THEME_NONE) {
+			if (_ai_count <= 10) { fprintf(stderr, "[TD THEME] calling Still_Playing\n"); fflush(stderr); }
+			bool sp = Still_Playing();
+			if (_ai_count <= 10) { fprintf(stderr, "[TD THEME] Still_Playing=%d\n", (int)sp); fflush(stderr); }
+			_do_play = !sp;
+		}
+		if (_do_play) {
+#else
 		if (ScoresPresent && Options.ScoreVolume && !Still_Playing() && Pending != THEME_NONE) {
+#endif
 
 			/*
 			**	If the pending song needs to be picked, then pick it now.
@@ -200,7 +214,13 @@ void ThemeClass::AI(void)
 			**	Start the song playing and then flag it so that a new song will
 			**	be picked when this one ends.
 			*/
+#ifndef _MSC_VER
+			if (_ai_count <= 10) { fprintf(stderr, "[TD THEME] calling Play_Song(%d)\n", (int)Pending); fflush(stderr); }
+#endif
 			Play_Song(Pending);
+#ifndef _MSC_VER
+			if (_ai_count <= 10) { fprintf(stderr, "[TD THEME] Play_Song done\n"); fflush(stderr); }
+#endif
 			Pending = THEME_PICK_ANOTHER;
 		}
 		Sound_Callback();
@@ -238,8 +258,14 @@ ThemeType ThemeClass::Next_Song(ThemeType theme)
 				**	playing.
 				*/
 				ThemeType newtheme;
+#ifndef _MSC_VER
+				int _ns_iter = 0;
+#endif
 				do {
 					newtheme = Sim_Random_Pick(THEME_FIRST, THEME_LAST);
+#ifndef _MSC_VER
+					if (++_ns_iter > 10000) { return THEME_PICK_ANOTHER; }
+#endif
 				} while(newtheme == theme || !Is_Allowed(newtheme));
 				theme = newtheme;
 
@@ -248,11 +274,19 @@ ThemeType ThemeClass::Next_Song(ThemeType theme)
 				/*
 				**	Sequential score playing.
 				*/
+#ifndef _MSC_VER
+				int _ns_seq = 0;
+#endif
 				do {
 					theme++;
 					if (theme > THEME_LAST) {
 						theme = THEME_FIRST;
 					}
+#ifndef _MSC_VER
+					if (++_ns_seq > (THEME_LAST - THEME_FIRST + 2) * 2 + 5) {
+						return THEME_PICK_ANOTHER;
+					}
+#endif
 				} while(!Is_Allowed(theme));
 			}
 		}

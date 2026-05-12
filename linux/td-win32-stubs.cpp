@@ -738,7 +738,11 @@ void Set_Palette(void *palette)
 void Fade_Palette_To(void *palette1, unsigned int /*delay*/, void (*callback)())
 {
     if (palette1) { std::memcpy(CurrentPalette, palette1, 768); Update_SDL_Palette(palette1); }
-    if (callback) callback();
+    if (callback) {
+        fprintf(stderr, "[TD FPT] calling callback\n"); fflush(stderr);
+        callback();
+        fprintf(stderr, "[TD FPT] callback done\n"); fflush(stderr);
+    }
 }
 
 // TIM-383: update both the engine CurrentPalette and the SDL colour table
@@ -857,6 +861,10 @@ extern "C" void Wait_Vert_Blank(void)
     SDL_RenderCopy(TD_SDL_Renderer, TD_SDL_Texture, nullptr, nullptr);
     SDL_RenderPresent(TD_SDL_Renderer);
 
+    // Frame counter for audit screenshots (TIM-447).
+    static int td_present_count = 0;
+    ++td_present_count;
+
     if (!TD_SDL_FirstPresent) {
         SDL_ShowWindow(TD_SDL_Window);
         TD_SDL_FirstPresent = true;
@@ -864,6 +872,15 @@ extern "C" void Wait_Vert_Blank(void)
         // Save first frame for offline verification (mirrors RA TIM-172 pattern).
         int rc = SDL_SaveBMP(TD_SDL_ARGB, "/tmp/td-frame0.bmp");
         fprintf(stderr, "[TD] first SDL frame presented; frame0.bmp rc=%d\n", rc);
+        fflush(stderr);
+    }
+
+    // TIM-447: save audit frames at 50, 100, 150 for visual verification.
+    if (td_present_count == 50 || td_present_count == 100 || td_present_count == 150) {
+        char path[64];
+        snprintf(path, sizeof(path), "/tmp/td-frame%d.bmp", td_present_count);
+        SDL_SaveBMP(TD_SDL_ARGB, path);
+        fprintf(stderr, "[TD] audit screenshot: %s\n", path);
         fflush(stderr);
     }
 #endif
@@ -939,64 +956,47 @@ BOOL Linear_Blit_To_Linear(void *thisptr, void *dest,
 
 BOOL Linear_Scale_To_Linear(void *, void *, int, int, int, int, int, int, int, int, BOOL, char *) { return FALSE; }
 long Buffer_To_Page(int, int, int, int, void *, void *) { return 0; }
-// TIM-419: terrain tile blitting for TD WASM/Linux.
-// IControl_Type::Icons is a real pointer (patched by Load_Icon_Set); TransFlag is an
-// offset into the icondata block. Using struct member access rather than hardcoded byte
-// offsets so LP64 / wasm32 struct layout is handled by the compiler automatically.
-void Buffer_Draw_Stamp(void const *this_object, void const *icondata, int icon,
-                       int x_pixel, int y_pixel, void const *remap)
-{
-    if (!icondata) return;
-    IControl_Type const *ic = (IControl_Type const *)icondata;
-    int icon_w = ic->Width, icon_h = ic->Height;
-    if (icon_w <= 0 || icon_h <= 0 || !ic->Icons) return;
-    int icon_sz = icon_w * icon_h;
-    unsigned char const *icon_src = ic->Icons + icon * icon_sz;
-    unsigned char tf = ic->TransFlag ?
-        ((unsigned char const *)icondata)[ic->TransFlag + icon] : 0;
-    GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
-    if (!vp) return;
-    int vw = vp->Get_Width(), vh = vp->Get_Height();
-    int stride = vw + vp->Get_XAdd();
-    unsigned char *buf = (unsigned char*)vp->Get_Offset();
-    for (int row = 0; row < icon_h; row++) {
-        int py = y_pixel + row;
-        if (py < 0 || py >= vh) continue;
-        for (int col = 0; col < icon_w; col++) {
-            int px = x_pixel + col;
-            if (px < 0 || px >= vw) continue;
-            unsigned char pixel = icon_src[row * icon_w + col];
-            if (remap) pixel = ((unsigned char const *)remap)[pixel];
-            if (!tf || pixel) buf[py * stride + px] = pixel;
-        }
-    }
-}
 
-void Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondata, int icon,
-                             int x_pixel, int y_pixel, void const *remap,
-                             int min_x, int min_y, int max_x, int max_y)
+/* TIM-453: The on-disk IControl_Type (C&C/TD icon-set header) uses 32-bit Windows
+ * layout regardless of host pointer width.  Reading it via the host IControl_Type
+ * struct breaks on LP64 because `long Size` becomes 8 bytes and shifts every
+ * subsequent field.  Use a packed int32_t layout that exactly matches the binary
+ * file format.  `Icons` and `TransFlag` are byte-offsets from the start of the
+ * icondata buffer (not pointers); the pixel data lives at (base + Icons + icon*w*h). */
+struct __attribute__((packed)) IControl_Disk {
+    int16_t Width;
+    int16_t Height;
+    int16_t Count;
+    int16_t Allocated;
+    int32_t Size;
+    int32_t Icons;       // byte offset from buffer start to pixel data
+    int32_t Palettes;
+    int32_t Remaps;
+    int32_t TransFlag;   // byte offset to transparency-flag table (0 = none)
+    int32_t Map;
+};
+static_assert(sizeof(IControl_Disk) == 32, "IControl_Disk must match Win32 layout");
+
+static inline void td_draw_stamp_inner(
+    GraphicViewPortClass *vp,
+    void const *icondata,
+    int icon, int x_pixel, int y_pixel,
+    void const *remap,
+    int clip_x0, int clip_y0, int clip_x1, int clip_y1)
 {
-    if (!icondata) return;
-    IControl_Type const *ic = (IControl_Type const *)icondata;
+    IControl_Disk const *ic = (IControl_Disk const *)icondata;
     int icon_w = ic->Width, icon_h = ic->Height;
-    if (icon_w <= 0 || icon_h <= 0 || !ic->Icons) return;
+    if (icon_w <= 0 || icon_h <= 0 || ic->Icons <= 0) return;
     int icon_sz = icon_w * icon_h;
-    unsigned char const *icon_src = ic->Icons + icon * icon_sz;
+    unsigned char const *base = (unsigned char const *)icondata;
+    unsigned char const *icon_src = base + ic->Icons + icon * icon_sz;
     unsigned char tf = ic->TransFlag ?
-        ((unsigned char const *)icondata)[ic->TransFlag + icon] : 0;
-    GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
-    if (!vp) return;
+        base[ic->TransFlag + icon] : 0;
     int vw = vp->Get_Width(), vh = vp->Get_Height();
     int stride = vw + vp->Get_XAdd();
     unsigned char *buf = (unsigned char*)vp->Get_Offset();
-    // WindowList WINDOWX/WINDOWWIDTH are in 8-pixel byte units; WINDOWY/WINDOWHEIGHT
-    // are in pixels. Convert to pixel clip bounds: [x0,x1) × [y0,y1).
-    int clip_x0 = min_x << 3;
-    int clip_x1 = (min_x + max_x) << 3;
-    int clip_y0 = min_y;
-    int clip_y1 = min_y + max_y;
-    if (clip_x0 < 0)  clip_x0 = 0;
-    if (clip_y0 < 0)  clip_y0 = 0;
+    if (clip_x0 < 0) clip_x0 = 0;
+    if (clip_y0 < 0) clip_y0 = 0;
     if (clip_x1 > vw) clip_x1 = vw;
     if (clip_y1 > vh) clip_y1 = vh;
     for (int row = 0; row < icon_h; row++) {
@@ -1010,6 +1010,33 @@ void Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondata, int i
             if (!tf || pixel) buf[py * stride + px] = pixel;
         }
     }
+}
+
+void Buffer_Draw_Stamp(void const *this_object, void const *icondata, int icon,
+                       int x_pixel, int y_pixel, void const *remap)
+{
+    if (!icondata) return;
+    GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+    if (!vp) return;
+    int vw = vp->Get_Width(), vh = vp->Get_Height();
+    td_draw_stamp_inner(vp, icondata, icon, x_pixel, y_pixel, remap,
+                        0, 0, vw, vh);
+}
+
+void Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondata, int icon,
+                             int x_pixel, int y_pixel, void const *remap,
+                             int min_x, int min_y, int max_x, int max_y)
+{
+    if (!icondata) return;
+    GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
+    if (!vp) return;
+    // WindowList WINDOWX/WINDOWWIDTH in 8-pixel units; WINDOWY/WINDOWHEIGHT in pixels.
+    int clip_x0 = min_x << 3;
+    int clip_x1 = (min_x + max_x) << 3;
+    int clip_y0 = min_y;
+    int clip_y1 = min_y + max_y;
+    td_draw_stamp_inner(vp, icondata, icon, x_pixel, y_pixel, remap,
+                        clip_x0, clip_y0, clip_x1, clip_y1);
 }
 unsigned long LCW_Uncompress(void *, void *, unsigned long) { return 0; }
 unsigned int Apply_XOR_Delta(char *, char *) { return 0; }

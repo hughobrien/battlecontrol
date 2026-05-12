@@ -392,7 +392,6 @@ void GScreenClass::Render(void)
 
 
 	if (IsToUpdate || IsToRedraw) {
-
 		//WWMouse->Erase_Mouse(&HidPage, TRUE);
 		GraphicViewPortClass * oldpage= Set_Logic_Page(HidPage);
 
@@ -424,12 +423,14 @@ void GScreenClass::Render(void)
 		}
 		Messages.Draw();
 
-		Blit_Display(); // TIM-404: copy HidPage → SeenBuff so SDL can present the frame
 		IsToUpdate = false;
 		IsToRedraw = false;
 
 		Set_Logic_Page(oldpage);
 	}
+	// TIM-447: always blit HidPage→SeenBuff so Wait_Vert_Blank always
+	// presents up-to-date content regardless of IsToRedraw state.
+	Blit_Display();
 }
 
 

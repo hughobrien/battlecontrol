@@ -67,12 +67,19 @@ extern int PreserveVQAScreen;
  *=============================================================================================*/
 bool Start_Scenario(char *root, bool briefing)
 {
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD SS] Start_Scenario entry: root=%s briefing=%d\n", root, briefing); fflush(stderr);
+#endif
 
 	if (!Read_Scenario(root)) {
 		CCDebugString ("C&C95 - Failed to read scenario.\n");
 		return(false);
 	}
 	CCDebugString ("C&C95 - Scenario read OK.\n");
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD SS] Read_Scenario OK; IntroMovie=%s BriefMovie=%s ActionMovie=%s\n",
+	        IntroMovie, BriefMovie, ActionMovie); fflush(stderr);
+#endif
 
 #ifdef DEMO
 
@@ -91,7 +98,13 @@ bool Start_Scenario(char *root, bool briefing)
 	*/
 	if (Scenario < 20 && (!Special.IsJurassic || !AreThingiesEnabled)) {
 		if (Scenario != 1 || Whom == HOUSE_GOOD) {
+#ifndef _MSC_VER
+			fprintf(stderr, "[TD SS] about to Play_Movie(IntroMovie=%s)\n", IntroMovie); fflush(stderr);
+#endif
 			Play_Movie(IntroMovie);
+#ifndef _MSC_VER
+			fprintf(stderr, "[TD SS] Play_Movie(IntroMovie) done\n"); fflush(stderr);
+#endif
 		}
 
 		if (briefing) {
