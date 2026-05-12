@@ -1791,7 +1791,15 @@ static void Play_Intro(bool sequenced)
 		VisiblePage.Clear();
 		Show_Mouse();
 #ifdef WIN32
-		Play_Movie(VQ_REDINTRO, THEME_NONE, false);
+		Play_Movie(VQ_REDINTRO, THEME_NONE, false);  // ENGLISH.VQA: Westwood + VIE logos
+#ifndef _MSC_VER
+		// TIM-477: play PROLOG.VQA (Einstein time-machine intro) after the logo,
+		// matching the original RA startup sequence.  Skip when RA_AUTOSTART is set
+		// so CI/autotest runs are not blocked by the ~4-minute cinematic.
+		if (!getenv("RA_AUTOSTART") && !RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
+			Play_Movie(VQ_INTRO_MOVIE, THEME_NONE, false);  // PROLOG.VQA
+		}
+#endif
 #else
 		Play_Movie(VQ_TITLE, THEME_NONE, false);
 #endif
