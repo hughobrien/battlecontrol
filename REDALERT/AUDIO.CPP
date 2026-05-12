@@ -396,6 +396,9 @@ BOOL Audio_Init(HWND window, int bits_per_sample, BOOL stereo, int rate, int rev
     BOOL ok = SDL_Audio_Open(rate, stereo ? 2 : 1, bits_per_sample) ? TRUE : FALSE;
     fprintf(stderr, "[RA] Audio_Init: SDL2 audio %s\n", ok ? "opened OK" : "FAILED");
     fflush(stderr);
+    // SampleType drives all Theme.Play_Song / Sound_Callback guards.
+    // Set it to a non-zero value so music and SFX paths engage.
+    SampleType = ok ? SAMPLE_SB : SAMPLE_NONE;
     return ok;
 }
 
@@ -411,6 +414,7 @@ void Sound_End(void)
     Stop_Sample(VOICE_MUSIC);
     Music_Teardown();
     SDL_Audio_Close();
+    SampleType = SAMPLE_NONE;
 }
 
 int Get_Free_Sample_Handle(int priority)
@@ -895,6 +899,9 @@ void Free_Sample(void const * sample)
 int File_Stream_Sample_Vol(char const * filename, int volume, BOOL real_time_start)
 {
     (void)real_time_start;     // pre-fill happens unconditionally; no async-start
+    fprintf(stderr, "[RA] File_Stream_Sample_Vol: filename=%s volume=%d audio_open=%d\n",
+            filename ? filename : "(null)", volume, (int)g_audio_open);
+    fflush(stderr);
     if (filename == NULL || !g_audio_open) return 0;
 
     // Replace any prior song. Stop_Sample takes the SDL lock; Music_Teardown
