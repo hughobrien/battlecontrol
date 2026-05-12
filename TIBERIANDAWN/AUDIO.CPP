@@ -40,16 +40,24 @@
 
 #include	"function.h"
 
-
+// TIM-428: SDL2 audio backend for Linux/WASM builds.
+#ifndef _MSC_VER
+#include <SDL2/SDL.h>
+#include <cstdio>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/threading.h>
+#include <emscripten/proxying.h>
+#endif
+#endif // !_MSC_VER
 
 
 /*
-** 
-** 
+**
+**
 ** Win32lib stubs
-** 
-** 
-** 
+**
+**
+**
 */
 
 
@@ -64,8 +72,6 @@ void *Load_Sample(char const *filename) {return NULL;};
 long Load_Sample_Into_Buffer(char const *filename, void *buffer, long size) {return 0;}
 long Sample_Read(int fh, void *buffer, long size) {return 0;};
 void Free_Sample(void const *sample) {};
-BOOL Audio_Init( HWND window , int bits_per_sample, BOOL stereo , int rate , int reverse_channels) {return 0;};
-void Sound_End(void) {};
 void Stop_Sample(int handle) {};
 BOOL Sample_Status(int handle) {return 0;};
 BOOL Is_Sample_Playing(void const * sample) {return 0;};
@@ -82,6 +88,106 @@ void Restore_Sound_Buffers (void) {};
 BOOL Set_Primary_Buffer_Format(void) {return 0;};
 BOOL Start_Primary_Sound_Buffer (BOOL forced) {return 0;};
 void Stop_Primary_Sound_Buffer (void) {};
+
+// TIM-428: Audio_Init / Sound_End — MSVC stubs vs SDL2 Linux/WASM backend.
+#ifdef _MSC_VER
+BOOL Audio_Init( HWND window , int bits_per_sample, BOOL stereo , int rate , int reverse_channels) {return 0;};
+void Sound_End(void) {};
+#else // !_MSC_VER
+
+static SDL_AudioDeviceID g_td_audio_device = 0;
+static bool              g_td_audio_open   = false;
+
+static void td_silent_callback(void * /*userdata*/, Uint8 *stream, int len)
+{
+    SDL_memset(stream, 0, len);
+}
+
+static bool td_sdl_audio_open(int rate, int channels)
+{
+    if (g_td_audio_open) return true;
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) return false;
+
+    SDL_AudioSpec want = {}, have = {};
+    want.freq     = rate;
+    want.format   = AUDIO_S16SYS;
+    want.channels = static_cast<Uint8>(channels);
+    want.samples  = 1024;
+    want.callback = td_silent_callback;
+
+    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(
+        nullptr, 0, &want, &have, 0);
+    if (dev == 0) { SDL_QuitSubSystem(SDL_INIT_AUDIO); return false; }
+
+    g_td_audio_device = dev;
+    g_td_audio_open   = true;
+    SDL_PauseAudioDevice(dev, 0);
+    return true;
+}
+
+#ifdef __EMSCRIPTEN__
+struct TdWasmAudioArgs { int rate; int channels; bool result; };
+static void td_audio_init_trampoline(void *arg)
+{
+    auto *a = static_cast<TdWasmAudioArgs *>(arg);
+    a->result = td_sdl_audio_open(a->rate, a->channels);
+}
+static void td_audio_close_trampoline(void * /*arg*/)
+{
+    if (!g_td_audio_open) return;
+    SDL_PauseAudioDevice(g_td_audio_device, 1);
+    SDL_CloseAudioDevice(g_td_audio_device);
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    g_td_audio_device = 0;
+    g_td_audio_open   = false;
+}
+#endif // __EMSCRIPTEN__
+
+BOOL Audio_Init(HWND /*window*/, int bits_per_sample, BOOL stereo, int rate, int /*reverse_channels*/)
+{
+    if (bits_per_sample != 16) return FALSE;
+
+    bool ok;
+#ifdef __EMSCRIPTEN__
+    if (!emscripten_is_main_runtime_thread()) {
+        TdWasmAudioArgs args = { rate, stereo ? 2 : 1, false };
+        emscripten_proxy_sync(
+            emscripten_proxy_get_system_queue(),
+            emscripten_main_runtime_thread_id(),
+            td_audio_init_trampoline, &args);
+        ok = args.result;
+    } else {
+        ok = td_sdl_audio_open(rate, stereo ? 2 : 1);
+    }
+#else
+    ok = td_sdl_audio_open(rate, stereo ? 2 : 1);
+#endif
+    fprintf(stderr, "[TD] Audio_Init: SDL2 audio %s\n", ok ? "opened OK" : "FAILED");
+    fflush(stderr);
+    SoundType  = ok ? SFX_ALFX   : SFX_NONE;
+    SampleType = ok ? SAMPLE_SB  : SAMPLE_NONE;
+    return ok ? TRUE : FALSE;
+}
+
+void Sound_End(void)
+{
+    if (!g_td_audio_open) return;
+#ifdef __EMSCRIPTEN__
+    if (!emscripten_is_main_runtime_thread()) {
+        emscripten_proxy_sync(
+            emscripten_proxy_get_system_queue(),
+            emscripten_main_runtime_thread_id(),
+            td_audio_close_trampoline, nullptr);
+        return;
+    }
+#endif
+    SDL_PauseAudioDevice(g_td_audio_device, 1);
+    SDL_CloseAudioDevice(g_td_audio_device);
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    g_td_audio_device = 0;
+    g_td_audio_open   = false;
+}
+#endif // !_MSC_VER
 
 
 

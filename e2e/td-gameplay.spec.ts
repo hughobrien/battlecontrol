@@ -183,7 +183,7 @@ test.describe('Tiberian Dawn WASM — browser gameplay (TIM-404)', () => {
     // Soft assertion — document outcome; harden to .toBe(true) once visual confirmed.
   });
 
-  test('5 · audio outcome documentation', async ({ page }) => {
+  test('5 · SDL2 audio opens in WASM (TIM-428)', async ({ page }) => {
     const audioLogs: string[] = [];
     page.on('console', msg => {
       const text = msg.text();
@@ -194,16 +194,16 @@ test.describe('Tiberian Dawn WASM — browser gameplay (TIM-404)', () => {
 
     await page.goto(gameUrl, { waitUntil: 'domcontentloaded' });
 
-    // Wait for TD autostart confirmation — audio init happens at startup.
-    await waitForOutput(page, 'TD_AUTOSTART active', 180_000);
-    await page.waitForTimeout(3_000);
+    // Audio_Init is called early in startup; wait for its log line.
+    await waitForOutput(page, '[TD] Audio_Init:', 180_000);
+    await page.waitForTimeout(1_000);
 
     const output = await getOutput(page);
     const audioLines = output.split('\n').filter(l =>
       /audio|sound|mixer|openal|alsa|pulse/i.test(l)
     );
 
-    console.log('=== Audio outcome (TIM-404) ===');
+    console.log('=== Audio outcome (TIM-428) ===');
     if (audioLogs.length > 0) {
       console.log('Console audio messages:');
       audioLogs.forEach(l => console.log(' ', l));
@@ -212,11 +212,8 @@ test.describe('Tiberian Dawn WASM — browser gameplay (TIM-404)', () => {
       console.log('Game output audio lines:');
       audioLines.forEach(l => console.log(' ', l));
     }
-    if (audioLogs.length === 0 && audioLines.length === 0) {
-      console.log('No audio-related messages observed — audio silently skipped.');
-      console.log('(Expected: Emscripten pthreads + Web Audio API requires user gesture.)');
-    }
 
-    expect(true).toBe(true);
+    // Hard assertion: SDL2 audio device must open successfully.
+    expect(output).toContain('[TD] Audio_Init: SDL2 audio opened OK');
   });
 });
