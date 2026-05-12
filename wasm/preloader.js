@@ -353,7 +353,7 @@
       return;
     }
 
-    var gameName = isTD ? 'Tiberian Dawn' : 'Red Alert';
+    var gameName = isTD ? 'TD' : 'RA';
     btn.addEventListener('click', openGameFolder);
     setStatus('Click "Open Game Folder" to load your ' + gameName + ' data files.');
   });
