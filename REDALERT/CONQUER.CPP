@@ -105,6 +105,8 @@ TcpipManagerClass	Winsock;
 #include	<stdio.h>
 #include	<string.h>
 #include	<direct.h>
+// TIM-441: Linux VQA cinematic player (no-op on MSVC)
+#include	"vqa_player.h"
 #include	<fcntl.h>
 #include	<io.h>
 #include	<dos.h>
@@ -2947,11 +2949,16 @@ extern void Play_Movie_GlyphX(const char * movie_name, ThemeType theme, bool imm
 
 void Play_Movie(char const * name, ThemeType theme, bool clrscrn, bool immediate)
 	{
-#if (1)
 	if (strcmp(name, "x") == 0 || strcmp(name, "X") == 0) {
 		return;
 	}
 
+#ifndef _MSC_VER
+	// TIM-441: native Linux path — decode and render VQA via SDL2.
+	// Bypasses the GlyphX DLL callback (EventCallback == NULL in standalone build).
+	Play_Movie_Linux(name);
+	return;
+#elif (1)
 	Play_Movie_GlyphX(name, theme, immediate);
 	return;
 #else
