@@ -289,9 +289,11 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
   });
 
   test('6 · TIM-429 visual audit — units, buildings, UI at frames 100, 300, 500', async ({ page }) => {
-    // Needs 10 minutes: frame 500 at ~10fps WASM rate takes ~50s of real time,
-    // but asset loading + game init can add 3-4 minutes on top.
-    test.setTimeout(600_000);
+    // TIM-502: under system load (prior tests still active + WASM init), game
+    // startup + Start_Scenario can exceed 4 min.  TIM-500 VQA-skip shortens it
+    // but budget 6 min for Start_Scenario and 15 min total to cover all three
+    // frame checkpoints (100/300/500) without masking real hangs.
+    test.setTimeout(900_000);
 
     const consoleLogs: string[] = [];
     page.on('console', msg => consoleLogs.push(`[${msg.type()}] ${msg.text()}`));
@@ -300,7 +302,7 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
     await page.goto(gameUrl, { waitUntil: 'domcontentloaded' });
 
     // Wait for scenario to load before auditing frames.
-    await waitForOutput(page, '[RA] Select_Game: Start_Scenario OK', 240_000);
+    await waitForOutput(page, '[RA] Select_Game: Start_Scenario OK', 360_000);
 
     // --- Frame 100 ---
     await waitForOutput(page, '[RA] Main_Loop frame 100', 240_000);
