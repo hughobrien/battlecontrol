@@ -10,6 +10,39 @@ No installation needed. You need legally-acquired game data — click **Open Gam
 
 ---
 
+## v0.1-beta Release Notes
+
+### What's included
+
+| | Browser (WASM) | Native Linux binary |
+|---|---|---|
+| **Tiberian Dawn** | Fully playable — game loop, audio, graphics, real font rendering | Not yet (TD Linux binary work in progress) |
+| **Red Alert** | Main menu loads; in-game not yet functional via browser | Fully playable — ~12 fps, 12 win/loss cycles, ASAN-clean |
+
+### How to play
+
+**Browser (no install):**
+1. Visit [▶ Play TD](https://hughobrien.github.io/battlecontrol/td.html) or [▶ Play RA](https://hughobrien.github.io/battlecontrol/ra.html)
+2. Click **Open Game Folder** and select your local data directory containing the MIX files
+3. The game loads automatically — no server upload, data stays on your machine
+
+**Native Linux (RA):**
+```bash
+git clone https://github.com/hughobrien/battlecontrol && cd battlecontrol
+nix develop --command bash scripts/first-run-pass-94.sh
+# or: cmake -S . -B build && cmake --build build -j$(nproc)
+```
+Point the binary at your RA data directory (`RA_DATA_DIR=/path/to/data`).
+
+### Known limitations
+
+- **RA WASM in-game**: Red Alert does not yet start a game scenario in the browser — it loads the main menu but the autostart path to `Start_Scenario` is incomplete. Fix tracked for v0.2.
+- **TD native Linux binary**: Tiberian Dawn native Linux port is complete (`e2e/td-gameplay.spec.ts` all pass) but a packaged run script is not yet included in this release.
+- **Prerequisites**: You must supply legally-acquired game data (MIX files). Game data is not included and cannot be distributed.
+- **Browser requirements**: Chrome or Edge (stable) required for SharedArrayBuffer / WASM threads. Firefox works with `dom.postMessage.sharedArrayBuffer.bypassCOOP_COEP.insecure.enabled = true`.
+
+---
+
 battlecontrol is a Linux and WebAssembly port of the EA-released game engine sources (RA + TD) from the [EA open-source release](https://github.com/electronicarts/CnC_Remastered_Collection). The upstream repo ships only an MSBuild/MSVC solution targeting Win32; this fork brings both games to a native Linux build using GCC/Clang, CMake, and SDL2.
 
 > **Note — related EA source repositories:**
@@ -21,7 +54,7 @@ battlecontrol is a Linux and WebAssembly port of the EA-released game engine sou
 > | [electronicarts/CnC_Red_Alert](https://github.com/electronicarts/CnC_Red_Alert) | Standalone **original 1996 Red Alert** source (Win32 game) | Separate project — not related to this fork |
 > | [electronicarts/CnC_Tiberian_Dawn](https://github.com/electronicarts/CnC_Tiberian_Dawn) | Standalone **original 1995 Tiberian Dawn** source (MS-DOS game) | Separate project — not related to this fork |
 
-> **Current status:** The game runs to completion on Linux. A release build sustains ~12 fps, navigates 12 win/loss cycles, and exits cleanly. ASAN-clean. The full rendering pipeline — title screen, main menu, sidebar, radar, tactical map, units — works end-to-end.
+> **Current status — v0.1-beta:** Both games run in the browser (WASM) and as a native Linux binary. Tiberian Dawn is fully playable end-to-end in WASM — game loop, audio, and full rendering pipeline confirmed. Red Alert reaches the main menu in WASM; in-game gameplay via browser autostart is a known limitation (tracked for the next release). The native Linux RA binary runs to completion at ~12 fps, 12 win/loss cycles, ASAN-clean.
 
 ---
 
