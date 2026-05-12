@@ -425,15 +425,23 @@ void MixFileClass::Free(void)
  *=============================================================================================*/
 //int _USERENTRY Compare(MixFileClass::SubBlock const *, MixFileClass::SubBlock const *);
 
-// int _USERENTRY compfunc(void const *ptr1, void const *ptr2) 
-int compfunc(void const *ptr1, void const *ptr2) 
+// int _USERENTRY compfunc(void const *ptr1, void const *ptr2)
+int compfunc(void const *ptr1, void const *ptr2)
 {
 //	long diff = *(long const *)ptr1 - *(long const *)ptr2;
 //	return FP_SEG(diff);
 
+#ifndef _MSC_VER
+	/* TIM-453: SubBlock::CRC is int32_t on LP64; reading as `long` (8 bytes)
+	 * bleeds into the Offset field, corrupting the bsearch key comparison. */
+	if (*(int32_t const *)ptr1 < *(int32_t const *)ptr2) return(-1);
+	if (*(int32_t const *)ptr1 > *(int32_t const *)ptr2) return(1);
+	return(0);
+#else
 	if (*(long const *)ptr1 < *(long const *)ptr2) return(-1);
 	if (*(long const *)ptr1 > *(long const *)ptr2) return(1);
 	return(0);
+#endif
 }
 
 

@@ -152,7 +152,9 @@ void Main_Game(int argc, char *argv[])
 	**		until they indicate that the user wants to exit the scenario.
 	*/
 	while (Select_Game(fade)) {
-		
+#ifndef _MSC_VER
+		fprintf(stderr, "[TD MGAME] Select_Game returned true\n"); fflush(stderr);
+#endif
 		if (RunningAsDLL) {
 			return;
 		}
@@ -166,7 +168,14 @@ void Main_Game(int argc, char *argv[])
 		**	values, and then show the mouse.  This PRESUMES that Select_Game() has
 		**	told the map to draw itself.
 		*/
+
+#ifndef _MSC_VER
+		fprintf(stderr, "[TD MGAME] before Fade_Palette_To\n"); fflush(stderr);
+#endif
 		Fade_Palette_To(GamePalette, FADE_PALETTE_MEDIUM, NULL);
+#ifndef _MSC_VER
+		fprintf(stderr, "[TD MGAME] after Fade_Palette_To\n"); fflush(stderr);
+#endif
 		Keyboard::Clear();
 
 		/*
@@ -1137,8 +1146,18 @@ void Call_Back(void)
 	**	Score maintenance
 	*/
 	if (SampleType) {
+#ifndef _MSC_VER
+		static int _cb_count = 0;
+		if (++_cb_count <= 10) { fprintf(stderr, "[TD CB] Call_Back #%d entry SampleType=%d\n", _cb_count, (int)SampleType); fflush(stderr); }
+#endif
 		Theme.AI();
+#ifndef _MSC_VER
+		if (_cb_count <= 10) { fprintf(stderr, "[TD CB] Theme.AI done\n"); fflush(stderr); }
+#endif
 		Speak_AI();
+#ifndef _MSC_VER
+		if (_cb_count <= 10) { fprintf(stderr, "[TD CB] Speak_AI done\n"); fflush(stderr); }
+#endif
 	}
 
 #ifndef DEMO
@@ -1479,10 +1498,26 @@ bool Main_Loop()
 	}
 	/* TIM-343: frame counter for smoke-test (≥10 frames = milestone reached). */
 	static int _td_frame_count = 0;
+#ifndef _MSC_VER
+	static long _td_last_ms = 0;
+	{
+		struct timespec _ts; clock_gettime(CLOCK_MONOTONIC, &_ts);
+		long _td_now_ms = _ts.tv_sec * 1000L + _ts.tv_nsec / 1000000L;
+		if (!_td_last_ms) _td_last_ms = _td_now_ms;
+		long _dt = _td_now_ms - _td_last_ms;
+		_td_last_ms = _td_now_ms;
+#endif
 	_td_frame_count++;
 	if (_td_frame_count <= 15 || (_td_frame_count % 100) == 0) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[TD] Main_Loop frame %d dt=%ldms\n", _td_frame_count, _dt); fflush(stderr);
+#else
 		fprintf(stderr, "[TD] Main_Loop frame %d\n", _td_frame_count); fflush(stderr);
+#endif
 	}
+#ifndef _MSC_VER
+	}
+#endif
 	/* TIM-360: inject cheat actions at fixed frames when TD_CHEAT=1 is set.
 	 * Bypasses the xdotool path since SDL keyboard input is not yet wired in TD.
 	 * Mirrors the actions of the M+Shift / C / F4 / Alt+W debug keys. */

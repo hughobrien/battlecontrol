@@ -983,21 +983,24 @@ int main(int argc, char * argv[])
                 HidPage.Attach(&HiddenPage, 0, 0, ScreenWidth, ScreenHeight);
             }
 
-            /* TIM-383: register the visible pixel buffer so Wait_Vert_Blank
-             * can read indexed pixels each frame for the SDL present pump.
-             * SeenBuff.Get_Offset() points to the first game-visible row
-             * (y=40 within VisiblePage, or y=0); stride is Get_Width() since
-             * XAdd is 0 for a plain attached viewport. */
+            /* TIM-453: register HidPage as the SDL present source.
+             * GScreenClass::Render writes to HidPage (LogicPage = HidPage).
+             * Blit_Display is commented out (remaster DLL path skips it),
+             * so SeenBuff/VisiblePage never receives rendered pixels.
+             * Wait_Vert_Blank reads from TD_SeenPixels — point it at HidPage
+             * so the present pump reads directly from the rendered buffer.
+             * stride = Get_Width() + Get_XAdd() is the actual row stride. */
 #ifndef _MSC_VER
             {
                 extern void SDL_TD_Register_SeenBuff(void*, int, int, int);
+                int stride = HidPage.Get_Width() + HidPage.Get_XAdd();
                 SDL_TD_Register_SeenBuff(
-                    reinterpret_cast<void*>(SeenBuff.Get_Offset()),
-                    SeenBuff.Get_Width(),
-                    SeenBuff.Get_Height(),
-                    SeenBuff.Get_Width());
-                fprintf(stderr, "[TD] SDL_TD_Register_SeenBuff %dx%d\n",
-                        SeenBuff.Get_Width(), SeenBuff.Get_Height());
+                    reinterpret_cast<void*>(HidPage.Get_Offset()),
+                    HidPage.Get_Width(),
+                    HidPage.Get_Height(),
+                    stride);
+                fprintf(stderr, "[TD] SDL_TD_Register_SeenBuff (HidPage) %dx%d stride=%d\n",
+                        HidPage.Get_Width(), HidPage.Get_Height(), stride);
                 fflush(stderr);
             }
 #endif

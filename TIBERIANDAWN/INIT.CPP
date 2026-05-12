@@ -554,6 +554,18 @@ bool Init_Game(int , char *[])
 		if (!ScoreMix) {
 			ScoreMix = new MixFileClass("SCORES.MIX");
 			ThemeClass::Scan();
+			// If SCORES.MIX contains no accessible AUD files (e.g. Remastered data),
+			// disable music to prevent Theme.AI busy-looping on every Call_Back.
+			bool any_available = false;
+			for (int t = THEME_FIRST; t < THEME_COUNT; t++) {
+				if (Theme.Is_Allowed(ThemeType(t))) { any_available = true; break; }
+			}
+			if (!any_available) {
+#ifndef _MSC_VER
+				fprintf(stderr, "[TD INIT] No music AUD files in SCORES.MIX - disabling ScoresPresent\n"); fflush(stderr);
+#endif
+				ScoresPresent = false;
+			}
 		}
 //	}
 #endif
@@ -1641,6 +1653,9 @@ bool Select_Game(bool fade)
 		}
 	}
 	CCDebugString ("C&C95 - About to start game initialisation.\n");
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] after Select_Game while-loop, before Kbd.Clear\n"); fflush(stderr);
+#endif
 #ifdef FORCE_WINSOCK
 	if (GameToPlay == GAME_INTERNET){
 		CommProtocol = COMM_PROTOCOL_MULTI_E_COMP;
@@ -1751,9 +1766,15 @@ bool Select_Game(bool fade)
 
 		Special.IsFromInstall = 0;
 		CCDebugString ("C&C95 - Starting scenario.\n");
+#ifndef _MSC_VER
+		fprintf(stderr, "[TD INIT] calling Start_Scenario(%s)\n", ScenarioName); fflush(stderr);
+#endif
 		if (!Start_Scenario(ScenarioName)) {
 			return(false);
 		}
+#ifndef _MSC_VER
+		fprintf(stderr, "[TD INIT] Start_Scenario returned OK\n"); fflush(stderr);
+#endif
 		CCDebugString ("C&C95 - Scenario started OK.\n");
 	}
 
@@ -1764,6 +1785,9 @@ bool Select_Game(bool fade)
 	*/
 	CCDebugString ("C&C95 - Initialising message system.\n");
 	int factor = (SeenBuff.Get_Width() == 320) ? 1 : 2;
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] Messages.Init\n"); fflush(stderr);
+#endif
 	Messages.Init(Map.TacPixelX, Map.TacPixelY, 6, MAX_MESSAGE_LENGTH, 6*factor+1);
 
 	/*
@@ -1774,8 +1798,13 @@ bool Select_Game(bool fade)
 	**	movies, which will have cleared the screen to black already.)
 	*/
 	CCDebugString ("C&C95 - About to call Call_Back.\n");
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] Call_Back E\n"); fflush(stderr);
+#endif
 	Call_Back();
-
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] Hide_Mouse + Erase_Mouse\n"); fflush(stderr);
+#endif
 	/*
 	** This is desperately sad isnt it?
 	*/
@@ -1785,14 +1814,25 @@ bool Select_Game(bool fade)
 	Hide_Mouse();
 	WWMouse->Erase_Mouse(&HidPage, TRUE);
 
-
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] Fade_Palette_To black\n"); fflush(stderr);
+#endif
 	Fade_Palette_To(BlackPalette, FADE_PALETTE_MEDIUM, Call_Back);
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] after Fade_Palette_To black\n"); fflush(stderr);
+#endif
 	HiddenPage.Clear();
 	VisiblePage.Clear();
 	Set_Logic_Page(SeenBuff);
 	Map.Flag_To_Redraw();
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] Call_Back F + Map.Render\n"); fflush(stderr);
+#endif
 	Call_Back();
 	Map.Render();
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] Map.Render done\n"); fflush(stderr);
+#endif
 	//Show_Mouse();
 
 	/*
@@ -1815,7 +1855,9 @@ bool Select_Game(bool fade)
 			Show_Mouse();
 		}
 	}
-
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] Select_Game returning true\n"); fflush(stderr);
+#endif
 	return(true);
 }
 

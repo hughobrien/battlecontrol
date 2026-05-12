@@ -597,28 +597,30 @@ void __cdecl Fat_Put_Pixel(int x, int y, int color, int siz, GraphicViewPortClas
 extern "C" long __cdecl Calculate_CRC(void *buffer, long length)
 {
 #ifndef _MSC_VER
-	// TIM-339: rotating additive CRC — for each 4-byte word: crc=ROL(crc,1)+word;
-	// remainder bytes are assembled little-endian before the final accumulate step.
-	unsigned long crc = 0;
+	/* TIM-453: rotating additive CRC — use uint32_t throughout so the ROL(crc,1)
+	 * rotation is 32-bit, matching the Win32 assembly original.  `unsigned long`
+	 * is 64 bits on LP64 Linux, making `crc >> 31` a 64-bit shift and producing
+	 * wrong hash values that fail MixFile bsearch lookups. */
+	uint32_t crc = 0;
 	const unsigned char *src = (const unsigned char*)buffer;
-	unsigned long len = (unsigned long)length;
-	unsigned long full_words = len >> 2;
-	unsigned long remainder  = len & 3;
+	uint32_t len = (uint32_t)length;
+	uint32_t full_words = len >> 2;
+	uint32_t remainder  = len & 3;
 
-	for (unsigned long i = 0; i < full_words; i++, src += 4) {
-		unsigned long word;
+	for (uint32_t i = 0; i < full_words; i++, src += 4) {
+		uint32_t word;
 		memcpy(&word, src, 4);  // little-endian load (x86 native order)
 		crc = (crc << 1) | (crc >> 31);
 		crc += word;
 	}
 	if (remainder) {
-		unsigned long word = 0;
-		for (unsigned long i = 0; i < remainder; i++)
-			word |= ((unsigned long)src[i]) << (i * 8);
+		uint32_t word = 0;
+		for (uint32_t i = 0; i < remainder; i++)
+			word |= ((uint32_t)src[i]) << (i * 8);
 		crc = (crc << 1) | (crc >> 31);
 		crc += word;
 	}
-	return (long)crc;
+	return (long)(int32_t)crc;
 #else
 	{}
 #endif
