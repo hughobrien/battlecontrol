@@ -948,6 +948,15 @@ void Clear_Scenario(void)
 void Do_Win(void)
 {
 #ifndef _MSC_VER
+	// TIM-489: in autostart/FPS-audit mode the win/lose sequence blocks the game
+	// loop on a modal dialog.  Return early so the game continues running and the
+	// frame-rate measurement can complete.
+	if (getenv("RA_AUTOSTART")) {
+		fprintf(stderr, "[RA] Do_Win() suppressed (autostart fps audit)\n");
+		return;
+	}
+#endif
+#ifndef _MSC_VER
 	if (getenv("RA_AUTOSTART")) {
 		static int s_win_count = 0;
 		s_win_count++;
@@ -1235,6 +1244,13 @@ void Do_Win(void)
  *=============================================================================================*/
 void Do_Lose(void)
 {
+#ifndef _MSC_VER
+	// TIM-489: same as Do_Win guard — modal dialog blocks game loop in audit mode.
+	if (getenv("RA_AUTOSTART")) {
+		fprintf(stderr, "[RA] Do_Lose() suppressed (autostart fps audit)\n");
+		return;
+	}
+#endif
 	Map.Set_Default_Mouse(MOUSE_NORMAL);
 	Hide_Mouse();
 
