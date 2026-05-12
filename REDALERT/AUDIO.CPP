@@ -112,10 +112,18 @@ void Stop_Primary_Sound_Buffer(void) {};
 #include "soscomp.h"   // pass-44D: ADPCM decoder (REDALERT/ADPCM.CPP)
 #include <SDL2/SDL.h>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>     // pass-44D: malloc/free/realloc
 #include <cstring>
 #include <algorithm>
 #include <climits>
+#ifdef __EMSCRIPTEN__
+// TIM-428: proxy SDL audio init/close to the main browser thread.
+// With PROXY_TO_PTHREAD the game loop runs in a Web Worker; Web Audio API
+// context can only be created on the main Emscripten runtime thread.
+#include <emscripten/threading.h>
+#include <emscripten/proxying.h>
+#endif
 
 // pass-44D: forward decls for the FILE.H API. function.h pre-defines
 // FILE_H (REDALERT/FUNCTION.H:197), so `#include "file.h"` is a no-op in
@@ -270,17 +278,42 @@ static void Sound_Mixer_Callback(void * /*userdata*/, Uint8 * stream, int len)
 
 extern "C" {
 
+#ifdef __EMSCRIPTEN__
+// SDL_OpenAudioDevice must run on the main browser thread.  With
+// PROXY_TO_PTHREAD the game loop lives in a Web Worker.  These trampolines
+// relay init/close synchronously via emscripten_proxy_sync so the caller
+// blocks until the main thread completes the work, giving a clean
+// happens-before for all g_audio_* globals.
+struct WasmAudioOpenArgs { int rate; int channels; int bits_per_sample; bool result; };
+static void wasm_audio_open_trampoline(void *arg)
+{
+    // Runs on main thread; SDL_Audio_Open re-enters with is_main=true.
+    auto *a = static_cast<WasmAudioOpenArgs *>(arg);
+    a->result = SDL_Audio_Open(a->rate, a->channels, a->bits_per_sample);
+}
+static void wasm_audio_close_trampoline(void * /*arg*/)
+{
+    SDL_Audio_Close();
+}
+#endif
+
 bool SDL_Audio_Open(int rate, int channels, int bits_per_sample)
 {
-#ifdef __EMSCRIPTEN__
-    // Web Audio API cannot be initialized from a PROXY_TO_PTHREAD Worker thread.
-    // SoundOn=false propagates: all callers guard on g_audio_open, so no
-    // further SDL audio calls are made and the game runs silently.
-    return false;
-#endif
     if (g_audio_open) {
         return true;
     }
+
+#ifdef __EMSCRIPTEN__
+    if (!emscripten_is_main_runtime_thread()) {
+        WasmAudioOpenArgs args = { rate, channels, bits_per_sample, false };
+        emscripten_proxy_sync(
+            emscripten_proxy_get_system_queue(),
+            emscripten_main_runtime_thread_id(),
+            wasm_audio_open_trampoline, &args);
+        return args.result;
+    }
+    // Already on main thread — fall through to direct init.
+#endif
 
     if (bits_per_sample != 16) {
         return false;
@@ -324,6 +357,17 @@ void SDL_Audio_Close(void)
     if (!g_audio_open) {
         return;
     }
+#ifdef __EMSCRIPTEN__
+    // SDL_PauseAudioDevice / SDL_CloseAudioDevice / SDL_QuitSubSystem interact
+    // with the Web Audio context and must run on the main browser thread.
+    if (!emscripten_is_main_runtime_thread()) {
+        emscripten_proxy_sync(
+            emscripten_proxy_get_system_queue(),
+            emscripten_main_runtime_thread_id(),
+            wasm_audio_close_trampoline, nullptr);
+        return;
+    }
+#endif
     SDL_PauseAudioDevice(g_audio_device, 1);
     SDL_CloseAudioDevice(g_audio_device);
     g_audio_device          = 0;
@@ -349,7 +393,10 @@ bool SDL_Audio_Is_Open(void)
 // `window` and `reverse_channels` are Win32-isms with no Linux analogue.
 BOOL Audio_Init(HWND window, int bits_per_sample, BOOL stereo, int rate, int reverse_channels)
 {
-    return SDL_Audio_Open(rate, stereo ? 2 : 1, bits_per_sample) ? TRUE : FALSE;
+    BOOL ok = SDL_Audio_Open(rate, stereo ? 2 : 1, bits_per_sample) ? TRUE : FALSE;
+    fprintf(stderr, "[RA] Audio_Init: SDL2 audio %s\n", ok ? "opened OK" : "FAILED");
+    fflush(stderr);
+    return ok;
 }
 
 void Sound_End(void)

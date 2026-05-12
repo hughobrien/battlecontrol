@@ -204,7 +204,7 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
     console.log('canvas-has-content:', hasContent);
   });
 
-  test('5 · audio outcome documentation', async ({ page }) => {
+  test('5 · SDL2 audio opens in WASM (TIM-428)', async ({ page }) => {
     const audioLogs: string[] = [];
     page.on('console', msg => {
       const text = msg.text();
@@ -215,11 +215,11 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
 
     await page.goto(gameUrl, { waitUntil: 'domcontentloaded' });
 
-    // Wait for game to start (not necessarily 100 frames — audio init happens early).
-    await waitForOutput(page, '[RA] Select_Game: Start_Scenario OK', 180_000);
+    // Audio_Init is called early in Init_Game; wait for it to log.
+    await waitForOutput(page, '[RA] Audio_Init:', 180_000);
 
-    // Give audio subsystem time to initialize.
-    await page.waitForTimeout(3_000);
+    // Give audio subsystem a moment.
+    await page.waitForTimeout(1_000);
 
     const output = await getOutput(page);
     const audioLines = output.split('\n').filter(l =>
@@ -235,12 +235,8 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
       console.log('Game output audio lines:');
       audioLines.forEach(l => console.log(' ', l));
     }
-    if (audioLogs.length === 0 && audioLines.length === 0) {
-      console.log('No audio-related messages observed — audio may be silently skipped.');
-      console.log('(Expected: Emscripten pthreads + Web Audio API requires user gesture in some browsers.)');
-    }
 
-    // Not a hard assertion — we document the outcome for TIM-399.
-    expect(true).toBe(true);
+    // Hard assertion: SDL2 audio device must open successfully.
+    expect(output).toContain('[RA] Audio_Init: SDL2 audio opened OK');
   });
 });
