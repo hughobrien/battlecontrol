@@ -65,8 +65,6 @@ SFX_Type					SoundType;
 Sample_Type				SampleType;
 
 // Always-stub (no audio-system-specific logic):
-int File_Stream_Sample(char const * /*filename*/, BOOL /*real_time_start*/) {return 1;}
-int File_Stream_Sample_Vol(char const * /*filename*/, int /*volume*/, BOOL /*real_time_start*/) {return 1;}
 void __cdecl far maintenance_callback(void) {}
 void Restore_Sound_Buffers(void) {}
 BOOL Set_Primary_Buffer_Format(void) {return 0;}
@@ -76,6 +74,8 @@ void Stop_Primary_Sound_Buffer(void) {}
 // TIM-437: MSVC stubs vs SDL2 Linux/WASM audio backend (Play_Sample + mixer).
 #ifdef _MSC_VER
 
+int File_Stream_Sample(char const * /*filename*/, BOOL /*real_time_start*/) {return 1;}
+int File_Stream_Sample_Vol(char const * /*filename*/, int /*volume*/, BOOL /*real_time_start*/) {return 1;}
 void __cdecl Sound_Callback(void) {}
 void *Load_Sample(char const * /*filename*/) {return NULL;}
 long Load_Sample_Into_Buffer(char const * /*filename*/, void * /*buffer*/, long /*size*/) {return 0;}
@@ -211,7 +211,8 @@ static std::uint8_t *td_decode_aud(
     return pcm;
 }
 
-// --- 5-voice SFX table ---
+// Voice slots: 0 is reserved for music (File_Stream_Sample_Vol), 1-4 are SFX.
+static constexpr int TD_VOICE_MUSIC = 0;
 static constexpr int TD_VOICE_COUNT = 5;
 
 struct TdVoice {
@@ -396,7 +397,8 @@ int Get_Free_Sample_Handle(int priority)
     if (!g_td_audio_open) return -1;
     SDL_LockAudioDevice(g_td_audio_device);
     int free_slot = -1, evict_slot = -1, lowest_prio = INT_MAX;
-    for (int i = 0; i < TD_VOICE_COUNT; ++i) {
+    // Slot 0 is reserved for music; SFX scans slots 1..TD_VOICE_COUNT-1.
+    for (int i = TD_VOICE_MUSIC + 1; i < TD_VOICE_COUNT; ++i) {
         if (!g_td_voices[i].active) { free_slot = i; break; }
         if (g_td_voices[i].priority < lowest_prio) {
             lowest_prio = g_td_voices[i].priority;
@@ -482,6 +484,70 @@ int  Set_Sound_Vol(int volume)  { return volume; }
 int  Set_Score_Vol(int volume)  { return volume; }
 void Fade_Sample(int handle, int /*ticks*/) { Stop_Sample(handle); }
 int  Get_Digi_Handle(void) { return g_td_audio_device > 0 ? static_cast<int>(g_td_audio_device) : 1; }
+
+// TIM-459: load AUD from CCFileClass (MixFile-backed), decode to PCM, and
+// start playing on the reserved music voice slot.  Returns TD_VOICE_MUSIC on
+// success so Sample_Status() can track play-state; -1 on any failure.
+int File_Stream_Sample_Vol(char const *filename, int volume, BOOL /*real_time_start*/)
+{
+    fprintf(stderr, "[TD] File_Stream_Sample_Vol: file=%s vol=%d open=%d\n",
+            filename ? filename : "(null)", volume, (int)g_td_audio_open);
+    fflush(stderr);
+    if (!filename || !g_td_audio_open) return -1;
+
+    // Stop any prior music in the reserved slot.
+    Stop_Sample(TD_VOICE_MUSIC);
+
+    // Load the AUD via the MixFile-backed CCFileClass lookup.
+    CCFileClass file(filename);
+    if (!file.Is_Available()) {
+        fprintf(stderr, "[TD] File_Stream_Sample_Vol: %s not in MixFile\n", filename);
+        fflush(stderr);
+        return -1;
+    }
+    long fsize = file.Size();
+    if (fsize <= 0) return -1;
+    void *blob = std::malloc(static_cast<std::size_t>(fsize));
+    if (!blob) return -1;
+    file.Open(READ);
+    long got = file.Read(blob, fsize);
+    file.Close();
+    if (got != fsize) { std::free(blob); return -1; }
+
+    // Decode AUD → raw PCM.
+    int rate = 0, pcm_len = 0;
+    std::uint8_t *pcm = td_decode_aud(blob, &rate, &pcm_len);
+    std::free(blob);
+    if (!pcm) {
+        fprintf(stderr, "[TD] File_Stream_Sample_Vol: decode failed for %s\n", filename);
+        fflush(stderr);
+        return -1;
+    }
+
+    // Fill the music voice slot directly (bypasses SFX priority/eviction).
+    SDL_LockAudioDevice(g_td_audio_device);
+    td_voice_free(g_td_voices[TD_VOICE_MUSIC]);
+    TdVoice &v    = g_td_voices[TD_VOICE_MUSIC];
+    v.active      = true;
+    v.decoded_pcm = pcm;
+    v.pcm_len     = pcm_len;
+    v.cursor      = 0.0;
+    v.source_rate = rate;
+    v.priority    = 255;
+    v.volume      = std::clamp(volume, 0, 255);
+    v.pan         = 0;
+    SDL_UnlockAudioDevice(g_td_audio_device);
+
+    fprintf(stderr, "[TD] File_Stream_Sample_Vol: %s started on slot %d (%d PCM bytes @ %d Hz)\n",
+            filename, TD_VOICE_MUSIC, pcm_len, rate);
+    fflush(stderr);
+    return TD_VOICE_MUSIC;
+}
+
+int File_Stream_Sample(char const *filename, BOOL real_time_start)
+{
+    return File_Stream_Sample_Vol(filename, 255, real_time_start);
+}
 
 #endif // !_MSC_VER
 
