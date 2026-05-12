@@ -58,6 +58,51 @@ async function getStatus(page: any): Promise<string> {
 }
 
 /**
+ * Sample the canvas and return pixel statistics for visual audit.
+ * Returns: { hasContent, nonBlackCount, totalSampled, uniqueColors, fillPct, width, height }
+ */
+async function canvasPixelStats(page: any): Promise<{
+  hasContent: boolean;
+  nonBlackCount: number;
+  totalSampled: number;
+  uniqueColors: number;
+  fillPct: number;
+  width: number;
+  height: number;
+}> {
+  return page.evaluate(() => {
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    if (!canvas) return { hasContent: false, nonBlackCount: 0, totalSampled: 0, uniqueColors: 0, fillPct: 0, width: 0, height: 0 };
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      const len = canvas.toDataURL('image/png').length;
+      return { hasContent: len > 2000, nonBlackCount: len > 2000 ? 1 : 0, totalSampled: 1, uniqueColors: 0, fillPct: 0, width: canvas.width, height: canvas.height };
+    }
+    const w = canvas.width;
+    const h = canvas.height;
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let nonBlack = 0;
+    const colorSet = new Set<number>();
+    // Sample every 4th pixel for speed
+    for (let i = 0; i < data.length; i += 16) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      if (r > 15 || g > 15 || b > 15) nonBlack++;
+      colorSet.add((r >> 3) << 10 | (g >> 3) << 5 | (b >> 3));
+    }
+    const total = Math.floor(data.length / 16);
+    return {
+      hasContent: nonBlack > 0,
+      nonBlackCount: nonBlack,
+      totalSampled: total,
+      uniqueColors: colorSet.size,
+      fillPct: Math.round(nonBlack / total * 100),
+      width: w,
+      height: h,
+    };
+  });
+}
+
+/**
  * Check whether the game canvas has any non-black pixels.
  */
 async function canvasHasContent(page: any): Promise<boolean> {
@@ -215,5 +260,72 @@ test.describe('Tiberian Dawn WASM — browser gameplay (TIM-404)', () => {
 
     // Hard assertion: SDL2 audio device must open successfully.
     expect(output).toContain('[TD] Audio_Init: SDL2 audio opened OK');
+  });
+
+  test('6 · TIM-435 visual audit — units, buildings, UI at frames 100, 300, 500', async ({ page }) => {
+    // 10 minutes: frame 500 at ~10fps WASM rate takes ~50s real time,
+    // but asset loading + game init can add 3-4 minutes on top.
+    test.setTimeout(600_000);
+
+    const consoleLogs: string[] = [];
+    page.on('console', msg => consoleLogs.push(`[${msg.type()}] ${msg.text()}`));
+    page.on('pageerror', err => consoleLogs.push(`[pageerror] ${err.message}`));
+
+    await page.goto(gameUrl, { waitUntil: 'domcontentloaded' });
+
+    // Wait for scenario to load before auditing frames.
+    await waitForOutput(page, 'TD_AUTOSTART active', 240_000);
+
+    // --- Frame 100 ---
+    await waitForOutput(page, '[TD] Main_Loop frame 100', 240_000);
+    await page.waitForTimeout(200);
+    const stats100 = await canvasPixelStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'td-visual-frame-100.png'), fullPage: true });
+    console.log(`[frame 100] canvas ${stats100.width}x${stats100.height}  fill=${stats100.fillPct}%  uniqueColors=${stats100.uniqueColors}  hasContent=${stats100.hasContent}`);
+
+    // --- Frame 300 ---
+    await waitForOutput(page, '[TD] Main_Loop frame 300', 300_000);
+    await page.waitForTimeout(200);
+    const stats300 = await canvasPixelStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'td-visual-frame-300.png'), fullPage: true });
+    console.log(`[frame 300] canvas ${stats300.width}x${stats300.height}  fill=${stats300.fillPct}%  uniqueColors=${stats300.uniqueColors}  hasContent=${stats300.hasContent}`);
+
+    // --- Frame 500 ---
+    await waitForOutput(page, '[TD] Main_Loop frame 500', 300_000);
+    await page.waitForTimeout(200);
+    const stats500 = await canvasPixelStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'td-visual-frame-500.png'), fullPage: true });
+    console.log(`[frame 500] canvas ${stats500.width}x${stats500.height}  fill=${stats500.fillPct}%  uniqueColors=${stats500.uniqueColors}  hasContent=${stats500.hasContent}`);
+
+    // Verify no crash during the run.
+    const output = await getOutput(page);
+    expect(output).not.toContain('SIGSEGV');
+    expect(output).not.toContain('Aborted(');
+
+    // Hard assertion: canvas must have non-black content by frame 300.
+    expect(stats300.hasContent).toBe(true);
+    expect(stats500.hasContent).toBe(true);
+
+    // Acceptance criteria: > 20% fill at frame 300 and 500.
+    expect(stats300.fillPct).toBeGreaterThan(20);
+    expect(stats500.fillPct).toBeGreaterThan(20);
+
+    // Acceptance criteria: > 50 unique colour buckets (palette health check).
+    expect(stats300.uniqueColors).toBeGreaterThan(50);
+    expect(stats500.uniqueColors).toBeGreaterThan(50);
+
+    // Warn (soft) if colour diversity is suspiciously low — possible palette corruption.
+    if (stats300.uniqueColors < 10) {
+      console.warn(`[frame 300] WARNING: only ${stats300.uniqueColors} unique colour buckets — possible palette/sprite corruption`);
+    }
+    if (stats500.uniqueColors < 10) {
+      console.warn(`[frame 500] WARNING: only ${stats500.uniqueColors} unique colour buckets — possible palette/sprite corruption`);
+    }
+
+    console.log('=== TIM-435 visual audit summary ===');
+    console.log(`  frame 100: fill=${stats100.fillPct}% colors=${stats100.uniqueColors}`);
+    console.log(`  frame 300: fill=${stats300.fillPct}% colors=${stats300.uniqueColors}`);
+    console.log(`  frame 500: fill=${stats500.fillPct}% colors=${stats500.uniqueColors}`);
+    console.log('  Screenshots: td-visual-frame-100.png, td-visual-frame-300.png, td-visual-frame-500.png');
   });
 });
