@@ -29,6 +29,7 @@
     #status-line { font-size: 12px; padding: 4px 0; color: #aaa; min-height: 1.4em; }
     #canvas { display: block; border: 1px solid #333; }
     #output {
+      display: none;
       width: 640px;
       height: 120px;
       overflow-y: auto;
@@ -103,9 +104,14 @@
   <pre id="output"></pre>
   <script>
     var outputEl = document.getElementById('output');
+    var _params = new URLSearchParams(window.location.search);
+    // ?debug=1 → show the stderr console below the canvas and inject TD_DEBUG env.
+    var _debugMode = _params.get('debug') === '1';
+    if (_debugMode) { outputEl.style.display = 'block'; }
     var Module = {
       canvas: document.getElementById('canvas'),
       noInitialRun: true,
+      ENV: _debugMode ? { 'TD_DEBUG': '1' } : {},
       print: function(text) {
         outputEl.textContent += text + '\n';
         outputEl.scrollTop = outputEl.scrollHeight;
