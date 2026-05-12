@@ -2126,16 +2126,12 @@ static void Sync_Delay(void)
 	**	speed controlled by the game options slider.
 	*/
 #ifdef __EMSCRIPTEN__
-	// TIM-489: Under WASM/PROXY_TO_PTHREAD, Map.Input() in the sync-wait loop
-	// calls Fill_Buffer_From_System() → Wait_Vert_Blank() → SDL_RenderPresent.
-	// With the software renderer, each present is a ~30 ms round-trip proxied to
-	// the browser main thread.  With 3 iterations per 66 ms frame budget that
-	// wastes ~90 ms/frame and is the root cause of the observed ~6 fps.
-	// The frame was already rendered and presented in Main_Loop; just yield the
-	// worker thread with SDL_Delay(1) until FrameTimer expires.
+	// TIM-489: Under WASM/PROXY_TO_PTHREAD any call that proxies to the browser
+	// main thread (SDL palette set, audio callbacks, SDL_RenderPresent) costs
+	// ~30 ms round-trip.  With Color_Cycle/Call_Back in the per-ms-sleep loop
+	// that's ~66 proxied calls per 66 ms frame — the root cause of <1 fps.
+	// Just yield the worker thread; Color_Cycle+Call_Back run once below.
 	while (FrameTimer) {
-		Color_Cycle();
-		Call_Back();
 		SDL_Delay(1);
 	}
 #else
