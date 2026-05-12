@@ -64,43 +64,223 @@
 SFX_Type					SoundType;
 Sample_Type				SampleType;
 
-int File_Stream_Sample(char const *filename, BOOL real_time_start) {return 1;};
-int File_Stream_Sample_Vol(char const *filename, int volume, BOOL real_time_start)  {return 1;};
-void __cdecl Sound_Callback(void) {};
-void __cdecl far maintenance_callback(void) {};
-void *Load_Sample(char const *filename) {return NULL;};
-long Load_Sample_Into_Buffer(char const *filename, void *buffer, long size) {return 0;}
-long Sample_Read(int fh, void *buffer, long size) {return 0;};
-void Free_Sample(void const *sample) {};
-void Stop_Sample(int handle) {};
-BOOL Sample_Status(int handle) {return 0;};
-BOOL Is_Sample_Playing(void const * sample) {return 0;};
-void Stop_Sample_Playing(void const * sample) {};
-int Play_Sample(void const *sample, int priority, int volume, signed short panloc) {return 1;};
-int Play_Sample_Handle(void const *sample, int priority, int volume, signed short panloc, int id) {return 1;};
-int Set_Sound_Vol(int volume) {return 0;};
-int Set_Score_Vol(int volume) {return 0;};
-void Fade_Sample(int handle, int ticks) {};
-int Get_Free_Sample_Handle(int priority) {return 1;};
-int Get_Digi_Handle(void) {return 1;}
-long Sample_Length(void const *sample) {return 0;};
-void Restore_Sound_Buffers (void) {};
-BOOL Set_Primary_Buffer_Format(void) {return 0;};
-BOOL Start_Primary_Sound_Buffer (BOOL forced) {return 0;};
-void Stop_Primary_Sound_Buffer (void) {};
+// Always-stub (no audio-system-specific logic):
+int File_Stream_Sample(char const * /*filename*/, BOOL /*real_time_start*/) {return 1;}
+int File_Stream_Sample_Vol(char const * /*filename*/, int /*volume*/, BOOL /*real_time_start*/) {return 1;}
+void __cdecl far maintenance_callback(void) {}
+void Restore_Sound_Buffers(void) {}
+BOOL Set_Primary_Buffer_Format(void) {return 0;}
+BOOL Start_Primary_Sound_Buffer(BOOL /*forced*/) {return 0;}
+void Stop_Primary_Sound_Buffer(void) {}
 
-// TIM-428: Audio_Init / Sound_End — MSVC stubs vs SDL2 Linux/WASM backend.
+// TIM-437: MSVC stubs vs SDL2 Linux/WASM audio backend (Play_Sample + mixer).
 #ifdef _MSC_VER
-BOOL Audio_Init( HWND window , int bits_per_sample, BOOL stereo , int rate , int reverse_channels) {return 0;};
-void Sound_End(void) {};
-#else // !_MSC_VER
 
-static SDL_AudioDeviceID g_td_audio_device = 0;
-static bool              g_td_audio_open   = false;
+void __cdecl Sound_Callback(void) {}
+void *Load_Sample(char const * /*filename*/) {return NULL;}
+long Load_Sample_Into_Buffer(char const * /*filename*/, void * /*buffer*/, long /*size*/) {return 0;}
+long Sample_Read(int /*fh*/, void * /*buffer*/, long /*size*/) {return 0;}
+void Free_Sample(void const * /*sample*/) {}
+BOOL Audio_Init(HWND /*window*/, int /*bits_per_sample*/, BOOL /*stereo*/, int /*rate*/, int /*reverse_channels*/) {return 0;}
+void Sound_End(void) {}
+void Stop_Sample(int /*handle*/) {}
+BOOL Sample_Status(int /*handle*/) {return 0;}
+BOOL Is_Sample_Playing(void const * /*sample*/) {return 0;}
+void Stop_Sample_Playing(void const * /*sample*/) {}
+int Play_Sample(void const * /*sample*/, int /*priority*/, int /*volume*/, signed short /*panloc*/) {return 1;}
+int Play_Sample_Handle(void const * /*sample*/, int /*priority*/, int /*volume*/, signed short /*panloc*/, int /*id*/) {return 1;}
+int Set_Sound_Vol(int /*volume*/) {return 0;}
+int Set_Score_Vol(int /*volume*/) {return 0;}
+void Fade_Sample(int /*handle*/, int /*ticks*/) {}
+int Get_Free_Sample_Handle(int /*priority*/) {return 1;}
+int Get_Digi_Handle(void) {return 1;}
+long Sample_Length(void const * /*sample*/) {return 0;}
 
-static void td_silent_callback(void * /*userdata*/, Uint8 *stream, int len)
+#else // !_MSC_VER — SDL2 audio backend (TIM-437)
+
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <algorithm>
+#include <climits>
+
+// SOS IMA-ADPCM tables (from REDALERT/, same GPLv3 codebase).
+// Namespace-scoped to keep DiffTable/IndexTable as distinct symbols from the
+// RA build where REDALERT/ADPCM.CPP defines them at global scope.
+namespace td_adpcm {
+#include "../REDALERT/DTABLE.CPP"
+#include "../REDALERT/ITABLE.CPP"
+} // namespace td_adpcm
+
+// AUD on-disk header — 12 bytes (same as RA).  AUDHeaderType uses `long`
+// which is 8 bytes on LP64 Linux (sizeof == 20), so we read the on-disk
+// bytes via this explicitly-sized packed struct to avoid LP64 misreads.
+#pragma pack(push, 1)
+struct TdAUDOnDiskHeader {
+    std::uint16_t rate;
+    std::uint32_t size;
+    std::uint32_t uncomp_size;
+    std::uint8_t  flags;
+    std::uint8_t  compression;
+};
+struct TdAUDChunkHeader {
+    std::uint16_t size;
+    std::uint16_t out_size;
+    std::uint32_t magic;
+};
+#pragma pack(pop)
+static_assert(sizeof(TdAUDOnDiskHeader) == 12, "AUD on-disk header must be 12 bytes");
+static_assert(sizeof(TdAUDChunkHeader)  ==  8, "AUD chunk header must be 8 bytes");
+static constexpr std::uint32_t TD_AUD_CHUNK_MAGIC    = 0x0000DEAFu;
+static constexpr std::uint8_t  TD_AUD_COMPRESSION_NO = 0;
+static constexpr std::uint8_t  TD_AUD_COMPRESSION_SOS = 99;
+
+// Decode a complete AUD blob (on-disk header + chunk stream) to S16 PCM.
+// Returns a malloc'd buffer (caller must std::free) and sets *rate_out and
+// *pcm_bytes_out on success; returns nullptr on format or allocation error.
+static std::uint8_t *td_decode_aud(
+    const void *aud_data, int *rate_out, int *pcm_bytes_out)
 {
-    SDL_memset(stream, 0, len);
+    if (!aud_data) return nullptr;
+
+    const std::uint8_t *p = static_cast<const std::uint8_t *>(aud_data);
+    TdAUDOnDiskHeader hdr;
+    std::memcpy(&hdr, p, sizeof(hdr));
+    p += sizeof(hdr);
+
+    if (hdr.uncomp_size == 0) return nullptr;
+
+    std::uint8_t *pcm = static_cast<std::uint8_t *>(std::malloc(hdr.uncomp_size));
+    if (!pcm) return nullptr;
+
+    if (hdr.compression == TD_AUD_COMPRESSION_NO) {
+        std::uint32_t copy_sz = std::min(hdr.uncomp_size, hdr.size);
+        std::memcpy(pcm, p, copy_sz);
+        *rate_out      = hdr.rate;
+        *pcm_bytes_out = static_cast<int>(copy_sz);
+        return pcm;
+    }
+    if (hdr.compression != TD_AUD_COMPRESSION_SOS) {
+        std::free(pcm);
+        return nullptr;
+    }
+
+    // IMA-ADPCM decode: walk chunk stream.
+    const std::uint8_t *in_end  = p + hdr.size;
+    std::uint32_t out_written   = 0;
+
+    while (out_written < hdr.uncomp_size &&
+           p + static_cast<int>(sizeof(TdAUDChunkHeader)) <= in_end) {
+        TdAUDChunkHeader chunk;
+        std::memcpy(&chunk, p, sizeof(chunk));
+        p += sizeof(chunk);
+
+        if (chunk.magic != TD_AUD_CHUNK_MAGIC)               { std::free(pcm); return nullptr; }
+        if (p + chunk.size > in_end)                          { std::free(pcm); return nullptr; }
+        if (out_written + chunk.out_size > hdr.uncomp_size)   { std::free(pcm); return nullptr; }
+
+        // Decoder state resets per chunk (SOS IMA-ADPCM spec).
+        unsigned long fast_index = 0;
+        long          sample     = 0;
+        const std::uint8_t *chunk_end = p + chunk.size;
+        std::uint16_t *out16 = reinterpret_cast<std::uint16_t *>(pcm + out_written);
+
+        while (p < chunk_end) {
+            std::uint32_t token = *p++;
+
+            fast_index += token & 0x0fu;
+            sample += td_adpcm::DiffTable[fast_index];
+            fast_index = td_adpcm::IndexTable[fast_index];
+            if (sample >  32767L) sample =  32767L;
+            if (sample < -32768L) sample = -32768L;
+            *out16++ = static_cast<std::uint16_t>(sample);
+
+            fast_index += token >> 4u;
+            sample += td_adpcm::DiffTable[fast_index];
+            fast_index = td_adpcm::IndexTable[fast_index];
+            if (sample >  32767L) sample =  32767L;
+            if (sample < -32768L) sample = -32768L;
+            *out16++ = static_cast<std::uint16_t>(sample);
+        }
+
+        out_written += chunk.out_size;
+    }
+
+    *rate_out      = hdr.rate;
+    *pcm_bytes_out = static_cast<int>(out_written);
+    return pcm;
+}
+
+// --- 5-voice SFX table ---
+static constexpr int TD_VOICE_COUNT = 5;
+
+struct TdVoice {
+    bool           active;
+    std::uint8_t * decoded_pcm;  // malloc'd; freed when slot is reused or stopped
+    int            pcm_len;      // bytes of decoded PCM
+    double         cursor;       // byte cursor (double for fractional rate rescale)
+    int            source_rate;  // AUD sample rate (Hz)
+    int            priority;
+    int            volume;       // 0..255
+    int            pan;          // -32767..32767
+};
+
+static TdVoice g_td_voices[TD_VOICE_COUNT] = {};
+
+static SDL_AudioDeviceID g_td_audio_device    = 0;
+static bool              g_td_audio_open      = false;
+static int               g_td_actual_freq     = 0;
+static int               g_td_actual_channels = 0;
+
+static void td_voice_free(TdVoice &v)
+{
+    if (v.decoded_pcm) {
+        std::free(v.decoded_pcm);
+        v.decoded_pcm = nullptr;
+    }
+}
+
+// SDL2 audio callback: mix all active voices into the S16 output stream.
+// The device lock is held for the duration; g_td_voices[] access is safe.
+static void td_sound_callback(void * /*userdata*/, Uint8 *stream, int len)
+{
+    std::memset(stream, 0, len);
+    if (g_td_actual_channels <= 0 || g_td_actual_freq <= 0) return;
+
+    int16_t * const out      = reinterpret_cast<int16_t *>(stream);
+    int       const channels = g_td_actual_channels;
+    int       const frames   = len / (static_cast<int>(sizeof(int16_t)) * channels);
+
+    for (int vi = 0; vi < TD_VOICE_COUNT; ++vi) {
+        TdVoice &v = g_td_voices[vi];
+        if (!v.active || !v.decoded_pcm || v.pcm_len <= 0 || v.source_rate <= 0) {
+            if (v.active) v.active = false;
+            continue;
+        }
+        // Nearest-neighbour rate rescale: stride = bytes-per-sample * (src_rate / dst_rate).
+        double const stride = 2.0 * static_cast<double>(v.source_rate)
+                                  / static_cast<double>(g_td_actual_freq);
+        for (int f = 0; f < frames; ++f) {
+            int const byte_idx = static_cast<int>(v.cursor);
+            if (byte_idx + 1 >= v.pcm_len) { v.active = false; break; }
+            int16_t const s = *reinterpret_cast<const int16_t *>(v.decoded_pcm + byte_idx);
+            int32_t const scaled = (static_cast<int32_t>(s) * v.volume) / 255;
+            if (channels == 2) {
+                int32_t const pan_pos = std::max(v.pan, 0);
+                int32_t const pan_neg = std::min(v.pan, 0);
+                int32_t const left    = scaled * (32767 - pan_pos) / 32767;
+                int32_t const right   = scaled * (32767 + pan_neg) / 32767;
+                int32_t const acc_l   = static_cast<int32_t>(out[f*2+0]) + left;
+                int32_t const acc_r   = static_cast<int32_t>(out[f*2+1]) + right;
+                out[f*2+0] = static_cast<int16_t>(std::clamp(acc_l, -32768, 32767));
+                out[f*2+1] = static_cast<int16_t>(std::clamp(acc_r, -32768, 32767));
+            } else {
+                int32_t const acc = static_cast<int32_t>(out[f]) + scaled;
+                out[f] = static_cast<int16_t>(std::clamp(acc, -32768, 32767));
+            }
+            v.cursor += stride;
+        }
+    }
 }
 
 static bool td_sdl_audio_open(int rate, int channels)
@@ -113,14 +293,17 @@ static bool td_sdl_audio_open(int rate, int channels)
     want.format   = AUDIO_S16SYS;
     want.channels = static_cast<Uint8>(channels);
     want.samples  = 1024;
-    want.callback = td_silent_callback;
+    want.callback = td_sound_callback;
 
     SDL_AudioDeviceID dev = SDL_OpenAudioDevice(
-        nullptr, 0, &want, &have, 0);
+        nullptr, 0, &want, &have, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
     if (dev == 0) { SDL_QuitSubSystem(SDL_INIT_AUDIO); return false; }
 
-    g_td_audio_device = dev;
-    g_td_audio_open   = true;
+    g_td_audio_device    = dev;
+    g_td_audio_open      = true;
+    g_td_actual_freq     = have.freq;
+    g_td_actual_channels = have.channels;
+    for (int i = 0; i < TD_VOICE_COUNT; ++i) g_td_voices[i] = TdVoice{};
     SDL_PauseAudioDevice(dev, 0);
     return true;
 }
@@ -135,18 +318,24 @@ static void td_audio_init_trampoline(void *arg)
 static void td_audio_close_trampoline(void * /*arg*/)
 {
     if (!g_td_audio_open) return;
+    for (int i = 0; i < TD_VOICE_COUNT; ++i) {
+        g_td_voices[i].active = false;
+        td_voice_free(g_td_voices[i]);
+        g_td_voices[i] = TdVoice{};
+    }
     SDL_PauseAudioDevice(g_td_audio_device, 1);
     SDL_CloseAudioDevice(g_td_audio_device);
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
-    g_td_audio_device = 0;
-    g_td_audio_open   = false;
+    g_td_audio_device    = 0;
+    g_td_audio_open      = false;
+    g_td_actual_freq     = 0;
+    g_td_actual_channels = 0;
 }
 #endif // __EMSCRIPTEN__
 
 BOOL Audio_Init(HWND /*window*/, int bits_per_sample, BOOL stereo, int rate, int /*reverse_channels*/)
 {
     if (bits_per_sample != 16) return FALSE;
-
     bool ok;
 #ifdef __EMSCRIPTEN__
     if (!emscripten_is_main_runtime_thread()) {
@@ -164,14 +353,18 @@ BOOL Audio_Init(HWND /*window*/, int bits_per_sample, BOOL stereo, int rate, int
 #endif
     fprintf(stderr, "[TD] Audio_Init: SDL2 audio %s\n", ok ? "opened OK" : "FAILED");
     fflush(stderr);
-    SoundType  = ok ? SFX_ALFX   : SFX_NONE;
-    SampleType = ok ? SAMPLE_SB  : SAMPLE_NONE;
+    SoundType  = ok ? SFX_ALFX  : SFX_NONE;
+    SampleType = ok ? SAMPLE_SB : SAMPLE_NONE;
     return ok ? TRUE : FALSE;
 }
 
 void Sound_End(void)
 {
     if (!g_td_audio_open) return;
+    SDL_LockAudioDevice(g_td_audio_device);
+    for (int i = 0; i < TD_VOICE_COUNT; ++i) g_td_voices[i].active = false;
+    SDL_UnlockAudioDevice(g_td_audio_device);
+    for (int i = 0; i < TD_VOICE_COUNT; ++i) td_voice_free(g_td_voices[i]);
 #ifdef __EMSCRIPTEN__
     if (!emscripten_is_main_runtime_thread()) {
         emscripten_proxy_sync(
@@ -184,9 +377,112 @@ void Sound_End(void)
     SDL_PauseAudioDevice(g_td_audio_device, 1);
     SDL_CloseAudioDevice(g_td_audio_device);
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
-    g_td_audio_device = 0;
-    g_td_audio_open   = false;
+    g_td_audio_device    = 0;
+    g_td_audio_open      = false;
+    g_td_actual_freq     = 0;
+    g_td_actual_channels = 0;
 }
+
+// Sound_Callback: engine timer pump (TD has no music streaming; kept as no-op).
+void __cdecl Sound_Callback(void) {}
+
+void *Load_Sample(char const * /*filename*/) { return nullptr; }
+void Free_Sample(void const * /*sample*/) {} // TD samples are MixFileClass-owned
+long Load_Sample_Into_Buffer(char const *, void *, long) { return 0; }
+long Sample_Read(int, void *, long) { return 0; }
+
+int Get_Free_Sample_Handle(int priority)
+{
+    if (!g_td_audio_open) return -1;
+    SDL_LockAudioDevice(g_td_audio_device);
+    int free_slot = -1, evict_slot = -1, lowest_prio = INT_MAX;
+    for (int i = 0; i < TD_VOICE_COUNT; ++i) {
+        if (!g_td_voices[i].active) { free_slot = i; break; }
+        if (g_td_voices[i].priority < lowest_prio) {
+            lowest_prio = g_td_voices[i].priority;
+            evict_slot  = i;
+        }
+    }
+    int result = -1;
+    if (free_slot >= 0) {
+        result = free_slot;
+    } else if (evict_slot >= 0 && priority > lowest_prio) {
+        g_td_voices[evict_slot].active = false;
+        result = evict_slot;
+    }
+    SDL_UnlockAudioDevice(g_td_audio_device);
+    if (result == evict_slot && result >= 0) td_voice_free(g_td_voices[result]);
+    return result;
+}
+
+int Play_Sample_Handle(void const *sample, int priority, int volume, signed short panloc, int id)
+{
+    if (!sample || id < 0 || id >= TD_VOICE_COUNT || !g_td_audio_open) return -1;
+    int rate = 0, pcm_len = 0;
+    std::uint8_t *decoded = td_decode_aud(sample, &rate, &pcm_len);
+    if (!decoded) return -1;
+    SDL_LockAudioDevice(g_td_audio_device);
+    td_voice_free(g_td_voices[id]);
+    TdVoice &v    = g_td_voices[id];
+    v.active      = true;
+    v.decoded_pcm = decoded;
+    v.pcm_len     = pcm_len;
+    v.cursor      = 0.0;
+    v.source_rate = rate;
+    v.priority    = priority;
+    v.volume      = std::clamp(volume, 0, 255);
+    v.pan         = static_cast<int>(panloc);
+    SDL_UnlockAudioDevice(g_td_audio_device);
+    return id;
+}
+
+int Play_Sample(void const *sample, int priority, int volume, signed short panloc)
+{
+    int id = Get_Free_Sample_Handle(priority);
+    if (id < 0) return -1;
+    return Play_Sample_Handle(sample, priority, volume, panloc, id);
+}
+
+void Stop_Sample(int handle)
+{
+    if (handle < 0 || handle >= TD_VOICE_COUNT || !g_td_audio_open) return;
+    SDL_LockAudioDevice(g_td_audio_device);
+    g_td_voices[handle].active = false;
+    SDL_UnlockAudioDevice(g_td_audio_device);
+    td_voice_free(g_td_voices[handle]);
+}
+
+BOOL Sample_Status(int handle)
+{
+    if (handle < 0 || handle >= TD_VOICE_COUNT || !g_td_audio_open) return FALSE;
+    SDL_LockAudioDevice(g_td_audio_device);
+    BOOL r = g_td_voices[handle].active ? TRUE : FALSE;
+    SDL_UnlockAudioDevice(g_td_audio_device);
+    return r;
+}
+
+BOOL Is_Sample_Playing(void const * /*sample*/)
+{
+    // TD samples arrive as MixFileClass raw pointers; we don't track by source
+    // pointer — each Play_Sample decodes into a fresh malloc'd buffer.
+    return FALSE;
+}
+
+void Stop_Sample_Playing(void const * /*sample*/) {}
+
+long Sample_Length(void const *sample)
+{
+    if (!sample) return 0;
+    TdAUDOnDiskHeader hdr;
+    std::memcpy(&hdr, sample, sizeof(hdr));
+    return static_cast<long>(hdr.uncomp_size);
+}
+
+int  Set_Sound_Vol(int volume)  { return volume; }
+int  Set_Score_Vol(int volume)  { return volume; }
+void Fade_Sample(int handle, int /*ticks*/) { Stop_Sample(handle); }
+int  Get_Digi_Handle(void) { return g_td_audio_device > 0 ? static_cast<int>(g_td_audio_device) : 1; }
+
 #endif // !_MSC_VER
 
 
