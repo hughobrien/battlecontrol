@@ -2236,6 +2236,13 @@ Mono_Set_Cursor(0,0);
 	if (_ra_autostart && (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0)) {
 		fprintf(stderr, "[RA] Main_Loop frame %ld\n", _ra_frame_count); fflush(stderr);
 	}
+	// TIM-490: save in-game BMP snapshots for gameplay audit (first cycle only)
+	static bool _tim490_saved = false;
+	if (_ra_autostart && !_tim490_saved &&
+	    (_ra_frame_count == 10 || _ra_frame_count == 50 || _ra_frame_count == 100)) {
+		RA_Save_Gameplay_BMP((int)_ra_frame_count);
+		if (_ra_frame_count == 100) _tim490_saved = true;
+	}
 	/* RA_CHEAT=1: inject cheat actions at fixed frames.
 	 * Bypasses xdotool since SDL keyboard is not yet fully wired.
 	 * Mirrors Debug_Cheat (level=98) / Debug_Unshroud / Flag_To_Win. */

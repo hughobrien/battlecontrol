@@ -90,6 +90,23 @@ int SDL_Get_Primary_Pitch(void)
     return SDL_PrimarySurface ? SDL_PrimarySurface->pitch : 0;
 }
 
+// TIM-490: save a BMP snapshot of the current rendered frame, keyed by game loop frame.
+void RA_Save_Gameplay_BMP(int game_frame)
+{
+    if (SDL_PrimaryARGB == nullptr) return;
+    char path[64];
+    snprintf(path, sizeof(path), "/tmp/redalert-gameplay-f%03d.bmp", game_frame);
+    int rc = SDL_SaveBMP(SDL_PrimaryARGB, path);
+    const uint32_t* px = (const uint32_t*)SDL_PrimaryARGB->pixels;
+    int total = SDL_PrimaryARGB->w * SDL_PrimaryARGB->h;
+    int nz = 0;
+    for (int i = 0; i < total; ++i)
+        if (px[i] & 0x00FFFFFF) ++nz;
+    fprintf(stderr, "[RA] gameplay BMP frame=%d rc=%d nz_pixels=%d path=%s\n",
+            game_frame, rc, nz, path);
+    fflush(stderr);
+}
+
 // TIM-141 commit 6: window-class event pump. Drives
 // SurfaceMonitorClass::Set_Surface_Focus from SDL_WINDOWEVENT_FOCUS_*
 // and captures SDL_QUIT into SDL_QuitRequested for the game loop to
@@ -1044,10 +1061,15 @@ void Wait_Vert_Blank(void)
 	// TIM-247: save frame 500 as BMP; also log raw indexed-surface samples
 	// and palette to distinguish "all-zero surface" from "bad palette".
 	// TIM-283: also save frame 1000 for tac-bottom zone audit.
+	// TIM-490: also save frames 100 and 300 for post-radar gameplay audit.
 	if (SDL_FirstPresentDone) ++SDL_PresentCount;
-	if (SDL_FirstPresentDone && (SDL_PresentCount == 500 || SDL_PresentCount == 1000)) {
-		bool is_f500 = (SDL_PresentCount == 500);
-		const char* bmp_path = is_f500 ? "/tmp/redalert-frame500.bmp" : "/tmp/redalert-frame1000.bmp";
+	if (SDL_FirstPresentDone && (SDL_PresentCount == 100 || SDL_PresentCount == 300 ||
+	                              SDL_PresentCount == 500 || SDL_PresentCount == 1000)) {
+		const char* bmp_path =
+			(SDL_PresentCount == 100)  ? "/tmp/redalert-frame100.bmp"  :
+			(SDL_PresentCount == 300)  ? "/tmp/redalert-frame300.bmp"  :
+			(SDL_PresentCount == 500)  ? "/tmp/redalert-frame500.bmp"  :
+			                             "/tmp/redalert-frame1000.bmp";
 		int bmp_rc = SDL_SaveBMP(SDL_PrimaryARGB, bmp_path);
 		const uint32_t* px = (const uint32_t*)SDL_PrimaryARGB->pixels;
 		int total = SDL_PrimaryARGB->w * SDL_PrimaryARGB->h;
@@ -1056,7 +1078,7 @@ void Wait_Vert_Blank(void)
 			if (px[i] & 0x00FFFFFF) ++nz;
 		fprintf(stderr, "[RA] frame%d BMP: rc=%d nz_pixels=%d path=%s\n",
 			SDL_PresentCount, bmp_rc, nz, bmp_path);
-		if (is_f500) {
+		if (SDL_PresentCount == 500) {
 			const uint8_t* idx = (const uint8_t*)SDL_PrimarySurface->pixels;
 			int total_idx = SDL_PrimarySurface->w * SDL_PrimarySurface->h;
 			int nz_idx = 0;
