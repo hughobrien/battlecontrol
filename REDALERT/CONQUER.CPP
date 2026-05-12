@@ -2441,6 +2441,18 @@ Mono_Set_Cursor(0,0);
 	}
 #endif
 
+#ifdef __EMSCRIPTEN__
+	// TIM-489: suppress win/loss during the autostart FPS audit (first 1000 frames)
+	// so Do_Win/Do_Lose don't halt the game loop on a dialog before we measure frame rate.
+	if (_ra_autostart && _ra_frame_count < 1000) {
+		if (PlayerWins || PlayerLoses) {
+			fprintf(stderr, "[RA] suppressing win/loss at frame=%ld (fps audit active)\n", (long)_ra_frame_count);
+			PlayerWins = false;
+			PlayerLoses = false;
+		}
+	}
+#endif
+
 	if (PlayerWins) {
 #ifndef _MSC_VER
 		if (getenv("RA_AUTOSTART")) fprintf(stderr, "[PLAYER-WINS] frame=%ld\n", (long)Frame);
