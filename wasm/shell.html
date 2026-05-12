@@ -29,6 +29,7 @@
     #status-line { font-size: 12px; padding: 4px 0; color: #aaa; min-height: 1.4em; }
     #canvas { display: block; border: 1px solid #333; }
     #output {
+      display: none;
       width: 640px;
       height: 120px;
       overflow-y: auto;
@@ -104,11 +105,18 @@
   <pre id="output"></pre>
   <script>
     var outputEl = document.getElementById('output');
+    var _params = new URLSearchParams(window.location.search);
+    // ?debug=1 → show the stderr console below the canvas and inject RA_DEBUG env.
+    var _debugMode = _params.get('debug') === '1';
+    if (_debugMode) { outputEl.style.display = 'block'; }
     // TIM-399: ?autostart=1 → inject RA_AUTOSTART into Emscripten ENV at module
     // init time (before onRuntimeInitialized) so getenv("RA_AUTOSTART") works.
     var _envFromUrl = {};
-    if (new URLSearchParams(window.location.search).get('autostart') === '1') {
+    if (_params.get('autostart') === '1') {
       _envFromUrl['RA_AUTOSTART'] = '1';
+    }
+    if (_debugMode) {
+      _envFromUrl['RA_DEBUG'] = '1';
     }
     var Module = {
       canvas: document.getElementById('canvas'),
