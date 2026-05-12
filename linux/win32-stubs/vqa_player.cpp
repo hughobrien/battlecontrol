@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "vqa_player.h"
+#include "sdl_audio.h"
 
 // -------------------------------------------------------------------------
 // Chunk-ID helpers (IFF: 4 ASCII bytes, sizes big-endian)
@@ -195,14 +196,31 @@ static std::vector<int16_t> decode_snd1(const uint8_t* src, size_t src_len)
 
 // -------------------------------------------------------------------------
 // SDL2 audio queue (dedicated device, non-callback / SDL_QueueAudio)
+//
+// In WASM/browser only one SDL audio device may be open at a time.
+// If the game audio device is already open we close it before opening the
+// VQA device, then reopen it when playback ends.
 // -------------------------------------------------------------------------
 static SDL_AudioDeviceID vqa_audio_dev = 0;
+
+// Saved game-audio params for reopening after VQA finishes.
+static bool vqa_stole_game_audio   = false;
+static int  vqa_saved_rate         = 22050;
+static int  vqa_saved_channels     = 1;
+static int  vqa_saved_bits         = 16;
 
 static bool vqa_audio_open(int freq, int channels)
 {
     // Clamp to safe values before passing to SDL2
     if (channels < 1 || channels > 2) channels = 1;
     if (freq < 8000 || freq > 48000) freq = 22050;
+
+    // If game audio is already open, close it so SDL can reuse the device.
+    vqa_stole_game_audio = SDL_Audio_Is_Open();
+    if (vqa_stole_game_audio) {
+        SDL_Audio_Get_Params(&vqa_saved_rate, &vqa_saved_channels, &vqa_saved_bits);
+        SDL_Audio_Close();
+    }
 
     SDL_AudioSpec want = {}, have = {};
     want.freq     = freq;
@@ -213,6 +231,11 @@ static bool vqa_audio_open(int freq, int channels)
                                          SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
     if (!vqa_audio_dev) {
         fprintf(stderr, "[VQA] SDL audio open failed: %s\n", SDL_GetError());
+        // Restore game audio immediately if we failed.
+        if (vqa_stole_game_audio) {
+            SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
+            vqa_stole_game_audio = false;
+        }
         return false;
     }
     SDL_PauseAudioDevice(vqa_audio_dev, 0);
@@ -224,6 +247,11 @@ static void vqa_audio_close()
     if (vqa_audio_dev) {
         SDL_CloseAudioDevice(vqa_audio_dev);
         vqa_audio_dev = 0;
+    }
+    // Reopen game audio device if we closed it for VQA.
+    if (vqa_stole_game_audio) {
+        SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
+        vqa_stole_game_audio = false;
     }
 }
 

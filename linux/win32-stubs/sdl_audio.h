@@ -28,6 +28,7 @@ extern "C" {
 bool SDL_Audio_Open(int rate, int channels, int bits_per_sample);
 void SDL_Audio_Close(void);
 bool SDL_Audio_Is_Open(void);
+void SDL_Audio_Get_Params(int *rate, int *channels, int *bits);
 
 #ifdef __cplusplus
 }

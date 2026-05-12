@@ -385,6 +385,13 @@ bool SDL_Audio_Is_Open(void)
     return g_audio_open;
 }
 
+void SDL_Audio_Get_Params(int *rate, int *channels, int *bits)
+{
+    if (rate)     *rate     = g_audio_actual_freq;
+    if (channels) *channels = g_audio_actual_channels;
+    if (bits)     *bits     = 16;
+}
+
 } // extern "C"
 
 // WIN32LIB audio entry points. Audio_Init / Sound_End route to the SDL2
