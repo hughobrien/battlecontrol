@@ -209,6 +209,11 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
   });
 
   test('3 · game loop runs 100+ frames', async ({ page }) => {
+    // TIM-501: under system load (prior tests still active), frame-100 can arrive
+    // at ~4 min vs ~2 min in isolation.  Give 8 min total + 7 min inner wait so
+    // there is headroom without masking real hangs.
+    test.setTimeout(480_000);
+
     const consoleLogs: string[] = [];
     page.on('console', msg => consoleLogs.push(`[${msg.type()}] ${msg.text()}`));
 
@@ -216,7 +221,7 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
 
     // Game logs "[RA] Main_Loop frame N" for N<=15 and every 100th frame.
     // frame 100 is logged when _ra_frame_count % 100 == 0.
-    await waitForOutput(page, '[RA] Main_Loop frame 100', 240_000);
+    await waitForOutput(page, '[RA] Main_Loop frame 100', 420_000);
 
     const output = await getOutput(page);
     console.log('Output at frame 100:\n', output.slice(-2000));
