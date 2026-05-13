@@ -34,6 +34,8 @@ nix develop --command bash scripts/first-run-pass-94.sh
 ```
 Point the binary at your RA data directory (`RA_DATA_DIR=/path/to/data`).
 
+![RA native Linux gameplay](docs/ra-native-linux.png)
+
 ### Known limitations
 
 - **RA WASM in-game**: Red Alert does not yet start a game scenario in the browser — it loads the main menu but the autostart path to `Start_Scenario` is incomplete. Fix tracked for v0.2.
