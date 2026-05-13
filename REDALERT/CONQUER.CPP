@@ -119,6 +119,7 @@ TcpipManagerClass	Winsock;
 // !_MSC_VER so MSVC sees nothing.
 #ifndef _MSC_VER
 #include "sdl_quit.h"
+#include <SDL2/SDL.h>  // TIM-531: SDL_PushEvent for in-game click injection
 #endif
 
 #ifdef WOLAPI_INTEGRATION
@@ -2307,6 +2308,70 @@ Mono_Set_Cursor(0,0);
 			}
 			fflush(stderr);
 			_tim529_done = true;
+		}
+	}
+	/* TIM-531: SDL_PushEvent-based click injection (TIM-528 criterion 5).
+	 * Unlike TIM-529 (direct Selection_At_Mouse/Command_Object call), this
+	 * exercises the full SDL → SDL_Process_Input_Events → _Kbd ring → GadgetClass
+	 * path.  Events pushed here are drained in the same frame's present call
+	 * (DDRAW.CPP:SDL_Process_Input_Events) and land in _Kbd; the game reads them
+	 * one frame later, so the unit-count check is deferred to frame 35/45.
+	 *
+	 * Frame 30: SDL_MOUSEBUTTONDOWN + SDL_MOUSEBUTTONUP (LEFT)  at (350,135)
+	 *           → Selection_At_Mouse fires at frame 31 → ACTION_SELECT
+	 * Frame 35: log "[RA] TIM-531: unit selected count=N" (criterion 2 evidence)
+	 * Frame 40: SDL_MOUSEBUTTONDOWN + SDL_MOUSEBUTTONUP (RIGHT) at (290,215)
+	 *           → Command_Object fires at frame 41 → ACTION_MOVE
+	 * Frame 45: log "[RA] TIM-531: move order issued" (criterion 3 evidence) */
+	static bool _tim531_done = false;
+	if (_ra_autostart && !_tim531_done) {
+		if (_ra_frame_count == 30) {
+			SDL_Event ev;
+			memset(&ev, 0, sizeof(ev));
+			ev.type              = SDL_MOUSEBUTTONDOWN;
+			ev.button.button     = SDL_BUTTON_LEFT;
+			ev.button.state      = SDL_PRESSED;
+			ev.button.x          = 350;
+			ev.button.y          = 135;
+			ev.button.timestamp  = SDL_GetTicks();
+			SDL_PushEvent(&ev);
+			ev.type              = SDL_MOUSEBUTTONUP;
+			ev.button.state      = SDL_RELEASED;
+			ev.button.timestamp  = SDL_GetTicks();
+			SDL_PushEvent(&ev);
+			fprintf(stderr, "[RA] TIM-531: SDL left-click pushed at (350,135) frame=%ld\n",
+			        _ra_frame_count);
+			fflush(stderr);
+		}
+		if (_ra_frame_count == 35) {
+			fprintf(stderr, "[RA] TIM-531: unit selected count=%d frame=%ld\n",
+			        CurrentObject.Count(), _ra_frame_count);
+			fflush(stderr);
+		}
+		if (_ra_frame_count == 40) {
+			int pre = CurrentObject.Count();
+			SDL_Event ev;
+			memset(&ev, 0, sizeof(ev));
+			ev.type              = SDL_MOUSEBUTTONDOWN;
+			ev.button.button     = SDL_BUTTON_RIGHT;
+			ev.button.state      = SDL_PRESSED;
+			ev.button.x          = 290;
+			ev.button.y          = 215;
+			ev.button.timestamp  = SDL_GetTicks();
+			SDL_PushEvent(&ev);
+			ev.type              = SDL_MOUSEBUTTONUP;
+			ev.button.state      = SDL_RELEASED;
+			ev.button.timestamp  = SDL_GetTicks();
+			SDL_PushEvent(&ev);
+			fprintf(stderr, "[RA] TIM-531: SDL right-click pushed at (290,215) frame=%ld count_before=%d\n",
+			        _ra_frame_count, pre);
+			fflush(stderr);
+		}
+		if (_ra_frame_count == 45) {
+			fprintf(stderr, "[RA] TIM-531: move order issued count=%d frame=%ld\n",
+			        CurrentObject.Count(), _ra_frame_count);
+			fflush(stderr);
+			_tim531_done = true;
 		}
 	}
 	/* RA_CHEAT=1: inject cheat actions at fixed frames.
