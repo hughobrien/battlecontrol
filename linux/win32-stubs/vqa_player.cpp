@@ -25,6 +25,12 @@
 #include "vqa_player.h"
 #include "sdl_audio.h"
 
+#ifdef __EMSCRIPTEN__
+// TIM-517: proxy VQA SDL audio calls to the main browser thread (same as AUDIO.CPP/TIM-428).
+#include <emscripten/threading.h>
+#include <emscripten/proxying.h>
+#endif
+
 // -------------------------------------------------------------------------
 // Chunk-ID helpers (IFF: 4 ASCII bytes, sizes big-endian)
 // -------------------------------------------------------------------------
@@ -209,22 +215,80 @@ static int  vqa_saved_rate         = 22050;
 static int  vqa_saved_channels     = 1;
 static int  vqa_saved_bits         = 16;
 
-// TIM-513: In PROXY_TO_PTHREAD WASM builds the game loop runs in a Web Worker.
-// SDL_InitSubSystem(SDL_INIT_AUDIO) and SDL_OpenAudioDevice called from a Web
-// Worker try to create AudioContext in the worker context.  AudioContext is a
-// main-thread-only API; Emscripten's SDL2 JS layer leaves Module["SDL2"] without
-// an audioContext, so the subsequent sampleRate read throws an uncaught TypeError
-// that aborts the WASM.  The existing PROXY_TO_PTHREAD trampoline in AUDIO.CPP
-// correctly handles game audio (it proxies to the main thread), but the VQA
-// player called SDL functions directly.
-//
-// Fix: under EMSCRIPTEN, skip VQA audio entirely (return false → audio_ok=false
-// → audio chunks are silently dropped).  Game audio stays open and unaffected.
-// vqa_audio_close becomes a no-op; the unconditional SDL_QuitSubSystem it used
-// to call would otherwise destroy the main thread's audio context.
+// TIM-517: proxy VQA audio device open/close to the main browser thread,
+// mirroring the AUDIO.CPP trampoline pattern (TIM-428).
+// SDL_OpenAudioDevice / SDL_CloseAudioDevice / SDL_InitSubSystem(SDL_INIT_AUDIO)
+// must run on the Emscripten main runtime thread; calling them from a Web Worker
+// crashes with an uncaught TypeError on AudioContext.sampleRate (TIM-513).
 #ifdef __EMSCRIPTEN__
-static bool vqa_audio_open(int /*freq*/, int /*channels*/) { return false; }
-static void vqa_audio_close() {}
+struct VqaAudioOpenArgs {
+    int freq;
+    int channels;
+    bool result;
+};
+
+static void vqa_audio_open_on_main(void* arg)
+{
+    auto* a = static_cast<VqaAudioOpenArgs*>(arg);
+    vqa_stole_game_audio = SDL_Audio_Is_Open();
+    if (vqa_stole_game_audio) {
+        SDL_Audio_Get_Params(&vqa_saved_rate, &vqa_saved_channels, &vqa_saved_bits);
+        SDL_Audio_Close();
+    }
+    SDL_InitSubSystem(SDL_INIT_AUDIO);
+    SDL_AudioSpec want = {}, have = {};
+    want.freq     = a->freq;
+    want.format   = AUDIO_S16LSB;
+    want.channels = (uint8_t)a->channels;
+    want.samples  = 1024;
+    vqa_audio_dev = SDL_OpenAudioDevice(nullptr, 0, &want, &have,
+                                         SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+    if (!vqa_audio_dev) {
+        fprintf(stderr, "[VQA] SDL audio open failed: %s\n", SDL_GetError());
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        if (vqa_stole_game_audio) {
+            SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
+            vqa_stole_game_audio = false;
+        }
+        a->result = false;
+        return;
+    }
+    SDL_PauseAudioDevice(vqa_audio_dev, 0);
+    a->result = true;
+}
+
+static void vqa_audio_close_on_main(void* /*arg*/)
+{
+    if (vqa_audio_dev) {
+        SDL_CloseAudioDevice(vqa_audio_dev);
+        vqa_audio_dev = 0;
+    }
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    if (vqa_stole_game_audio) {
+        SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
+        vqa_stole_game_audio = false;
+    }
+}
+
+static bool vqa_audio_open(int freq, int channels)
+{
+    if (channels < 1 || channels > 2) channels = 1;
+    if (freq < 8000 || freq > 48000) freq = 22050;
+    VqaAudioOpenArgs args = { freq, channels, false };
+    emscripten_proxy_sync(
+        emscripten_proxy_get_system_queue(),
+        emscripten_main_runtime_thread_id(),
+        vqa_audio_open_on_main, &args);
+    return args.result;
+}
+
+static void vqa_audio_close()
+{
+    emscripten_proxy_sync(
+        emscripten_proxy_get_system_queue(),
+        emscripten_main_runtime_thread_id(),
+        vqa_audio_close_on_main, nullptr);
+}
 #else
 static bool vqa_audio_open(int freq, int channels)
 {
