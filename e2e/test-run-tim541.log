@@ -1,0 +1,61 @@
+
+Running 1 test using 1 worker
+
+
+[TIM-541] === Phase 1: Boot + preloader ===
+  preloader hidden — 0s
+
+[TIM-541] === Phase 2: Init_Game + Start_Scenario ===
+  Init_Bulk_Data done — 6s
+  SDL2 audio opened OK: PASS
+  Start_Scenario OK — 7s
+
+[TIM-541] === Phase 3: Frames 100–500 (TIM-538 regression) ===
+  frame 100 — 12s  fill=51%  colors=197
+  frame 300 — 22s  fill=51%  colors=203
+  frame 500 — 33s  fill=51%  colors=192
+  fps 100→300=22  300→500=17.4
+
+[TIM-541] === Phase 4: Frames 1000–5000 (enemy AI + combat) ===
+  frame 1000 — 68s
+  TIM-536 probe@1000: [err] [TIM-536] pass-97 probe frame=1000 enemy_units=2 enemy_infantry=31
+  frame 2000 — 165s  fps_1000→2000=10.3
+  TIM-536 probe@2000: [err] [TIM-536] pass-97 probe frame=2000 enemy_units=3 enemy_infantry=31
+  frame 3000 — 298s
+  TIM-536 probe@3000: [err] [TIM-536] pass-97 probe frame=3000 enemy_units=3 enemy_infantry=31
+  frame 4000 — 470s
+  TIM-536 probe@4000: [err] [TIM-536] pass-97 probe frame=4000 enemy_units=3 enemy_infantry=31
+  frame 5000 — 678s  fps_4000→5000=4.8
+  canvas at frame 5000: 640×480  fill=51%  colors=200
+
+[TIM-541] ===== AUDIT SUMMARY (pass-98 WASM combat) =====
+  c1. 5000+ frames reached, no crash:              PASS (frame 5000 at 678s)
+  c2a. [TIM-536] enemy AI active (enemy_units>0):  PASS
+  c2b. [TIM-301] death events (combat):            PASS (6 events)
+  c2c. fps ≥10 at frame 5000 (4000→5000):          FAIL (fps=4.8)
+  c3.  wasm-frame-5000-combat.png ≥10% fill:       PASS (fill=51%)
+  c4a. TIM-538 regression — no crash:              PASS
+  c4b. TIM-538 regression — SDL2 audio OK:         PASS
+  c4c. TIM-538 regression — canvas fill≥40%@500:   PASS (fill=51%)
+  c4d. TIM-538 regression — fps≥15 (300→500):      PASS (fps=17.4)
+  c4e. TIM-538 regression — no AudioContext crash:  PASS
+  c5.  [GAME-CLICK] injection (pass-97 regression): PASS (4 click events)
+
+  TIM-536 probe lines:
+    [err] [TIM-536] pass-97 probe frame=1000 enemy_units=2 enemy_infantry=31
+    [err] [TIM-536] pass-97 probe frame=2000 enemy_units=3 enemy_infantry=31
+    [err] [TIM-536] pass-97 probe frame=3000 enemy_units=3 enemy_infantry=31
+    [err] [TIM-536] pass-97 probe frame=4000 enemy_units=3 enemy_infantry=31
+    [err] [TIM-536] pass-97 probe frame=5000 enemy_units=4 enemy_infantry=31
+  TIM-301 deaths (first 5):
+    [err] [TIM-301] death_announcement frame=96 unit=E1
+    [err] [TIM-301] death_announcement frame=109 unit=DOG
+    [err] [TIM-301] death_announcement frame=159 unit=E1
+    [err] [TIM-301] death_announcement frame=201 unit=E1
+    [err] [TIM-301] death_announcement frame=254 unit=E1
+  ✓  1 [chromium] › e2e/tim541-combat.spec.ts:109:7 › TIM-541 — RA WASM combat verification (pass-98) › 5000-frame run: enemy AI active + combat + TIM-538 regression (11.3m)
+
+  Slow test file: [chromium] › e2e/tim541-combat.spec.ts (11.3m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 passed (11.4m)
+[tmux-done] exit=0
