@@ -118,6 +118,12 @@
     if (_debugMode) {
       _envFromUrl['RA_DEBUG'] = '1';
     }
+    // TIM-537: ?gameclk=1 → inject RA_GAME_CLICK so C++ fires SDL_PushEvent-based
+    // unit-select (frame 30) and move-order (frame 35) clicks; also shows #output.
+    if (_params.get('gameclk') === '1') {
+      _envFromUrl['RA_GAME_CLICK'] = '1';
+      outputEl.style.display = 'block';
+    }
     var Module = {
       canvas: document.getElementById('canvas'),
       noInitialRun: true,   // preloader.js calls callMain() after files are mounted
