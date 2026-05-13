@@ -79,6 +79,8 @@
 
   // ?autostart=1 URL param — set once during DOMContentLoaded, read in mountAndLaunch.
   var autostart = false;
+  // TIM-540: ?gameclk=1 URL param — same pattern; used to create RA_GAME_CLICK.FLAG.
+  var gameclk = false;
 
   // Hook into Emscripten runtime init.  noInitialRun:true in the Module
   // pre-definition means callMain() won't fire automatically; we call it
@@ -296,6 +298,18 @@
       }
     }
 
+    // TIM-540: ?gameclk=1 creates RA_GAME_CLICK.FLAG in MEMFS for the same reason.
+    // getenv("RA_GAME_CLICK") returns NULL in the PROXY_TO_PTHREAD worker; the flag
+    // file is checked by C++ as fallback (RawFileClass("RA_GAME_CLICK.FLAG")).
+    if (!isTD && gameclk) {
+      try {
+        FS.createDataFile(GAME_DIR, 'RA_GAME_CLICK.FLAG', new Uint8Array([1]), true, true, false);
+        console.log('[preloader] gameclk flag → ' + GAME_DIR + '/RA_GAME_CLICK.FLAG');
+      } catch (e) {
+        console.warn('[preloader] could not create gameclk flag file:', e.message);
+      }
+    }
+
     function launchGame() {
       setStatus('Starting game…');
       Module.callMain([]);
@@ -332,6 +346,10 @@
     // ?autostart=1 — skip menu, jump to first mission (used in e2e tests).
     if (params.get('autostart') === '1') {
       autostart = true;
+    }
+    // ?gameclk=1 — enable synthetic unit-click injection (TIM-537/TIM-540).
+    if (params.get('gameclk') === '1') {
+      gameclk = true;
     }
 
     // ?src=<url> param: fetch MIX files from S3 / HTTP instead of local picker.

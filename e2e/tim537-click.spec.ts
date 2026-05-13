@@ -142,8 +142,12 @@ test.describe('TIM-537 — RA WASM unit-click injection (pass-97)', () => {
     // -------------------------------------------------------------------------
     console.log('\n[TIM-537] === Phase 3: Click injection (frame 30 → unit select) ===');
 
-    await waitForOutput(page, '[RA] Main_Loop frame 30', 420_000);
-    console.log(`  frame 30 observed — ${Math.round((Date.now() - tStart) / 1000)}s`);
+    // TIM-540 fix: wait for [GAME-CLICK] frame 30 — the C++ RA_GAME_CLICK code logs
+    // this exactly at frame 30. "[RA] Main_Loop frame 30" was wrong: the loop only
+    // logs frames ≤15 or multiples of 100, so "frame 30" only appeared as a substring
+    // of "frame 300" causing the browser click to fire 270 frames late.
+    await waitForOutput(page, '[GAME-CLICK] frame 30:', 420_000);
+    console.log(`  [GAME-CLICK] frame 30 observed — ${Math.round((Date.now() - tStart) / 1000)}s`);
 
     // Browser-native left-click: position is relative to canvas top-left corner.
     // Matches native SDL coordinates (350,155) used by RA_GAME_CLICK.
@@ -157,8 +161,9 @@ test.describe('TIM-537 — RA WASM unit-click injection (pass-97)', () => {
     // -------------------------------------------------------------------------
     console.log('\n[TIM-537] === Phase 4: Click injection (frame 35 → move order) ===');
 
-    await waitForOutput(page, '[RA] Main_Loop frame 35', 120_000);
-    console.log(`  frame 35 observed — ${Math.round((Date.now() - tStart) / 1000)}s`);
+    // TIM-540 fix: wait for [GAME-CLICK] frame 35 — logged exactly at frame 35.
+    await waitForOutput(page, '[GAME-CLICK] frame 35:', 120_000);
+    console.log(`  [GAME-CLICK] frame 35 observed — ${Math.round((Date.now() - tStart) / 1000)}s`);
 
     // Browser-native right-click for move order.
     await canvas.click({ button: 'right', position: { x: 430, y: 375 } });
