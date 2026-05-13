@@ -233,16 +233,11 @@ def decode_vqa(vqa_path: str, outdir: str, frames_to_dump=None,
     blocksY = vqaH // blockH
     numBlocks = blocksX * blocksY
 
-    # ffmpeg allocates MAX_CODEBOOK_SIZE = (0xFF00 + 0x100) * 4 * 4 bytes;
-    # solid-color blocks occupy the top 256 slots (indices 0xFF00..0xFFFF).
-    MAX_CB_VECTORS = 0xFF00 + 0x100
+    # VQA v2: pointer values 0x0000..0xFEFF = codebook indices;
+    # hi==0xFF = block unchanged from previous frame (render loop skips it).
+    MAX_CB_VECTORS = 0xFF00
     codebook_size = MAX_CB_VECTORS * cbEntrySize
     codebook = bytearray(codebook_size)
-    # Pre-fill solid-color entries at the top of the codebook
-    for ci in range(256):
-        base = (0xFF00 + ci) * cbEntrySize
-        for j in range(cbEntrySize):
-            codebook[base + j] = ci
 
     # ffmpeg-style CBPZ accumulation: chunks are appended raw and decompressed
     # together every cbParts frames (after rendering, so new codebook takes
@@ -342,8 +337,9 @@ def decode_vqa(vqa_path: str, outdir: str, frames_to_dump=None,
 
                 dst_base = by * blockH * vqaW + bx * blockW
 
-                # v2 VQA: hi=0xFF → solid-color vector (codebook index 0xFF00+lo)
-                # hi=0xFF, lo=0xFF → solid color 255 (same codebook path)
+                # hi==0xFF: block unchanged from previous frame — skip
+                if hi == 0xFF:
+                    continue
                 cb_idx = lo | (hi << 8)
                 cb_base = cb_idx * cbEntrySize
                 if cb_base + cbEntrySize <= codebook_size:

@@ -487,13 +487,11 @@ extern "C" void Play_Movie_Linux(const char* name)
             filename, vqaW, vqaH, blockW, blockH, fps,
             hdr.flags, has_audio, freq, channels, hdr.numFrames);
 
-    // ffmpeg allocates (0xFF00+0x100) vectors; top 256 slots are solid-colour
-    // blocks pre-filled with their palette index so hi=0xFF routes to a solid
-    // fill without any special-case in the render loop.
-    const size_t MAX_CB_VECTORS = 0xFF00u + 0x100u;
+    // VQA v2: 0x0000..0xFEFF = codebook indices; hi==0xFF = block unchanged
+    // from the previous frame.  The render loop skips hi==0xFF blocks so we
+    // only need 0xFF00 codebook slots here.
+    const size_t MAX_CB_VECTORS = 0xFF00u;
     std::vector<uint8_t> codebook(MAX_CB_VECTORS * cbEntrySize, 0);
-    for (int ci = 0; ci < 256; ++ci)
-        memset(codebook.data() + (0xFF00u + ci) * cbEntrySize, (uint8_t)ci, cbEntrySize);
 
     std::vector<uint8_t> framebuf((size_t)vqaW * vqaH, 0);
     std::vector<uint8_t> prevbuf((size_t)vqaW * vqaH, 0);
@@ -617,8 +615,9 @@ extern "C" void Play_Movie_Linux(const char* name)
         });
 
         // Pass 2: Render frame (VPT0 / VPTZ / VPTR / VPRZ)
-        // hi=0xFF routes to the solid-colour vectors at 0xFF00..0xFFFF
-        // that were pre-initialised at startup — no special-case needed.
+        // hi==0xFF: block unchanged from previous frame — skip (framebuf
+        // already holds the previous frame content for that block).
+        // hi<0xFF: index into codebook (0x0000..0xFEFF).
         iter_sub([&](const uint8_t* shdr, uint32_t ssz, const uint8_t* sbody) {
             if (!chunk_eq(shdr, "VPT0") && !chunk_eq(shdr, "VPTZ") &&
                 !chunk_eq(shdr, "VPTR") && !chunk_eq(shdr, "VPRZ")) return;
@@ -638,6 +637,7 @@ extern "C" void Play_Movie_Linux(const char* name)
             for (int bi = 0; bi < numBlocks; ++bi) {
                 int bx = bi % blocksX, by = bi / blocksX;
                 uint8_t lo = lo_tbl[bi], hi = hi_tbl[bi];
+                if (hi == 0xFF) continue;  // block unchanged from previous frame
                 int cb_idx = (int)lo | ((int)hi << 8);
                 const uint8_t* src = codebook.data() + (size_t)cb_idx * cbEntrySize;
                 for (int fy = 0; fy < blockH; ++fy)
