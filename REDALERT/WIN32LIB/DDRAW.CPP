@@ -1213,7 +1213,26 @@ void Set_DD_Palette ( void *palette )
 #endif
 }
 
-
+#ifndef _MSC_VER
+// TIM-523: VQA CPL0 palette bytes are 8-bit (0-255), not 6-bit VGA.
+// Set_DD_Palette always applies <<2, corrupting values >= 64.
+// This variant writes pre-scaled 8-bit RGB directly, bypassing the shift.
+extern "C" void Set_DD_Palette_8bit(const uint8_t* rgb8, int ncolors)
+{
+	if (!rgb8 || ncolors <= 0) return;
+	if (ncolors > 256) ncolors = 256;
+	for (int i = 0; i < ncolors; ++i) {
+		SDL_PaletteEntries[i].r = rgb8[i * 3 + 0];
+		SDL_PaletteEntries[i].g = rgb8[i * 3 + 1];
+		SDL_PaletteEntries[i].b = rgb8[i * 3 + 2];
+		SDL_PaletteEntries[i].a = 255;
+	}
+	if (SDL_PrimarySurface && SDL_PrimarySurface->format &&
+	    SDL_PrimarySurface->format->palette)
+		SDL_SetPaletteColors(SDL_PrimarySurface->format->palette,
+		                     SDL_PaletteEntries, 0, ncolors);
+}
+#endif // !_MSC_VER
 
 
 
