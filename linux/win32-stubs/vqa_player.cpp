@@ -201,6 +201,60 @@ static std::vector<int16_t> decode_snd1(const uint8_t* src, size_t src_len)
 }
 
 // -------------------------------------------------------------------------
+// Westwood SND2 IMA ADPCM decoder (standard Intel/DVI IMA ADPCM)
+//
+// Red Alert VQA files use SND2 for all audio.  Each SND2 chunk is raw
+// 4-bit nibble data with NO per-chunk header — the predictor and step
+// index persist across chunks for the lifetime of the movie (reset to
+// 0/0 at the start of each Play_Movie_Linux call).
+//
+// Nibble order: low nibble first, then high nibble (VQA v2 format).
+// Formula: diff = ((2*(nibble&7)+1)*step) >> 3  (ffmpeg adpcm_ima_ws)
+// -------------------------------------------------------------------------
+static const int ima_step_table[89] = {
+    7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34,
+    37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143,
+    157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494,
+    544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552,
+    1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428,
+    4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487,
+    12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086,
+    29794, 32767
+};
+
+static const int8_t ima_index_table[16] = {
+    -1, -1, -1, -1, 2, 4, 6, 8,
+    -1, -1, -1, -1, 2, 4, 6, 8
+};
+
+struct ImaState {
+    int32_t predictor  = 0;
+    int32_t step_index = 0;
+};
+
+static int16_t ima_decode_nibble(ImaState& st, int nibble)
+{
+    int step  = ima_step_table[st.step_index];
+    int diff  = ((2 * (nibble & 7) + 1) * step) >> 3;
+    if (nibble & 8) st.predictor -= diff;
+    else            st.predictor += diff;
+    st.predictor   = std::max(-32768, std::min(32767, (int)st.predictor));
+    st.step_index  = std::max(0, std::min(88, (int)(st.step_index + ima_index_table[nibble])));
+    return (int16_t)st.predictor;
+}
+
+static std::vector<int16_t> decode_snd2(const uint8_t* src, size_t src_len, ImaState& st)
+{
+    std::vector<int16_t> out;
+    out.reserve(src_len * 2);
+    for (size_t i = 0; i < src_len; ++i) {
+        out.push_back(ima_decode_nibble(st, src[i] & 0x0F));  // low nibble first
+        out.push_back(ima_decode_nibble(st, src[i] >> 4));    // then high nibble
+    }
+    return out;
+}
+
+// -------------------------------------------------------------------------
 // SDL2 audio queue (dedicated device, non-callback / SDL_QueueAudio)
 //
 // In WASM/browser only one SDL audio device may be open at a time.
@@ -507,6 +561,7 @@ extern "C" void Play_Movie_Linux(const char* name)
     int partial_countdown = hdr.cbParts ? hdr.cbParts : 1;
 
     bool audio_ok = has_audio && vqa_audio_open(freq, channels);
+    ImaState ima_state;  // predictor=0, step_index=0; persists across SND2 chunks
 
     uint32_t frame_ms = (fps > 0) ? (1000u / (uint32_t)fps) : 67u;
     bool user_abort   = false;
@@ -557,8 +612,15 @@ extern "C" void Play_Movie_Linux(const char* name)
             continue;
         }
         if (chunk_eq(chk, "SND2")) {
-            // IMA ADPCM — unsupported, skip
-            if (chk_sz) f.Seek((long)chk_sz + (chk_sz & 1), SEEK_CUR);
+            if (chk_sz) {
+                std::vector<uint8_t> raw(chk_sz);
+                f.Read(raw.data(), (long)chk_sz);
+                if (audio_ok) {
+                    auto pcm = decode_snd2(raw.data(), raw.size(), ima_state);
+                    vqa_audio_queue_s16(pcm.data(), pcm.size());
+                }
+                if (chk_sz & 1) f.Seek(1, SEEK_CUR);
+            }
             continue;
         }
         if (!chunk_eq(chk, "VQFR")) {
