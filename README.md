@@ -34,7 +34,7 @@ nix develop --command bash scripts/first-run-pass-94.sh
 ```
 Point the binary at your RA data directory (`RA_DATA_DIR=/path/to/data`).
 
-![RA native Linux gameplay](docs/ra-native-linux.png)
+![RA native Linux gameplay](https://raw.githubusercontent.com/hughobrien/battlecontrol/master/docs/ra-native-linux.png)
 
 ### Known limitations
 
