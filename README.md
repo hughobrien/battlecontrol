@@ -10,14 +10,25 @@ No installation needed. You need legally-acquired game data — click **Open Gam
 
 ---
 
-## v0.1-beta Release Notes
+## v0.2 Release Notes
 
 ### What's included
 
 | | Browser (WASM) | Native Linux binary |
 |---|---|---|
-| **Tiberian Dawn** | Fully playable — game loop, audio, graphics, real font rendering | Not yet (TD Linux binary work in progress) |
-| **Red Alert** | Main menu loads; in-game not yet functional via browser | Fully playable — ~12 fps, 12 win/loss cycles, ASAN-clean |
+| **Tiberian Dawn** | ✅ Fully playable — game loop, audio, graphics, real font rendering | Not yet (TD Linux binary work in progress) |
+| **Red Alert** | ✅ Fully playable — unit control, AI, VQA cinematics, audio, full game loop | ✅ Fully playable — ~12 fps, 12 win/loss cycles, ASAN-clean |
+
+### What's new in v0.2 (since v0.1-beta)
+
+**Red Alert WASM** — now fully playable in browser:
+- `Start_Scenario` fires correctly; the full mission loop runs in WASM
+- Unit selection and movement (left-click select, right-click move order)
+- Enemy AI: units patrol, attack, and interact with the player
+- VQA cinematics play correctly: skip of hi==0xFF blocks, SND2 IMA ADPCM audio, CPL0 palette fix (no 2-bit shift on 8-bit values)
+- WASM audio pitch correct (AudioContext.sampleRate queried before SDL_OpenAudioDevice)
+
+**Tiberian Dawn WASM** — full gameplay audit passed; all e2e specs green.
 
 ### How to play
 
@@ -38,7 +49,6 @@ Point the binary at your RA data directory (`RA_DATA_DIR=/path/to/data`).
 
 ### Known limitations
 
-- **RA WASM in-game**: Red Alert does not yet start a game scenario in the browser — it loads the main menu but the autostart path to `Start_Scenario` is incomplete. Fix tracked for v0.2.
 - **TD native Linux binary**: Tiberian Dawn native Linux port is complete (`e2e/td-gameplay.spec.ts` all pass) but a packaged run script is not yet included in this release.
 - **Prerequisites**: You must supply legally-acquired game data (MIX files). Game data is not included and cannot be distributed.
 - **Browser requirements**: Chrome or Edge (stable) required for SharedArrayBuffer / WASM threads. Firefox works with `dom.postMessage.sharedArrayBuffer.bypassCOOP_COEP.insecure.enabled = true`.
@@ -56,7 +66,7 @@ battlecontrol is a Linux and WebAssembly port of the EA-released game engine sou
 > | [electronicarts/CnC_Red_Alert](https://github.com/electronicarts/CnC_Red_Alert) | Standalone **original 1996 Red Alert** source (Win32 game) | Separate project — not related to this fork |
 > | [electronicarts/CnC_Tiberian_Dawn](https://github.com/electronicarts/CnC_Tiberian_Dawn) | Standalone **original 1995 Tiberian Dawn** source (MS-DOS game) | Separate project — not related to this fork |
 
-> **Current status — v0.1-beta:** Both games run in the browser (WASM) and as a native Linux binary. Tiberian Dawn is fully playable end-to-end in WASM — game loop, audio, and full rendering pipeline confirmed. Red Alert reaches the main menu in WASM; in-game gameplay via browser autostart is a known limitation (tracked for the next release). The native Linux RA binary runs to completion at ~12 fps, 12 win/loss cycles, ASAN-clean.
+> **Current status — v0.2:** Both games are fully playable in the browser (WASM). Tiberian Dawn: complete game loop, audio, and full rendering pipeline. Red Alert: unit control, enemy AI, VQA cinematics (with correct palette and audio), and the full mission loop confirmed. The native Linux RA binary runs at ~12 fps, 12 win/loss cycles, ASAN-clean.
 
 ---
 
