@@ -2374,6 +2374,58 @@ Mono_Set_Cursor(0,0);
 			_tim531_done = true;
 		}
 	}
+	/* TIM-534: RA_GAME_CLICK=1 — synthetic unit click for unit select/move audit (pass-73).
+	 * Left-click at frame 30 targets infantry cluster at ~(350,155) in SCG01EA default
+	 * viewport. Right-click at frame 35 issues move order to open terrain at ~(430,375).
+	 * Events are pushed via SDL_PushEvent; SDL_Process_Input_Events (called from
+	 * DDRAW.CPP:Wait_Vert_Blank each frame) converts them to _Kbd entries, which
+	 * Map.Input() then processes in the same or next Main_Loop iteration.
+	 * Frame 40: log unit-count after both clicks for acceptance-criteria evidence. */
+	static bool _ra_game_click_done = false;
+	static bool _ra_game_click = getenv("RA_GAME_CLICK") != nullptr;
+	if (_ra_game_click && !_ra_game_click_done) {
+		if (_ra_frame_count == 30) {
+			SDL_Event ev;
+			memset(&ev, 0, sizeof(ev));
+			ev.type             = SDL_MOUSEBUTTONDOWN;
+			ev.button.button    = SDL_BUTTON_LEFT;
+			ev.button.state     = SDL_PRESSED;
+			ev.button.x         = 350;
+			ev.button.y         = 155;
+			ev.button.timestamp = SDL_GetTicks();
+			SDL_PushEvent(&ev);
+			ev.type             = SDL_MOUSEBUTTONUP;
+			ev.button.state     = SDL_RELEASED;
+			ev.button.timestamp = SDL_GetTicks();
+			SDL_PushEvent(&ev);
+			fprintf(stderr, "[GAME-CLICK] frame %ld: left-click at (350,155) pushed\n",
+			        _ra_frame_count); fflush(stderr);
+		}
+		if (_ra_frame_count == 35) {
+			fprintf(stderr, "[GAME-CLICK] frame %ld: unit-count after left-click = %d\n",
+			        _ra_frame_count, CurrentObject.Count()); fflush(stderr);
+			SDL_Event ev;
+			memset(&ev, 0, sizeof(ev));
+			ev.type             = SDL_MOUSEBUTTONDOWN;
+			ev.button.button    = SDL_BUTTON_RIGHT;
+			ev.button.state     = SDL_PRESSED;
+			ev.button.x         = 430;
+			ev.button.y         = 375;
+			ev.button.timestamp = SDL_GetTicks();
+			SDL_PushEvent(&ev);
+			ev.type             = SDL_MOUSEBUTTONUP;
+			ev.button.state     = SDL_RELEASED;
+			ev.button.timestamp = SDL_GetTicks();
+			SDL_PushEvent(&ev);
+			fprintf(stderr, "[GAME-CLICK] frame %ld: right-click at (430,375) pushed (move order)\n",
+			        _ra_frame_count); fflush(stderr);
+		}
+		if (_ra_frame_count == 40) {
+			fprintf(stderr, "[GAME-CLICK] frame %ld: post-click unit-count = %d\n",
+			        _ra_frame_count, CurrentObject.Count()); fflush(stderr);
+			_ra_game_click_done = true;
+		}
+	}
 	/* RA_CHEAT=1: inject cheat actions at fixed frames.
 	 * Bypasses xdotool since SDL keyboard is not yet fully wired.
 	 * Mirrors Debug_Cheat (level=98) / Debug_Unshroud / Flag_To_Win. */
