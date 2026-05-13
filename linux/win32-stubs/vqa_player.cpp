@@ -209,6 +209,23 @@ static int  vqa_saved_rate         = 22050;
 static int  vqa_saved_channels     = 1;
 static int  vqa_saved_bits         = 16;
 
+// TIM-513: In PROXY_TO_PTHREAD WASM builds the game loop runs in a Web Worker.
+// SDL_InitSubSystem(SDL_INIT_AUDIO) and SDL_OpenAudioDevice called from a Web
+// Worker try to create AudioContext in the worker context.  AudioContext is a
+// main-thread-only API; Emscripten's SDL2 JS layer leaves Module["SDL2"] without
+// an audioContext, so the subsequent sampleRate read throws an uncaught TypeError
+// that aborts the WASM.  The existing PROXY_TO_PTHREAD trampoline in AUDIO.CPP
+// correctly handles game audio (it proxies to the main thread), but the VQA
+// player called SDL functions directly.
+//
+// Fix: under EMSCRIPTEN, skip VQA audio entirely (return false → audio_ok=false
+// → audio chunks are silently dropped).  Game audio stays open and unaffected.
+// vqa_audio_close becomes a no-op; the unconditional SDL_QuitSubSystem it used
+// to call would otherwise destroy the main thread's audio context.
+#ifdef __EMSCRIPTEN__
+static bool vqa_audio_open(int /*freq*/, int /*channels*/) { return false; }
+static void vqa_audio_close() {}
+#else
 static bool vqa_audio_open(int freq, int channels)
 {
     // Clamp to safe values before passing to SDL2
@@ -262,6 +279,7 @@ static void vqa_audio_close()
         vqa_stole_game_audio = false;
     }
 }
+#endif // __EMSCRIPTEN__
 
 static void vqa_audio_queue_s16(const int16_t* pcm, size_t count)
 {
