@@ -299,12 +299,14 @@
     }
 
     // TIM-540: ?gameclk=1 creates RA_GAME_CLICK.FLAG in MEMFS for the same reason.
-    // getenv("RA_GAME_CLICK") returns NULL in the PROXY_TO_PTHREAD worker; the flag
-    // file is checked by C++ as fallback (RawFileClass("RA_GAME_CLICK.FLAG")).
-    if (!isTD && gameclk) {
+    // getenv("RA_GAME_CLICK") / getenv("TD_GAME_CLICK") returns NULL in the
+    // PROXY_TO_PTHREAD worker; the flag file is the C++ fallback.
+    // TIM-546: also creates TD_GAME_CLICK.FLAG for the TD build.
+    if (gameclk) {
+      var clickFlagFile = isTD ? 'TD_GAME_CLICK.FLAG' : 'RA_GAME_CLICK.FLAG';
       try {
-        FS.createDataFile(GAME_DIR, 'RA_GAME_CLICK.FLAG', new Uint8Array([1]), true, true, false);
-        console.log('[preloader] gameclk flag → ' + GAME_DIR + '/RA_GAME_CLICK.FLAG');
+        FS.createDataFile(GAME_DIR, clickFlagFile, new Uint8Array([1]), true, true, false);
+        console.log('[preloader] gameclk flag → ' + GAME_DIR + '/' + clickFlagFile);
       } catch (e) {
         console.warn('[preloader] could not create gameclk flag file:', e.message);
       }
