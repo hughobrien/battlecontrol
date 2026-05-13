@@ -7,7 +7,7 @@
 //
 // Format reference: Westwood VQA version 2 (C&C: Red Alert intro files).
 // LCW decompression: LCW.CPP (Format80 variant).
-// Palette convention: CPL0 stores 6-bit VGA DAC values (0-63); Set_DD_Palette applies <<2.
+// Palette convention: CPL0 stores 8-bit RGB values (0-255); use Set_DD_Palette_8bit.
 //
 // Include pattern: function.h first (same as REDALERT/*.cpp), then SDL2.
 
@@ -744,7 +744,7 @@ extern "C" void Play_Movie_Linux(const char* name)
         if (SDL_Has_Primary_Surface()) {
             int scrW = (ScreenWidth  > 0) ? ScreenWidth  : 640;
             int scrH = (ScreenHeight > 0) ? ScreenHeight : 480;
-            Set_DD_Palette(palette);  // CPL0 is 6-bit VGA; <<2 expansion is correct
+            Set_DD_Palette_8bit(palette, 256);  // CPL0 is 8-bit (0-255); bypass Set_DD_Palette <<2
             blit_vqa_frame(framebuf.data(), vqaW, vqaH,
                            SDL_Get_Primary_Pixels(),
                            SDL_Get_Primary_Pitch(),
@@ -767,9 +767,9 @@ extern "C" void Play_Movie_Linux(const char* name)
                     for (int py = 0; py < vqaH; ++py) {
                         for (int px = 0; px < vqaW; ++px) {
                             uint8_t idx = framebuf[(size_t)py * vqaW + px];
-                            uint8_t r = (palette[idx*3+0] << 2) & 0xFF;
-                            uint8_t g = (palette[idx*3+1] << 2) & 0xFF;
-                            uint8_t b = (palette[idx*3+2] << 2) & 0xFF;
+                            uint8_t r = palette[idx*3+0];
+                            uint8_t g = palette[idx*3+1];
+                            uint8_t b = palette[idx*3+2];
                             fputc(r, fp); fputc(g, fp); fputc(b, fp);
                         }
                     }

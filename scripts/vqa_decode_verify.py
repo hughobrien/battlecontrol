@@ -80,11 +80,11 @@ def lcw_decode(src_bytes: bytes, dst_cap: int) -> bytearray:
 # Write indexed image to PNG via zlib (palette-aware)
 # ---------------------------------------------------------------------------
 def write_png_rgb(path: str, pixels: bytearray, palette: bytearray, w: int, h: int,
-                  scale_palette: bool = True):
+                  scale_palette: bool = False):
     """Write indexed pixel array as RGB24 PNG.
 
-    scale_palette: apply 6-bit VGA DAC →8-bit expansion (<<2) matching Set_DD_Palette.
-    CPL0 stores 6-bit values; without scaling the image is ~4x too dark.
+    TIM-523: CPL0 stores 8-bit RGB values (0-255); no <<2 shift needed.
+    scale_palette is kept for callers that pass 6-bit VGA data explicitly.
     """
     import zlib
     # Build RGB24 scanlines
