@@ -7,9 +7,10 @@
  *   - TIM-519: WASM VQA audio trampoline verification (all 8 criteria PASS)
  *   - TIM-525: VQA CBPZ codebook fix
  *
- * Criterion 8 (unit-click in browser) is N/A: TIM-537 (WASM click injection
- * e2e spec) is still in_progress.  The underlying C++ injection code (TIM-534)
- * is on battlecontrol/master but the WASM-specific e2e test is not yet merged.
+ * Criterion 8 (unit-click in browser): TIM-537 merged to battlecontrol/master
+ * during this audit run, but the current WASM build on port 8080 predates both
+ * TIM-534 (C++ RA_GAME_CLICK) and TIM-537 (shell.html ?gameclk=1 support).
+ * Criterion 8 is N/A for this audit; a WASM rebuild is required to test it.
  *
  * Two tests:
  *   A — VQA + boot (no autostart): criteria 1 + 2
