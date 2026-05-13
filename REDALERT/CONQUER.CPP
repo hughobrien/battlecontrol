@@ -2267,6 +2267,35 @@ Mono_Set_Cursor(0,0);
 		RA_Save_Gameplay_BMP((int)_ra_frame_count);
 		if (_ra_frame_count == 100) _tim490_saved = true;
 	}
+	// TIM-536: pass-97 — enemy AI activity probe at 1000-frame intervals.
+	// Logs non-player active unit/infantry counts as evidence the enemy AI is ticking.
+	// At frame 5000: also saves a gameplay BMP for screenshot evidence.
+#ifndef _MSC_VER
+	static bool _ra_pass97_bmp_saved = false;
+	if (_ra_autostart && (_ra_frame_count == 1000 || _ra_frame_count == 2000 ||
+	    _ra_frame_count == 3000 || _ra_frame_count == 4000 || _ra_frame_count == 5000)) {
+		int _enemy_units = 0, _enemy_infantry = 0;
+		if (PlayerPtr != nullptr) {
+			for (int _ui = 0; _ui < Units.Count(); _ui++) {
+				UnitClass * _pu = Units.Ptr(_ui);
+				if (_pu && _pu->IsActive && !_pu->IsInLimbo && !(_pu->House == PlayerPtr))
+					_enemy_units++;
+			}
+			for (int _ii = 0; _ii < Infantry.Count(); _ii++) {
+				InfantryClass * _pi = Infantry.Ptr(_ii);
+				if (_pi && _pi->IsActive && !_pi->IsInLimbo && !(_pi->House == PlayerPtr))
+					_enemy_infantry++;
+			}
+		}
+		fprintf(stderr, "[TIM-536] pass-97 probe frame=%ld enemy_units=%d enemy_infantry=%d\n",
+		        _ra_frame_count, _enemy_units, _enemy_infantry);
+		fflush(stderr);
+		if (_ra_frame_count == 5000 && !_ra_pass97_bmp_saved) {
+			RA_Save_Gameplay_BMP(5000);
+			_ra_pass97_bmp_saved = true;
+		}
+	}
+#endif
 	/* TIM-529: synthetic mouse click injection for unit select/move audit.
 	 * Frame 20: left-click on player unit cluster at ~(350,135) in SCG01EA
 	 *           initial viewport → Selection_At_Mouse fires ACTION_SELECT.
