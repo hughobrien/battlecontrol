@@ -70,6 +70,9 @@
 #include	<share.h>
 #include <malloc.h>
 #include  "ccdde.h"
+#ifndef _MSC_VER
+#include <SDL2/SDL.h>  // TIM-546: SDL_PushEvent for TD_GAME_CLICK injection
+#endif
 
 #define SHAPE_TRANS		0x40
 
@@ -1548,6 +1551,82 @@ bool Main_Loop()
 			PlayerPtr->Flag_To_Win();
 			fprintf(stderr, "[TD-CHEAT] frame %d: Flag_To_Win fired\n",
 			        _td_frame_count); fflush(stderr);
+		}
+	}
+	// TIM-546: enemy AI activity probe at 1000-frame intervals.
+	// Logs non-player active unit/infantry counts as evidence the enemy AI is ticking.
+	{
+		static bool _td546_autostart = getenv("TD_AUTOSTART") != nullptr
+		                               || RawFileClass("TD_AUTOSTART.FLAG").Is_Available();
+		if (_td546_autostart && (_td_frame_count == 1000 || _td_frame_count == 2000 ||
+		    _td_frame_count == 3000 || _td_frame_count == 4000 || _td_frame_count == 5000)) {
+			int _enemy_units = 0, _enemy_infantry = 0;
+			if (PlayerPtr != nullptr) {
+				for (int _ui = 0; _ui < Units.Count(); _ui++) {
+					UnitClass * _pu = Units.Ptr(_ui);
+					if (_pu && _pu->IsActive && !_pu->IsInLimbo && _pu->House != PlayerPtr)
+						_enemy_units++;
+				}
+				for (int _ii = 0; _ii < Infantry.Count(); _ii++) {
+					InfantryClass * _pi = Infantry.Ptr(_ii);
+					if (_pi && _pi->IsActive && !_pi->IsInLimbo && _pi->House != PlayerPtr)
+						_enemy_infantry++;
+				}
+			}
+			fprintf(stderr, "[TIM-546] probe frame=%d enemy_units=%d enemy_infantry=%d\n",
+			        _td_frame_count, _enemy_units, _enemy_infantry);
+			fflush(stderr);
+		}
+	}
+	// TIM-546: TD_GAME_CLICK synthetic unit click injection.
+	// Left-click at frame 30 selects a unit; right-click at frame 35 issues move order.
+	// Logs [GAME-CLICK] lines consumed by the td-wasm-audit Playwright spec.
+	{
+		static bool _td_game_click_done = false;
+		static bool _td_game_click = getenv("TD_GAME_CLICK") != nullptr
+		                              || RawFileClass("TD_GAME_CLICK.FLAG").Is_Available();
+		if (_td_game_click && !_td_game_click_done && PlayerPtr) {
+			if (_td_frame_count == 30) {
+				SDL_Event ev;
+				memset(&ev, 0, sizeof(ev));
+				ev.type             = SDL_MOUSEBUTTONDOWN;
+				ev.button.button    = SDL_BUTTON_LEFT;
+				ev.button.state     = SDL_PRESSED;
+				ev.button.x         = 200;
+				ev.button.y         = 180;
+				ev.button.timestamp = SDL_GetTicks();
+				SDL_PushEvent(&ev);
+				ev.type             = SDL_MOUSEBUTTONUP;
+				ev.button.state     = SDL_RELEASED;
+				ev.button.timestamp = SDL_GetTicks();
+				SDL_PushEvent(&ev);
+				fprintf(stderr, "[GAME-CLICK] frame %d: left-click at (200,180) pushed\n",
+				        _td_frame_count); fflush(stderr);
+			}
+			if (_td_frame_count == 35) {
+				fprintf(stderr, "[GAME-CLICK] frame %d: unit-count after left-click = %d\n",
+				        _td_frame_count, CurrentObject.Count()); fflush(stderr);
+				SDL_Event ev;
+				memset(&ev, 0, sizeof(ev));
+				ev.type             = SDL_MOUSEBUTTONDOWN;
+				ev.button.button    = SDL_BUTTON_RIGHT;
+				ev.button.state     = SDL_PRESSED;
+				ev.button.x         = 350;
+				ev.button.y         = 350;
+				ev.button.timestamp = SDL_GetTicks();
+				SDL_PushEvent(&ev);
+				ev.type             = SDL_MOUSEBUTTONUP;
+				ev.button.state     = SDL_RELEASED;
+				ev.button.timestamp = SDL_GetTicks();
+				SDL_PushEvent(&ev);
+				fprintf(stderr, "[GAME-CLICK] frame %d: right-click at (350,350) pushed (move order)\n",
+				        _td_frame_count); fflush(stderr);
+			}
+			if (_td_frame_count == 40) {
+				fprintf(stderr, "[GAME-CLICK] frame %d: post-click unit-count = %d\n",
+				        _td_frame_count, CurrentObject.Count()); fflush(stderr);
+				_td_game_click_done = true;
+			}
 		}
 	}
 #endif
