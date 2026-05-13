@@ -2266,6 +2266,49 @@ Mono_Set_Cursor(0,0);
 		RA_Save_Gameplay_BMP((int)_ra_frame_count);
 		if (_ra_frame_count == 100) _tim490_saved = true;
 	}
+	/* TIM-529: synthetic mouse click injection for unit select/move audit.
+	 * Frame 20: left-click on player unit cluster at ~(350,135) in SCG01EA
+	 *           initial viewport → Selection_At_Mouse fires ACTION_SELECT.
+	 * Frame 25: log CurrentObject.Count() for "[RA] unit selected: count=N".
+	 * Frame 30: right-click/command at ~(290,215) open terrain → Command_Object
+	 *           fires ACTION_MOVE (if a unit is selected) → "[RA] move order issued".
+	 * Uses the same Selection_At_Mouse/Command_Object calls as DLLInterface.cpp
+	 * INPUT_REQUEST_SELECT_AT_POSITION / INPUT_REQUEST_COMMAND_AT_POSITION. */
+	static bool _tim529_done = false;
+	if (_ra_autostart && !_tim529_done) {
+		if (_ra_frame_count == 20) {
+			const int sel_x = 350, sel_y = 135;
+			Keyboard->MouseQX = sel_x;
+			Keyboard->MouseQY = sel_y;
+			KeyNumType key_s = (KeyNumType)(KN_LMOUSE | KN_RLSE_BIT);
+			DisplayClass::TacButton.Selection_At_Mouse(GadgetClass::LEFTRELEASE, key_s);
+			fprintf(stderr, "[RA] TIM-529: left-click at (%d,%d) frame=%ld count=%d\n",
+			        sel_x, sel_y, _ra_frame_count, CurrentObject.Count());
+			fflush(stderr);
+		}
+		if (_ra_frame_count == 25) {
+			fprintf(stderr, "[RA] unit selected: count=%d frame=%ld\n",
+			        CurrentObject.Count(), _ra_frame_count);
+			fflush(stderr);
+		}
+		if (_ra_frame_count == 30) {
+			const int mv_x = 290, mv_y = 215;
+			int pre_count = CurrentObject.Count();
+			Keyboard->MouseQX = mv_x;
+			Keyboard->MouseQY = mv_y;
+			KeyNumType key_m = (KeyNumType)(KN_LMOUSE | KN_RLSE_BIT);
+			DisplayClass::TacButton.Command_Object(GadgetClass::LEFTRELEASE, key_m);
+			if (pre_count > 0) {
+				fprintf(stderr, "[RA] move order issued frame=%ld count_before=%d\n",
+				        _ra_frame_count, pre_count);
+			} else {
+				fprintf(stderr, "[RA] TIM-529: no unit selected for move at frame=%ld\n",
+				        _ra_frame_count);
+			}
+			fflush(stderr);
+			_tim529_done = true;
+		}
+	}
 	/* RA_CHEAT=1: inject cheat actions at fixed frames.
 	 * Bypasses xdotool since SDL keyboard is not yet fully wired.
 	 * Mirrors Debug_Cheat (level=98) / Debug_Unshroud / Flag_To_Win. */
