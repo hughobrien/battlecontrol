@@ -2411,7 +2411,8 @@ Mono_Set_Cursor(0,0);
 	 * Map.Input() then processes in the same or next Main_Loop iteration.
 	 * Frame 40: log unit-count after both clicks for acceptance-criteria evidence. */
 	static bool _ra_game_click_done = false;
-	static bool _ra_game_click = getenv("RA_GAME_CLICK") != nullptr;
+	static bool _ra_game_click = getenv("RA_GAME_CLICK") != nullptr
+	                              || RawFileClass("RA_GAME_CLICK.FLAG").Is_Available();
 	if (_ra_game_click && !_ra_game_click_done) {
 		if (_ra_frame_count == 30) {
 			SDL_Event ev;
