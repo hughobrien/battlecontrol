@@ -7,6 +7,7 @@ on:
       - 'REDALERT/**'
       - 'TIBDAWN/**'
       - 'wasm/**'
+      - 'linux/**'
       - 'CMakeLists.txt'
       - 'CMakePresets.json'
   workflow_dispatch: {}
