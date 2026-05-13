@@ -7,7 +7,7 @@
 //
 // Format reference: Westwood VQA version 2 (C&C: Red Alert intro files).
 // LCW decompression: LCW.CPP (Format80 variant).
-// Palette convention: CPL0 stores 8-bit values (0-255); use Set_DD_Palette_8bit.
+// Palette convention: CPL0 stores 6-bit VGA DAC values (0-63); Set_DD_Palette applies <<2.
 //
 // Include pattern: function.h first (same as REDALERT/*.cpp), then SDL2.
 
@@ -407,7 +407,9 @@ extern "C" void Play_Movie_Linux(const char* name)
     // (mission briefing) from crashing via SDL_InitSubSystem in vqa_audio_open
     // (TIM-496 regression: Emscripten leaves SDL.audioContext undefined after
     // SDL_QuitSubSystem, causing TypeError on the subsequent InitSubSystem call).
-    if (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
+    bool dump_frames = (getenv("RA_VQA_DUMP_FRAMES") != nullptr);
+    if (!dump_frames &&
+        (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available())) {
         fprintf(stderr, "[VQA] RA_AUTOSTART active — skipping '%s.VQA'\n", name);
         return;
     }
@@ -485,18 +487,32 @@ extern "C" void Play_Movie_Linux(const char* name)
             filename, vqaW, vqaH, blockW, blockH, fps,
             hdr.flags, has_audio, freq, channels, hdr.numFrames);
 
-    std::vector<uint8_t> codebook((size_t)maxBlocks * cbEntrySize, 0);
+    // ffmpeg allocates (0xFF00+0x100) vectors; top 256 slots are solid-colour
+    // blocks pre-filled with their palette index so hi=0xFF routes to a solid
+    // fill without any special-case in the render loop.
+    const size_t MAX_CB_VECTORS = 0xFF00u + 0x100u;
+    std::vector<uint8_t> codebook(MAX_CB_VECTORS * cbEntrySize, 0);
+    for (int ci = 0; ci < 256; ++ci)
+        memset(codebook.data() + (0xFF00u + ci) * cbEntrySize, (uint8_t)ci, cbEntrySize);
+
     std::vector<uint8_t> framebuf((size_t)vqaW * vqaH, 0);
     std::vector<uint8_t> prevbuf((size_t)vqaW * vqaH, 0);
     uint8_t palette[768] = {};
     std::vector<uint8_t> decomp_buf;
+
+    // CBPZ accumulation: raw compressed chunks are collected over cbParts frames,
+    // then decompressed together as one LCW stream replacing the full codebook.
+    // Rendering happens BEFORE accumulation so the new codebook takes effect on
+    // the NEXT frame — exactly matching ffmpeg's vqa_decode_frame_pal8.
+    std::vector<uint8_t> next_codebook_buffer;
+    size_t next_cb_idx    = 0;
+    int partial_countdown = hdr.cbParts ? hdr.cbParts : 1;
 
     bool audio_ok = has_audio && vqa_audio_open(freq, channels);
 
     uint32_t frame_ms = (fps > 0) ? (1000u / (uint32_t)fps) : 67u;
     bool user_abort   = false;
     int  frame_num    = 0;
-    int  cbp_accum    = 0;
 
     // Skip FINF (frame offsets — not needed for sequential playback)
     {
@@ -553,149 +569,152 @@ extern "C" void Play_Movie_Linux(const char* name)
             continue;
         }
 
-        // ---- VQFR video frame — manual position tracking ----
-        long vqfr_remaining = (long)chk_sz;
+        // ---- VQFR video frame — read whole body, three-pass processing ----
+        // Reading the full VQFR body enables ffmpeg-compatible chunk ordering:
+        // render (VPT*) BEFORE accumulating CBPZ so the new codebook takes
+        // effect only on the next frame.
+        std::vector<uint8_t> vqfr_body((size_t)chk_sz);
+        if ((long)f.Read(vqfr_body.data(), (long)chk_sz) != (long)chk_sz) {
+            if (chk_sz & 1) f.Seek(1, SEEK_CUR);
+            break;
+        }
+        if (chk_sz & 1) f.Seek(1, SEEK_CUR);
 
-        while (vqfr_remaining >= 8) {
-            uint8_t sub[8];
-            if (f.Read(sub, 8) != 8) break;
-            vqfr_remaining -= 8;
-            uint32_t sub_sz = be32(sub + 4);
-
-            // Sub-chunk size must not exceed the remaining VQFR bytes.
-            // Some files use little-endian sub-chunk sizes; fall back to LE
-            // if the BE interpretation is out of range.
-            if ((long)sub_sz > vqfr_remaining) {
-                uint32_t le_sz = (uint32_t)sub[4] | ((uint32_t)sub[5]<<8)
-                                | ((uint32_t)sub[6]<<16) | ((uint32_t)sub[7]<<24);
-                if ((long)le_sz <= vqfr_remaining) {
-                    sub_sz = le_sz;
-                } else {
-                    break;  // corrupt VQFR; skip to next frame
-                }
+        // Helper: walk VQFR sub-chunk table and call fn(tag_ptr, ssz, body_ptr).
+        auto iter_sub = [&](auto fn) {
+            size_t fp = 0;
+            while (fp + 8 <= vqfr_body.size()) {
+                const uint8_t* shdr = vqfr_body.data() + fp;
+                uint32_t ssz = be32(shdr + 4);
+                if (fp + 8 + ssz > vqfr_body.size()) break;
+                fn(shdr, ssz, shdr + 8);
+                fp += 8 + ssz + (ssz & 1);
             }
+        };
 
-            if (chunk_eq(sub, "CBF0")) {
-                long rd = (long)std::min((size_t)sub_sz, codebook.size());
-                f.Read(codebook.data(), rd);
-                long skip = (long)sub_sz - rd;
-                if (skip > 0) f.Seek(skip, SEEK_CUR);
-                cbp_accum = 0;
+        // Pass 1: CPL0 palette + full codebook (CBF0 / CBFZ)
+        iter_sub([&](const uint8_t* shdr, uint32_t ssz, const uint8_t* sbody) {
+            if (chunk_eq(shdr, "CPL0")) {
+                long rd = (long)std::min((uint32_t)768u, ssz);
+                memcpy(palette, sbody, rd);
 
-            } else if (chunk_eq(sub, "CBFZ")) {
-                std::vector<uint8_t> comp(sub_sz);
-                f.Read(comp.data(), (long)sub_sz);
-                decomp_buf = lcw_decompress(comp.data(), comp.size(), codebook.size());
+            } else if (chunk_eq(shdr, "CBF0")) {
+                long rd = (long)std::min((size_t)ssz, codebook.size());
+                memcpy(codebook.data(), sbody, rd);
+                next_codebook_buffer.clear();
+                next_cb_idx = 0;
+                partial_countdown = hdr.cbParts ? hdr.cbParts : 1;
+
+            } else if (chunk_eq(shdr, "CBFZ")) {
+                decomp_buf = lcw_decompress(sbody, ssz, codebook.size());
                 if (!decomp_buf.empty())
                     memcpy(codebook.data(), decomp_buf.data(),
                            std::min(decomp_buf.size(), codebook.size()));
-                cbp_accum = 0;
-
-            } else if (chunk_eq(sub, "CBP0")) {
-                int parts     = hdr.cbParts ? hdr.cbParts : 1;
-                size_t part_b = codebook.size() / (size_t)parts;
-                size_t off    = (size_t)cbp_accum * part_b;
-                long   rd     = (long)std::min((size_t)sub_sz, codebook.size() - off);
-                f.Read(codebook.data() + off, rd);
-                long skip = (long)sub_sz - rd;
-                if (skip > 0) f.Seek(skip, SEEK_CUR);
-                cbp_accum = (cbp_accum + 1) % parts;
-
-            } else if (chunk_eq(sub, "CBPZ")) {
-                std::vector<uint8_t> comp(sub_sz);
-                f.Read(comp.data(), (long)sub_sz);
-                int parts     = hdr.cbParts ? hdr.cbParts : 1;
-                size_t part_b = codebook.size() / (size_t)parts;
-                size_t off    = (size_t)cbp_accum * part_b;
-                decomp_buf = lcw_decompress(comp.data(), comp.size(), part_b);
-                if (!decomp_buf.empty())
-                    memcpy(codebook.data() + off, decomp_buf.data(),
-                           std::min(decomp_buf.size(), codebook.size() - off));
-                cbp_accum = (cbp_accum + 1) % parts;
-
-            } else if (chunk_eq(sub, "CPL0")) {
-                uint8_t raw[768] = {};
-                long rd = (long)std::min((uint32_t)768u, sub_sz);
-                f.Read(raw, rd);
-                long skip = (long)sub_sz - rd;
-                if (skip > 0) f.Seek(skip, SEEK_CUR);
-                memcpy(palette, raw, 768);  // 8-bit values; Set_DD_Palette_8bit bypasses <<2
-
-            } else if (chunk_eq(sub, "VPT0") || chunk_eq(sub, "VPTZ")
-                    || chunk_eq(sub, "VPTR") || chunk_eq(sub, "VPRZ")) {
-                std::vector<uint8_t> vpt_raw(sub_sz);
-                f.Read(vpt_raw.data(), (long)sub_sz);
-
-                const std::vector<uint8_t>* vpt = &vpt_raw;
-                if (chunk_eq(sub, "VPTZ") || chunk_eq(sub, "VPRZ")) {
-                    decomp_buf = lcw_decompress(vpt_raw.data(), vpt_raw.size(),
-                                                 (size_t)numBlocks * 2);
-                    if (!decomp_buf.empty()) vpt = &decomp_buf;
-                }
-
-                if (vpt->size() >= (size_t)numBlocks * 2) {
-                    const uint8_t* lo_tbl = vpt->data();
-                    const uint8_t* hi_tbl = vpt->data() + numBlocks;
-
-                    memcpy(prevbuf.data(), framebuf.data(), framebuf.size());
-
-                    for (int bi = 0; bi < numBlocks; ++bi) {
-                        int bx = bi % blocksX;
-                        int by = bi / blocksX;
-                        uint8_t lo = lo_tbl[bi];
-                        uint8_t hi = hi_tbl[bi];
-
-                        if (hi == 0xFF) {
-                            if (lo == 0xFF) {
-                                for (int fy = 0; fy < blockH; ++fy)
-                                    memcpy(framebuf.data()
-                                           + (size_t)(by*blockH+fy)*vqaW + bx*blockW,
-                                           prevbuf.data()
-                                           + (size_t)(by*blockH+fy)*vqaW + bx*blockW,
-                                           blockW);
-                            } else {
-                                for (int fy = 0; fy < blockH; ++fy)
-                                    memset(framebuf.data()
-                                           + (size_t)(by*blockH+fy)*vqaW + bx*blockW,
-                                           lo, blockW);
-                            }
-                            continue;
-                        }
-
-                        int cb_idx = (int)lo | ((int)hi << 8);
-                        if (cb_idx >= maxBlocks) cb_idx = 0;
-                        const uint8_t* src = codebook.data()
-                                             + (size_t)cb_idx * cbEntrySize;
-                        for (int fy = 0; fy < blockH; ++fy)
-                            memcpy(framebuf.data()
-                                   + (size_t)(by*blockH+fy)*vqaW + bx*blockW,
-                                   src + fy*blockW, blockW);
-                    }
-                }
-
-            } else {
-                // Unknown sub-chunk: skip body
-                if (sub_sz > 0) f.Seek((long)sub_sz, SEEK_CUR);
+                next_codebook_buffer.clear();
+                next_cb_idx = 0;
+                partial_countdown = hdr.cbParts ? hdr.cbParts : 1;
             }
+        });
 
-            vqfr_remaining -= (long)sub_sz;
-            if (sub_sz & 1) { f.Seek(1, SEEK_CUR); --vqfr_remaining; }
-        }
+        // Pass 2: Render frame (VPT0 / VPTZ / VPTR / VPRZ)
+        // hi=0xFF routes to the solid-colour vectors at 0xFF00..0xFFFF
+        // that were pre-initialised at startup — no special-case needed.
+        iter_sub([&](const uint8_t* shdr, uint32_t ssz, const uint8_t* sbody) {
+            if (!chunk_eq(shdr, "VPT0") && !chunk_eq(shdr, "VPTZ") &&
+                !chunk_eq(shdr, "VPTR") && !chunk_eq(shdr, "VPRZ")) return;
 
-        // Seek past any unprocessed VQFR bytes (including IFF VQFR padding)
-        if (vqfr_remaining > 0) f.Seek(vqfr_remaining, SEEK_CUR);
-        if (chk_sz & 1) f.Seek(1, SEEK_CUR);
+            const uint8_t* vpt = sbody;
+            size_t vpt_sz = ssz;
+            if (chunk_eq(shdr, "VPTZ") || chunk_eq(shdr, "VPRZ")) {
+                decomp_buf = lcw_decompress(sbody, ssz, (size_t)numBlocks * 2);
+                if (!decomp_buf.empty()) { vpt = decomp_buf.data(); vpt_sz = decomp_buf.size(); }
+            }
+            if (vpt_sz < (size_t)numBlocks * 2) return;
+
+            const uint8_t* lo_tbl = vpt;
+            const uint8_t* hi_tbl = vpt + numBlocks;
+            memcpy(prevbuf.data(), framebuf.data(), framebuf.size());
+
+            for (int bi = 0; bi < numBlocks; ++bi) {
+                int bx = bi % blocksX, by = bi / blocksX;
+                uint8_t lo = lo_tbl[bi], hi = hi_tbl[bi];
+                int cb_idx = (int)lo | ((int)hi << 8);
+                const uint8_t* src = codebook.data() + (size_t)cb_idx * cbEntrySize;
+                for (int fy = 0; fy < blockH; ++fy)
+                    memcpy(framebuf.data() + (size_t)(by*blockH+fy)*vqaW + bx*blockW,
+                           src + fy * blockW, blockW);
+            }
+        });
+
+        // Pass 3: Accumulate partial codebook AFTER rendering.
+        // CBP0: uncompressed — concat, replace codebook after cbParts frames.
+        // CBPZ: compressed   — concat raw bytes, decompress entire buffer as
+        //        one LCW stream after cbParts frames (ffmpeg algorithm).
+        iter_sub([&](const uint8_t* shdr, uint32_t ssz, const uint8_t* sbody) {
+            int parts = hdr.cbParts ? hdr.cbParts : 1;
+            if (chunk_eq(shdr, "CBP0")) {
+                next_codebook_buffer.insert(next_codebook_buffer.end(), sbody, sbody + ssz);
+                next_cb_idx += ssz;
+                if (--partial_countdown <= 0) {
+                    size_t n = std::min(next_cb_idx, codebook.size());
+                    memcpy(codebook.data(), next_codebook_buffer.data(), n);
+                    next_codebook_buffer.clear();
+                    next_cb_idx = 0;
+                    partial_countdown = parts;
+                }
+            } else if (chunk_eq(shdr, "CBPZ")) {
+                next_codebook_buffer.insert(next_codebook_buffer.end(), sbody, sbody + ssz);
+                next_cb_idx += ssz;
+                if (--partial_countdown <= 0) {
+                    decomp_buf = lcw_decompress(next_codebook_buffer.data(),
+                                                next_codebook_buffer.size(), codebook.size());
+                    if (!decomp_buf.empty())
+                        memcpy(codebook.data(), decomp_buf.data(),
+                               std::min(decomp_buf.size(), codebook.size()));
+                    next_codebook_buffer.clear();
+                    next_cb_idx = 0;
+                    partial_countdown = parts;
+                }
+            }
+        });
 
         // ---- Present frame ----
         if (SDL_Has_Primary_Surface()) {
             int scrW = (ScreenWidth  > 0) ? ScreenWidth  : 640;
             int scrH = (ScreenHeight > 0) ? ScreenHeight : 480;
-            Set_DD_Palette_8bit(palette, 256);  // CPL0 is 8-bit; bypass Set_DD_Palette <<2
+            Set_DD_Palette(palette);  // CPL0 is 6-bit VGA; <<2 expansion is correct
             blit_vqa_frame(framebuf.data(), vqaW, vqaH,
                            SDL_Get_Primary_Pixels(),
                            SDL_Get_Primary_Pitch(),
                            scrW, scrH);
             Wait_Vert_Blank();
+        }
+
+        // ---- Optional PPM frame dump (RA_VQA_DUMP_FRAMES=<dir>) ----
+        {
+            static const char* dump_dir = nullptr;
+            static bool dump_checked = false;
+            if (!dump_checked) { dump_dir = getenv("RA_VQA_DUMP_FRAMES"); dump_checked = true; }
+            if (dump_dir && (frame_num == 0 || frame_num == 29 || frame_num == 59)) {
+                char path[512];
+                snprintf(path, sizeof(path), "%s/%s_frame_%03d.ppm",
+                         dump_dir, name, frame_num + 1);
+                FILE* fp = fopen(path, "wb");
+                if (fp) {
+                    fprintf(fp, "P6\n%d %d\n255\n", vqaW, vqaH);
+                    for (int py = 0; py < vqaH; ++py) {
+                        for (int px = 0; px < vqaW; ++px) {
+                            uint8_t idx = framebuf[(size_t)py * vqaW + px];
+                            uint8_t r = (palette[idx*3+0] << 2) & 0xFF;
+                            uint8_t g = (palette[idx*3+1] << 2) & 0xFF;
+                            uint8_t b = (palette[idx*3+2] << 2) & 0xFF;
+                            fputc(r, fp); fputc(g, fp); fputc(b, fp);
+                        }
+                    }
+                    fclose(fp);
+                    fprintf(stderr, "[VQA] Dumped %s frame %d → %s\n", name, frame_num + 1, path);
+                }
+            }
         }
 
         ++frame_num;
