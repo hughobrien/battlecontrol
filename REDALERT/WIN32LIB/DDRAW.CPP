@@ -1037,9 +1037,13 @@ void Wait_Vert_Blank(void)
 		}
 	}
 
-	// Palette-aware indexed->ARGB conversion. SDL_BlitSurface honors
-	// SDL_PrimarySurface->format->palette (populated by Set_DD_Palette
-	// at DDRAW.CPP:864-867).
+	// Palette-aware indexed->ARGB conversion.
+	// TIM-573: Manual expansion using SDL_PaletteEntries[] instead of
+	// SDL_BlitSurface. Emscripten's USE_SDL=2 port does not reliably use the
+	// SDL surface palette when blitting INDEX8→ARGB8888 from a Worker thread,
+	// producing wrong colours in VQA cinematics. SDL_PaletteEntries[] is
+	// populated directly by Set_DD_Palette / Set_DD_Palette_8bit, so it is
+	// always authoritative regardless of SDL surface-palette state.
 	// TIM-250 debug: sanity-check surfaces before blit
 	if (!SDL_PrimarySurface || !SDL_PrimarySurface->pixels ||
 	    !SDL_PrimaryARGB || !SDL_PrimaryARGB->pixels) {
@@ -1051,7 +1055,24 @@ void Wait_Vert_Blank(void)
 		fflush(stderr);
 		return;
 	}
-	int blit_rc = SDL_BlitSurface(SDL_PrimarySurface, nullptr, SDL_PrimaryARGB, nullptr);
+	int blit_rc = 0;
+	{
+		const uint8_t* src     = (const uint8_t*)SDL_PrimarySurface->pixels;
+		uint32_t*      dst     = (uint32_t*)SDL_PrimaryARGB->pixels;
+		int            srcPitch = SDL_PrimarySurface->pitch;
+		int            dstPitch32 = SDL_PrimaryARGB->pitch / 4;
+		for (int y = 0; y < h; ++y) {
+			for (int x = 0; x < w; ++x) {
+				uint8_t idx = src[y * srcPitch + x];
+				const SDL_Color& c = SDL_PaletteEntries[idx];
+				dst[y * dstPitch32 + x] =
+					((uint32_t)0xFF << 24) |
+					((uint32_t)c.r  << 16) |
+					((uint32_t)c.g  <<  8) |
+					((uint32_t)c.b);
+			}
+		}
+	}
 	SDL_UpdateTexture(SDL_PrimaryTexture, nullptr,
 	                  SDL_PrimaryARGB->pixels, SDL_PrimaryARGB->pitch);
 	SDL_RenderClear(SDL_VideoRenderer);
