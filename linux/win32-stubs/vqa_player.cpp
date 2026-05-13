@@ -7,7 +7,7 @@
 //
 // Format reference: Westwood VQA version 2 (C&C: Red Alert intro files).
 // LCW decompression: LCW.CPP (Format80 variant).
-// Palette convention: CPL0 stores 6-bit VGA values; Set_DD_Palette scales to 8-bit.
+// Palette convention: CPL0 stores 8-bit values (0-255); use Set_DD_Palette_8bit.
 //
 // Include pattern: function.h first (same as REDALERT/*.cpp), then SDL2.
 
@@ -619,7 +619,7 @@ extern "C" void Play_Movie_Linux(const char* name)
                 f.Read(raw, rd);
                 long skip = (long)sub_sz - rd;
                 if (skip > 0) f.Seek(skip, SEEK_CUR);
-                memcpy(palette, raw, 768);  // pass 6-bit; Set_DD_Palette scales to 8-bit
+                memcpy(palette, raw, 768);  // 8-bit values; Set_DD_Palette_8bit bypasses <<2
 
             } else if (chunk_eq(sub, "VPT0") || chunk_eq(sub, "VPTZ")
                     || chunk_eq(sub, "VPTR") || chunk_eq(sub, "VPRZ")) {
@@ -690,7 +690,7 @@ extern "C" void Play_Movie_Linux(const char* name)
         if (SDL_Has_Primary_Surface()) {
             int scrW = (ScreenWidth  > 0) ? ScreenWidth  : 640;
             int scrH = (ScreenHeight > 0) ? ScreenHeight : 480;
-            Set_DD_Palette(palette);
+            Set_DD_Palette_8bit(palette, 256);  // CPL0 is 8-bit; bypass Set_DD_Palette <<2
             blit_vqa_frame(framebuf.data(), vqaW, vqaH,
                            SDL_Get_Primary_Pixels(),
                            SDL_Get_Primary_Pitch(),
