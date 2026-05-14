@@ -153,6 +153,7 @@ fi
 
 # ---- run ----
 echo "Running RA cheat smoke test (timeout ${TIMEOUT_SECS}s) ..."
+# RA_AUTOSTART=1: deliberately skips ~200s of VQA intro movies (TIM-665).
 (cd "$RUN_DIR" && DISPLAY="$DISPLAY_NUM" SDL_AUDIODRIVER=dummy \
     RA_AUTOSTART=1 RA_CHEAT=1 \
     timeout -k 5 "$TIMEOUT_SECS" "$LINK_BIN") > "$LOG" 2>&1 || true
