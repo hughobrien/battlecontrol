@@ -61,7 +61,7 @@ jobs:
           python3 wasm/serve-coop.py &
           SERVER_PID=$!
           sleep 2
-          npx playwright test e2e/wasm-smoke.spec.ts
+          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts
           SMOKE_EXIT=$?
           kill $SERVER_PID 2>/dev/null || true
           kill $XVFB_PID  2>/dev/null || true
