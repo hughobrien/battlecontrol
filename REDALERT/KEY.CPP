@@ -63,6 +63,7 @@
 #ifndef _MSC_VER
 #include <SDL2/SDL.h>
 #include "sdl_input.h"
+#include "sdl_window.h"
 
 // TIM-145 pass-43C: storage for the cursor cells GetCursorPos reads
 // from. Declared extern "C" in linux/win32-stubs/windows.h. Updated
@@ -168,6 +169,16 @@ extern "C" void SDL_Process_Input_Events(void)
 		                         SDL_KEYDOWN, SDL_KEYUP);
 		for (int i = 0; i < drained; ++i) {
 			const SDL_KeyboardEvent &ke = events[i].key;
+#ifndef __EMSCRIPTEN__
+			// Intercept fullscreen toggles before the game sees them.
+			if (events[i].type == SDL_KEYDOWN) {
+				bool f11 = (ke.keysym.sym == SDLK_F11);
+				bool alt_enter = ((ke.keysym.sym == SDLK_RETURN ||
+				                   ke.keysym.sym == SDLK_KP_ENTER) &&
+				                  (ke.keysym.mod & KMOD_ALT));
+				if (f11 || alt_enter) { SDL_Toggle_Fullscreen(); continue; }
+			}
+#endif
 			unsigned short vk = SDL_Keysym_To_VK(ke.keysym.sym);
 			if (vk == 0) continue;
 
