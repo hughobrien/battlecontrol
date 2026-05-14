@@ -1449,6 +1449,11 @@ static void Sync_Delay(void)
 	**	This accumulates into a running histogram of performance.
 	*/
 	SpareTicks += FrameTimer.Time();
+#ifndef __EMSCRIPTEN__
+	// TIM-651: Under WASM/PROXY_TO_PTHREAD, each Map.Input() call chains to
+	// SDL_RenderPresent which is a ~30 ms main-thread proxy.  Looping here
+	// ~66 times per frame produces ~6 fps.  Skip the throttle entirely on
+	// WASM; mirrors RA fix TIM-489 in REDALERT/CONQUER.CPP.
 	while (FrameTimer.Time()) {
 		Color_Cycle();
 		Call_Back();
@@ -1465,6 +1470,7 @@ static void Sync_Delay(void)
 			Map.Render();
 		}
 	}
+#endif
 	Color_Cycle();
 	Call_Back();
 }
