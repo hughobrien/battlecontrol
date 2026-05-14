@@ -1,0 +1,51 @@
+
+Running 1 test using 1 worker
+
+[TIM-601] loading http://localhost:8080/ra.html?src=http%3A%2F%2Flocalhost%3A9090%2F&debug=1
+
+[TIM-601] === Phase 1: Preloader ===
+  preloader hidden ✓
+
+[TIM-601] === Phase 2: ENGLISH.VQA → done ===
+  ENGLISH.VQA done ✓
+
+[TIM-601] === Phase 3: PROLOG.VQA start ===
+  PROLOG.VQA Playing fired ✓
+
+[TIM-601] === Phase 4: PROLOG.VQA frame sampling ===
+  [early-t3s @ t=3.0s] fill=37%  colors=71  cyanPx=0  blackBlocks(32×32)=5
+  [mid-t20s @ t=20.0s] fill=24%  colors=69  cyanPx=0  blackBlocks(32×32)=20
+  [mid-t60s @ t=60.0s] fill=55%  colors=188  cyanPx=0  blackBlocks(32×32)=0
+  ✘  1 [chromium] › e2e/tim601-prolog-audit.spec.ts:112:5 › TIM-601 PROLOG.VQA visual + audio verification (2.3m)
+
+
+  1) [chromium] › e2e/tim601-prolog-audit.spec.ts:112:5 › TIM-601 PROLOG.VQA visual + audio verification 
+
+    Error: page.screenshot: Protocol error (Page.captureScreenshot): Unable to capture screenshot
+    Call log:
+    [2m  - taking page screenshot[22m
+    [2m  - waiting for fonts to load...[22m
+    [2m  - fonts loaded[22m
+
+
+      167 |     samples.push({ label, offsetMs: t, ...stats, blackBlocks });
+      168 |     const slug = label.replace(/[^a-z0-9]+/gi, '-');
+    > 169 |     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `tim601-prolog-${slug}.png`) });
+          |                ^
+      170 |     console.log(`  [${label} @ t=${(t/1000).toFixed(1)}s] fill=${stats.fill}%  colors=${stats.colors}  cyanPx=${stats.cyanCount}  blackBlocks(32×32)=${blackBlocks}`);
+      171 |   }
+      172 |
+        at /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-601/e2e/tim601-prolog-audit.spec.ts:169:16
+
+    Error Context: e2e/test-results/tim601-prolog-audit-TIM-60-fca71-A-visual-audio-verification-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/test-results/tim601-prolog-audit-TIM-60-fca71-A-visual-audio-verification-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace e2e/test-results/tim601-prolog-audit-TIM-60-fca71-A-visual-audio-verification-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › e2e/tim601-prolog-audit.spec.ts:112:5 › TIM-601 PROLOG.VQA visual + audio verification 
