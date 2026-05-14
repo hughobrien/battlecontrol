@@ -582,9 +582,12 @@ int Fetch_Difficulty(void)
 		Call_Back();
 
 #ifndef _MSC_VER
-		/* TIM-206: synthetic Enter to accept default difficulty for smoke testing. */
+		/* TIM-206: synthetic Enter to accept default difficulty for smoke testing.
+		 * TIM-626: gate on RA_AUTOSTART — normal users must choose difficulty. */
 		static bool _diff_injected = false;
-		if (!_diff_injected) {
+		static bool _ra_autostart_diff = getenv("RA_AUTOSTART") != nullptr
+		                                  || RawFileClass("RA_AUTOSTART.FLAG").Is_Available();
+		if (!_diff_injected && _ra_autostart_diff) {
 			_diff_injected = true;
 			fprintf(stderr, "[DIFF] injecting KN_RETURN to accept default difficulty\n");
 			fflush(stderr);
