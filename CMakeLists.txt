@@ -70,6 +70,19 @@ add_custom_target(redalert_include_shim ALL
     DEPENDS "${RA_SHIM_STAMP}"
 )
 
+# TIM-640: LP64 static hazard audit.  Run with:
+#   cmake --build <build-dir> --target lint-lp64       # informational report (never fails)
+#   python3 scripts/lint-lp64.py --errors-only         # hard gate (exit 1 on errors)
+add_custom_target(lint-lp64
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/lint-lp64.py"
+        "--dirs" "REDALERT" "TIBERIANDAWN"
+        "--no-colour"
+        "--no-fail"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    COMMENT "Running LP64 static hazard audit (scripts/lint-lp64.py)"
+    VERBATIM
+)
+
 add_library(redalert_includes INTERFACE)
 add_dependencies(redalert_includes redalert_include_shim)
 target_include_directories(redalert_includes INTERFACE
