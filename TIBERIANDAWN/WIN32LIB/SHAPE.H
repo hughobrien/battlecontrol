@@ -110,16 +110,25 @@ typedef struct {
 /*
 ------------------------------- Shape block ---------------------------------
 */
-//#pragma warning (push, 4200)
+// TIM-648: ShapeBlock_Type is a struct overlay on raw .shp file data.
+// The on-disk format is: uint16_t NumShapes, then uint32_t Offsets[].
+// Using `long` was LP64-safe on Win32 (long=4) but breaks on Linux LP64
+// (long=8): the element size doubles AND the struct gains 6 bytes of padding
+// before Offsets[], so Offsets[0] reads file bytes 8-15 instead of bytes 2-5.
+// Fix: int32_t Offsets[] + pack(push,2) to match the on-disk layout.
+#ifndef _MSC_VER
+#include <stdint.h>
+#endif
+#pragma pack(push, 2)
 #pragma warning (disable : 4200)
 typedef struct {
 	unsigned short		NumShapes;			// number of shapes in the block
-	long		Offsets[];			// array of offsets to shape data
+	int32_t		Offsets[];			// array of offsets to shape data
 										//  (offsets within the shape block, with
 										//  0 being the first offset value, not the
 										//  start of the shape block)
 } ShapeBlock_Type;
-//#pragma warning (pop)
+#pragma pack(pop)
 
 /*
 ******************************** Prototypes *********************************
