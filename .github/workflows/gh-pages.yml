@@ -79,6 +79,25 @@ jobs:
       - name: Build td.wasm
         run: cmake --build build-wasm --target td --parallel
 
+      - name: Validate WASM binaries
+        # TIM-593: Sanity-check that both binaries are valid WASM and non-trivially
+        # large.  This catches silent build failures and the class of Binaryen
+        # over-optimisation bugs where the output file is near-empty or malformed.
+        # A full audio-path smoke test requires game assets (not in this repo) and
+        # a browser; that is tracked separately.
+        run: |
+          python3 - <<'EOF'
+          import os, struct, sys
+          MIN_SIZE = 2_000_000  # ra.wasm is typically 9-10 MB; 2 MB minimum is generous
+          for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
+              with open(name, 'rb') as f:
+                  magic = f.read(4)
+              assert magic == b'\x00asm', f'{name}: invalid WASM magic {magic!r}'
+              size = os.path.getsize(name)
+              assert size > MIN_SIZE, f'{name}: suspiciously small ({size} bytes < {MIN_SIZE})'
+              print(f'{name}: {size // 1024} KB — OK')
+          EOF
+
       - name: Assemble deploy directory
         run: |
           cp build-wasm/ra.html  wasm/deploy/ra.html

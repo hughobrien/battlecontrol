@@ -160,6 +160,9 @@ if(EMSCRIPTEN)
     )
     set_target_properties(td PROPERTIES SUFFIX ".html")
     target_link_options(td PRIVATE
+        # TIM-593: match ra's -O2 link opt — keeps SDL2 audio function table entries
+        # intact on all Binaryen versions (see ra block comment above).
+        -O2
         -sUSE_SDL=2
         -sALLOW_MEMORY_GROWTH=1
         -sUSE_PTHREADS=1
@@ -259,13 +262,20 @@ if(EMSCRIPTEN)
         -pthread
         -sUSE_SDL=2
         -sUSE_PTHREADS=1
-        -O3     # TIM-489: override Release-mode -O2; Emscripten last-O-wins
+        -O3     # TIM-489: override Release-mode -O2 (per-TU; compile stays at -O3)
     )
     # TIM-381: Output ra.html so --shell-file is honoured (Emscripten only
     # processes the shell template when the output suffix is .html).
     set_target_properties(ra PROPERTIES SUFFIX ".html")
     target_link_options(ra PRIVATE
-        -O3     # TIM-489: triggers Binaryen whole-program optimisation at link
+        # TIM-593: -O2 instead of -O3 at link time.  Binaryen's -O3 whole-program
+        # optimisation aggressively prunes function-table entries that look unused
+        # from WASM's perspective.  SDL2's HandleAudioProcess is only ever called
+        # from JavaScript via dynCall('vp', ptr, [dev]), not via WASM call_indirect,
+        # so Binaryen at -O3 removes it from the table → ptr==0 → null-function trap.
+        # Binaryen 129 (Nix) happens not to prune it at -O3; newer emsdk Binaryen does.
+        # -O2 keeps the table entry intact on all Binaryen versions.
+        -O2
         -sUSE_SDL=2
         -sALLOW_MEMORY_GROWTH=1
         -sUSE_PTHREADS=1
