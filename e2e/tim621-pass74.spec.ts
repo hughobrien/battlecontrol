@@ -85,7 +85,7 @@ async function sampleCanvas(page: any): Promise<{ fillPct: number; uniqueColors:
 // Test 1: Mission Briefing without RA_AUTOSTART
 // ---------------------------------------------------------------------------
 test.describe('TIM-621 item 1 — mission briefing (no autostart)', () => {
-  test.setTimeout(660_000);  // 11 min: 5s menu delay + Init_Bulk_Data (~4min) + frames
+  test.setTimeout(900_000);  // 15 min: 5s menu delay + Init_Bulk_Data (~4min) + ~285s VQA playback + frames
 
   test('menu nav auto-fires, briefing path completes, game reaches frame 200', async ({ page }) => {
     const consoleLogs: string[] = [];
@@ -134,7 +134,7 @@ test.describe('TIM-621 item 1 — mission briefing (no autostart)', () => {
 
     // --- Phase 4: game loop reaches frame 200 (no hang in briefing) ---
     console.log('[briefing] waiting for frame 200…');
-    await waitForOutput(page, '[RA] Main_Loop frame 200', 180_000);
+    await waitForOutput(page, '[RA] Main_Loop frame 200', 420_000);  // VQA movies ~285s before gameplay starts
     console.log('[briefing] frame 200 reached — briefing did not hang');
 
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim621-briefing-frame200.png'), fullPage: true });
