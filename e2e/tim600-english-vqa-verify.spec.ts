@@ -196,9 +196,18 @@ test('TIM-600 ENGLISH.VQA — visual + audio + completion', async ({ page }) => 
   console.log('\n[TIM-600] === Phase 5: log analysis ===');
   const vqaLines = [...output.matchAll(/\[VQA\][^\n]*/g)].map(m => m[0]);
 
-  // Audio open sample-rate (TIM-583/TIM-555 pattern)
-  const audioOpenMatch = output.match(/\[VQA\] WASM audio: opening at (\d+) Hz/);
-  const audioOpenRate  = audioOpenMatch ? parseInt(audioOpenMatch[1], 10) : 0;
+  // Audio open device rate. TIM-604 replaced the SDL2 ScriptProcessorNode path
+  // with a JS-owned AudioBufferSourceNode scheduler, so the log line changed
+  // from `[VQA] WASM audio: opening at N Hz (browser native rate ...)` to
+  // `[VQA] WebAudio: source=N Hz device=M Hz channels=K`. Accept either.
+  let audioOpenRate = 0;
+  const webAudioMatch = output.match(/\[VQA\] WebAudio: source=\d+ Hz device=(\d+) Hz/);
+  if (webAudioMatch) {
+    audioOpenRate = parseInt(webAudioMatch[1], 10);
+  } else {
+    const legacyMatch = output.match(/\[VQA\] WASM audio: opening at (\d+) Hz/);
+    if (legacyMatch) audioOpenRate = parseInt(legacyMatch[1], 10);
+  }
 
   // VQA header sample-rate (from the [VQA] Playing line)
   const playingMatch = output.match(/\[VQA\] Playing 'ENGLISH\.VQA':.*hz=(\d+)/);
