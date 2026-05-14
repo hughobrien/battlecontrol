@@ -417,6 +417,53 @@ static void vqa_audio_close()
         vqa_stole_game_audio = false;
     }
 }
+
+#endif // __EMSCRIPTEN__
+
+// TIM-586: SDL_PollEvent on the worker thread does not surface canvas key/
+// mouse events under PROXY_TO_PTHREAD (the browser delivers them to the main
+// thread's JS handlers but they never reach the worker's SDL event queue,
+// so the user_abort path in the frame loop never trips).  Bypass SDL for
+// VQA skip detection by installing JS-side canvas listeners that flip a
+// global flag; the worker polls the flag once per frame.
+//
+// MAIN_THREAD_EM_ASM is required because EM_ASM/EM_JS bind to the calling
+// thread, and the worker thread cannot reach `document`/`window`.
+#ifdef __EMSCRIPTEN__
+static void vqa_install_abort_listeners()
+{
+    MAIN_THREAD_EM_ASM({
+        if (window._vqa_abort_installed) {
+            window._vqa_aborted = false;
+            return;
+        }
+        window._vqa_abort_installed = true;
+        window._vqa_aborted = false;
+        var fire = function() { window._vqa_aborted = true; };
+        var canvas = document.getElementById('canvas');
+        if (canvas) {
+            canvas.addEventListener('mousedown', fire);
+            canvas.addEventListener('touchstart', fire, { passive: true });
+        }
+        // Keydown on document — focus may not be on canvas yet (TIM-582 only
+        // focuses on first mousedown), but document captures all key events.
+        document.addEventListener('keydown', fire);
+    });
+}
+
+static bool vqa_check_abort_flag()
+{
+    return MAIN_THREAD_EM_ASM_INT({
+        return window._vqa_aborted ? 1 : 0;
+    }) != 0;
+}
+
+static void vqa_clear_abort_flag()
+{
+    MAIN_THREAD_EM_ASM({
+        window._vqa_aborted = false;
+    });
+}
 #endif // __EMSCRIPTEN__
 
 static void vqa_audio_queue_s16(const int16_t* pcm, size_t count)
@@ -586,6 +633,13 @@ extern "C" void Play_Movie_Linux(const char* name)
     uint32_t frame_ms = (fps > 0) ? (1000u / (uint32_t)fps) : 67u;
     bool user_abort   = false;
     int  frame_num    = 0;
+
+#ifdef __EMSCRIPTEN__
+    // TIM-586: install JS-side canvas listeners and reset the flag so a click
+    // during the previous movie doesn't insta-skip this one.
+    vqa_install_abort_listeners();
+    vqa_clear_abort_flag();
+#endif
 
     // Skip FINF (frame offsets — not needed for sequential playback)
     {
@@ -812,6 +866,14 @@ extern "C" void Play_Movie_Linux(const char* name)
                 break;
             }
         }
+#ifdef __EMSCRIPTEN__
+        // TIM-586: SDL_PollEvent above does not see canvas events on the
+        // worker thread; consult the JS-side flag set by our canvas listeners.
+        if (!user_abort && vqa_check_abort_flag()) {
+            user_abort = true;
+            fprintf(stderr, "[VQA] '%s' aborted by user (canvas event)\n", filename);
+        }
+#endif
 
         // ---- Frame pacing ----
         uint32_t elapsed = SDL_GetTicks() - t0;

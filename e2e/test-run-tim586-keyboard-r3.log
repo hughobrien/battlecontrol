@@ -1,0 +1,9 @@
+
+Running 1 test using 1 worker
+
+[TIM-586/kbd] state before keydown: {"abortInstalled":true,"aborted":false,"activeEl":"BODY"}
+[TIM-586/kbd] state after keydown: {"aborted":true,"activeEl":"CANVAS"}
+[TIM-586/kbd] ENGLISH.VQA done: 32/160 frames
+  ✓  1 [chromium] › e2e/tim586-skip-keyboard.spec.ts:29:5 › TIM-586 — pressing Escape during intro VQA aborts playback (11.5s)
+
+  1 passed (12.9s)
