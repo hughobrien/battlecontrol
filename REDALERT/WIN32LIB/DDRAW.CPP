@@ -651,6 +651,12 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 					return FALSE;
 				}
 			}
+#ifdef __EMSCRIPTEN__
+			// TIM-582: set keyboard-element hint before SDL_CreateWindow so the
+			// Emscripten backend registers key listeners on #canvas, not #window.
+			SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+			SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
+#endif
 			SDL_VideoWindow = SDL_CreateWindow(
 				"Red Alert",
 				SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
