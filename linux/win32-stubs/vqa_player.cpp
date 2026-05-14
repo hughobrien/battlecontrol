@@ -297,6 +297,17 @@ static int  vqa_saved_rate         = 22050;
 static int  vqa_saved_channels     = 1;
 static int  vqa_saved_bits         = 16;
 
+// TIM-602: resampler state.  WASM opens the audio device at the browser's
+// native rate (e.g. 44100 Hz) while VQA source PCM is 22050 Hz; without
+// resampling SDL_QueueAudio plays the source at 2× speed / one octave high.
+// TIM-555's TD callback mixer solves this with stride = src_rate / dst_rate;
+// VQA uses the push model (SDL_QueueAudio) so we resample at the queue
+// boundary instead.  Set in vqa_audio_open from the source freq and have.freq.
+static int    vqa_source_rate     = 22050;
+static int    vqa_have_rate       = 22050;
+static int    vqa_have_channels   = 1;
+static double vqa_resample_cursor = 0.0;  // fractional source-frame position; persists across SND chunks
+
 // TIM-517: proxy VQA audio device open/close to the main browser thread,
 // mirroring the AUDIO.CPP trampoline pattern (TIM-428).
 // SDL_OpenAudioDevice / SDL_CloseAudioDevice / SDL_InitSubSystem(SDL_INIT_AUDIO)
@@ -318,6 +329,10 @@ static void vqa_audio_open_on_main(void* arg)
         SDL_Audio_Close();
     }
     SDL_InitSubSystem(SDL_INIT_AUDIO);
+    // TIM-602: capture the source rate (from the VQA header) before we override
+    // a->freq with the native browser rate.  Used to drive the queue-time
+    // resampler so 22050 Hz source PCM doesn't play 2× fast on a 44100 Hz device.
+    int source_rate = a->freq;
     // TIM-583: query browser native AudioContext.sampleRate before SDL_OpenAudioDevice.
     // Old Emscripten SDL2 sets have.freq = want.freq even when the browser AudioContext
     // runs at its native rate; if sampleRate is 0 at open time, the resampling ratio
@@ -335,7 +350,8 @@ static void vqa_audio_open_on_main(void* arg)
         }, a->freq);
         if (native > 0) a->freq = native;
     }
-    fprintf(stderr, "[VQA] WASM audio: opening at %d Hz (browser native rate)\n", a->freq);
+    fprintf(stderr, "[VQA] WASM audio: opening at %d Hz (browser native rate, source=%d Hz)\n",
+            a->freq, source_rate);
     fflush(stderr);
     SDL_AudioSpec want = {}, have = {};
     want.freq     = a->freq;
@@ -362,6 +378,14 @@ static void vqa_audio_open_on_main(void* arg)
         a->result = false;
         return;
     }
+    // TIM-602: prime the queue-time resampler.
+    vqa_source_rate     = source_rate > 0 ? source_rate : a->freq;
+    vqa_have_rate       = have.freq > 0 ? have.freq : a->freq;
+    vqa_have_channels   = have.channels > 0 ? have.channels : a->channels;
+    vqa_resample_cursor = 0.0;
+    fprintf(stderr, "[VQA] resampler: source=%d Hz device=%d Hz channels=%d\n",
+            vqa_source_rate, vqa_have_rate, vqa_have_channels);
+    fflush(stderr);
     SDL_PauseAudioDevice(vqa_audio_dev, 0);
     a->result = true;
 }
@@ -434,6 +458,11 @@ static bool vqa_audio_open(int freq, int channels)
         }
         return false;
     }
+    // TIM-602: prime the queue-time resampler from the actual device rate.
+    vqa_source_rate     = freq > 0 ? freq : 22050;
+    vqa_have_rate       = have.freq > 0 ? have.freq : freq;
+    vqa_have_channels   = have.channels > 0 ? have.channels : channels;
+    vqa_resample_cursor = 0.0;
     SDL_PauseAudioDevice(vqa_audio_dev, 0);
     return true;
 }
@@ -501,10 +530,63 @@ static void vqa_clear_abort_flag()
 }
 #endif // __EMSCRIPTEN__
 
+// TIM-602: nearest-neighbour stride resample from source rate to device rate.
+// Mirrors TIBERIANDAWN/AUDIO.CPP::td_sound_callback (TIM-555).  The cursor is
+// kept in source frames and persists across SND chunks so the predictor-continuous
+// ADPCM stream stays phase-coherent across chunk boundaries.
+//
+// `count` is the total number of int16 samples in `pcm` (= frames * channels).
+// For 22050 Hz source on a 44100 Hz device, stride = 0.5 and the cursor advances
+// half a source frame per output frame, duplicating each source frame — i.e. a
+// pitch-correct 2× upsample.
 static void vqa_audio_queue_s16(const int16_t* pcm, size_t count)
 {
-    if (vqa_audio_dev && pcm && count)
+    if (!vqa_audio_dev || !pcm || !count) return;
+
+    // Identity passthrough when rates match (or are unknown).
+    if (vqa_have_rate <= 0 || vqa_source_rate <= 0 ||
+        vqa_source_rate == vqa_have_rate) {
         SDL_QueueAudio(vqa_audio_dev, pcm, (uint32_t)(count * sizeof(int16_t)));
+        return;
+    }
+
+    int ch = vqa_have_channels > 0 ? vqa_have_channels : 1;
+    if ((size_t)ch > count) {
+        // Pathologically short chunk — nothing to resample.
+        return;
+    }
+    size_t in_frames = count / (size_t)ch;
+    if (!in_frames) return;
+
+    double stride = (double)vqa_source_rate / (double)vqa_have_rate;
+
+    // Upper bound on output frames: (in_frames - cursor) / stride + 1.
+    double remaining = (double)in_frames - vqa_resample_cursor;
+    if (remaining <= 0.0) {
+        // Cursor sits past end of this chunk (carry-over from previous call).
+        vqa_resample_cursor -= (double)in_frames;
+        if (vqa_resample_cursor < 0.0) vqa_resample_cursor = 0.0;
+        return;
+    }
+    size_t out_frames_cap = (size_t)(remaining / stride) + 2;
+    std::vector<int16_t> out;
+    out.reserve(out_frames_cap * (size_t)ch);
+
+    double c = vqa_resample_cursor;
+    while (c < (double)in_frames) {
+        size_t idx = (size_t)c;
+        if (idx >= in_frames) break;
+        const int16_t* src = pcm + idx * (size_t)ch;
+        for (int k = 0; k < ch; ++k) out.push_back(src[k]);
+        c += stride;
+    }
+    // Carry residual cursor into next chunk (relative to its frame 0).
+    vqa_resample_cursor = c - (double)in_frames;
+    if (vqa_resample_cursor < 0.0) vqa_resample_cursor = 0.0;
+
+    if (!out.empty())
+        SDL_QueueAudio(vqa_audio_dev, out.data(),
+                       (uint32_t)(out.size() * sizeof(int16_t)));
 }
 
 static void vqa_audio_queue_u8(const uint8_t* data, size_t len)
