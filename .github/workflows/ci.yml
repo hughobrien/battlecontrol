@@ -24,7 +24,8 @@ jobs:
             binutils \
             python3 \
             cmake \
-            ninja-build
+            ninja-build \
+            libsdl2-ttf-dev
 
       - name: Build and smoke-test
         run: bash scripts/first-run-pass-94.sh
