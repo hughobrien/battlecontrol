@@ -355,8 +355,14 @@ bool SDL_Audio_Open(int rate, int channels, int bits_per_sample)
     want.userdata = nullptr;
 
     SDL_AudioSpec have = {};
+    // TIM-604: do NOT pass SDL_AUDIO_ALLOW_FREQUENCY_CHANGE here, mirroring the
+    // TIM-593 fix in vqa_player.cpp.  TIM-583 already queries the browser native
+    // AudioContext.sampleRate and passes it as want.freq, so SDL does not need to
+    // activate its internal resampler.  On emcc 5.0.6 that resampler registers a
+    // function-pointer slot that can be null in the WASM table, causing a
+    // "null function" trap.  Opening at exactly want.freq avoids the resampler.
     SDL_AudioDeviceID dev = SDL_OpenAudioDevice(
-        nullptr, 0, &want, &have, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+        nullptr, 0, &want, &have, 0);
 
     if (dev == 0) {
         SDL_QuitSubSystem(SDL_INIT_AUDIO);

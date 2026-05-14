@@ -283,11 +283,22 @@ static std::vector<int16_t> decode_snd2(const uint8_t* src, size_t src_len, ImaS
 }
 
 // -------------------------------------------------------------------------
-// SDL2 audio queue (dedicated device, non-callback / SDL_QueueAudio)
+// VQA audio — SDL_QueueAudio on native Linux; WebAudio bypass on WASM.
 //
-// In WASM/browser only one SDL audio device may be open at a time.
-// If the game audio device is already open we close it before opening the
-// VQA device, then reopen it when playback ends.
+// TIM-604: on WASM, SDL2's SDL_emscriptenaudio.c passes HandleAudioProcess
+// (a C function pointer) to the ScriptProcessorNode onaudioprocess callback
+// via dynCall('vp', ptr, [this]).  In Chrome's cold-cache JIT scenario the
+// WASM function-table slot for HandleAudioProcess is null when the first
+// onaudioprocess fires, causing an intermittent "null function" trap.
+//
+// Fix: bypass SDL_OpenAudioDevice entirely for VQA on WASM.  Instead use
+// the WebAudio API directly — AudioBufferSourceNode objects are scheduled
+// at successive times, producing gapless output with no WASM function-table
+// lookups in the audio path.  vqa_audio_dev is set to a sentinel (1) to
+// signal "audio open" to the rest of the VQA code; it is never used as a
+// real SDL_AudioDeviceID.
+//
+// On native Linux the existing SDL_QueueAudio path is unchanged.
 // -------------------------------------------------------------------------
 static SDL_AudioDeviceID vqa_audio_dev = 0;
 
@@ -323,80 +334,66 @@ struct VqaAudioOpenArgs {
 static void vqa_audio_open_on_main(void* arg)
 {
     auto* a = static_cast<VqaAudioOpenArgs*>(arg);
-    vqa_stole_game_audio = SDL_Audio_Is_Open();
-    if (vqa_stole_game_audio) {
-        SDL_Audio_Get_Params(&vqa_saved_rate, &vqa_saved_channels, &vqa_saved_bits);
-        SDL_Audio_Close();
-    }
-    SDL_InitSubSystem(SDL_INIT_AUDIO);
-    // TIM-602: capture the source rate (from the VQA header) before we override
-    // a->freq with the native browser rate.  Used to drive the queue-time
-    // resampler so 22050 Hz source PCM doesn't play 2× fast on a 44100 Hz device.
+    // TIM-604: WebAudio bypass — do NOT open an SDL audio device.
+    // SDL2's Emscripten audio backend wires the ScriptProcessorNode onaudioprocess
+    // callback via dynCall('vp', HandleAudioProcess_ptr, [device]).  In Chrome's
+    // cold-cache JIT scenario that function-table slot can be null when the first
+    // onaudioprocess fires, causing an intermittent "null function" WASM trap.
+    // Bypassing SDL_OpenAudioDevice eliminates this code path entirely for VQA.
+    //
+    // We also skip the game-audio "steal" (SDL_Audio_Close / SDL_Audio_Open):
+    // WebAudio AudioBufferSourceNodes connect directly to ctx.destination and mix
+    // alongside SDL2's ScriptProcessorNode without conflict.
     int source_rate = a->freq;
-    // TIM-583: query browser native AudioContext.sampleRate before SDL_OpenAudioDevice.
-    // Old Emscripten SDL2 sets have.freq = want.freq even when the browser AudioContext
-    // runs at its native rate; if sampleRate is 0 at open time, the resampling ratio
-    // divide-by-zero traps the WASM worker.  Same fix as TIM-555/TIBERIANDAWN/AUDIO.CPP.
-    {
-        int native = EM_ASM_INT({
-            var Ctx = window.AudioContext || window.webkitAudioContext;
-            if (!Ctx) return $0;
+    // TIM-604 / TIM-583: query browser native AudioContext.sampleRate.
+    // Use SDL2's shared audioContext if it exists; create a new one otherwise.
+    // Module['_vqa_audio'] holds our playback cursor; it is reset on every open.
+    int actual_rate = MAIN_THREAD_EM_ASM_INT({
+        var SDL2 = Module['SDL2'];
+        var ctx = (SDL2 && SDL2.audioContext) ? SDL2.audioContext : null;
+        if (!ctx) {
             try {
-                var c = new Ctx();
-                var r = c.sampleRate | 0;
-                c.close();
-                return r;
-            } catch(e) { return $0; }
-        }, a->freq);
-        if (native > 0) a->freq = native;
-    }
-    fprintf(stderr, "[VQA] WASM audio: opening at %d Hz (browser native rate, source=%d Hz)\n",
-            a->freq, source_rate);
-    fflush(stderr);
-    SDL_AudioSpec want = {}, have = {};
-    want.freq     = a->freq;
-    want.format   = AUDIO_S16LSB;
-    want.channels = (uint8_t)a->channels;
-    want.samples  = 1024;
-    // TIM-593: do NOT pass SDL_AUDIO_ALLOW_FREQUENCY_CHANGE here.
-    // That flag permits SDL to set a different frequency and activate its internal
-    // resampler, which registers a function pointer into the WASM indirect-call table.
-    // In emcc 5.0.6 (emsdk release) that slot is absent/null, causing a
-    // "null function" WASM trap downstream of SDL_OpenAudioDevice.  Since we already
-    // queried the browser native AudioContext.sampleRate and pass it as want.freq,
-    // SDL does not need to resample — opening at exactly want.freq is correct.
-    // If SDL cannot open at this exact rate the call fails gracefully (return 0)
-    // and VQA plays silently rather than crashing.
-    vqa_audio_dev = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
-    if (!vqa_audio_dev) {
-        fprintf(stderr, "[VQA] SDL audio open failed: %s\n", SDL_GetError());
-        SDL_QuitSubSystem(SDL_INIT_AUDIO);
-        if (vqa_stole_game_audio) {
-            SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
-            vqa_stole_game_audio = false;
+                ctx = new AudioContext();
+                if (!SDL2) { Module['SDL2'] = {}; SDL2 = Module['SDL2']; }
+                SDL2.audioContext = ctx;
+            } catch(e) { return 0; }
         }
+        // Note: avoid JS object literal { k: v, k: v } here — the commas
+        // are at macro-argument depth 0 and confuse the C preprocessor.
+        Module['_vqa_audio'] = {};
+        Module['_vqa_audio'].ctx = ctx;
+        Module['_vqa_audio'].nextTime = 0;
+        return ctx.sampleRate | 0;
+    });
+    if (actual_rate <= 0) {
+        fprintf(stderr, "[VQA] WebAudio open failed — AudioContext unavailable\n");
+        fflush(stderr);
         a->result = false;
         return;
     }
-    // TIM-602: prime the queue-time resampler.
-    vqa_source_rate     = source_rate > 0 ? source_rate : a->freq;
-    vqa_have_rate       = have.freq > 0 ? have.freq : a->freq;
-    vqa_have_channels   = have.channels > 0 ? have.channels : a->channels;
-    vqa_resample_cursor = 0.0;
-    fprintf(stderr, "[VQA] resampler: source=%d Hz device=%d Hz channels=%d\n",
-            vqa_source_rate, vqa_have_rate, vqa_have_channels);
+    fprintf(stderr, "[VQA] WebAudio: source=%d Hz device=%d Hz channels=%d\n",
+            source_rate, actual_rate, a->channels);
     fflush(stderr);
-    SDL_PauseAudioDevice(vqa_audio_dev, 0);
+    vqa_audio_dev      = 1;  // sentinel: non-zero = audio open; not a real SDL device
+    vqa_source_rate    = source_rate > 0 ? source_rate : actual_rate;
+    vqa_have_rate      = actual_rate;
+    vqa_have_channels  = a->channels > 0 ? a->channels : 1;
+    vqa_resample_cursor = 0.0;
     a->result = true;
 }
 
 static void vqa_audio_close_on_main(void* /*arg*/)
 {
-    if (vqa_audio_dev) {
-        SDL_CloseAudioDevice(vqa_audio_dev);
-        vqa_audio_dev = 0;
-    }
-    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    // TIM-604: WebAudio bypass — no SDL device to close.
+    vqa_audio_dev = 0;
+    MAIN_THREAD_EM_ASM({
+        if (typeof Module['_vqa_audio'] !== 'undefined') {
+            Module['_vqa_audio'].nextTime = 0;
+            Module['_vqa_audio'] = undefined;
+        }
+    });
+    // vqa_stole_game_audio is always false on the WebAudio path (we never stole),
+    // but guard defensively in case of future refactors.
     if (vqa_stole_game_audio) {
         SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
         vqa_stole_game_audio = false;
@@ -530,6 +527,45 @@ static void vqa_clear_abort_flag()
 }
 #endif // __EMSCRIPTEN__
 
+// TIM-604: WebAudio push — schedule an AudioBufferSourceNode on the shared
+// WebAudio context.  Called from vqa_audio_queue_s16 on WASM instead of
+// SDL_QueueAudio.  Uses AudioBufferSourceNode.start(when) so successive chunks
+// play back-to-back without gaps.  S16 PCM is converted to Float32 in JS.
+// Must run on any thread (the WASM worker) — reads from Module['_vqa_audio']
+// set up by vqa_audio_open_on_main on the main thread; writes are safe because
+// the VQA worker is the only writer of nextTime after open.
+#ifdef __EMSCRIPTEN__
+static void vqa_webaudio_push(const int16_t* pcm, size_t count)
+{
+    if (!pcm || !count) return;
+    int ch = vqa_have_channels > 0 ? vqa_have_channels : 1;
+    intptr_t frames = (intptr_t)(count / (size_t)ch);
+    if (frames <= 0) return;
+    EM_ASM({
+        var va = Module['_vqa_audio'];
+        if (!va || !va.ctx) return;
+        var ctx    = va.ctx;
+        var ptr    = $0;   // HEAP16 byte offset of S16 PCM
+        var frames = $1;
+        var ch     = $2;
+        var buf = ctx.createBuffer(ch, frames, ctx.sampleRate);
+        for (var c = 0; c < ch; c++) {
+            var cd  = buf.getChannelData(c);
+            var off = ptr >> 1;   // convert byte ptr to HEAP16 index
+            for (var i = 0; i < frames; i++)
+                cd[i] = HEAP16[off + i * ch + c] / 32768.0;
+        }
+        var src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        // Schedule 20 ms ahead of current playback position to absorb jitter.
+        var t = Math.max(ctx.currentTime + 0.020, va.nextTime);
+        src.start(t);
+        va.nextTime = t + buf.duration;
+    }, (intptr_t)pcm, frames, ch);
+}
+#endif // __EMSCRIPTEN__
+
 // TIM-602: nearest-neighbour stride resample from source rate to device rate.
 // Mirrors TIBERIANDAWN/AUDIO.CPP::td_sound_callback (TIM-555).  The cursor is
 // kept in source frames and persists across SND chunks so the predictor-continuous
@@ -546,7 +582,11 @@ static void vqa_audio_queue_s16(const int16_t* pcm, size_t count)
     // Identity passthrough when rates match (or are unknown).
     if (vqa_have_rate <= 0 || vqa_source_rate <= 0 ||
         vqa_source_rate == vqa_have_rate) {
+#ifdef __EMSCRIPTEN__
+        vqa_webaudio_push(pcm, count);
+#else
         SDL_QueueAudio(vqa_audio_dev, pcm, (uint32_t)(count * sizeof(int16_t)));
+#endif
         return;
     }
 
@@ -584,9 +624,14 @@ static void vqa_audio_queue_s16(const int16_t* pcm, size_t count)
     vqa_resample_cursor = c - (double)in_frames;
     if (vqa_resample_cursor < 0.0) vqa_resample_cursor = 0.0;
 
-    if (!out.empty())
+    if (!out.empty()) {
+#ifdef __EMSCRIPTEN__
+        vqa_webaudio_push(out.data(), out.size());
+#else
         SDL_QueueAudio(vqa_audio_dev, out.data(),
                        (uint32_t)(out.size() * sizeof(int16_t)));
+#endif
+    }
 }
 
 static void vqa_audio_queue_u8(const uint8_t* data, size_t len)
