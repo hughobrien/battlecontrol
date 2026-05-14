@@ -16,10 +16,11 @@
  * binary takes longer than the observation window.
  *
  * Pixel gate (TIM-652): canvasStats() is always sampled and logged. The
- * fill > 0 assertion fires only when the game loop has produced output
- * (callMain was invoked with game data). In CI smoke runs without game assets
- * callMain is never invoked so the canvas stays black; the guard prevents a
- * false failure while still catching all-black regressions on full runs.
+ * fill > 0 assertion fires only once the preloader overlay has been dismissed,
+ * which happens after the user picks a game folder and callMain is invoked.
+ * In the standard CI smoke run no folder is picked, the overlay stays visible,
+ * and the canvas-fill check is skipped — preventing a false failure on a valid
+ * no-asset run while still catching all-black regressions on full runs.
  */
 
 import { test, expect } from '@playwright/test';
@@ -86,14 +87,15 @@ test('TIM-595 — CI WASM smoke: ra.wasm loads without crash', async ({ page }) 
     `ra.html status-line still shows "Loading…" after ${OBSERVE_MS / 1000}s — server may not be serving the WASM`
   ).toBe(true);
 
-  // Pixel gate (TIM-652): canvas must not be entirely black when the game has
-  // rendered. canvasStats() is always sampled so the fill percentage is visible
-  // in CI logs. The assertion only fires when #output has content — proof that
-  // callMain ran and the game loop produced at least one frame. In the standard
-  // CI smoke run (no game assets, callMain never called) this guard is false and
-  // the check is skipped, preventing a false failure on a valid no-asset run.
-  const outputText = await page.locator('#output').textContent().catch(() => '') ?? '';
-  const gameHasRun = outputText.trim().length > 0;
+  // Pixel gate (TIM-652): canvas must not be entirely black once the game is
+  // actually rendering. We detect "game is rendering" by the preloader overlay
+  // being hidden — the JS shell hides #preloader-overlay only after the user
+  // picks a folder and callMain is invoked. In the standard no-asset CI run the
+  // overlay stays visible and the check is skipped; previously this used
+  // #output text which got populated by RFC stderr noise during init, causing
+  // the check to fire unconditionally on every no-asset deploy.
+  const preloaderVisible = await page.locator('#preloader-overlay').isVisible().catch(() => true);
+  const gameHasRun = !preloaderVisible;
   const stats = await canvasStats(page);
   console.log(
     `[TIM-652] canvas: fill=${stats.fill}% total=${stats.total} (${stats.w}×${stats.h}) game-ran=${gameHasRun}`
