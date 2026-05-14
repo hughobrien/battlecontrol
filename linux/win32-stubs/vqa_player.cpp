@@ -531,9 +531,17 @@ static void vqa_clear_abort_flag()
 // WebAudio context.  Called from vqa_audio_queue_s16 on WASM instead of
 // SDL_QueueAudio.  Uses AudioBufferSourceNode.start(when) so successive chunks
 // play back-to-back without gaps.  S16 PCM is converted to Float32 in JS.
-// Must run on any thread (the WASM worker) — reads from Module['_vqa_audio']
-// set up by vqa_audio_open_on_main on the main thread; writes are safe because
-// the VQA worker is the only writer of nextTime after open.
+//
+// TIM-620: must use MAIN_THREAD_EM_ASM, not EM_ASM.  Under PROXY_TO_PTHREAD
+// (CMakeLists.txt:285) the VQA decoder runs in a pthread worker; plain EM_ASM
+// runs in that worker's JS context where `Module` is a separate object from
+// the main thread's `Module`.  `Module['_vqa_audio']` was created on the main
+// thread by vqa_audio_open_on_main, so it is undefined in the worker, and the
+// `if (!va || !va.ctx) return;` guard silently dropped every audio chunk.
+// AudioContext and AudioBufferSourceNode live only on the main thread anyway,
+// so proxy the whole push there.  The PCM pointer references shared WASM
+// memory (SharedArrayBuffer); HEAP16 in the main-thread JS context views the
+// same bytes the worker just wrote, so the data is safe to read.
 #ifdef __EMSCRIPTEN__
 static void vqa_webaudio_push(const int16_t* pcm, size_t count)
 {
@@ -541,7 +549,7 @@ static void vqa_webaudio_push(const int16_t* pcm, size_t count)
     int ch = vqa_have_channels > 0 ? vqa_have_channels : 1;
     intptr_t frames = (intptr_t)(count / (size_t)ch);
     if (frames <= 0) return;
-    EM_ASM({
+    MAIN_THREAD_EM_ASM({
         var va = Module['_vqa_audio'];
         if (!va || !va.ctx) return;
         var ctx    = va.ctx;
