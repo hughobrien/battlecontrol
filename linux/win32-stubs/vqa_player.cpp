@@ -27,6 +27,7 @@
 
 #ifdef __EMSCRIPTEN__
 // TIM-517: proxy VQA SDL audio calls to the main browser thread (same as AUDIO.CPP/TIM-428).
+#include <emscripten.h>
 #include <emscripten/threading.h>
 #include <emscripten/proxying.h>
 #endif
@@ -290,6 +291,25 @@ static void vqa_audio_open_on_main(void* arg)
         SDL_Audio_Close();
     }
     SDL_InitSubSystem(SDL_INIT_AUDIO);
+    // TIM-583: query browser native AudioContext.sampleRate before SDL_OpenAudioDevice.
+    // Old Emscripten SDL2 sets have.freq = want.freq even when the browser AudioContext
+    // runs at its native rate; if sampleRate is 0 at open time, the resampling ratio
+    // divide-by-zero traps the WASM worker.  Same fix as TIM-555/TIBERIANDAWN/AUDIO.CPP.
+    {
+        int native = EM_ASM_INT({
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return $0;
+            try {
+                var c = new Ctx();
+                var r = c.sampleRate | 0;
+                c.close();
+                return r;
+            } catch(e) { return $0; }
+        }, a->freq);
+        if (native > 0) a->freq = native;
+    }
+    fprintf(stderr, "[VQA] WASM audio: opening at %d Hz (browser native rate)\n", a->freq);
+    fflush(stderr);
     SDL_AudioSpec want = {}, have = {};
     want.freq     = a->freq;
     want.format   = AUDIO_S16LSB;
