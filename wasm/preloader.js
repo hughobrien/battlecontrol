@@ -85,6 +85,8 @@
   var missiontest = false;
   // TIM-621: ?quicksave_test=1 — auto save/load at frames 500/550 for save-load roundtrip test.
   var quicksavetest = false;
+  // TIM-621: ?debug=1 — enable frame-count logging (RA_DEBUG.FLAG) without autostart side-effects.
+  var debugframes = false;
 
   // Hook into Emscripten runtime init.  noInitialRun:true in the Module
   // pre-definition means callMain() won't fire automatically; we call it
@@ -336,6 +338,16 @@
       }
     }
 
+    // TIM-621: ?debug=1 — enable frame-progress logging without enabling autostart game behavior.
+    if (debugframes) {
+      try {
+        FS.createDataFile(GAME_DIR, 'RA_DEBUG.FLAG', new Uint8Array([1]), true, true, false);
+        console.log('[preloader] debug flag → ' + GAME_DIR + '/RA_DEBUG.FLAG');
+      } catch (e) {
+        console.warn('[preloader] could not create debug flag file:', e.message);
+      }
+    }
+
     function launchGame() {
       setStatus('Starting game…');
       Module.callMain([]);
@@ -384,6 +396,10 @@
     // TIM-621: ?quicksave_test=1 — save/load roundtrip test (auto save frame 500, load frame 550).
     if (params.get('quicksave_test') === '1') {
       quicksavetest = true;
+    }
+    // TIM-621: ?debug=1 — enable frame logging without autostart (RA_DEBUG.FLAG).
+    if (params.get('debug') === '1') {
+      debugframes = true;
     }
 
     // ?src=<url> param: fetch MIX files from S3 / HTTP instead of local picker.
