@@ -808,7 +808,7 @@ void Memory_Error_Handler(void)
 	VisiblePage.Clear();
 	CCPalette.Set();
 	while (Get_Mouse_State()) {Show_Mouse();};
-	WWMessageBox().Process(TEXT_MEMORY_ERROR, TEXT_ABORT, false);
+	WWMessageBox().Process(TEXT_MEMORY_ERROR, TEXT_ABORT, nullptr);
 
 	ReadyToQuit = 1;
 

@@ -43,11 +43,14 @@
 /**********************************************************************
 **	Language control: define the desired language for this build.
 */
-//#define ENGLISH 1
+// TIM-616: original makefile passed ENGLISH via command line; we enable it here
+// so all TUs get English strings. Guard to avoid redef warnings from per-TU pins.
+#ifndef ENGLISH
+#define ENGLISH 1
+#endif
 //#define FRENCH 1
 //#define GERMAN 1
 //#define SPAIN 1	(never used)
-//	- Language define is now passed in from the makefile. -
 
 /**********************************************************************
 **	Controls the nature of the game and its abilities. Only define
