@@ -607,6 +607,7 @@ int Main_Menu(unsigned long )
 		ystep = 13 * RESFACTOR;
 
 	TextButtonClass expandbtnCS( BUTTON_EXPAND, TXT_WOL_CS_MISSIONS, TPF_BUTTON, d_start_x, starty, d_start_w, d_start_h );
+	fprintf(stderr, "[TIM-616] menu_cs='%s' menu_am='%s'\n", TXT_WOL_CS_MISSIONS, TXT_WOL_AM_MISSIONS); fflush(stderr);
 	if( bExpansionCS )
 		starty += ystep;
 	TextButtonClass expandbtnAM( BUTTON_EXPAND_AM, TXT_WOL_AM_MISSIONS, TPF_BUTTON, d_start_x, starty, d_start_w, d_start_h );
