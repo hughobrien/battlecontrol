@@ -148,6 +148,7 @@ LOG="$PASS_DIR/run.log"
 #   strcpy-param-overlap is NOT suppressed — we fixed it in READLINE.CPP
 ASAN_OPTIONS="new_delete_type_mismatch=0:alloc_dealloc_mismatch=0:detect_leaks=0:abort_on_error=0:log_path=stderr"
 
+# RA_AUTOSTART=1: deliberately skips ~200s of VQA intro movies (TIM-665).
 (cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy RA_AUTOSTART=1 \
     ASAN_OPTIONS="$ASAN_OPTIONS" \
     timeout 600 "$LINK_BIN") > "$LOG" 2>&1

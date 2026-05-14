@@ -121,6 +121,7 @@ XVFB_PID=$!
 sleep 1
 
 LOG="$PASS_DIR/run.log"
+# RA_AUTOSTART=1: deliberately skips ~200s of VQA intro movies (TIM-665).
 # Run to frame 200 — enough to see ~14 Mission_Hunt cycles for HUNT infantry
 (cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy RA_AUTOSTART=1 \
     timeout 120 "$LINK_BIN") > "$LOG" 2>&1

@@ -9,15 +9,17 @@ Xvfb :98 -screen 0 640x480x24 -ac &
 XVFB_PID=$!
 sleep 1
 
-cd "$RUN_DIR" && DISPLAY=:98 SDL_AUDIODRIVER=dummy RA_AUTOSTART=1 \
+cd "$RUN_DIR" && DISPLAY=:98 SDL_AUDIODRIVER=dummy \
     timeout 30 "$ELF" > "$LOG" 2>&1
 RUN_RC=$?
 kill -9 "$XVFB_PID" 2>/dev/null || true
 echo "Run rc=$RUN_RC" >> "$LOG"
 
-echo "--- Shape info ---"
-grep -a "Init_One_Time\|Reload:" "$LOG" | head -10
-echo "--- CC_DRAW / SIDEBAR Draw ---"
-grep -a "CC_DRAW\|SIDEBAR.*Draw\|SidebarShape=" "$LOG" | head -15
-echo "--- frame500 ---"
-grep -a "frame500\|palette" "$LOG" | head -5
+# Without RA_AUTOSTART the game plays intro movies then shows main menu.
+# A 30s run covers the boot sequence; check for clean init and no crash.
+echo "--- Boot / SDL init ---"
+grep -a "SDL\|Init\|redalert\|[Ee]rror" "$LOG" | head -10
+echo "--- Movie playback ---"
+grep -a "Play_Movie\|VQA\|ENGLISH\|PROLOG" "$LOG" | head -10
+echo "--- Crash signals ---"
+grep -a "SIGSEGV\|SIGILL\|Segmentation\|abort" "$LOG" | head -5
