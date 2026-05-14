@@ -2487,6 +2487,42 @@ Mono_Set_Cursor(0,0);
 	}
 #endif
 
+#ifndef _MSC_VER
+	/* TIM-621 pass-74: RA_MISSION_TEST — re-arm win trigger after FPS audit window.
+	 * RA_AUTOSTART + RA_MISSION_TEST.FLAG: TIM-310 armed win at Frame+200 was suppressed
+	 * by TIM-489 (first 1000 frames).  Re-arm at _ra_frame_count==1050 so Do_Win() can
+	 * exercise the full win/score sequence in a controlled automated test. */
+	if (RawFileClass("RA_MISSION_TEST.FLAG").Is_Available()
+	        && PlayerPtr && Session.Type == GAME_NORMAL
+	        && _ra_frame_count == 1050) {
+		extern long g_tim310_restart_frame;
+		g_tim310_restart_frame = _ra_frame_count;
+		fprintf(stderr, "[RA-MISSION-TEST] re-arming win trigger at frame %ld\n",
+		        (long)_ra_frame_count); fflush(stderr);
+	}
+
+	/* TIM-621 pass-74: RA_QUICKSAVE_TEST — auto save/load at fixed frames.
+	 * Exercises Save_Game / Load_Game without interactive UI.
+	 * Save at frame 500, load at 550, verify game continues to 700. */
+	if (RawFileClass("RA_QUICKSAVE_TEST.FLAG").Is_Available()
+	        && Session.Type == GAME_NORMAL) {
+		if (_ra_frame_count == 500) {
+			fprintf(stderr, "[RA-QUICKSAVE-TEST] saving at frame %ld\n",
+			        (long)_ra_frame_count); fflush(stderr);
+			bool ok = Save_Game(1, "TIM621test");
+			fprintf(stderr, "[RA-QUICKSAVE-TEST] Save_Game(1) = %s\n",
+			        ok ? "OK" : "FAIL"); fflush(stderr);
+		}
+		if (_ra_frame_count == 550) {
+			fprintf(stderr, "[RA-QUICKSAVE-TEST] loading at frame %ld\n",
+			        (long)_ra_frame_count); fflush(stderr);
+			bool ok = Load_Game(1);
+			fprintf(stderr, "[RA-QUICKSAVE-TEST] Load_Game(1) = %s\n",
+			        ok ? "OK" : "FAIL"); fflush(stderr);
+		}
+	}
+#endif
+
 	BStart(BENCH_GAME_FRAME);
 
 	/*
