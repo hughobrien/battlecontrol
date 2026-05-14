@@ -1,0 +1,58 @@
+
+Running 1 test using 1 worker
+
+[TIM-590] loading https://hughobrien.github.io/battlecontrol/ra.html?src=https%3A%2F%2Fhughobrien.github.io%2Fbattlecontrol%2F__assets__%2F&debug=1
+[TIM-590] preloader hidden — assets mounted
+[TIM-590] Play_Intro fired at t=1778736441319
+[TIM-590] frame20 (t≈1.33s): fill=42% cyan=1% warm=1% colors=54 (640x480)
+[TIM-590] t2s: fill=43% cyan=1% warm=1% colors=53
+[TIM-590] t5s: fill=49% cyan=11% warm=0% colors=30
+[TIM-590] frame100 (t≈6.67s): fill=55% cyan=0% warm=0% colors=45
+
+[TIM-590] ===== AUDIT SUMMARY =====
+  Deployment: GH Pages (TIM-587 merge commit 6c0cb1c, deployed 2026-05-14T04:18Z)
+  frame20 (t≈1.33s) — fill=42%  cyan=1%  warm=1%
+  t2s     (t=2s)    — fill=43%  cyan=1%  warm=1%
+  t5s     (t=5s)    — fill=49%  cyan=11%  warm=0%
+  frame100(t≈6.67s) — fill=55% cyan=0%  warm=0%
+  Max cyan: 11% (pass <5%)  Max fill: 55% (pass ≥10%)
+  C1 (no cyan scatter):    FAIL (max=11%)
+  C2 (title-card warm ≥1%): PASS (frame20 warm=1%)
+  C3 (VQA fill ≥10%):      PASS (max=55%)
+  ✘  1 [chromium] › e2e/tim590-ghpages-cyan-verify.spec.ts:62:5 › TIM-590 — GH Pages post-TIM-587: no cyan scatter, title-card OK (17.2s)
+
+
+  1) [chromium] › e2e/tim590-ghpages-cyan-verify.spec.ts:62:5 › TIM-590 — GH Pages post-TIM-587: no cyan scatter, title-card OK 
+
+    Error: No cyan scatter (max <5%). Before TIM-587 fix, frame20 had heavy cyan blocks.
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoBeLessThan[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: < [32m5[39m
+    Received:   [31m11[39m
+
+      192 |     maxCyan,
+      193 |     `No cyan scatter (max <5%). Before TIM-587 fix, frame20 had heavy cyan blocks.`
+    > 194 |   ).toBeLessThan(5);
+          |     ^
+      195 |
+      196 |   expect(
+      197 |     sFrame20.warm,
+        at /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-590/e2e/tim590-ghpages-cyan-verify.spec.ts:194:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e/test-results/tim590-ghpages-cyan-verify-08562--cyan-scatter-title-card-OK-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e/test-results/tim590-ghpages-cyan-verify-08562--cyan-scatter-title-card-OK-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/test-results/tim590-ghpages-cyan-verify-08562--cyan-scatter-title-card-OK-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace e2e/test-results/tim590-ghpages-cyan-verify-08562--cyan-scatter-title-card-OK-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › e2e/tim590-ghpages-cyan-verify.spec.ts:62:5 › TIM-590 — GH Pages post-TIM-587: no cyan scatter, title-card OK 
