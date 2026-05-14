@@ -88,7 +88,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           import os, struct, sys
-          MIN_SIZE = 2_000_000  # ra.wasm is typically 9-10 MB; 2 MB minimum is generous
+          MIN_SIZE = 1_000_000  # TIM-597: Emscripten 5.0.6 -O2 produces ~1.8 MB; 1 MB guards against empty stubs
           for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
               with open(name, 'rb') as f:
                   magic = f.read(4)
