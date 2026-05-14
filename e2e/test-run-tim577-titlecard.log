@@ -1,0 +1,11 @@
+
+Running 1 test using 1 worker
+
+[TIM-573] ENGLISH.VQA started
+[TIM-573] t1s: fill=35% colors=35 (640x480)
+[TIM-573] t2s: fill=44% colors=55
+[TIM-573] t3s: fill=44% colors=52
+[TIM-573] Title card captured — check screenshots for visual quality
+  ✓  1 [chromium] › e2e/tim573-titlecard-verify.spec.ts:43:5 › TIM-573 — VQA title-card capture (post-fix) (14.6s)
+
+  1 passed (16.9s)
