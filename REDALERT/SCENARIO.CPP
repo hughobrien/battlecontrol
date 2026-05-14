@@ -953,18 +953,21 @@ void Do_Win(void)
 	// frame-rate measurement can complete.
 	// RA_VQA_VERIFY overrides the suppression so VQA playback can be audited (TIM-496).
 	// TIM-621: RA_MISSION_TEST.FLAG overrides suppression for mission completion test.
-	if (getenv("RA_AUTOSTART") && !getenv("RA_VQA_VERIFY")
-	        && !RawFileClass("RA_MISSION_TEST.FLAG").Is_Available()) {
-		fprintf(stderr, "[RA] Do_Win() suppressed (autostart fps audit)\n");
-		return;
-	}
-#endif
-#ifndef _MSC_VER
-	if (getenv("RA_AUTOSTART")) {
-		static int s_win_count = 0;
-		s_win_count++;
-		fprintf(stderr, "[TIM-310] do_win #%d frame=%ld\n", s_win_count, (long)Frame);
-		fprintf(stderr, "[TIM-308] do_win frame=%ld mission_accomplished\n", (long)Frame);
+	// TIM-621: use flag file as fallback — getenv("RA_AUTOSTART") returns NULL in WASM PROXY_TO_PTHREAD.
+	{
+		bool ra_autostart = getenv("RA_AUTOSTART") != nullptr
+		                    || RawFileClass("RA_AUTOSTART.FLAG").Is_Available();
+		if (ra_autostart && !getenv("RA_VQA_VERIFY")
+		        && !RawFileClass("RA_MISSION_TEST.FLAG").Is_Available()) {
+			fprintf(stderr, "[RA] Do_Win() suppressed (autostart fps audit)\n");
+			return;
+		}
+		if (ra_autostart) {
+			static int s_win_count = 0;
+			s_win_count++;
+			fprintf(stderr, "[TIM-310] do_win #%d frame=%ld\n", s_win_count, (long)Frame);
+			fprintf(stderr, "[TIM-308] do_win frame=%ld mission_accomplished\n", (long)Frame);
+		}
 	}
 #endif
 	Map.Set_Default_Mouse(MOUSE_NORMAL);
