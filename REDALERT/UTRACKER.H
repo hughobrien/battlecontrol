@@ -40,6 +40,14 @@
 ** UnitTracker Class
 */
 
+/* TIM-648: UnitTotals elements are serialized via htonl/ntohl (32-bit) and
+ * STATS.CPP sends Get_Unit_Count()*4 bytes over the network. `long` is 8 bytes
+ * on LP64, doubling element size and corrupting network-format conversions.
+ * Fix: use int32_t for all UnitTotals storage and Get_All_Totals return. */
+#ifndef _MSC_VER
+#include <stdint.h>
+#endif
+
 class	UnitTrackerClass {
 
 	public:
@@ -52,7 +60,7 @@ class	UnitTrackerClass {
 		void	Clear_Unit_Total(void);
 
 		int 	Get_Unit_Total (int unit_type);
-		long *Get_All_Totals (void);
+		int32_t *Get_All_Totals (void);
 		int	Get_Unit_Count (void){return (UnitCount);};
 
 		void	To_Network_Format(void);
@@ -60,7 +68,7 @@ class	UnitTrackerClass {
 
 	private:
 
-		long	*UnitTotals;
+		int32_t	*UnitTotals;
 		int	UnitCount;
 		int	InNetworkFormat;
 
