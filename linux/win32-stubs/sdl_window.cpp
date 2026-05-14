@@ -88,6 +88,15 @@ extern "C" void * SDL_Get_Main_Window(void)
         return nullptr;
     }
 
+#ifdef __EMSCRIPTEN__
+    // TIM-582: SDL2's Emscripten backend reads this hint during SDL_CreateWindow
+    // when registering keyboard event listeners. Without it, events go to #window
+    // and may not reach the canvas if it does not have browser focus.
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+    // TIM-582: Translate touch events to synthetic SDL mouse events (mobile WASM).
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
+#endif
+
     g_main_window = SDL_CreateWindow(
         RA_WINDOW_TITLE,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
