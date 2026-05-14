@@ -1,0 +1,13 @@
+
+Running 1 test using 1 worker
+
+[TIM-579] loading https://hughobrien.github.io/battlecontrol/ra.html?src=https%3A%2F%2Fhughobrien.github.io%2Fbattlecontrol%2F__assets__%2F&debug=1
+[TIM-579] preloader hidden — assets mounted
+[TIM-579] Play_Intro fired at t=1778721090430
+[TIM-579] frame 20 (~t=1.333s): fill=41% colors=54 (640x480)
+[TIM-579] t2s: fill=43% colors=55
+[TIM-579] t5s: fill=49% colors=48
+[TIM-579] frame 20 captured — see screenshots for visual quality verdict
+  ✓  1 [chromium] › e2e/tim579-ghpages-frame20.spec.ts:54:5 › TIM-579 — live gh-pages WASM: capture frame 20 of ENGLISH.VQA (55.8s)
+
+  1 passed (57.8s)
