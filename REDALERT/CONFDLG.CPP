@@ -40,12 +40,10 @@
 
 bool ConfirmationClass::Process(int text)
 {
-	text;
-	return true;
-	//return(Process(Text_String(text)));
+	return(Process(Text_String(text)));
 }
 
-#if (0) // ST - 5/8/2019
+
 /***********************************************************************************************
  * ConfirmationClass::Process -- Handles all the options graphic interface.                    *
  *                                                                                             *
@@ -92,7 +90,7 @@ bool ConfirmationClass::Process(char const * string)
 	**	Create Buttons.  Button coords are in pixels, but are window-relative.
 	*/
 	bheight = FontHeight + FontYSpacing + 2;
-	bwidth = max( (String_Pixel_Width( Text_String( TXT_YES ) ) + 8), 30);
+	bwidth = max( (int)(String_Pixel_Width( Text_String( TXT_YES ) ) + 8), 30);
 
 	TextButtonClass yesbtn(BUTTON_YES, TXT_YES,
 		TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
@@ -154,7 +152,7 @@ bool ConfirmationClass::Process(char const * string)
 			**	Draw the background.
 			*/
 			Dialog_Box(x, y, width, height);
-			Draw_Caption(TXT_CONFIRMATION, x, y, width);
+			Draw_Caption(TXT_NONE, x, y, width);
 			Fancy_Text_Print(buffer, x+20, y+30, GadgetClass::Get_Color_Scheme(), TBLACK, TPF_6PT_GRAD|TPF_USE_GRAD_PAL|TPF_NOSHADOW);
 
 			/*
@@ -241,4 +239,3 @@ bool ConfirmationClass::Process(char const * string)
 	}
 	return(result);
 }
-#endif
