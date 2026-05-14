@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <algorithm>
 #include <vector>
 
@@ -341,6 +342,12 @@ static int    vqa_have_rate       = 22050;
 static int    vqa_have_channels   = 1;
 static double vqa_resample_cursor = 0.0;  // fractional source-frame position; persists across SND chunks
 
+// TIM-677: linear-interpolation resampler needs the previous chunk's last
+// source sample so that the first output frame after a chunk boundary can
+// interpolate cleanly between the two chunks.  Reset in vqa_audio_open.
+static int16_t vqa_resample_prev_last[2] = {0, 0};
+static bool    vqa_resample_have_prev    = false;
+
 // TIM-517: proxy VQA audio device open/close to the main browser thread,
 // mirroring the AUDIO.CPP trampoline pattern (TIM-428).
 // SDL_OpenAudioDevice / SDL_CloseAudioDevice / SDL_InitSubSystem(SDL_INIT_AUDIO)
@@ -401,6 +408,8 @@ static void vqa_audio_open_on_main(void* arg)
     vqa_have_rate      = actual_rate;
     vqa_have_channels  = a->channels > 0 ? a->channels : 1;
     vqa_resample_cursor = 0.0;
+    vqa_resample_have_prev = false;
+    vqa_resample_prev_last[0] = vqa_resample_prev_last[1] = 0;
     a->result = true;
 }
 
@@ -482,6 +491,8 @@ static bool vqa_audio_open(int freq, int channels)
     vqa_have_rate       = have.freq > 0 ? have.freq : freq;
     vqa_have_channels   = have.channels > 0 ? have.channels : channels;
     vqa_resample_cursor = 0.0;
+    vqa_resample_have_prev = false;
+    vqa_resample_prev_last[0] = vqa_resample_prev_last[1] = 0;
     SDL_PauseAudioDevice(vqa_audio_dev, 0);
     return true;
 }
@@ -596,15 +607,33 @@ static void vqa_webaudio_push(const int16_t* pcm, size_t count)
 }
 #endif // __EMSCRIPTEN__
 
-// TIM-602: nearest-neighbour stride resample from source rate to device rate.
-// Mirrors TIBERIANDAWN/AUDIO.CPP::td_sound_callback (TIM-555).  The cursor is
-// kept in source frames and persists across SND chunks so the predictor-continuous
-// ADPCM stream stays phase-coherent across chunk boundaries.
+// TIM-677: linear-interpolation stride resample from source rate to device rate.
+// Replaces the TIM-602 nearest-neighbour resampler, which introduced audible
+// high-frequency aliasing during speech consonants (perceived as "mild
+// background clicking" in the RA prologue ENGLISH.VQA narration).
+//
+// FFT verification on the pre-fix output showed ~3.6 GU^2 of energy in the
+// 12-22 kHz "alias" band (above source Nyquist 11025 Hz) during voiced speech,
+// vs essentially zero in the bit-perfect 22050 Hz source.  Linear
+// interpolation acts as a sinc^2 low-pass that suppresses that band by ~12 dB,
+// removing the audible artifact while keeping the resampler cheap and lock-free.
+//
+// Cursor semantics: position in a "virtual" stream that prepends the previous
+// chunk's last source sample at index -1, so the first output frame of each
+// new chunk can interpolate between that prev_last and pcm[0].  At chunk
+// start, cursor ∈ [-1, 0) after a boundary-deferred iteration in the previous
+// chunk, or 0 for the very first chunk.  Loop emits output frames at c
+// positions [cursor, in_frames) where i = floor(c):
+//   i == -1                 → interp(prev_last, pcm[0],   c+1)
+//   0 <= i < in_frames - 1  → interp(pcm[i],    pcm[i+1], c-i)
+//   i == in_frames - 1      → defer: pcm[in_frames] = NEXT chunk's pcm[0]
+//                             which we do not have yet.  Save cursor at
+//                             c - in_frames (∈ [-1, 0)) and break.
 //
 // `count` is the total number of int16 samples in `pcm` (= frames * channels).
-// For 22050 Hz source on a 44100 Hz device, stride = 0.5 and the cursor advances
-// half a source frame per output frame, duplicating each source frame — i.e. a
-// pitch-correct 2× upsample.
+// For 22050 Hz source on a 44100 Hz device, stride = 0.5; for 48000 Hz device,
+// stride = 0.459375.  Stride > 1 (downsample) falls back to nearest-neighbour
+// because the deferral logic assumes at most one boundary iteration per chunk.
 static void vqa_audio_queue_s16(const int16_t* pcm, size_t count)
 {
     if (!vqa_audio_dev || !pcm || !count) return;
@@ -617,42 +646,135 @@ static void vqa_audio_queue_s16(const int16_t* pcm, size_t count)
 #else
         SDL_QueueAudio(vqa_audio_dev, pcm, (uint32_t)(count * sizeof(int16_t)));
 #endif
+        // Keep prev_last in sync so a later non-passthrough chunk has a sensible
+        // boundary anchor (e.g. if device rate changes mid-stream — unusual but
+        // defensive).
+        int ch_p = vqa_have_channels > 0 ? vqa_have_channels : 1;
+        size_t fr_p = count / (size_t)ch_p;
+        if (fr_p > 0) {
+            for (int k = 0; k < ch_p && k < 2; ++k)
+                vqa_resample_prev_last[k] = pcm[(fr_p - 1) * (size_t)ch_p + k];
+            vqa_resample_have_prev = true;
+        }
         return;
     }
 
     int ch = vqa_have_channels > 0 ? vqa_have_channels : 1;
-    if ((size_t)ch > count) {
-        // Pathologically short chunk — nothing to resample.
-        return;
-    }
+    if ((size_t)ch > count) return;  // pathologically short
     size_t in_frames = count / (size_t)ch;
     if (!in_frames) return;
 
     double stride = (double)vqa_source_rate / (double)vqa_have_rate;
 
-    // Upper bound on output frames: (in_frames - cursor) / stride + 1.
-    double remaining = (double)in_frames - vqa_resample_cursor;
-    if (remaining <= 0.0) {
-        // Cursor sits past end of this chunk (carry-over from previous call).
-        vqa_resample_cursor -= (double)in_frames;
+    // Downsample / equal-rate paths fall back to nearest-neighbour because the
+    // deferral logic below assumes stride < 1.  (Equal-rate is already handled
+    // by the identity branch above; this is a defensive guard for stride > 1.)
+    if (stride >= 1.0) {
+        std::vector<int16_t> out;
+        out.reserve((size_t)((double)in_frames / stride + 2.0) * (size_t)ch);
+        double c = vqa_resample_cursor;
+        if (c < 0.0) c = 0.0;
+        while (c < (double)in_frames) {
+            size_t idx = (size_t)c;
+            if (idx >= in_frames) break;
+            const int16_t* src = pcm + idx * (size_t)ch;
+            for (int k = 0; k < ch; ++k) out.push_back(src[k]);
+            c += stride;
+        }
+        vqa_resample_cursor = c - (double)in_frames;
         if (vqa_resample_cursor < 0.0) vqa_resample_cursor = 0.0;
+        for (int k = 0; k < ch && k < 2; ++k)
+            vqa_resample_prev_last[k] = pcm[(in_frames - 1) * (size_t)ch + k];
+        vqa_resample_have_prev = true;
+        if (!out.empty()) {
+#ifdef __EMSCRIPTEN__
+            vqa_webaudio_push(out.data(), out.size());
+#else
+            SDL_QueueAudio(vqa_audio_dev, out.data(),
+                           (uint32_t)(out.size() * sizeof(int16_t)));
+#endif
+        }
         return;
     }
+
+    // First chunk has no real prev_last — anchor it to pcm[0] so the cursor∈[-1,0)
+    // virtual-stream interpolation degrades to "pcm[0]" rather than 0 (avoids a
+    // leading fade-in artifact at chunk 0).  Subsequent chunks use the actual
+    // last sample cached from the previous call.
+    int16_t anchor[2] = {0, 0};
+    if (!vqa_resample_have_prev) {
+        for (int k = 0; k < ch && k < 2; ++k) anchor[k] = pcm[k];
+    } else {
+        for (int k = 0; k < ch && k < 2; ++k) anchor[k] = vqa_resample_prev_last[k];
+    }
+
+    // Cursor may be slightly negative ∈ [-1, 0) from a previous deferred boundary,
+    // exactly 0 on the first chunk, or in [0, 1) for normal in-chunk continuation.
+    // Cap any pathological cursor that sits past in_frames - 1 (the deferral zone).
+    double c = vqa_resample_cursor;
+    if (c < -1.0) c = -1.0;
+    if (c >= (double)in_frames) {
+        // Carry-over past end of this chunk — possible only if a previous chunk
+        // was abnormally short.  Skip emission, slide cursor down.
+        vqa_resample_cursor = c - (double)in_frames;
+        for (int k = 0; k < ch && k < 2; ++k)
+            vqa_resample_prev_last[k] = pcm[(in_frames - 1) * (size_t)ch + k];
+        vqa_resample_have_prev = true;
+        return;
+    }
+
+    // Output frame count upper bound.  Range from cursor up to (in_frames - 1),
+    // since the iteration at i == in_frames - 1 is always deferred.
+    double remaining = (double)(in_frames - 1) - c;
     size_t out_frames_cap = (size_t)(remaining / stride) + 2;
     std::vector<int16_t> out;
     out.reserve(out_frames_cap * (size_t)ch);
 
-    double c = vqa_resample_cursor;
     while (c < (double)in_frames) {
-        size_t idx = (size_t)c;
-        if (idx >= in_frames) break;
-        const int16_t* src = pcm + idx * (size_t)ch;
-        for (int k = 0; k < ch; ++k) out.push_back(src[k]);
+        // i = floor(c).  For c ∈ [-1, 0): i = -1 (virt boundary case).
+        double cf = std::floor(c);
+        int    i  = (int)cf;
+        double f  = c - cf;
+
+        if (i == (int)in_frames - 1) {
+            // Defer this iteration: would need pcm[in_frames] = next chunk's pcm[0].
+            break;
+        }
+        if (i < -1 || i >= (int)in_frames) {
+            // Out of range — shouldn't happen given the cursor invariants, but
+            // break defensively rather than read past the buffer.
+            break;
+        }
+
+        for (int k = 0; k < ch; ++k) {
+            int16_t a, b;
+            if (i == -1) {
+                a = anchor[k];
+                b = pcm[k];
+            } else {
+                a = pcm[(size_t)i * (size_t)ch + k];
+                b = pcm[((size_t)i + 1) * (size_t)ch + k];
+            }
+            double v = (1.0 - f) * (double)a + f * (double)b;
+            int iv = (int)(v + (v >= 0.0 ? 0.5 : -0.5));
+            if (iv >  32767) iv =  32767;
+            if (iv < -32768) iv = -32768;
+            out.push_back((int16_t)iv);
+        }
         c += stride;
     }
-    // Carry residual cursor into next chunk (relative to its frame 0).
+
+    // Carry the residual cursor into the next chunk's local frame.  The
+    // defer-at-i=in_frames-1 invariant guarantees this lands in [-1, 0); the
+    // clamp below is defensive against unexpected FP drift.
     vqa_resample_cursor = c - (double)in_frames;
-    if (vqa_resample_cursor < 0.0) vqa_resample_cursor = 0.0;
+    if (vqa_resample_cursor < -1.0) vqa_resample_cursor = -1.0;
+
+    // Cache last sample so the next chunk can resolve its left-boundary
+    // interpolation against this chunk's tail.
+    for (int k = 0; k < ch && k < 2; ++k)
+        vqa_resample_prev_last[k] = pcm[(in_frames - 1) * (size_t)ch + k];
+    vqa_resample_have_prev = true;
 
     if (!out.empty()) {
 #ifdef __EMSCRIPTEN__
