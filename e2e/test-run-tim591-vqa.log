@@ -1,0 +1,45 @@
+
+Running 1 test using 1 worker
+
+[TIM-591] loading http://localhost:8080/ra.html?src=http%3A%2F%2Flocalhost%3A9090%2F&debug=1
+
+[TIM-591] === Phase 1: Preloader ===
+  preloader hidden ✓
+
+[TIM-591] === Phase 2: Play_Intro → ENGLISH.VQA ===
+  Play_Intro fired ✓
+
+[TIM-591] === Phase 3: VQA frame sampling ===
+  Sampling frames at t≈1s/2s/4s/7s/10s (frames 15/30/60/105/150)
+  [frame-15 (t1s)] fill=82%  colors=124  cyanPx=0  letterbox(top=0% bot=0%)
+  [frame-30 (t2s)] fill=81%  colors=123  cyanPx=0  letterbox(top=0% bot=0%)
+  [frame-60 (t4s)] fill=81%  colors=98  cyanPx=0  letterbox(top=0% bot=0%)
+  [frame-105 (t7s)] fill=82%  colors=145  cyanPx=0  letterbox(top=0% bot=0%)
+  [frame-150 (t10s)] fill=83%  colors=43  cyanPx=0  letterbox(top=0% bot=0%)
+
+[TIM-591] === Phase 4: Main menu after VQA ===
+  main menu: fill=70%  colors=177
+
+[TIM-591] === Phase 5: Log analysis ===
+  AudioContext.sampleRate in logs: NOT FOUND
+  Divide-by-zero / abort: PASS (none)
+  SIGSEGV / Aborted: PASS (none)
+  VQA log lines: 6
+    [VQA] Playing 'ENGLISH.VQA': 640x400 blk=4x4 fps=15 flags=0x1 audio=1 hz=22050 ch=1 frames=160
+    [VQA] WASM audio: opening at 44100 Hz (browser native rate)
+    [VQA] 'ENGLISH.VQA' done (160/160 frames)
+    [VQA] Playing 'PROLOG.VQA': 320x156 blk=4x2 fps=15 flags=0x1 audio=1 hz=22050 ch=1 frames=2856
+    [VQA] WASM audio: opening at 44100 Hz (browser native rate)
+    [VQA] 'PROLOG.VQA' done (2856/2856 frames)
+
+[TIM-591] ===== VQA AUDIT SUMMARY =====
+  Build: battlecontrol/master post TIM-587 + TIM-580
+  Best VQA fill: 83%  (expect ≥25%)
+  Title-card fill (t1s): 82%  (expect ≥20%)
+  Max cyan-scatter pixels: 0  (expect 0 after TIM-587)
+  Max letterbox noise top-band: 0%  (expect 0)
+  Max letterbox noise bot-band: 0%  (expect 0)
+  Main menu fill: 70%  (expect ≥20%)
+  ✓  1 [chromium] › e2e/tim591-final-audit.spec.ts:122:5 › TIM-591 VQA intro visual + audio quality (3.5m)
+
+  1 passed (3.5m)

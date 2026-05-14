@@ -1,0 +1,35 @@
+
+Running 1 test using 1 worker
+
+[framesync] waiting for Start_Scenario OK…
+[framesync] frame 300 reached — in-game phase confirmed
+
+[framesync] === A: LEFT-CLICK UNIT SELECTION ===
+  left-clicking at canvas (350, 125)…
+  waiting for frame 400…
+  pixel diff in unit region: 57
+  green highlight pixels: before=166  after=175  delta=9
+
+[framesync] === B: RIGHT-CLICK MOVE ORDER ===
+  right-clicking move target at canvas (430, 375)…
+  waiting for frame 500…
+  pixel diff in map region after right-click move: 3761
+
+[framesync] === C: SIDEBAR BUILD ICON CLICK (diagnostic) ===
+  frame before sidebar click: 600
+  clicking sidebar icon at canvas (512, 165)…
+  waiting for frame 700 (next 100-frame milestone)…
+  sidebar pixel diff after icon click: 0
+  frame after: 700  (delta: 100)
+  game alive after sidebar click: YES — reached frame 700
+
+[framesync] ===== SUMMARY =====
+  game frame reached: 700
+  A. Unit region diff (left-click select) : 57  PASS
+  A. Green highlight delta (selection box): 9  PASS
+  B. Map region diff  (right-click move)  : 3761  PASS
+  C. Sidebar diff     (build icon click)  : 0  WARN
+  C. Game alive after sidebar click       : PASS
+  ✓  1 [chromium] › e2e/ra-gameplay-audit.spec.ts:356:7 › TIM-482 — RA WASM frame-synchronized unit control audit › left-click select, right-click move, sidebar build icon — frame-sync pixel diff (17.3s)
+
+  1 passed (18.5s)
