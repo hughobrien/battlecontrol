@@ -70,6 +70,10 @@ static int           SDL_CachedH        = 0;
 static bool          SDL_FirstPresentDone = false;
 static int           SDL_PresentCount     = 0;  // TIM-237: counts presents after game loop starts
 
+// TIM-619: set to 1 by vqa_player.cpp while a VQA cinematic is playing with
+// VQA_SCANLINES enabled. Wait_Vert_Blank reads this flag to apply the overlay.
+extern int vqa_scanlines_active;
+
 // TIM-141 commit 4: typed accessors over the file-static SDL_PrimarySurface
 // for GBUFFER.CPP's GraphicBufferClass::Lock/Unlock. Keeps <SDL.h> out of
 // every TU that includes DDRAW.H/GBUFFER.H. Indexed (8-bit) SDL surfaces
@@ -1083,6 +1087,17 @@ void Wait_Vert_Blank(void)
 	                  SDL_PrimaryARGB->pixels, SDL_PrimaryARGB->pitch);
 	SDL_RenderClear(SDL_VideoRenderer);
 	SDL_RenderCopy(SDL_VideoRenderer, SDL_PrimaryTexture, nullptr, nullptr);
+
+	// TIM-619: CRT scanline overlay — horizontal dim rows at ~50% opacity.
+	// Only active during VQA playback when VQA_SCANLINES env var is set.
+	if (vqa_scanlines_active) {
+		SDL_SetRenderDrawBlendMode(SDL_VideoRenderer, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(SDL_VideoRenderer, 0, 0, 0, 128);
+		for (int sl = 1; sl < h; sl += 2)
+			SDL_RenderDrawLine(SDL_VideoRenderer, 0, sl, w - 1, sl);
+		SDL_SetRenderDrawBlendMode(SDL_VideoRenderer, SDL_BLENDMODE_NONE);
+	}
+
 	SDL_RenderPresent(SDL_VideoRenderer);
 
 	// TIM-247: save frame 500 as BMP; also log raw indexed-surface samples

@@ -51,6 +51,28 @@ static bool vqa_trace_enabled()
     return cached != 0;
 }
 
+// -------------------------------------------------------------------------
+// TIM-619: CRT scanline overlay (VQA_SCANLINES env var or flag file).
+// vqa_scanlines_active is read by Wait_Vert_Blank in DDRAW.CPP to apply the
+// overlay; it is set to 1 only while Play_Movie_Linux is executing.
+// -------------------------------------------------------------------------
+
+// WASM note: getenv() returns NULL in the PROXY_TO_PTHREAD worker thread.
+// Fall back to a flag file (same pattern as RA_AUTOSTART.FLAG in TIM-506).
+static bool vqa_scanlines_check_env()
+{
+    if (std::getenv("VQA_SCANLINES") != nullptr)
+        return true;
+#ifdef __EMSCRIPTEN__
+    if (RawFileClass("VQA_SCANLINES.FLAG").Is_Available())
+        return true;
+#endif
+    return false;
+}
+
+// Defined here; declared extern in DDRAW.CPP.
+int vqa_scanlines_active = 0;
+
 // FNV-1a 32-bit hash of a byte range — used to print compact codebook snapshots.
 static uint32_t vqa_fnv1a(const uint8_t* p, size_t n)
 {
@@ -824,6 +846,11 @@ extern "C" void Play_Movie_Linux(const char* name)
     vqa_clear_abort_flag();
 #endif
 
+    // TIM-619: enable scanline overlay for this playback session if requested.
+    static int s_scanlines = -1;
+    if (s_scanlines < 0) s_scanlines = vqa_scanlines_check_env() ? 1 : 0;
+    vqa_scanlines_active = s_scanlines;
+
     // Skip FINF (frame offsets — not needed for sequential playback)
     {
         uint8_t chk[8];
@@ -1137,6 +1164,9 @@ extern "C" void Play_Movie_Linux(const char* name)
         uint32_t elapsed = SDL_GetTicks() - t0;
         if (elapsed < frame_ms) SDL_Delay(frame_ms - elapsed);
     }
+
+    // TIM-619: clear scanline overlay before returning to game rendering.
+    vqa_scanlines_active = 0;
 
     // Drain remaining audio before returning
     if (audio_ok) {
