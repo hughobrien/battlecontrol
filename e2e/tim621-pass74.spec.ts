@@ -8,15 +8,14 @@
  *
  * Three primary items verified:
  *
- *   1. Mission Briefing (no autostart)
- *      Load without ?autostart=1.  The TIM-206 synthetic injections in MENUS.CPP /
- *      SPECIAL.CPP / INIT.CPP navigate the menu automatically:
- *        [MENU] synthetic LCLICK at (322,183) — "New Game" button after 5 s
- *        [DIFF] injecting KN_RETURN — accepts default difficulty
- *        [INIT] injecting KN_RETURN for faction select — picks Allies → SCG01EA
- *      Start_Scenario is then called with briefing=true.  The briefing path
- *      (Play_Movie for BriefMovie VQA, or Display_Briefing_Text_GlyphX) must
- *      complete without hanging; game must reach frame 200.
+ *   1. Mission Briefing (?autostart=1)
+ *      TIM-626: the TIM-206 synthetic injections in MENUS.CPP / SPECIAL.CPP /
+ *      INIT.CPP are now gated on RA_AUTOSTART so normal users see the menu.
+ *      This test uses ?autostart=1 so RA_AUTOSTART bypasses the menu directly
+ *      to SCG01EA.INI.  Start_Scenario is then called with briefing=true.
+ *      The briefing path (Play_Movie for BriefMovie VQA, or
+ *      Display_Briefing_Text_GlyphX) must complete without hanging; game must
+ *      reach frame 200.
  *
  *   2. Save/Load roundtrip (?autostart=1 + ?quicksave_test=1)
  *      C++ injection at frame 500 calls Save_Game(1, "TIM621test").
@@ -82,19 +81,23 @@ async function sampleCanvas(page: any): Promise<{ fillPct: number; uniqueColors:
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Mission Briefing without RA_AUTOSTART
+// Test 1: Mission Briefing with RA_AUTOSTART
+// (TIM-626: synthetic menu injections are now gated on RA_AUTOSTART, so
+// the briefing test requires ?autostart=1 to reach the mission.)
 // ---------------------------------------------------------------------------
-test.describe('TIM-621 item 1 — mission briefing (no autostart)', () => {
-  test.setTimeout(900_000);  // 15 min: 5s menu delay + Init_Bulk_Data (~4min) + ~285s VQA playback + frames
+test.describe('TIM-621 item 1 — mission briefing (autostart)', () => {
+  test.setTimeout(900_000);  // 15 min: Init_Bulk_Data (~4min) + ~285s VQA playback + frames
 
-  test('menu nav auto-fires, briefing path completes, game reaches frame 200', async ({ page }) => {
+  test('autostart fires, briefing path completes, game reaches frame 200', async ({ page }) => {
     const consoleLogs: string[] = [];
     page.on('console', msg => consoleLogs.push(`[${msg.type()}] ${msg.text()}`));
     page.on('pageerror', err => consoleLogs.push(`[pageerror] ${err.message}`));
 
-    // NO autostart — exercises the full menu + briefing path.
-    const menuUrl = `${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`;
-    await page.goto(menuUrl, { waitUntil: 'domcontentloaded' });
+    // autostart=1 — RA_AUTOSTART bypasses menu and goes directly to SCG01EA.
+    // TIM-626: synthetic injections in MENUS.CPP/SPECIAL.CPP/INIT.CPP are now
+    // gated on RA_AUTOSTART, so normal users see the menu and choose manually.
+    const briefingUrl = `${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1&autostart=1`;
+    await page.goto(briefingUrl, { waitUntil: 'domcontentloaded' });
 
     // --- Phase 1: game initialises ---
     console.log('[briefing] waiting for Init_Bulk_Data done…');
@@ -102,20 +105,11 @@ test.describe('TIM-621 item 1 — mission briefing (no autostart)', () => {
     console.log('[briefing] Init_Bulk_Data done');
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim621-briefing-menu-loaded.png'), fullPage: true });
 
-    // --- Phase 2: TIM-206 synthetic menu navigation ---
-    // MENUS.CPP fires a synthetic LCLICK on "New Game" after 5 s of menu time.
-    console.log('[briefing] waiting for [MENU] synthetic LCLICK…');
-    await waitForOutput(page, '[MENU] synthetic LCLICK at', 120_000);
-    const menuClickLine = (await getOutput(page)).split('\n').find(l => l.includes('[MENU] synthetic LCLICK'));
-    console.log('[briefing] menu click fired:', menuClickLine);
-
-    // SPECIAL.CPP: auto-accepts difficulty dialog.
-    await waitForOutput(page, '[DIFF] injecting KN_RETURN', 30_000);
-    console.log('[briefing] difficulty auto-accepted');
-
-    // INIT.CPP: auto-selects Allies faction → SCG01EA.INI.
-    await waitForOutput(page, '[INIT] injecting KN_RETURN for faction select', 30_000);
-    console.log('[briefing] faction (Allies) auto-selected');
+    // --- Phase 2: RA_AUTOSTART bypasses menu ---
+    // INIT.CPP: RA_AUTOSTART path sets SCG01EA.INI + SEL_START_NEW_GAME directly.
+    console.log('[briefing] waiting for RA_AUTOSTART log…');
+    await waitForOutput(page, '[RA] Select_Game: RA_AUTOSTART active', 120_000);
+    console.log('[briefing] RA_AUTOSTART active — bypassing menu');
 
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim621-briefing-faction-selected.png'), fullPage: true });
 
@@ -142,14 +136,11 @@ test.describe('TIM-621 item 1 — mission briefing (no autostart)', () => {
     output = await getOutput(page);
 
     // Summarise briefing behaviour.
-    const briefMovieLine = vqaLines.find(l => l.includes("not found") || l.includes("WVQA") || l.includes("skipping"));
     const vqaPlayed = vqaLines.some(l => l.includes("playing") || l.includes("VQHD") || l.includes("frames decoded"));
     const briefSkipped = vqaLines.some(l => l.includes("not found") || l.includes("skipping"));
 
     console.log('\n[briefing] ===== SUMMARY =====');
-    console.log(`  Menu nav (LCLICK):      PASS`);
-    console.log(`  Difficulty accept:      PASS`);
-    console.log(`  Faction select:         PASS`);
+    console.log(`  RA_AUTOSTART bypass:    PASS`);
     console.log(`  Start_Scenario OK:      PASS`);
     console.log(`  VQA lines found:        ${vqaLines.length}`);
     console.log(`  Brief VQA played:       ${vqaPlayed ? 'YES' : 'NO'}`);
