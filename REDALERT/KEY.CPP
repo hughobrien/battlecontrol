@@ -210,10 +210,10 @@ extern "C" void SDL_Process_Input_Events(void)
 				case SDL_BUTTON_RIGHT:  vk = VK_RBUTTON; break;
 				default: continue;
 				}
-				/* TIM-206: must include WWKEY_VK_BIT so buffer value equals
-				 * KN_LMOUSE/KN_RMOUSE (0x1001/0x1002) for GadgetClass comparisons.
-				 * Is_Mouse_Key() masks to &0xFF so it still recognises VK_LBUTTON. */
-				vk |= WWKEY_VK_BIT;
+				/* TIM-664: do NOT add WWKEY_VK_BIT to mouse events.
+				 * KN_LMOUSE == VK_LBUTTON == 0x01; game compares key==KN_LMOUSE with no
+				 * masking, so storing 0x1001 means LEFTPRESS is never set.
+				 * Is_Mouse_Key() masks &0xFF so it correctly pops the coords either way. */
 				if (type == SDL_MOUSEBUTTONUP) vk |= WWKEY_RLS_BIT;
 
 				_Kbd->Put(vk);
