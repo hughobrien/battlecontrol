@@ -30,6 +30,10 @@ extern "C" {
 void * SDL_Get_Main_Window(void);
 void   SDL_Set_Main_Window(void * window);
 
+#ifndef __EMSCRIPTEN__
+void SDL_Toggle_Fullscreen(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
