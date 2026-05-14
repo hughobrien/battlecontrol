@@ -85,6 +85,38 @@
       text-align: center;
       width: 640px;
     }
+    #fullscreen-btn {
+      font-family: monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      background: #1a1a1a;
+      color: #666;
+      border: 1px solid #333;
+      cursor: pointer;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    #fullscreen-btn:hover { color: #aaa; border-color: #555; }
+    /* Fullscreen: canvas-wrapper fills screen, canvas scales 4:3 */
+    :fullscreen #canvas-wrapper,
+    :-webkit-full-screen #canvas-wrapper,
+    :-moz-full-screen #canvas-wrapper {
+      width: 100vw !important;
+      height: 100vh !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: #000 !important;
+      padding: 0 !important;
+    }
+    :fullscreen #canvas,
+    :-webkit-full-screen #canvas,
+    :-moz-full-screen #canvas {
+      width: min(100vw, calc(100vh * 4 / 3)) !important;
+      height: min(100vh, calc(100vw * 3 / 4)) !important;
+      border: none !important;
+      image-rendering: pixelated;
+    }
   </style>
 </head>
 <body>
@@ -108,7 +140,9 @@
       </div>
     </div>
   </div>
-  <div id="controls-hint">LMB: select / move unit &nbsp;|&nbsp; RMB: attack / cancel &nbsp;|&nbsp; Scroll: zoom map &nbsp;|&nbsp; Esc: menu</div>
+  <div id="controls-hint">LMB: select / move unit &nbsp;|&nbsp; RMB: attack / cancel &nbsp;|&nbsp; Scroll: zoom map &nbsp;|&nbsp; Esc: menu
+    <button id="fullscreen-btn" type="button" title="Toggle fullscreen (F11 / Alt+Enter)">[ ]</button>
+  </div>
   <pre id="output"></pre>
   <script>
     var outputEl = document.getElementById('output');
@@ -151,6 +185,46 @@
       canvas.addEventListener('mousedown', function () {
         canvas.focus();
       });
+    }());
+
+    // Fullscreen toggle — button click and F11/Alt+Enter keyboard shortcuts.
+    (function () {
+      var wrapper = document.getElementById('canvas-wrapper');
+      var btn = document.getElementById('fullscreen-btn');
+      if (!wrapper || !btn) return;
+
+      function enterFullscreen() {
+        var req = wrapper.requestFullscreen || wrapper.webkitRequestFullscreen || wrapper.mozRequestFullScreen;
+        if (req) req.call(wrapper).catch(function() {});
+      }
+      function exitFullscreen() {
+        var ex = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
+        if (ex) ex.call(document).catch(function() {});
+      }
+      function toggleFullscreen() {
+        if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+          exitFullscreen();
+        } else {
+          enterFullscreen();
+        }
+      }
+
+      btn.addEventListener('click', function () { toggleFullscreen(); });
+
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'F11' || (e.key === 'Enter' && e.altKey)) {
+          e.preventDefault();
+          toggleFullscreen();
+        }
+      });
+
+      function onFSChange() {
+        var fs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+        btn.textContent = fs ? '[x]' : '[ ]';
+      }
+      document.addEventListener('fullscreenchange', onFSChange);
+      document.addEventListener('webkitfullscreenchange', onFSChange);
+      document.addEventListener('mozfullscreenchange', onFSChange);
     }());
   </script>
   <script src="preloader.js"></script>

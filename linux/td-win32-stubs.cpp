@@ -191,6 +191,16 @@ extern "C" void SDL_Process_Input_Events(void)
         n = SDL_PeepEvents(ev, 16, SDL_GETEVENT, SDL_KEYDOWN, SDL_KEYUP);
         for (int i = 0; i < n; ++i) {
             const SDL_KeyboardEvent& ke = ev[i].key;
+#ifndef __EMSCRIPTEN__
+            // Intercept fullscreen toggles before the game sees them.
+            if (ev[i].type == SDL_KEYDOWN) {
+                bool f11 = (ke.keysym.sym == SDLK_F11);
+                bool alt_enter = ((ke.keysym.sym == SDLK_RETURN ||
+                                   ke.keysym.sym == SDLK_KP_ENTER) &&
+                                  (ke.keysym.mod & KMOD_ALT));
+                if (f11 || alt_enter) { SDL_Toggle_Fullscreen(); continue; }
+            }
+#endif
             unsigned short vk = TD_SDL_Keysym_To_VK(ke.keysym.sym);
             if (vk == 0) continue;
             Uint16 mod = ke.keysym.mod;
