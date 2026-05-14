@@ -978,10 +978,13 @@ bool Select_Game(bool fade)
 #endif
 #ifndef _MSC_VER
 							/* TIM-206: inject KN_RETURN to auto-select Allies (curbutton=0)
-							 * for smoke test mission launch — avoids blocking on faction dialog. */
-							fprintf(stderr, "[INIT] injecting KN_RETURN for faction select (Allies)\n");
-							fflush(stderr);
-							Keyboard->Put(KN_RETURN);
+							 * for smoke test mission launch — avoids blocking on faction dialog.
+							 * TIM-626: gate on RA_AUTOSTART — normal users must choose faction. */
+							if (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
+								fprintf(stderr, "[INIT] injecting KN_RETURN for faction select (Allies)\n");
+								fflush(stderr);
+								Keyboard->Put(KN_RETURN);
+							}
 #endif
 #ifdef FIXIT_VERSION_3
 							switch (WWMessageBox().Process(TXT_CHOOSE, TXT_ALLIES, TXT_CANCEL, TXT_SOVIET)) {
