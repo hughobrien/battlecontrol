@@ -1,0 +1,65 @@
+
+Running 1 test using 1 worker
+
+
+[TIM-562] === Phase 1: Preloader ===
+  preloader overlay hidden — 1s
+
+[TIM-562] === Phase 2: Init_Game → Play_Intro ===
+  calling Play_Intro — 8s
+
+[TIM-562] === Phase 3: ENGLISH.VQA canvas sampling (20s) ===
+  [t1s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t2s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t3s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t4s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t5s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t6s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t7s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t8s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t9s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t10s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [TIM-562] ra-visual-frame-300.png captured (frame-300 equivalent)
+  [t11s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t12s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t13s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t14s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t15s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t16s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t17s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t18s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t19s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+  [t20s] 640×480  fill=0%  canvas_black=100%  content_black=100%  colors=1
+
+[TIM-562] === Phase 4: Main menu after VQA intro ===
+  ✘  1 [chromium] › e2e/tim562-vqa-cinematic-audit.spec.ts:101:7 › TIM-562 — RA WASM post-fix cinematic audit › VQA intro quality — fill ≥10%, no black cell scatter, palette correct (5.6m)
+
+
+  1) [chromium] › e2e/tim562-vqa-cinematic-audit.spec.ts:101:7 › TIM-562 — RA WASM post-fix cinematic audit › VQA intro quality — fill ≥10%, no black cell scatter, palette correct 
+
+    TimeoutError: page.waitForFunction: Timeout 300000ms exceeded.
+
+      32 |
+      33 | async function waitForOutput(page: any, substring: string, timeoutMs = 180_000) {
+    > 34 |   await page.waitForFunction(
+         |              ^
+      35 |     (s: string) => {
+      36 |       const el = document.getElementById('output');
+      37 |       return el !== null && el.textContent !== null && el.textContent.includes(s);
+        at waitForOutput (/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-577/e2e/tim562-vqa-cinematic-audit.spec.ts:34:14)
+        at /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-577/e2e/tim562-vqa-cinematic-audit.spec.ts:185:11
+
+    Error Context: e2e/test-results/tim562-vqa-cinematic-audit-bf927-ell-scatter-palette-correct-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/test-results/tim562-vqa-cinematic-audit-bf927-ell-scatter-palette-correct-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace e2e/test-results/tim562-vqa-cinematic-audit-bf927-ell-scatter-palette-correct-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  Slow test file: [chromium] › e2e/tim562-vqa-cinematic-audit.spec.ts (5.6m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 failed
+    [chromium] › e2e/tim562-vqa-cinematic-audit.spec.ts:101:7 › TIM-562 — RA WASM post-fix cinematic audit › VQA intro quality — fill ≥10%, no black cell scatter, palette correct 
