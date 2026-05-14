@@ -1,0 +1,57 @@
+warning: Git tree '/home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-601' is dirty
+evaluation warning: The xorg package set has been deprecated, 'xorg.libX11' has been renamed to 'libx11'
+C&C Red Alert — dev shell
+  cmake -S . -B build && cmake --build build -j$(nproc)
+  emcmake cmake --preset wasm && cmake --build build-wasm --target ra  # WASM
+  bash scripts/first-run-pass-94.sh   # full RA build + smoke test
+
+Running 1 test using 1 worker
+
+[TIM-601] loading http://localhost:8080/ra.html?src=http%3A%2F%2Flocalhost%3A9090%2F&debug=1
+
+[TIM-601] === Phase 1: Preloader ===
+  preloader hidden ✓
+
+[TIM-601] === Phase 2: ENGLISH.VQA → done ===
+  ENGLISH.VQA done ✓
+
+[TIM-601] === Phase 3: PROLOG.VQA start ===
+  PROLOG.VQA Playing fired ✓
+
+[TIM-601] === Phase 4: PROLOG.VQA frame sampling ===
+  [early-t3s @ t=3.0s] fill=37%  colors=71  cyanPx=0  blackBlocks(32×32)=7
+  [mid-t30s @ t=30.0s] fill=22%  colors=71  cyanPx=0  blackBlocks(32×32)=19
+  [mid-t90s @ t=90.0s] fill=23%  colors=70  cyanPx=0  blackBlocks(32×32)=18
+
+[TIM-601] === Phase 5: PROLOG.VQA done ===
+  PROLOG.VQA done ✓  (wall-clock playback 193.4s — expected ~190s for 2856 frames @ 15fps)
+
+[TIM-601] === Phase 6: Log analysis ===
+  PROLOG source hz: 22050
+  Audio device rate: 44100 Hz
+  Frames played: (2856/2856 frames)
+  Divide-by-zero / abort: PASS (none)
+  SIGSEGV / Aborted: PASS (none)
+  Null-function trap: PASS (none)
+  VQA log lines: 8
+    [VQA] Playing 'ENGLISH.VQA': 640x400 blk=4x4 fps=15 flags=0x1 audio=1 hz=22050 ch=1 frames=160
+    [VQA] WASM audio: opening at 44100 Hz (browser native rate, source=22050 Hz)
+    [VQA] resampler: source=22050 Hz device=44100 Hz channels=1
+    [VQA] 'ENGLISH.VQA' done (160/160 frames)
+    [VQA] Playing 'PROLOG.VQA': 320x156 blk=4x2 fps=15 flags=0x1 audio=1 hz=22050 ch=1 frames=2856
+    [VQA] WASM audio: opening at 44100 Hz (browser native rate, source=22050 Hz)
+    [VQA] resampler: source=22050 Hz device=44100 Hz channels=1
+    [VQA] 'PROLOG.VQA' done (2856/2856 frames)
+
+[TIM-601] ===== PROLOG.VQA AUDIT SUMMARY =====
+  PROLOG hz=22050  device=44100 Hz  (ratio=2.00)
+  Wall-clock playback: 193.4s  (expected ~190s — drift = 3.4s)
+  Frames: (2856/2856 frames)
+  Max VQA fill across samples: 37%
+  Mid-playback fill (t60s): 0%
+  Max cyan-scatter pixels:   0  (expect 0 after TIM-587)
+  Max 32x32 black-block count in VQA viewport: 19  (high count = missing-region symptom)
+  Audio open: YES  Divide-by-zero: PASS  SIGSEGV: PASS  Null-fn: PASS
+  ✓  1 [chromium] › e2e/tim601-prolog-audit.spec.ts:112:5 › TIM-601 PROLOG.VQA visual + audio verification (3.5m)
+
+  1 passed (3.5m)
