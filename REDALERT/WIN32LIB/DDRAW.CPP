@@ -1241,17 +1241,34 @@ void Set_DD_Palette ( void *palette )
 }
 
 #ifndef _MSC_VER
-// TIM-523: VQA CPL0 palette bytes are 8-bit (0-255), not 6-bit VGA.
-// Set_DD_Palette always applies <<2, corrupting values >= 64.
-// This variant writes pre-scaled 8-bit RGB directly, bypassing the shift.
-extern "C" void Set_DD_Palette_8bit(const uint8_t* rgb8, int ncolors)
+// TIM-580: VQA CPL0 palette is 6-bit VGA after all.  TIM-523 misread the
+// bimodal byte distribution (538 bytes in 0-31, 230 bytes in 224-255) as
+// proof of 8-bit encoding, but ffmpeg's vqavideo.c handles it as 6-bit
+// VGA with byte truncation: r = (cpl0[i] * 4) & 0xFF, plus bottom-bit
+// replication so 6'b111111 maps to 8'b11111111 instead of 8'b11111100.
+//
+// Empirically (TIM-580 frame 20/75 vs ffmpeg reference): the 6-bit
+// interpretation produces the correct metallic-gray backgrounds and clean
+// snow/sky in the targeting reticle.  The TIM-523 "8-bit direct" path made
+// background palette entries (CPL0 values 4-31) appear black, leaving only
+// the gold-text indices (values 224-255) visible and producing the cyan
+// scatter the issue reports.
+//
+// This variant only writes SDL_PaletteEntries[] — it does NOT touch
+// the legacy Westwood `PaletteEntries[]` global, so VQA playback does not
+// disturb the game's palette state.
+extern "C" void Set_DD_Palette_8bit(const uint8_t* cpl0, int ncolors)
 {
-	if (!rgb8 || ncolors <= 0) return;
+	if (!cpl0 || ncolors <= 0) return;
 	if (ncolors > 256) ncolors = 256;
 	for (int i = 0; i < ncolors; ++i) {
-		SDL_PaletteEntries[i].r = rgb8[i * 3 + 0];
-		SDL_PaletteEntries[i].g = rgb8[i * 3 + 1];
-		SDL_PaletteEntries[i].b = rgb8[i * 3 + 2];
+		uint8_t r = (uint8_t)(cpl0[i * 3 + 0] << 2);
+		uint8_t g = (uint8_t)(cpl0[i * 3 + 1] << 2);
+		uint8_t b = (uint8_t)(cpl0[i * 3 + 2] << 2);
+		// Bottom-bit replication: r |= (r >> 6) & 0x3 (matches ffmpeg).
+		SDL_PaletteEntries[i].r = (uint8_t)(r | ((r >> 6) & 0x3));
+		SDL_PaletteEntries[i].g = (uint8_t)(g | ((g >> 6) & 0x3));
+		SDL_PaletteEntries[i].b = (uint8_t)(b | ((b >> 6) & 0x3));
 		SDL_PaletteEntries[i].a = 255;
 	}
 	if (SDL_PrimarySurface && SDL_PrimarySurface->format &&
