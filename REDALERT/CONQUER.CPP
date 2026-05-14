@@ -2236,13 +2236,17 @@ Mono_Set_Cursor(0,0);
 #ifndef _MSC_VER
 	/* TIM-363: frame counter + RA_CHEAT injection for automated smoke tests.
 	 * TIM-471: cache autostart flag once — getenv() returns NULL in WASM worker
-	 * (PROXY_TO_PTHREAD doesn't propagate C environ); check flag file as fallback. */
+	 * (PROXY_TO_PTHREAD doesn't propagate C environ); check flag file as fallback.
+	 * TIM-621: _ra_debug_frames also enabled by RA_DEBUG.FLAG (?debug=1 in browser URL)
+	 * so non-autostart tests can observe frame progress without triggering autostart behavior. */
 	static bool _ra_autostart = getenv("RA_AUTOSTART") != nullptr
 	                             || RawFileClass("RA_AUTOSTART.FLAG").Is_Available();
+	static bool _ra_debug_frames = _ra_autostart
+	                               || RawFileClass("RA_DEBUG.FLAG").Is_Available();
 	static long _ra_frame_count = 0;
 	static long _ra_t100_ms = 0;  // TIM-489: wall-clock ms at frame 100 for FPS calc
 	_ra_frame_count++;
-	if (_ra_autostart && (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0)) {
+	if (_ra_debug_frames && (_ra_frame_count <= 15 || (_ra_frame_count % 100) == 0)) {
 		// TIM-489: include elapsed-since-frame-100 so FPS can be derived from the log.
 		long elapsed_ms = 0;
 		if (_ra_frame_count >= 100) {
@@ -2487,6 +2491,42 @@ Mono_Set_Cursor(0,0);
 	}
 #endif
 
+#ifndef _MSC_VER
+	/* TIM-621 pass-74: RA_MISSION_TEST — re-arm win trigger after FPS audit window.
+	 * RA_AUTOSTART + RA_MISSION_TEST.FLAG: TIM-310 armed win at Frame+200 was suppressed
+	 * by TIM-489 (first 1000 frames).  Re-arm at _ra_frame_count==1050 so Do_Win() can
+	 * exercise the full win/score sequence in a controlled automated test. */
+	if (RawFileClass("RA_MISSION_TEST.FLAG").Is_Available()
+	        && PlayerPtr && Session.Type == GAME_NORMAL
+	        && _ra_frame_count == 1050) {
+		extern long g_tim310_restart_frame;
+		g_tim310_restart_frame = _ra_frame_count;
+		fprintf(stderr, "[RA-MISSION-TEST] re-arming win trigger at frame %ld\n",
+		        (long)_ra_frame_count); fflush(stderr);
+	}
+
+	/* TIM-621 pass-74: RA_QUICKSAVE_TEST — auto save/load at fixed frames.
+	 * Exercises Save_Game / Load_Game without interactive UI.
+	 * Save at frame 500, load at 550, verify game continues to 700. */
+	if (RawFileClass("RA_QUICKSAVE_TEST.FLAG").Is_Available()
+	        && Session.Type == GAME_NORMAL) {
+		if (_ra_frame_count == 500) {
+			fprintf(stderr, "[RA-QUICKSAVE-TEST] saving at frame %ld\n",
+			        (long)_ra_frame_count); fflush(stderr);
+			bool ok = Save_Game(1, "TIM621test");
+			fprintf(stderr, "[RA-QUICKSAVE-TEST] Save_Game(1) = %s\n",
+			        ok ? "OK" : "FAIL"); fflush(stderr);
+		}
+		if (_ra_frame_count == 550) {
+			fprintf(stderr, "[RA-QUICKSAVE-TEST] loading at frame %ld\n",
+			        (long)_ra_frame_count); fflush(stderr);
+			bool ok = Load_Game(1);
+			fprintf(stderr, "[RA-QUICKSAVE-TEST] Load_Game(1) = %s\n",
+			        ok ? "OK" : "FAIL"); fflush(stderr);
+		}
+	}
+#endif
+
 	BStart(BENCH_GAME_FRAME);
 
 	/*
@@ -2611,7 +2651,8 @@ Mono_Set_Cursor(0,0);
 #ifndef _MSC_VER
 	// TIM-310: pass-90 — per-cycle win trigger (smoke test only, gated on RA_AUTOSTART).
 	// Without this gate every user playing via `nix run` would get a forced win after ~13s (TIM-416).
-	if (getenv("RA_AUTOSTART")) {
+	// TIM-621: use _ra_autostart (flag-file aware) instead of getenv() which returns NULL in WASM.
+	if (_ra_autostart) {
 		extern long g_tim310_restart_frame;
 		if (g_tim310_restart_frame >= 0 && Frame >= g_tim310_restart_frame + 200
 				&& Session.Type == GAME_NORMAL && !PlayerWins && !PlayerLoses && PlayerPtr != NULL) {
