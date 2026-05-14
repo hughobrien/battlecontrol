@@ -7,7 +7,10 @@
 //
 // Format reference: Westwood VQA version 2 (C&C: Red Alert intro files).
 // LCW decompression: LCW.CPP (Format80 variant).
-// Palette convention: CPL0 stores 6-bit VGA DAC values (0-63); Set_DD_Palette applies <<2.
+// Palette convention: CPL0 stores 6-bit VGA DAC values; Set_DD_Palette_8bit applies
+// `<<2` plus bottom-bit replication (matches ffmpeg vqavideo.c).  TIM-523's "8-bit
+// direct" reading was wrong (TIM-580): values 4-31 were rendered nearly-black,
+// leaving codebook-driven backgrounds invisible and only gold-text indices visible.
 //
 // Include pattern: function.h first (same as REDALERT/*.cpp), then SDL2.
 
@@ -897,7 +900,7 @@ extern "C" void Play_Movie_Linux(const char* name)
         if (SDL_Has_Primary_Surface()) {
             int scrW = (ScreenWidth  > 0) ? ScreenWidth  : 640;
             int scrH = (ScreenHeight > 0) ? ScreenHeight : 480;
-            Set_DD_Palette_8bit(palette, 256);  // TIM-523: CPL0 stores 8-bit RGB (0-255), not 6-bit VGA
+            Set_DD_Palette_8bit(palette, 256);  // TIM-580: 6-bit VGA *4 + bottom-bit fill (ffmpeg-compatible)
             blit_vqa_frame(framebuf.data(), vqaW, vqaH,
                            SDL_Get_Primary_Pixels(),
                            SDL_Get_Primary_Pitch(),
@@ -917,12 +920,18 @@ extern "C" void Play_Movie_Linux(const char* name)
                 FILE* fp = fopen(path, "wb");
                 if (fp) {
                     fprintf(fp, "P6\n%d %d\n255\n", vqaW, vqaH);
+                    // TIM-580: PPM uses same 6-bit→8-bit scaling as the live render
+                    // (Set_DD_Palette_8bit in DDRAW.CPP), so PPMs match what the
+                    // player puts on screen and what ffmpeg outputs.
                     for (int py = 0; py < vqaH; ++py) {
                         for (int px = 0; px < vqaW; ++px) {
                             uint8_t idx = framebuf[(size_t)py * vqaW + px];
-                            uint8_t r = palette[idx*3+0];
-                            uint8_t g = palette[idx*3+1];
-                            uint8_t b = palette[idx*3+2];
+                            uint8_t r = (uint8_t)(palette[idx*3+0] << 2);
+                            uint8_t g = (uint8_t)(palette[idx*3+1] << 2);
+                            uint8_t b = (uint8_t)(palette[idx*3+2] << 2);
+                            r |= (uint8_t)((r >> 6) & 0x3);
+                            g |= (uint8_t)((g >> 6) & 0x3);
+                            b |= (uint8_t)((b >> 6) & 0x3);
                             fputc(r, fp); fputc(g, fp); fputc(b, fp);
                         }
                     }
