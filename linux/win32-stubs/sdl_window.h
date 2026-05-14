@@ -30,6 +30,10 @@ extern "C" {
 void * SDL_Get_Main_Window(void);
 void   SDL_Set_Main_Window(void * window);
 
+// TIM-675: renderer handle so SDL_Toggle_Fullscreen can apply integer scaling.
+void * SDL_Get_Main_Renderer(void);
+void   SDL_Set_Main_Renderer(void * renderer);
+
 #ifndef __EMSCRIPTEN__
 void SDL_Toggle_Fullscreen(void);
 #endif
