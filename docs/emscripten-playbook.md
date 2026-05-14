@@ -113,6 +113,19 @@ var Module = {
 Do not rely on `putenv` from C++ for variables that must be set at startup;
 by the time `main()` runs, the value must already be in `Module.ENV`.
 
+**Alternative — flag files via IDBFS/VFS:** For opt-in features that don't
+require a JS harness change, check for a sentinel file with `RawFileClass`:
+
+```cpp
+bool enabled = (std::getenv("MY_VAR") != nullptr);
+#ifdef __EMSCRIPTEN__
+if (!enabled) enabled = RawFileClass("MY_VAR.FLAG").Is_Available();
+#endif
+```
+
+Create the file via the browser DevTools console (`FS.writeFile('/MY_VAR.FLAG','1')`).
+Used by RA_AUTOSTART.FLAG (TIM-506) and VQA_SCANLINES.FLAG (TIM-619).
+
 **Reference:** [Emscripten environment variables](https://emscripten.org/docs/porting/connecting_cpp_and_javascript/Interacting-with-code.html#environment-variables)
 
 ---
@@ -274,4 +287,4 @@ endif()
 ---
 
 *Last updated: 2026-05-14. Maintainer: EmscriptenExpert agent.*
-*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-620.*
+*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620.*
