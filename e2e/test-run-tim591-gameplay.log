@@ -1,0 +1,23 @@
+
+Running 1 test using 1 worker
+
+[TIM-591] loading gameplay url: http://localhost:8080/ra.html?src=http%3A%2F%2Flocalhost%3A9090%2F&autostart=1
+[TIM-591 gameplay] preloader hidden ✓
+[TIM-591 gameplay] Start_Scenario OK ✓
+[TIM-591 gameplay] frame 300 reached ✓
+[TIM-591 gameplay] left-click unit at (350, 125)
+[TIM-591 gameplay] frame 400 reached ✓
+[TIM-591 gameplay] pixel diff after unit click: 2240268
+[TIM-591 gameplay] right-click move order to (430, 375)
+[TIM-591 gameplay] frame 500 reached ✓
+[TIM-591 gameplay] pixel diff frames 400→500 (move + AI): 2470060
+
+[TIM-591] ===== GAMEPLAY AUDIT SUMMARY =====
+  Start_Scenario OK: PASS
+  Reached frame 500: PASS
+  Unit select pixel diff (f300→f400): 2240268  PASS
+  AI+move pixel diff  (f400→f500): 2470060  PASS
+  No crash: PASS
+  ✓  1 [chromium] › e2e/tim591-final-audit.spec.ts:255:5 › TIM-591 gameplay — Start_Scenario, unit select, AI movement (25.2s)
+
+  1 passed (26.6s)
