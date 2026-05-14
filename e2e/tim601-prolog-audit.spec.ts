@@ -150,12 +150,13 @@ test('TIM-601 PROLOG.VQA visual + audio verification', async ({ page }) => {
   console.log('\n[TIM-601] === Phase 4: PROLOG.VQA frame sampling ===');
   const samples: {label: string; offsetMs: number; fill: number; colors: number; cyanCount: number; blackBlocks: number}[] = [];
 
+  // Three samples — five samples destabilized Chrome's captureScreenshot
+  // protocol after t=120s. Wall-clock duration assertion at end catches the
+  // audio 2× regression more reliably than late frame screenshots.
   const schedule: [string, number][] = [
-    ['early-t3s',   3_000],
-    ['mid-t20s',   20_000],
-    ['mid-t60s',   60_000],
-    ['mid-t120s', 120_000],
-    ['late-t180s',180_000],
+    ['early-t3s',  3_000],
+    ['mid-t30s',  30_000],
+    ['mid-t90s',  90_000],
   ];
 
   for (const [label, targetMs] of schedule) {
@@ -172,7 +173,8 @@ test('TIM-601 PROLOG.VQA visual + audio verification', async ({ page }) => {
 
   // ── Phase 5: Wait for PROLOG.VQA done ──────────────────────────────────
   console.log('\n[TIM-601] === Phase 5: PROLOG.VQA done ===');
-  await waitForOutput(page, "[VQA] 'PROLOG.VQA' done", 120_000);
+  // Need >120s after last sample to reach end of 190s PROLOG.
+  await waitForOutput(page, "[VQA] 'PROLOG.VQA' done", 180_000);
   const prologEndMs = Date.now();
   const playbackDurationS = (prologEndMs - prologStartMs) / 1000;
   console.log(`  PROLOG.VQA done ✓  (wall-clock playback ${playbackDurationS.toFixed(1)}s — expected ~190s for 2856 frames @ 15fps)`);
