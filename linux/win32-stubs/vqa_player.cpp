@@ -770,20 +770,24 @@ extern "C" void Play_Movie_Linux(const char* name)
             filename, vqaW, vqaH, blockW, blockH, fps,
             hdr.flags, has_audio, freq, channels, hdr.numFrames);
 
-    // TIM-587: VQA v2 pointer table uses 0xFF** entries as "solid colour"
-    // blocks where the lo byte is the palette index.  Pre-fill codebook
-    // slots 0xFF00..0xFFFF with a solid byte of `i` so a VPT entry
-    // (lo=i, hi=0xFF) renders as palette[i] without any special case in the
-    // render loop.  This matches ffmpeg's vqa_decode_frame_pal8.  TIM-549
-    // had replaced this with `if (hi == 0xFF) continue;` (skip), which
-    // worked accidentally for the Einstein briefing (lo==0 background) but
-    // left stale prior-frame content wherever the encoder wanted a non-zero
-    // solid fill — visible as block-aligned cyan scatter through the title
-    // and prologue cinematics (TIM-587).
+    // VQA pal8 "solid colour" block convention: a VPT entry with hi == the
+    // blockH-specific marker is rendered as palette[lo].  The marker depends
+    // on blockH (per multimedia wiki VQA spec):
+    //   blockH=4 → marker 0xFF, solid slots at codebook[0xFF00..0xFFFF]
+    //   blockH=2 → marker 0x0F, solid slots at codebook[0x0F00..0x0FFF]
+    // Pre-fill both ranges so a VPT entry (lo=i, hi=marker) renders palette[i]
+    // without any special case in the render loop.  TIM-587 added the 0xFF
+    // pre-fill (fixes ENGLISH.VQA 640×400 blk=4×4 cyan scatter).  TIM-613 adds
+    // the 0x0F pre-fill (fixes PROLOG.VQA Trinity prologue and the other
+    // 320×156 blk=4×2 MAIN.MIX movies — without it, every block that should
+    // render as a solid palette colour reads the zero-initialised codebook
+    // tail and renders as palette[0], visible as scattered black squares).
     const size_t MAX_CB_VECTORS = 0xFF00u + 0x100u;
     std::vector<uint8_t> codebook(MAX_CB_VECTORS * cbEntrySize, 0);
-    for (int ci = 0; ci < 256; ++ci)
+    for (int ci = 0; ci < 256; ++ci) {
         memset(codebook.data() + (0xFF00u + ci) * cbEntrySize, (uint8_t)ci, cbEntrySize);
+        memset(codebook.data() + (0x0F00u + ci) * cbEntrySize, (uint8_t)ci, cbEntrySize);
+    }
 
     std::vector<uint8_t> framebuf((size_t)vqaW * vqaH, 0);
     std::vector<uint8_t> prevbuf((size_t)vqaW * vqaH, 0);
@@ -943,10 +947,12 @@ extern "C" void Play_Movie_Linux(const char* name)
             }
         });
 
-        // Pass 2: Render frame (VPT0 / VPTZ / VPTR / VPRZ)
-        // hi<0xFF: index into codebook (0x0000..0xFEFF).
-        // hi==0xFF: index 0xFF**, routes to pre-filled solid-colour blocks
-        // (codebook[0xFF00+lo] = palette[lo] for each pixel).  TIM-587.
+        // Pass 2: Render frame (VPT0 / VPTZ / VPTR / VPRZ).
+        // cb_idx = lo | (hi<<8).  When hi == the blockH-specific "solid"
+        // marker (0xFF for blockH=4, 0x0F for blockH=2), the block is a solid
+        // palette[lo] fill; the pre-filled codebook slots make this work
+        // without a special case in the inner loop.
+        // TIM-587 added 0xFF; TIM-613 added 0x0F (PROLOG.VQA / Trinity).
         iter_sub([&](const uint8_t* shdr, uint32_t ssz, const uint8_t* sbody) {
             if (!chunk_eq(shdr, "VPT0") && !chunk_eq(shdr, "VPTZ") &&
                 !chunk_eq(shdr, "VPTR") && !chunk_eq(shdr, "VPRZ")) return;
@@ -974,7 +980,10 @@ extern "C" void Play_Movie_Linux(const char* name)
                 for (int fy = 0; fy < blockH; ++fy)
                     memcpy(framebuf.data() + (size_t)(by*blockH+fy)*vqaW + bx*blockW,
                            src + fy * blockW, blockW);
-                if (hi == 0xFF) ++trc_solid; else ++trc_rendered;
+                // blockH-specific solid-marker (TIM-613): 0xFF for blockH=4,
+                // 0x0F for blockH=2.  Track separately for trace accuracy.
+                uint8_t solid_marker = (blockH == 4) ? 0xFF : 0x0F;
+                if (hi == solid_marker) ++trc_solid; else ++trc_rendered;
             }
             if (trace) {
                 fprintf(stderr, "[VQA-TRACE] f=%d cb=%d solid=%d "
