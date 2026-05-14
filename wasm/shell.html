@@ -97,7 +97,7 @@
   </div>
   <div id="status-line">Loading…</div>
   <div id="canvas-wrapper">
-    <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
+    <canvas id="canvas" width="640" height="480" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
     <div id="preloader-overlay">
       <div>BattleControl — RA</div>
       <button id="open-btn" type="button">Open Game Folder</button>
@@ -159,6 +159,26 @@
     window.onerror = function(ev) {
       Module.setStatus('JS exception: ' + ev.message);
     };
+
+    // TIM-582: Canvas keyboard focus management.
+    // tabindex="0" (on the element) makes the canvas focusable.
+    // SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT="#canvas" (set in C++ before
+    // SDL_CreateWindow) routes SDL key events to #canvas; but the canvas
+    // must also have browser focus for those events to fire.
+    // Note: pointer lock is intentionally NOT requested here — RA is an RTS
+    // that reads absolute SDL_MOUSEMOTION x/y coordinates. Browser-level
+    // pointer lock without matching SDL_SetRelativeMouseMode in C++ would
+    // switch the browser to reporting relative deltas while SDL still reads
+    // absolute canvas-relative coordinates, breaking cursor tracking.
+    (function () {
+      var canvas = document.getElementById('canvas');
+      if (!canvas) return;
+
+      // Focus the canvas on every click so keyboard events are delivered.
+      canvas.addEventListener('mousedown', function () {
+        canvas.focus();
+      });
+    }());
   </script>
   <script src="preloader.js"></script>
   {{{ SCRIPT }}}

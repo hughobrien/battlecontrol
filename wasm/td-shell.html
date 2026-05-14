@@ -89,7 +89,7 @@
   </div>
   <div id="status-line">Loading…</div>
   <div id="canvas-wrapper">
-    <canvas id="canvas" width="640" height="480" oncontextmenu="event.preventDefault()"></canvas>
+    <canvas id="canvas" width="640" height="480" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
     <div id="preloader-overlay">
       <div>BattleControl — TD</div>
       <button id="open-btn" type="button">Open Game Folder</button>
@@ -135,6 +135,15 @@
     window.onerror = function(ev) {
       Module.setStatus('JS exception: ' + ev.message);
     };
+
+    // TIM-582: Canvas keyboard focus — see shell.html for rationale.
+    (function () {
+      var canvas = document.getElementById('canvas');
+      if (!canvas) return;
+      canvas.addEventListener('mousedown', function () {
+        canvas.focus();
+      });
+    }());
   </script>
   <script src="preloader.js"></script>
   {{{ SCRIPT }}}
