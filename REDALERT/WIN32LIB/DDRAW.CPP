@@ -703,6 +703,7 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 #endif
 		fprintf(stderr, "[RA] SDL window %dx%d renderer=%p\n",
 		        w, h, (void *)SDL_VideoRenderer);
+		SDL_Set_Main_Renderer(SDL_VideoRenderer); // TIM-675: expose for integer-scale fullscreen
 		// Indexed 8-bit primary surface; palette is filled in by
 		// Set_DD_Palette and applied via SDL_SetPaletteColors.
 		SDL_PrimarySurface = SDL_CreateRGBSurfaceWithFormat(
@@ -828,6 +829,7 @@ void Reset_Video_Mode(void)
 		SDL_PrimarySurface = nullptr;
 	}
 	if (SDL_VideoRenderer) {
+		SDL_Set_Main_Renderer(nullptr); // TIM-675: unregister before destroy
 		SDL_DestroyRenderer(SDL_VideoRenderer);
 		SDL_VideoRenderer = nullptr;
 	}
