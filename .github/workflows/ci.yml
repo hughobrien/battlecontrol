@@ -26,3 +26,51 @@ jobs:
 
       - name: Build and smoke-test
         run: bash scripts/first-run-pass-94.sh
+
+  vqa-pixel-diff:
+    name: VQA codec pixel-diff
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg python3
+
+      - name: Regenerate synthetic test VQA
+        # Ensures the committed test.vqa is bit-for-bit identical to what the
+        # generator produces on this Python version (catches generator drift).
+        run: |
+          python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa.new
+          if ! diff -q e2e/goldens/vqa/test.vqa e2e/goldens/vqa/test.vqa.new; then
+            echo "ERROR: committed test.vqa differs from generator output"
+            echo "Run: python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa"
+            exit 1
+          fi
+          rm e2e/goldens/vqa/test.vqa.new
+
+      - name: VQA pixel-diff — synthetic test VQA (always runs)
+        # Compares our Python reference decoder against ffmpeg on the committed
+        # synthetic VQA.  This gate always runs regardless of game-data presence.
+        # Catches: codebook bugs, palette scaling bugs, solid-marker regressions.
+        run: |
+          python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa \
+            --frames 0,1,2 \
+            --threshold 5
+
+      - name: VQA pixel-diff — game VQA samples (skips if data absent)
+        # Runs the same harness against real VQA files from MAIN.MIX when the
+        # game data symlink build/run-172 is present.  Always exits 0 when data
+        # is absent so the job does not block PRs from contributors without data.
+        run: |
+          if [ -f build/run-172/MAIN.MIX ]; then
+            python3 scripts/vqa-pixel-diff.py build/run-172/MAIN.MIX \
+              --frames 0,29,59 \
+              --threshold 5 \
+              --quiet
+          else
+            echo "SKIP: build/run-172/MAIN.MIX not found — game data absent"
+            exit 0
+          fi
