@@ -122,6 +122,7 @@ sleep 1
 
 LOG="$PASS_DIR/run.log"
 rm -f /tmp/redalert-frame500.bmp
+# RA_AUTOSTART=1: deliberately skips ~200s of VQA intro movies (TIM-665).
 (cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy RA_AUTOSTART=1 \
     timeout 90 "$LINK_BIN") > "$LOG" 2>&1
 RUN_RC=$?
