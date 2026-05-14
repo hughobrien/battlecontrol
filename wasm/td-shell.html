@@ -78,6 +78,13 @@
     }
     #progress-text { font-size: 12px; color: #888; min-height: 1em; }
     .overlay-hint { font-size: 11px; color: #666; max-width: 420px; text-align: center; }
+    #controls-hint {
+      font-size: 11px;
+      color: #555;
+      margin-top: 4px;
+      text-align: center;
+      width: 640px;
+    }
   </style>
 </head>
 <body>
@@ -101,6 +108,7 @@
       </div>
     </div>
   </div>
+  <div id="controls-hint">LMB: select / move unit &nbsp;|&nbsp; RMB: attack / cancel &nbsp;|&nbsp; Scroll: zoom map &nbsp;|&nbsp; Esc: menu</div>
   <pre id="output"></pre>
   <script>
     var outputEl = document.getElementById('output');
