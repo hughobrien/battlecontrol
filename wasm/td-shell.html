@@ -112,8 +112,6 @@
     :fullscreen #canvas,
     :-webkit-full-screen #canvas,
     :-moz-full-screen #canvas {
-      width: min(100vw, calc(100vh * 4 / 3)) !important;
-      height: min(100vh, calc(100vw * 3 / 4)) !important;
       border: none !important;
       image-rendering: pixelated;
     }
@@ -218,9 +216,19 @@
         }
       });
 
+      // TIM-675: integer scaling on fullscreen enter/exit (see shell.html).
+      var canvas = document.getElementById('canvas');
       function onFSChange() {
         var fs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
         btn.textContent = fs ? '[x]' : '[ ]';
+        if (fs && canvas) {
+          var factor = Math.max(1, Math.floor(Math.min(screen.width / 640, screen.height / 480)));
+          canvas.style.width  = (factor * 640) + 'px';
+          canvas.style.height = (factor * 480) + 'px';
+        } else if (canvas) {
+          canvas.style.width  = '';
+          canvas.style.height = '';
+        }
       }
       document.addEventListener('fullscreenchange', onFSChange);
       document.addEventListener('webkitfullscreenchange', onFSChange);

@@ -57,8 +57,9 @@
 
 namespace {
 
-SDL_Window * g_main_window = nullptr;
-bool         g_is_fullscreen = false;
+SDL_Window *   g_main_window   = nullptr;
+SDL_Renderer * g_main_renderer = nullptr;
+bool           g_is_fullscreen = false;
 
 // Red Alert's native primary mode is 640x400. The substrate creates the
 // window hidden so DDRAW.CPP's first-present latch (TIM-141 commit 5)
@@ -117,13 +118,38 @@ extern "C" void SDL_Set_Main_Window(void * window)
     g_is_fullscreen = false;  // reset on window reassignment
 }
 
+extern "C" void * SDL_Get_Main_Renderer(void)
+{
+    return g_main_renderer;
+}
+
+extern "C" void SDL_Set_Main_Renderer(void * renderer)
+{
+    g_main_renderer = static_cast<SDL_Renderer *>(renderer);
+}
+
 #ifndef __EMSCRIPTEN__
 extern "C" void SDL_Toggle_Fullscreen(void)
 {
     if (g_main_window == nullptr) return;
     g_is_fullscreen = !g_is_fullscreen;
+
+    if (g_is_fullscreen && g_main_renderer != nullptr) {
+        // TIM-675: integer scaling — largest integer multiple of the game
+        // resolution that fits the display, centred with black bars.
+        int win_w = 0, win_h = 0;
+        SDL_GetWindowSize(g_main_window, &win_w, &win_h);
+        SDL_RenderSetLogicalSize(g_main_renderer, win_w, win_h);
+        SDL_RenderSetIntegerScale(g_main_renderer, SDL_TRUE);
+    }
+
     SDL_SetWindowFullscreen(g_main_window,
         g_is_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+
+    if (!g_is_fullscreen && g_main_renderer != nullptr) {
+        SDL_RenderSetIntegerScale(g_main_renderer, SDL_FALSE);
+        SDL_RenderSetLogicalSize(g_main_renderer, 0, 0);
+    }
 }
 #endif
 
