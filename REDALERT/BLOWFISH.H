@@ -96,6 +96,14 @@ class BlowfishEngine {
 		**	Initialization data for sub keys. The initial values are constant and
 		**	filled with a number generated from pi. Thus they are not random but
 		**	they don't hold a weak pattern either.
+		**
+		**	TIM-633 LP64 note: these are 'unsigned long' (8 bytes on LP64 vs. 4 on
+		**	Win32). The Blowfish algorithm is designed for 32-bit words; using 64-bit
+		**	types means additions across S-box values can carry into bit 32, producing
+		**	ciphertext that differs from the Win32 build. The algorithm remains
+		**	symmetric (Encrypt/Decrypt cancel) on a single platform, so save files
+		**	are loadable within the same binary. Cross-platform save compatibility
+		**	is not a current requirement; leave as-is unless/until needed.
 		*/
 		static unsigned long const P_Init[(int)ROUNDS+2];
 		static unsigned long const S_Init[4][UCHAR_MAX+1];
