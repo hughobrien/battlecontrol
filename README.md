@@ -14,10 +14,10 @@ No installation needed. You need legally-acquired game data — click **Open Gam
 
 ### What's included
 
-| | Browser (WASM) | Native Linux binary |
+| | Browser (WASM) — **primary deliverable** | Native Linux — ASAN/GDB/rr testbed |
 |---|---|---|
-| **Tiberian Dawn** | ✅ Fully playable — game loop, audio, graphics, real font rendering | Not yet (TD Linux binary work in progress) |
-| **Red Alert** | ✅ Fully playable — unit control, AI, VQA cinematics, audio, full game loop | ✅ Fully playable — ~12 fps, 12 win/loss cycles, ASAN-clean |
+| **Tiberian Dawn** | ✅ Fully playable — game loop, audio, graphics, real font rendering | Not yet |
+| **Red Alert** | ✅ Fully playable — unit control, AI, VQA cinematics, audio, full game loop | ASAN-clean testbed (12 fps, 12 win/loss cycles) — for debugging only, not packaged for end users |
 
 ### What's new in v0.2 (since v0.1-beta)
 
@@ -37,19 +37,23 @@ No installation needed. You need legally-acquired game data — click **Open Gam
 2. Click **Open Game Folder** and select your local data directory containing the MIX files
 3. The game loads automatically — no server upload, data stays on your machine
 
-**Native Linux (RA):**
+**Developer testbed (native Linux — ASAN/GDB/rr only, not packaged for end users):**
+
+The native Linux binary is an ASAN/GDB/rr development testbed used to catch memory bugs before they reach WASM. It is not a packaged deliverable; the browser build is the supported way to play. If you are porting or debugging:
+
 ```bash
 git clone https://github.com/hughobrien/battlecontrol && cd battlecontrol
+# Debug + ASAN (recommended for development work):
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"
+cmake --build build-asan -j$(nproc)
+# Or run the full smoke-test script (requires RA_DATA_DIR):
 nix develop --command bash scripts/first-run-pass-94.sh
-# or: cmake -S . -B build && cmake --build build -j$(nproc)
 ```
-Point the binary at your RA data directory (`RA_DATA_DIR=/path/to/data`).
-
-![RA native Linux gameplay](https://raw.githubusercontent.com/hughobrien/battlecontrol/master/docs/ra-native-linux.png)
 
 ### Known limitations
 
-- **TD native Linux binary**: Tiberian Dawn native Linux port is complete (`e2e/td-gameplay.spec.ts` all pass) but a packaged run script is not yet included in this release.
+- **Native Linux builds are developer testbeds, not deliverables.** The native binaries are used for ASAN/GDB/rr debugging. They are not packaged, not performance-tuned for end users, and not on the release roadmap. The browser (WASM) build is the deliverable.
 - **Prerequisites**: You must supply legally-acquired game data (MIX files). Game data is not included and cannot be distributed.
 - **Browser requirements**: Chrome or Edge (stable) required for SharedArrayBuffer / WASM threads. Firefox works with `dom.postMessage.sharedArrayBuffer.bypassCOOP_COEP.insecure.enabled = true`.
 
@@ -66,7 +70,7 @@ battlecontrol is a Linux and WebAssembly port of the EA-released game engine sou
 > | [electronicarts/CnC_Red_Alert](https://github.com/electronicarts/CnC_Red_Alert) | Standalone **original 1996 Red Alert** source (Win32 game) | Separate project — not related to this fork |
 > | [electronicarts/CnC_Tiberian_Dawn](https://github.com/electronicarts/CnC_Tiberian_Dawn) | Standalone **original 1995 Tiberian Dawn** source (MS-DOS game) | Separate project — not related to this fork |
 
-> **Current status — v0.2:** Both games are fully playable in the browser (WASM). Tiberian Dawn: complete game loop, audio, and full rendering pipeline. Red Alert: unit control, enemy AI, VQA cinematics (with correct palette and audio), and the full mission loop confirmed. The native Linux RA binary runs at ~12 fps, 12 win/loss cycles, ASAN-clean.
+> **Current status — v0.2:** Both games are fully playable in the browser (WASM) — that is the primary deliverable. Tiberian Dawn: complete game loop, audio, and full rendering pipeline. Red Alert: unit control, enemy AI, VQA cinematics (with correct palette and audio), and the full mission loop confirmed. A native Linux RA binary also exists as an ASAN/GDB/rr development testbed (not a packaged product).
 
 ---
 
@@ -141,7 +145,7 @@ First clean link: **TIM-156 / commit b7a4439**.
 - Allied win condition verified via reinforcement injection
 - `MissionControl[-1]` ASAN OOB in TECHNO.CPP / FOOT.CPP fixed (pass-93)
 - `AnimClass` pool exhaustion fixed (cycle-3 crash root cause, pass-92)
-- **Release smoke test: TIM-316 / pass-94** — 12.1 fps, 12 win/loss cycles, 0 crashes, ASAN-clean
+- **Testbed smoke test: TIM-316 / pass-94** — 12.1 fps, 12 win/loss cycles, 0 crashes, ASAN-clean (FPS is not a target — this is a debugging testbed; performance polish is post-WASM work)
 
 ---
 
@@ -162,7 +166,9 @@ Passes are numbered sequentially (pass-1 through pass-94) and each has a corresp
 
 ---
 
-## Building on Linux
+## Building on Linux (ASAN/GDB/rr testbed — not a player deliverable)
+
+> **Developer note:** The native Linux build exists as an ASAN/GDB/rr debugging testbed, not as a packaged product for end users. The browser (WASM) build at the top of this README is the deliverable. Use the native build when you need fast iteration under a memory sanitizer, `gdb`, or `rr` (Mozilla's record-and-replay debugger). FPS targets and installer polish are intentionally deferred until post-WASM work is needed.
 
 ### Prerequisites
 
@@ -212,38 +218,26 @@ DISPLAY=:99 ./redalert
 
 ## Nix
 
-A `flake.nix` is provided for Nix users on x86_64-Linux.
-
-### One-liner run
-
-```bash
-# From a directory containing your RA game data (MAIN.MIX etc.):
-cd /path/to/red-alert-data
-nix run github:hughobrien/battlecontrol
-
-# Or set the data path explicitly:
-RA_DATA_DIR=/path/to/red-alert-data nix run github:hughobrien/battlecontrol
-```
-
-The game data is **not** included — you must supply legally-acquired files
-(MAIN.MIX, REDALERT.MIX, and supporting MIX files).
+A `flake.nix` is provided for Nix users on x86_64-Linux. This is primarily useful for **contributors and developers** entering the build environment — the native binary is a testbed, not an end-user deliverable. To play the game, use the [browser build](#play-in-browser) above.
 
 ### Contributors — drop into a build shell
 
 ```bash
 git clone https://github.com/hughobrien/battlecontrol && cd battlecontrol
 nix develop
-# Now cmake, gcc, clang, SDL2, python3 etc. are all on PATH:
-cmake -S . -B build && cmake --build build -j$(nproc)
-# Or run the full RA smoke-test script:
+# cmake, gcc, clang, SDL2, python3 etc. are all on PATH:
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"
+cmake --build build-asan -j$(nproc)
+# Or run the full RA smoke-test script (sets RA_DATA_DIR internally):
 bash scripts/first-run-pass-94.sh
 ```
 
-### Build the binary without entering the shell
+### Build the testbed binary without entering the shell
 
 ```bash
 nix build github:hughobrien/battlecontrol
-# Binary lands at ./result/bin/redalert
+# Testbed binary lands at ./result/bin/redalert (for ASAN/GDB use)
 ```
 
 ### First-time lock-file generation
