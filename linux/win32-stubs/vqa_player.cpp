@@ -847,11 +847,29 @@ extern "C" void Play_Movie_Linux(const char* name)
         uint32_t chk_sz = be32(chk + 4);
 
         // ---- Audio chunks ----
+        // SND0 is raw PCM at VQHD.bits per sample.  The Allied campaign briefing
+        // VQA ("Allied Headquarters Present Day") stores 16-bit signed LE PCM in
+        // SND0 chunks; treating those bytes as 8-bit unsigned (the legacy default)
+        // doubles the sample count and decodes each byte as a signed offset from
+        // 128, producing total noise.  Branch on hdr.bits to select the right
+        // interpretation (TIM-661).
         if (chunk_eq(chk, "SND0")) {
             if (chk_sz) {
                 std::vector<uint8_t> raw(chk_sz);
                 f.Read(raw.data(), (long)chk_sz);
-                if (audio_ok) vqa_audio_queue_u8(raw.data(), raw.size());
+                if (audio_ok) {
+                    if (hdr.bits == 16) {
+                        // Copy into an int16-aligned buffer.  vqa_webaudio_push
+                        // computes a HEAP16 index via `ptr >> 1`, which requires
+                        // a 2-byte-aligned pointer; the source `raw` byte vector
+                        // is only guaranteed 1-byte alignment.
+                        std::vector<int16_t> pcm(raw.size() / sizeof(int16_t));
+                        memcpy(pcm.data(), raw.data(), pcm.size() * sizeof(int16_t));
+                        vqa_audio_queue_s16(pcm.data(), pcm.size());
+                    } else {
+                        vqa_audio_queue_u8(raw.data(), raw.size());
+                    }
+                }
                 if (chk_sz & 1) f.Seek(1, SEEK_CUR);
             }
             continue;
