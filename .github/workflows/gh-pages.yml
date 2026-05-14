@@ -32,13 +32,49 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ninja-build cmake
+          sudo apt-get install -y --no-install-recommends ninja-build cmake xvfb
 
       - name: Configure WASM build
         run: emcmake cmake --preset wasm
 
       - name: Build ra.wasm
         run: cmake --build build-wasm --target ra --parallel
+
+      - name: Set up Node.js for smoke tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: WASM smoke test — ra.wasm loads without crash
+        # Serves the freshly-built ra.wasm via serve-coop.py (COOP+COEP headers
+        # required for SharedArrayBuffer / pthreads). Fails the build if the
+        # binary crashes during Emscripten runtime init, blocking the deploy.
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          SERVER_PID=$!
+          sleep 2
+          npx playwright test e2e/wasm-smoke.spec.ts
+          SMOKE_EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID  2>/dev/null || true
+          exit $SMOKE_EXIT
+
+      - name: Upload smoke test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-smoke-results
+          path: |
+            e2e/screenshots/tim595-smoke-after-init.png
+            e2e/test-results/
 
       - name: Build td.wasm
         run: cmake --build build-wasm --target td --parallel
