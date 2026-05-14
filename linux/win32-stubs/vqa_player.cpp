@@ -342,8 +342,16 @@ static void vqa_audio_open_on_main(void* arg)
     want.format   = AUDIO_S16LSB;
     want.channels = (uint8_t)a->channels;
     want.samples  = 1024;
-    vqa_audio_dev = SDL_OpenAudioDevice(nullptr, 0, &want, &have,
-                                         SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+    // TIM-593: do NOT pass SDL_AUDIO_ALLOW_FREQUENCY_CHANGE here.
+    // That flag permits SDL to set a different frequency and activate its internal
+    // resampler, which registers a function pointer into the WASM indirect-call table.
+    // In emcc 5.0.6 (emsdk release) that slot is absent/null, causing a
+    // "null function" WASM trap downstream of SDL_OpenAudioDevice.  Since we already
+    // queried the browser native AudioContext.sampleRate and pass it as want.freq,
+    // SDL does not need to resample — opening at exactly want.freq is correct.
+    // If SDL cannot open at this exact rate the call fails gracefully (return 0)
+    // and VQA plays silently rather than crashing.
+    vqa_audio_dev = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
     if (!vqa_audio_dev) {
         fprintf(stderr, "[VQA] SDL audio open failed: %s\n", SDL_GetError());
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
