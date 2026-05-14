@@ -74,7 +74,7 @@ When reviewing a PR that adds or modifies a smoke test, verify:
 | Test | Assertions | Visual? | Audit status |
 |------|-----------|---------|--------------|
 | `e2e/wasm-smoke.spec.ts` | no crash + status line | None | **TIM-645** — needs pixel assertion |
-| `scripts/first-run-pass-94.sh` (CI) | 1000 frames, 1 win, no crash, FPS | None | **TIM-646** — no visual gate for native build |
+| `scripts/first-run-pass-94.sh` (CI) | 1000 frames, 1 win, no crash, FPS | None | Visual rendering **not covered** by this test — rendering gap covered by WASM smoke test (`e2e/tim600-english-vqa-verify.spec.ts`, `e2e/tim590-ghpages-cyan-verify.spec.ts`). Adding a pixel gate here would require ffmpeg or ImageMagick (not in the CI image); the WASM path exercises the same C++ renderer compiled to a different target and already has fill%, cyan%, warm%, blockEdge, and colour-range assertions. |
 | `ci.yml: vqa-pixel-diff` | ffmpeg pixel diff `--threshold 5` | Yes | OK |
 | `e2e/tim590-ghpages-cyan-verify.spec.ts` | fill%, cyan%, warm% pixel ranges | Yes | OK |
 | `e2e/tim600-english-vqa-verify.spec.ts` | fill%, cyanCount, blockEdges, audio log | Yes | OK |

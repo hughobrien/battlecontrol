@@ -15,6 +15,14 @@
 #   3. At least 1 win/restart cycle fires
 #   4. Average FPS reported
 #
+# VISUAL RENDERING: intentionally not covered by this test.
+#   The CI image only has g++/libsdl2/xvfb/python3; adding a pixel-level
+#   screenshot gate would require ffmpeg or ImageMagick.  Rendering visual
+#   correctness is covered by the WASM smoke tests instead:
+#     e2e/tim600-english-vqa-verify.spec.ts  — fill%, cyan%, blockEdges
+#     e2e/tim590-ghpages-cyan-verify.spec.ts — colour-range checks
+#   See docs/smoke-test-design-rule.md (audit table) for rationale.
+#
 # Run from repo root:
 #   bash scripts/first-run-pass-94.sh
 
