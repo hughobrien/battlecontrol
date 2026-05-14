@@ -46,6 +46,11 @@
 
 #include	"function.h"
 #include	"vortex.h"
+#ifndef _MSC_VER
+#include <stdio.h>
+#include <sys/stat.h>
+#include <errno.h>
+#endif
 #ifdef WIN32
 #include "tcpip.h"
 #include "ccdde.h"
@@ -363,6 +368,28 @@ bool Save_Game(const char *file_name, const char *descr)
 	Code_All_Pointers();
 
 	/*
+	**	TIM-629: Ensure the save directory exists before creating the file.
+	**	Under Emscripten the /saves/ directory is created by the JS preloader,
+	**	but can fail silently.  RawFileClass::Error() is empty (non-fatal), so
+	**	a missing directory means Save_Game silently writes nothing yet still
+	**	returns true, causing Load_Game to fail with "file not available".
+	*/
+#ifdef __EMSCRIPTEN__
+	{
+		const char *saves_dir = "/saves";
+		if (mkdir(saves_dir, 0755) != 0 && errno != EEXIST) {
+			fprintf(stderr, "[RA-SAVE] warning: mkdir(%s) errno=%d\n",
+			        saves_dir, errno);
+			fflush(stderr);
+		}
+	}
+#endif
+
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA-SAVE] saving to '%s'\n", file_name); fflush(stderr);
+#endif
+
+	/*
 	**	Open the file
 	*/
 	BufferIOFileClass file(file_name);
@@ -445,6 +472,21 @@ bool Save_Game(const char *file_name, const char *descr)
 
 	NowSavingGame = false; // TEMP MBL: Need to discuss better solution with Steve
 
+#ifndef _MSC_VER
+	{
+		/* TIM-629: log actual file size to confirm the save was written. */
+		struct stat _st;
+		if (stat(file_name, &_st) == 0) {
+			fprintf(stderr, "[RA-SAVE] wrote '%s' size=%ld bytes\n",
+			        file_name, (long)_st.st_size);
+		} else {
+			fprintf(stderr, "[RA-SAVE] ERROR: '%s' not found after save (errno=%d)\n",
+			        file_name, errno);
+		}
+		fflush(stderr);
+	}
+#endif
+
 	return(true);
 }
 
@@ -511,18 +553,32 @@ bool Load_Game(int id)
 ** Version that takes a file name instead. ST - 9/9/2019 11:13AM
 */
 bool Load_Game(const char *file_name)
-{		
+{
 	int i;
 	unsigned scenario;
 	HousesType house;
 	char descr_buf[DESCRIP_MAX];
 	int load_net = 0;									// 1 = save network/modem game
-	
+
 	/*
 	**	Open the file
 	*/
+#ifndef _MSC_VER
+	{
+		/* TIM-629: log file availability before opening. */
+		struct stat _st;
+		int _exists = (stat(file_name, &_st) == 0);
+		fprintf(stderr, "[RA-LOAD] opening '%s' exists=%d size=%ld\n",
+		        file_name, _exists, _exists ? (long)_st.st_size : 0L);
+		fflush(stderr);
+	}
+#endif
 	RawFileClass file(file_name);
 	if (!file.Is_Available()) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA-LOAD] FAIL: file not available '%s'\n", file_name);
+		fflush(stderr);
+#endif
 		return(false);
 	}
 
@@ -541,14 +597,23 @@ bool Load_Game(const char *file_name)
 	**	Read & discard the save-game's header info
 	*/
 	if (fstraw.Get(descr_buf, DESCRIP_MAX) != DESCRIP_MAX) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA-LOAD] FAIL: short read on descr_buf\n"); fflush(stderr);
+#endif
 		return(false);
 	}
 
 	if (fstraw.Get(&scenario, sizeof(scenario)) != sizeof(scenario)) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA-LOAD] FAIL: short read on scenario\n"); fflush(stderr);
+#endif
 		return(false);
 	}
 
 	if (fstraw.Get(&house, sizeof(house)) != sizeof(house)) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA-LOAD] FAIL: short read on house\n"); fflush(stderr);
+#endif
 		return(false);
 	}
 
@@ -557,15 +622,30 @@ bool Load_Game(const char *file_name)
 	*/
 	unsigned long version;
 	if (fstraw.Get(&version, sizeof(version)) != sizeof(version)) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA-LOAD] FAIL: short read on version\n"); fflush(stderr);
+#endif
 		return(false);
 	}
 	GameVersion = version;
 #ifdef FIXIT_CSII	//	checked - ajw 9/28/98
 	if (version != SAVEGAME_VERSION && ((version-1) != SAVEGAME_VERSION) ) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA-LOAD] FAIL: version mismatch got=%lu expected=%lu or %lu\n",
+		        (unsigned long)version,
+		        (unsigned long)SAVEGAME_VERSION,
+		        (unsigned long)(SAVEGAME_VERSION+1));
+		fflush(stderr);
+#endif
 	      	return(false);
 	}
 #else
 	if (version != SAVEGAME_VERSION /*&& version != 0x0100616D*/){
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA-LOAD] FAIL: version mismatch got=%lu expected=%lu\n",
+		        (unsigned long)version, (unsigned long)SAVEGAME_VERSION);
+		fflush(stderr);
+#endif
 	      	return(false);
 	}
 #endif
@@ -601,8 +681,20 @@ bool Load_Game(const char *file_name)
 	**	before any damage could be done.
 	*/
 	if (memcmp(actual, digest, sizeof(digest)) != 0) {
+#ifndef _MSC_VER
+		fprintf(stderr, "[RA-LOAD] FAIL: SHA digest mismatch pos=%ld\n", (long)pos);
+		fprintf(stderr, "[RA-LOAD]   stored: ");
+		for (int _i=0; _i<20; _i++) fprintf(stderr, "%02x", (unsigned char)digest[_i]);
+		fprintf(stderr, "\n[RA-LOAD]   actual: ");
+		for (int _i=0; _i<20; _i++) fprintf(stderr, "%02x", (unsigned char)actual[_i]);
+		fprintf(stderr, "\n"); fflush(stderr);
+#endif
 		return(false);
 	}
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA-LOAD] header+digest OK, loading game state from pos=%ld\n",
+	        (long)pos); fflush(stderr);
+#endif
 
 	/*
 	**	Set up the pipe so that the scenario data can be read.
