@@ -80,11 +80,13 @@ def lcw_decode(src_bytes: bytes, dst_cap: int) -> bytearray:
 # Write indexed image to PNG via zlib (palette-aware)
 # ---------------------------------------------------------------------------
 def write_png_rgb(path: str, pixels: bytearray, palette: bytearray, w: int, h: int,
-                  scale_palette: bool = False):
+                  scale_palette: bool = True):
     """Write indexed pixel array as RGB24 PNG.
 
-    TIM-523: CPL0 stores 8-bit RGB values (0-255); no <<2 shift needed.
-    scale_palette is kept for callers that pass 6-bit VGA data explicitly.
+    Red Alert VQA files store 6-bit VGA palette values (0-63) in CPL0 chunks.
+    scale_palette=True (default) expands 6-bit to 8-bit using the same
+    formula as vqa_player.cpp: (v << 2) | (v >> 4) to fill low bits.
+    Pass scale_palette=False only when the palette is already 8-bit.
     """
     import zlib
     # Build RGB24 scanlines
@@ -95,9 +97,10 @@ def write_png_rgb(path: str, pixels: bytearray, palette: bytearray, w: int, h: i
             idx = pixels[y * w + x]
             r, g, b = palette[idx*3], palette[idx*3+1], palette[idx*3+2]
             if scale_palette:
-                r = (r << 2) & 0xFF
-                g = (g << 2) & 0xFF
-                b = (b << 2) & 0xFF
+                # 6-bit VGA → 8-bit expansion (matches vqa_player.cpp Set_DD_Palette_8bit)
+                r = ((r << 2) & 0xFF) | ((r >> 4) & 0x03)
+                g = ((g << 2) & 0xFF) | ((g >> 4) & 0x03)
+                b = ((b << 2) & 0xFF) | ((b >> 4) & 0x03)
             raw += bytes([r, g, b])
 
     compressed = zlib.compress(bytes(raw), 9)
@@ -233,11 +236,20 @@ def decode_vqa(vqa_path: str, outdir: str, frames_to_dump=None,
     blocksY = vqaH // blockH
     numBlocks = blocksX * blocksY
 
-    # VQA v2: pointer values 0x0000..0xFEFF = codebook indices;
-    # hi==0xFF = block unchanged from previous frame (render loop skips it).
-    MAX_CB_VECTORS = 0xFF00
+    # VQA v2 codebook: 0x10000 entries total (matches vqa_player.cpp TIM-613).
+    # Solid-colour convention: when hi==0xFF (blockH=4) or hi==0x0F (blockH=2),
+    # cb_idx points into a pre-filled solid range — every pixel in the block
+    # gets palette index lo.  Entries 0xFF00-0xFFFF and 0x0F00-0x0FFF are
+    # pre-filled before the first frame so the codebook lookup is uniform.
+    MAX_CB_VECTORS = 0x10000
     codebook_size = MAX_CB_VECTORS * cbEntrySize
     codebook = bytearray(codebook_size)
+    # Pre-fill solid-colour entries (matches C++ vqa_player.cpp init loop)
+    for ci in range(256):
+        base_ff = (0xFF00 + ci) * cbEntrySize
+        base_0f = (0x0F00 + ci) * cbEntrySize
+        codebook[base_ff:base_ff + cbEntrySize] = bytes([ci]) * cbEntrySize
+        codebook[base_0f:base_0f + cbEntrySize] = bytes([ci]) * cbEntrySize
 
     # ffmpeg-style CBPZ accumulation: chunks are appended raw and decompressed
     # together every cbParts frames (after rendering, so new codebook takes
@@ -337,9 +349,6 @@ def decode_vqa(vqa_path: str, outdir: str, frames_to_dump=None,
 
                 dst_base = by * blockH * vqaW + bx * blockW
 
-                # hi==0xFF: block unchanged from previous frame — skip
-                if hi == 0xFF:
-                    continue
                 cb_idx = lo | (hi << 8)
                 cb_base = cb_idx * cbEntrySize
                 if cb_base + cbEntrySize <= codebook_size:
