@@ -7,10 +7,11 @@
  * No game assets required. Requires serve-coop.py on :8080 serving build-wasm/.
  *
  * Gate: Emscripten runtime reaches onRuntimeInitialized ("WASM ready" status)
- * within 120 s with no pageerror. A broken binary crashes before this point
- * and emits a pageerror instead. 120 s is chosen because the -O2 link-time
+ * within 240 s with no pageerror. A broken binary crashes before this point
+ * and emits a pageerror instead. 240 s is chosen because the -O2 link-time
  * WASM binary (~12 MB) takes longer to JIT-compile in CI headless Chromium
- * than the original -O3 binary did — see TIM-593.
+ * than the original -O3 binary did — see TIM-593. TIM-597 bumped 120→240 s
+ * after the 120 s limit was still exceeded in the gh-pages CI runner.
  */
 
 import { test, expect } from '@playwright/test';
@@ -20,7 +21,7 @@ import * as fs from 'fs';
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 
 test('TIM-595 — CI WASM smoke: ra.wasm loads without crash', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
@@ -42,7 +43,7 @@ test('TIM-595 — CI WASM smoke: ra.wasm loads without crash', async ({ page }) 
   //
   // A broken binary (TIM-593: crash during thread-pool init or WASM parse)
   // will emit a pageerror and never reach this status, so __smokeError lets
-  // waitForFunction exit quickly rather than waiting the full 120 s.
+  // waitForFunction exit quickly rather than waiting the full 240 s.
   await page.waitForFunction(
     () => {
       if ((window as any).__smokeError) return true;
@@ -56,7 +57,7 @@ test('TIM-595 — CI WASM smoke: ra.wasm loads without crash', async ({ page }) 
       );
     },
     null,
-    { timeout: 120_000 }
+    { timeout: 240_000 }
   );
 
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim595-smoke-after-init.png') });
