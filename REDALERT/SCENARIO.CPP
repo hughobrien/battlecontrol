@@ -952,7 +952,9 @@ void Do_Win(void)
 	// loop on a modal dialog.  Return early so the game continues running and the
 	// frame-rate measurement can complete.
 	// RA_VQA_VERIFY overrides the suppression so VQA playback can be audited (TIM-496).
-	if (getenv("RA_AUTOSTART") && !getenv("RA_VQA_VERIFY")) {
+	// TIM-621: RA_MISSION_TEST.FLAG overrides suppression for mission completion test.
+	if (getenv("RA_AUTOSTART") && !getenv("RA_VQA_VERIFY")
+	        && !RawFileClass("RA_MISSION_TEST.FLAG").Is_Available()) {
 		fprintf(stderr, "[RA] Do_Win() suppressed (autostart fps audit)\n");
 		return;
 	}
