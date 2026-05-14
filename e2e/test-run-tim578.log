@@ -1,0 +1,38 @@
+
+Running 2 tests using 1 worker
+
+[TIM-578] c1a: no browser-error banner — PASS
+[TIM-578] c1b: preloader hidden — 1s
+[TIM-578] c2: canvas 640×480 fill=20% colors=88
+
+[TIM-578] ===== Boot + Menu Summary =====
+  c1. No error banner:     PASS
+  c1. Preloader hidden:    PASS
+  c2. Canvas has content:  PASS (fill=20%)
+  AudioContext crash:       PASS
+  ✓  1 [chromium] › e2e/tim578-td-ghpages-audit.spec.ts:95:7 › TIM-578 — TD GH Pages: boot + menu › c1+c2: preloader hidden, no error banner, main menu canvas has content (4.2s)
+[TIM-578] preloader hidden — 0s
+[browser] [idbfs] IDBFS not available in this build — saves will not persist
+[browser] The ScriptProcessorNode is deprecated. Use AudioWorkletNode instead. (https://bit.ly/audio-worklet)
+[TIM-578] audio init — 1s  audioOK=true
+[TIM-578] c3: TD_AUTOSTART active — 1s
+[browser] Failed to load resource: the server responded with a status of 404 ()
+[TIM-578] frame 100 — 9s  fill=24%  colors=96
+[browser] Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently
+[TIM-578] frame 300 — 22s  fill=33%  colors=99
+[TIM-578] frame 500 — 35s  fill=36%  colors=102
+[TIM-578] c4: frame 1000 — 69s  fill=36%
+
+[TIM-578] ===== Gameplay Audit Summary =====
+  c3. Scenario loads (TD_AUTOSTART → SCG01EA): PASS (1s)
+  c4. 1000+ frames, no crash:                  PASS
+  c5. frame-100  fill=24%  colors=96
+  c5. frame-300  fill=33%  colors=99  PASS
+  c5. frame-500  fill=36%  colors=102  PASS
+  c5. frame-1000 fill=36%
+  Audio opened OK:                              PASS
+  AudioContext crash:                           PASS
+  Unit click injection [GAME-CLICK]:            PASS (4 events)
+  ✓  2 [chromium] › e2e/tim578-td-ghpages-audit.spec.ts:150:7 › TIM-578 — TD GH Pages: scenario + gameplay › c3+c4+c5: TD_AUTOSTART → SCG01EA → 1000 frames → visual fill ≥20% (1.2m)
+
+  2 passed (1.3m)

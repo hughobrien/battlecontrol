@@ -18,6 +18,7 @@
 #include <SDL2/SDL.h>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <algorithm>
 #include <vector>
@@ -27,9 +28,33 @@
 
 #ifdef __EMSCRIPTEN__
 // TIM-517: proxy VQA SDL audio calls to the main browser thread (same as AUDIO.CPP/TIM-428).
+#include <emscripten.h>
 #include <emscripten/threading.h>
 #include <emscripten/proxying.h>
 #endif
+
+// -------------------------------------------------------------------------
+// TIM-587: per-frame decoder trace (RA_VQA_TRACE=1 enables).
+// Used to diagnose block-aligned palette/codebook artifacts.
+// -------------------------------------------------------------------------
+
+static bool vqa_trace_enabled()
+{
+    static int cached = -1;
+    if (cached < 0) {
+        const char* e = std::getenv("RA_VQA_TRACE");
+        cached = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return cached != 0;
+}
+
+// FNV-1a 32-bit hash of a byte range — used to print compact codebook snapshots.
+static uint32_t vqa_fnv1a(const uint8_t* p, size_t n)
+{
+    uint32_t h = 0x811c9dc5u;
+    for (size_t i = 0; i < n; ++i) { h ^= p[i]; h *= 0x01000193u; }
+    return h;
+}
 
 // -------------------------------------------------------------------------
 // Chunk-ID helpers (IFF: 4 ASCII bytes, sizes big-endian)
@@ -290,6 +315,25 @@ static void vqa_audio_open_on_main(void* arg)
         SDL_Audio_Close();
     }
     SDL_InitSubSystem(SDL_INIT_AUDIO);
+    // TIM-583: query browser native AudioContext.sampleRate before SDL_OpenAudioDevice.
+    // Old Emscripten SDL2 sets have.freq = want.freq even when the browser AudioContext
+    // runs at its native rate; if sampleRate is 0 at open time, the resampling ratio
+    // divide-by-zero traps the WASM worker.  Same fix as TIM-555/TIBERIANDAWN/AUDIO.CPP.
+    {
+        int native = EM_ASM_INT({
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return $0;
+            try {
+                var c = new Ctx();
+                var r = c.sampleRate | 0;
+                c.close();
+                return r;
+            } catch(e) { return $0; }
+        }, a->freq);
+        if (native > 0) a->freq = native;
+    }
+    fprintf(stderr, "[VQA] WASM audio: opening at %d Hz (browser native rate)\n", a->freq);
+    fflush(stderr);
     SDL_AudioSpec want = {}, have = {};
     want.freq     = a->freq;
     want.format   = AUDIO_S16LSB;
@@ -396,6 +440,53 @@ static void vqa_audio_close()
         SDL_Audio_Open(vqa_saved_rate, vqa_saved_channels, vqa_saved_bits);
         vqa_stole_game_audio = false;
     }
+}
+
+#endif // __EMSCRIPTEN__
+
+// TIM-586: SDL_PollEvent on the worker thread does not surface canvas key/
+// mouse events under PROXY_TO_PTHREAD (the browser delivers them to the main
+// thread's JS handlers but they never reach the worker's SDL event queue,
+// so the user_abort path in the frame loop never trips).  Bypass SDL for
+// VQA skip detection by installing JS-side canvas listeners that flip a
+// global flag; the worker polls the flag once per frame.
+//
+// MAIN_THREAD_EM_ASM is required because EM_ASM/EM_JS bind to the calling
+// thread, and the worker thread cannot reach `document`/`window`.
+#ifdef __EMSCRIPTEN__
+static void vqa_install_abort_listeners()
+{
+    MAIN_THREAD_EM_ASM({
+        if (window._vqa_abort_installed) {
+            window._vqa_aborted = false;
+            return;
+        }
+        window._vqa_abort_installed = true;
+        window._vqa_aborted = false;
+        var fire = function() { window._vqa_aborted = true; };
+        var canvas = document.getElementById('canvas');
+        if (canvas) {
+            canvas.addEventListener('mousedown', fire);
+            canvas.addEventListener('touchstart', fire, { passive: true });
+        }
+        // Keydown on document — focus may not be on canvas yet (TIM-582 only
+        // focuses on first mousedown), but document captures all key events.
+        document.addEventListener('keydown', fire);
+    });
+}
+
+static bool vqa_check_abort_flag()
+{
+    return MAIN_THREAD_EM_ASM_INT({
+        return window._vqa_aborted ? 1 : 0;
+    }) != 0;
+}
+
+static void vqa_clear_abort_flag()
+{
+    MAIN_THREAD_EM_ASM({
+        window._vqa_aborted = false;
+    });
 }
 #endif // __EMSCRIPTEN__
 
@@ -541,11 +632,20 @@ extern "C" void Play_Movie_Linux(const char* name)
             filename, vqaW, vqaH, blockW, blockH, fps,
             hdr.flags, has_audio, freq, channels, hdr.numFrames);
 
-    // VQA v2: 0x0000..0xFEFF = codebook indices; hi==0xFF = block unchanged
-    // from the previous frame.  The render loop skips hi==0xFF blocks so we
-    // only need 0xFF00 codebook slots here.
-    const size_t MAX_CB_VECTORS = 0xFF00u;
+    // TIM-587: VQA v2 pointer table uses 0xFF** entries as "solid colour"
+    // blocks where the lo byte is the palette index.  Pre-fill codebook
+    // slots 0xFF00..0xFFFF with a solid byte of `i` so a VPT entry
+    // (lo=i, hi=0xFF) renders as palette[i] without any special case in the
+    // render loop.  This matches ffmpeg's vqa_decode_frame_pal8.  TIM-549
+    // had replaced this with `if (hi == 0xFF) continue;` (skip), which
+    // worked accidentally for the Einstein briefing (lo==0 background) but
+    // left stale prior-frame content wherever the encoder wanted a non-zero
+    // solid fill — visible as block-aligned cyan scatter through the title
+    // and prologue cinematics (TIM-587).
+    const size_t MAX_CB_VECTORS = 0xFF00u + 0x100u;
     std::vector<uint8_t> codebook(MAX_CB_VECTORS * cbEntrySize, 0);
+    for (int ci = 0; ci < 256; ++ci)
+        memset(codebook.data() + (0xFF00u + ci) * cbEntrySize, (uint8_t)ci, cbEntrySize);
 
     std::vector<uint8_t> framebuf((size_t)vqaW * vqaH, 0);
     std::vector<uint8_t> prevbuf((size_t)vqaW * vqaH, 0);
@@ -566,6 +666,13 @@ extern "C" void Play_Movie_Linux(const char* name)
     uint32_t frame_ms = (fps > 0) ? (1000u / (uint32_t)fps) : 67u;
     bool user_abort   = false;
     int  frame_num    = 0;
+
+#ifdef __EMSCRIPTEN__
+    // TIM-586: install JS-side canvas listeners and reset the flag so a click
+    // during the previous movie doesn't insta-skip this one.
+    vqa_install_abort_listeners();
+    vqa_clear_abort_flag();
+#endif
 
     // Skip FINF (frame offsets — not needed for sequential playback)
     {
@@ -652,6 +759,28 @@ extern "C" void Play_Movie_Linux(const char* name)
             }
         };
 
+        // TIM-587: trace VQFR sub-chunk layout for the first 40 frames.
+        bool trace = vqa_trace_enabled() && frame_num < 40;
+        int  trc_cpl0 = 0, trc_cbf = 0, trc_cbp = 0, trc_vpt = 0;
+        uint32_t trc_vpt_ssz = 0, trc_cb_ssz = 0;
+        char trc_vpt_tag[5] = "", trc_cb_tag[5] = "";
+        if (trace) {
+            iter_sub([&](const uint8_t* shdr, uint32_t ssz, const uint8_t* /*sb*/) {
+                char t[5]; memcpy(t, shdr, 4); t[4] = 0;
+                if (chunk_eq(shdr, "CPL0")) { trc_cpl0 = 1; }
+                else if (chunk_eq(shdr, "CBF0") || chunk_eq(shdr, "CBFZ")) {
+                    trc_cbf = 1; memcpy(trc_cb_tag, t, 5); trc_cb_ssz = ssz;
+                }
+                else if (chunk_eq(shdr, "CBP0") || chunk_eq(shdr, "CBPZ")) {
+                    trc_cbp = 1; memcpy(trc_cb_tag, t, 5); trc_cb_ssz = ssz;
+                }
+                else if (chunk_eq(shdr, "VPT0") || chunk_eq(shdr, "VPTZ") ||
+                         chunk_eq(shdr, "VPTR") || chunk_eq(shdr, "VPRZ")) {
+                    trc_vpt = 1; memcpy(trc_vpt_tag, t, 5); trc_vpt_ssz = ssz;
+                }
+            });
+        }
+
         // Pass 1: CPL0 palette + full codebook (CBF0 / CBFZ)
         iter_sub([&](const uint8_t* shdr, uint32_t ssz, const uint8_t* sbody) {
             if (chunk_eq(shdr, "CPL0")) {
@@ -677,9 +806,9 @@ extern "C" void Play_Movie_Linux(const char* name)
         });
 
         // Pass 2: Render frame (VPT0 / VPTZ / VPTR / VPRZ)
-        // hi==0xFF: block unchanged from previous frame — skip (framebuf
-        // already holds the previous frame content for that block).
         // hi<0xFF: index into codebook (0x0000..0xFEFF).
+        // hi==0xFF: index 0xFF**, routes to pre-filled solid-colour blocks
+        // (codebook[0xFF00+lo] = palette[lo] for each pixel).  TIM-587.
         iter_sub([&](const uint8_t* shdr, uint32_t ssz, const uint8_t* sbody) {
             if (!chunk_eq(shdr, "VPT0") && !chunk_eq(shdr, "VPTZ") &&
                 !chunk_eq(shdr, "VPTR") && !chunk_eq(shdr, "VPRZ")) return;
@@ -696,15 +825,28 @@ extern "C" void Play_Movie_Linux(const char* name)
             const uint8_t* hi_tbl = vpt + numBlocks;
             memcpy(prevbuf.data(), framebuf.data(), framebuf.size());
 
+            int trc_rendered = 0, trc_solid = 0;
+            int trc_max_cb_idx = 0;
             for (int bi = 0; bi < numBlocks; ++bi) {
                 int bx = bi % blocksX, by = bi / blocksX;
                 uint8_t lo = lo_tbl[bi], hi = hi_tbl[bi];
-                if (hi == 0xFF) continue;  // block unchanged from previous frame
                 int cb_idx = (int)lo | ((int)hi << 8);
+                if (cb_idx > trc_max_cb_idx) trc_max_cb_idx = cb_idx;
                 const uint8_t* src = codebook.data() + (size_t)cb_idx * cbEntrySize;
                 for (int fy = 0; fy < blockH; ++fy)
                     memcpy(framebuf.data() + (size_t)(by*blockH+fy)*vqaW + bx*blockW,
                            src + fy * blockW, blockW);
+                if (hi == 0xFF) ++trc_solid; else ++trc_rendered;
+            }
+            if (trace) {
+                fprintf(stderr, "[VQA-TRACE] f=%d cb=%d solid=%d "
+                                "max_cb_idx=0x%04x (entries_used<=%d) "
+                                "cb_hash_front=%08x cb_hash_back=%08x\n",
+                        frame_num, trc_rendered, trc_solid, trc_max_cb_idx,
+                        trc_max_cb_idx + 1,
+                        vqa_fnv1a(codebook.data(), std::min<size_t>(2048, codebook.size())),
+                        vqa_fnv1a(codebook.data() + codebook.size() - std::min<size_t>(2048, codebook.size()),
+                                  std::min<size_t>(2048, codebook.size())));
             }
         });
 
@@ -739,6 +881,17 @@ extern "C" void Play_Movie_Linux(const char* name)
                 }
             }
         });
+
+        if (trace) {
+            fprintf(stderr, "[VQA-TRACE] f=%d chunks: cpl0=%d cbf=%s(%u) "
+                            "cbp=%s(%u) vpt=%s(%u) countdown=%d acc=%zu cbParts=%u\n",
+                    frame_num, trc_cpl0,
+                    trc_cbf ? trc_cb_tag : "-", trc_cbf ? trc_cb_ssz : 0u,
+                    trc_cbp ? trc_cb_tag : "-", trc_cbp ? trc_cb_ssz : 0u,
+                    trc_vpt ? trc_vpt_tag : "-", trc_vpt ? trc_vpt_ssz : 0u,
+                    partial_countdown, next_codebook_buffer.size(),
+                    (unsigned)(hdr.cbParts ? hdr.cbParts : 1));
+        }
 
         // ---- Present frame ----
         if (SDL_Has_Primary_Surface()) {
@@ -792,6 +945,14 @@ extern "C" void Play_Movie_Linux(const char* name)
                 break;
             }
         }
+#ifdef __EMSCRIPTEN__
+        // TIM-586: SDL_PollEvent above does not see canvas events on the
+        // worker thread; consult the JS-side flag set by our canvas listeners.
+        if (!user_abort && vqa_check_abort_flag()) {
+            user_abort = true;
+            fprintf(stderr, "[VQA] '%s' aborted by user (canvas event)\n", filename);
+        }
+#endif
 
         // ---- Frame pacing ----
         uint32_t elapsed = SDL_GetTicks() - t0;

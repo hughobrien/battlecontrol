@@ -1,0 +1,80 @@
+
+Running 2 tests using 1 worker
+
+[audit] waiting for Start_Scenario OK…
+[audit] frame 300 reached — in-game phase confirmed
+
+[audit] === SIDEBAR ===
+  Radar region   fill=88%  uniqueColors=33
+  Icon area      fill=17%  uniqueColors=78
+  Sidebar has content: YES
+  Clicking sidebar structure icon at canvas (495, 165)…
+  Sidebar pixel diff after icon click: 0 pixels changed
+  Clicking sidebar unit tab icon at canvas (560, 165)…
+  Sidebar pixel diff after unit tab click: 0 pixels changed
+
+[audit] === UNIT CONTROL ===
+  Left-clicking unit at canvas (350, 155)…
+  Unit region pixel diff after left-click: 0 pixels changed
+  Right-clicking move target at canvas (420, 370)…
+  Left-clicking vehicle at canvas (340, 185)…
+
+[audit] === ENEMY AI + FOG OF WAR ===
+  Map at frame ~300+: fill=56%  uniqueColors=171
+  Waiting for frame 600…
+  Frame 600 reached — FPS frames 300→600: 17.3
+  Map pixel diff (frame ~300 → frame 600): 7582 pixels changed
+  Map at frame 600: fill=56%  uniqueColors=170
+  AI/unit movement detected (>500 changed pixels): YES
+  Waiting for frame 900…
+  Frame 900 reached — FPS frames 600→900: 48.3
+  Map pixel diff (frame 600 → frame 900): 754 pixels changed
+
+[audit] === WIN/LOSS ===
+  Victory triggered:  false
+  Defeat triggered:   false
+  Game over / end:    false
+
+[audit] ===== SUMMARY =====
+  1. Sidebar renders (fill>5%):        PASS
+  1. Sidebar responds to click:           FAIL (0 diff)
+  2. Unit region changes on click:        FAIL (0 diff)
+  3. AI/unit movement frames 300→600:     PASS
+  3. Further movement frames 600→900:     PASS
+  4. No premature win/loss:               PASS
+  5. No crash by frame 900:               PASS (if we reached here)
+  6. FPS frames 300→600: 17.3  FPS frames 600→900: 48.3  sustained: 17.3
+  6. FPS ≥15 target:                      PASS
+  ✓  1 [chromium] › e2e/ra-gameplay-audit.spec.ts:145:7 › TIM-480 — RA WASM gameplay audit › gameplay audit: sidebar, unit control, AI, fog, win/loss (39.5s)
+[framesync] waiting for Start_Scenario OK…
+[framesync] frame 300 reached — in-game phase confirmed
+
+[framesync] === A: LEFT-CLICK UNIT SELECTION ===
+  left-clicking at canvas (350, 125)…
+  waiting for frame 400…
+  pixel diff in unit region: 55
+  green highlight pixels: before=173  after=174  delta=1
+
+[framesync] === B: RIGHT-CLICK MOVE ORDER ===
+  right-clicking move target at canvas (430, 375)…
+  waiting for frame 500…
+  pixel diff in map region after right-click move: 2564
+
+[framesync] === C: SIDEBAR BUILD ICON CLICK (diagnostic) ===
+  frame before sidebar click: 600
+  clicking sidebar icon at canvas (512, 165)…
+  waiting for frame 700 (next 100-frame milestone)…
+  sidebar pixel diff after icon click: 0
+  frame after: 700  (delta: 100)
+  game alive after sidebar click: YES — reached frame 700
+
+[framesync] ===== SUMMARY =====
+  game frame reached: 700
+  A. Unit region diff (left-click select) : 55  PASS
+  A. Green highlight delta (selection box): 1  PASS
+  B. Map region diff  (right-click move)  : 2564  PASS
+  C. Sidebar diff     (build icon click)  : 0  WARN
+  C. Game alive after sidebar click       : PASS
+  ✓  2 [chromium] › e2e/ra-gameplay-audit.spec.ts:356:7 › TIM-482 — RA WASM frame-synchronized unit control audit › left-click select, right-click move, sidebar build icon — frame-sync pixel diff (20.1s)
+
+  2 passed (1.0m)
