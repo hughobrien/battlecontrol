@@ -1,0 +1,12 @@
+
+Running 1 test using 1 worker
+
+[TIM-586] loading http://localhost:8081/ra.html?src=http%3A%2F%2Flocalhost%3A8081%2F__assets__%2F&debug=1
+[TIM-586] preloader hidden — assets mounted
+[TIM-586] VQA playback started
+[TIM-586] canvas clicked at center
+[TIM-586] ENGLISH.VQA done: 35/160 frames
+[TIM-586] abort line present: true
+  ✓  1 [chromium] › e2e/tim586-skip-cinematic.spec.ts:33:5 › TIM-586 — clicking canvas during intro VQA aborts playback (13.3s)
+
+  1 passed (15.3s)

@@ -121,6 +121,7 @@ void Stop_Primary_Sound_Buffer(void) {};
 // TIM-428: proxy SDL audio init/close to the main browser thread.
 // With PROXY_TO_PTHREAD the game loop runs in a Web Worker; Web Audio API
 // context can only be created on the main Emscripten runtime thread.
+#include <emscripten.h>
 #include <emscripten/threading.h>
 #include <emscripten/proxying.h>
 #endif
@@ -322,6 +323,28 @@ bool SDL_Audio_Open(int rate, int channels, int bits_per_sample)
     if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
         return false;
     }
+
+#ifdef __EMSCRIPTEN__
+    // TIM-583: query browser native AudioContext.sampleRate before SDL_OpenAudioDevice.
+    // Old Emscripten SDL2 sets have.freq = want.freq even when the browser AudioContext
+    // runs at its native rate; if sampleRate is 0 at open time, the resampling ratio
+    // divide-by-zero traps the WASM worker.  Same fix as TIM-555/TIBERIANDAWN/AUDIO.CPP.
+    {
+        int native = EM_ASM_INT({
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return $0;
+            try {
+                var c = new Ctx();
+                var r = c.sampleRate | 0;
+                c.close();
+                return r;
+            } catch(e) { return $0; }
+        }, rate);
+        if (native > 0) rate = native;
+    }
+    fprintf(stderr, "[RA] WASM audio: opening at %d Hz (browser native rate)\n", rate);
+    fflush(stderr);
+#endif
 
     SDL_AudioSpec want = {};
     want.freq     = rate;
