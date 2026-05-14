@@ -21,6 +21,17 @@ frames showed block-aligned cyan corruption.
 - [ ] Screenshots are saved and uploaded as artefacts on failure
 - [ ] Each assertion comment names the specific regression it guards
 
+## Issue labelling — `tier:milestone`
+
+When an issue marks a **categorical phase transition** in the port (first clean link,
+first menu render, first in-game frame, first playable WASM build, etc.) apply the
+`tier:milestone` label.  Routine bug-fixes and refactors do not qualify.
+
+This lets future contributors scan the roadmap at a glance without wading through
+the full pass-number chronology.
+
+The label is company-wide in the TIM project (colour `#7C3AED`).
+
 ## Worktree protocol
 
 All engineering work happens in a per-issue git worktree. See
