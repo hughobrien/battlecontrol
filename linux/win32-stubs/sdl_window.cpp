@@ -58,6 +58,7 @@
 namespace {
 
 SDL_Window * g_main_window = nullptr;
+bool         g_is_fullscreen = false;
 
 // Red Alert's native primary mode is 640x400. The substrate creates the
 // window hidden so DDRAW.CPP's first-present latch (TIM-141 commit 5)
@@ -113,7 +114,18 @@ extern "C" void * SDL_Get_Main_Window(void)
 extern "C" void SDL_Set_Main_Window(void * window)
 {
     g_main_window = static_cast<SDL_Window *>(window);
+    g_is_fullscreen = false;  // reset on window reassignment
 }
+
+#ifndef __EMSCRIPTEN__
+extern "C" void SDL_Toggle_Fullscreen(void)
+{
+    if (g_main_window == nullptr) return;
+    g_is_fullscreen = !g_is_fullscreen;
+    SDL_SetWindowFullscreen(g_main_window,
+        g_is_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+}
+#endif
 
 // Weak shims for the engine globals upstream defines in DDRAW.CPP
 // (MainWindow) and INTERNET.CPP (ShowCommand). See the file header
