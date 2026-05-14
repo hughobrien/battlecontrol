@@ -22,10 +22,19 @@ jobs:
             libsdl2-dev \
             xvfb \
             binutils \
-            python3
+            python3 \
+            cmake \
+            ninja-build \
+            libsdl2-ttf-dev
 
       - name: Build and smoke-test
         run: bash scripts/first-run-pass-94.sh
+
+      - name: Configure RA cmake build
+        run: cmake --preset linux-native
+
+      - name: Build RA native (cmake)
+        run: cmake --build build --target ra --parallel
 
   vqa-pixel-diff:
     name: VQA codec pixel-diff
