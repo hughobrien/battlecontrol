@@ -79,6 +79,31 @@ jobs:
       - name: Build td.wasm
         run: cmake --build build-wasm --target td --parallel
 
+      - name: WASM smoke test — td.wasm loads without crash (T2 / TIM-623)
+        # TIM-623 regression T2: same shape as the ra.wasm smoke test above,
+        # asserts td.wasm initializes without a pageerror in 30 s.
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts
+          SMOKE_EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID  2>/dev/null || true
+          exit $SMOKE_EXIT
+
+      - name: Upload T2 smoke artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t2-td-wasm-boot-results
+          path: |
+            e2e/screenshots/t2-td-wasm-boot.png
+            e2e/test-results/
+
       - name: Validate WASM binaries
         # TIM-593: Sanity-check that both binaries are valid WASM and non-trivially
         # large.  This catches silent build failures and the class of Binaryen
