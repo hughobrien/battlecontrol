@@ -45,6 +45,7 @@
 #include <SDL2/SDL.h>
 #include <cstdio>
 #ifdef __EMSCRIPTEN__
+#include <emscripten.h>
 #include <emscripten/threading.h>
 #include <emscripten/proxying.h>
 #endif
@@ -289,6 +290,31 @@ static bool td_sdl_audio_open(int rate, int channels)
     if (g_td_audio_open) return true;
     if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) return false;
 
+#ifdef __EMSCRIPTEN__
+    // TIM-555: Old Emscripten SDL2 may set have.freq = want.freq even when the
+    // underlying Web AudioContext runs at the browser's native rate (e.g. 44100
+    // when we request 22050).  Our mixer stride = 2 * src_rate / out_rate would
+    // then be 2.0 instead of 1.0, playing audio at 2× speed (one octave high).
+    // Fix: ask the browser for its native AudioContext.sampleRate before we open
+    // SDL, and use that as want.freq.  Both old and new Emscripten then agree on
+    // the actual output rate, making have.freq reliable and the stride correct.
+    {
+        int native = EM_ASM_INT({
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return $0;
+            try {
+                var c = new Ctx();
+                var r = c.sampleRate | 0;
+                c.close();
+                return r;
+            } catch(e) { return $0; }
+        }, rate);
+        if (native > 0) rate = native;
+    }
+    fprintf(stderr, "[TD] WASM audio: opening at %d Hz (browser native rate)\n", rate);
+    fflush(stderr);
+#endif
+
     SDL_AudioSpec want = {}, have = {};
     want.freq     = rate;
     want.format   = AUDIO_S16SYS;
@@ -304,6 +330,9 @@ static bool td_sdl_audio_open(int rate, int channels)
     g_td_audio_open      = true;
     g_td_actual_freq     = have.freq;
     g_td_actual_channels = have.channels;
+    fprintf(stderr, "[TD] SDL audio open: have.freq=%d have.channels=%d\n",
+            g_td_actual_freq, g_td_actual_channels);
+    fflush(stderr);
     for (int i = 0; i < TD_VOICE_COUNT; ++i) g_td_voices[i] = TdVoice{};
     SDL_PauseAudioDevice(dev, 0);
     return true;
