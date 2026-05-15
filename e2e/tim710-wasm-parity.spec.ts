@@ -415,7 +415,7 @@ test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
   test('Allied L1 t=0: SSIM ≥ 0.90 vs Wine OG', async ({}, testInfo) => {
     const wineShot = path.join(SCREENSHOTS_DIR, 'wine-allied-l1-t0.png');
     const wasmShot = path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t0.png');
-    test.skip(!fs.existsSync(wineShot), 'wine-allied-l1-t0.png missing — run bash scripts/wine-gameplay.sh');
+    test.skip(!fs.existsSync(wineShot), 'wine-allied-l1-t0.png missing — run bash scripts/wine-allied-l1.sh (TIM-752)');
     test.skip(!fs.existsSync(wasmShot), 'tim710-wasm-allied-l1-t0.png missing — run Tier 1 gameplay test first');
 
     const diffOut = path.join(SCREENSHOTS_DIR, 'tim710-diff-allied-l1-t0.png');
