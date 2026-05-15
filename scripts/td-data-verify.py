@@ -20,11 +20,13 @@ import sys
 
 DATA_DIR_DEFAULT = '/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1'
 
-# SHA-256 of C&C95.EXE (Windows 95 game executable).
-# Extracted from GDI95.iso at archive.org via IS v3 Z decompressor.
-# Run scripts/wine-td-setup.sh to obtain and set this value.
-# Placeholder: update after first successful extraction.
-CC95_EXE_SHA256 = 'PLACEHOLDER_RUN_wine-td-setup.sh_TO_OBTAIN'
+# SHA-256 of C&C95.EXE (Windows 95 game executable, 1,161,216 bytes).
+# Extracted from "Command & Conquer Gold.zip" at archive.org identifier
+# "command-aand-conquer-gold" (Command & Conquer Gold - Complete Edition).
+# The binary is at ZIP entry "Command & Conquer/C&C95.EXE" (deflate-compressed).
+# scripts/wine-td-setup.sh fetches only the compressed entry via HTTP range
+# (bytes 105-519098) and decompresses with Python zlib.
+CC95_EXE_SHA256 = 'f606bee19de599daa5ccbc9586d61ee48b8f01f42a4f943196fe30d92a124d30'
 CC95_EXE_DEFAULT = '/opt/tiberiandawn/C&C95.EXE'
 
 # SHA-256 of each file in the reference CD1 dataset (Remastered Collection).
