@@ -5,7 +5,11 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:td": "playwright test e2e/td-gameplay.spec.ts",
-    "test:e2e:ra": "playwright test e2e/wasm-gameplay.spec.ts"
+    "test:e2e:ra": "playwright test e2e/wasm-gameplay.spec.ts",
+    "test:e2e:tim705": "playwright test e2e/tim705-equivalence.spec.ts",
+    "test:e2e:tim705:wine": "WINE_RA_READY=1 playwright test e2e/tim705-equivalence.spec.ts --grep wine",
+    "cinematic-compare": "python3 scripts/cinematic-compare.py",
+    "wine-gameplay": "bash scripts/wine-gameplay.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.0",
