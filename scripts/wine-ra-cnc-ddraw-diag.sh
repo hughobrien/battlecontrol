@@ -37,6 +37,7 @@ CNC_DDRAW_DIR="${CNC_DDRAW_DIR:-/tmp/cnc-ddraw}"
 
 THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
 FOCUS_SKIP="$THIS_DIR/focus-skip-patch.py"
+GAME_IN_FOCUS="$THIS_DIR/game-in-focus-patch.py"
 
 [[ -f "$RA_EXE" ]] || { echo "FAIL: $RA_EXE missing"; exit 2; }
 [[ -d "$DATA_DIR" ]] || { echo "FAIL: $DATA_DIR missing"; exit 2; }
@@ -46,6 +47,13 @@ FOCUS_SKIP="$THIS_DIR/focus-skip-patch.py"
 if [[ ! -f "$FOCUS_SKIP" ]]; then
     echo "warn: $FOCUS_SKIP not present (TIM-708 / PR #135 not merged yet); running un-patched"
     FOCUS_SKIP=""
+fi
+# game-in-focus-patch.py (TIM-735) pins GameInFocus = TRUE at PE entry so the
+# render guard at CONQUER.CPP:2579 fires under headless Wine where
+# WM_ACTIVATEAPP is never delivered.
+if [[ ! -f "$GAME_IN_FOCUS" ]]; then
+    echo "warn: $GAME_IN_FOCUS not present; render guards will stay shut"
+    GAME_IN_FOCUS=""
 fi
 
 rm -rf "$ARTIFACT"
@@ -64,6 +72,9 @@ for dll in THIPX32.DLL THIPX16.DLL; do
 done
 if [[ -n "$FOCUS_SKIP" ]]; then
     python3 "$FOCUS_SKIP" "$STAGE/RA95.EXE" 2>&1 | tail -5
+fi
+if [[ -n "$GAME_IN_FOCUS" ]]; then
+    python3 "$GAME_IN_FOCUS" "$STAGE/RA95.EXE" 2>&1 | tail -5
 fi
 
 # cnc-ddraw drop-in (gdi renderer, windowed, no hook).
