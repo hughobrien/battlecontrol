@@ -1,0 +1,52 @@
+{
+  "methodology": "Direct SSIM and structural-artefact comparison of the cropped game window region (640x400) from Wine OG Xvfb captures, with and without the cnc-ddraw scanline_double=true workaround.",
+  "pre_fix_dll": "cnc-ddraw master a0b81b1, scanline_double NOT set",
+  "post_fix_dll": "cnc-ddraw master a0b81b1 + scripts/cnc-ddraw-tim740-scanline-double.patch, scanline_double=true",
+  "capture_source": "/tmp/tim740/verify/{A_control,B_scanline_double}/t{8,10,12,14}.png",
+  "comparisons": [
+    {
+      "timestamp": "t8",
+      "ssim_pre_vs_post": 1.0,
+      "pre_png_bytes": 5912,
+      "post_png_bytes": 5912,
+      "png_size_ratio": 1.0,
+      "pre_gap_rows": 1,
+      "post_gap_rows": 1
+    },
+    {
+      "timestamp": "t10",
+      "ssim_pre_vs_post": 0.7849,
+      "pre_png_bytes": 52298,
+      "post_png_bytes": 67512,
+      "png_size_ratio": 1.29,
+      "pre_gap_rows": 157,
+      "post_gap_rows": 12
+    },
+    {
+      "timestamp": "t12",
+      "ssim_pre_vs_post": 0.7723,
+      "pre_png_bytes": 39793,
+      "post_png_bytes": 59306,
+      "png_size_ratio": 1.49,
+      "pre_gap_rows": 157,
+      "post_gap_rows": 2
+    },
+    {
+      "timestamp": "t14",
+      "ssim_pre_vs_post": 0.0849,
+      "pre_png_bytes": 41284,
+      "post_png_bytes": 63718,
+      "png_size_ratio": 1.54,
+      "pre_gap_rows": 157,
+      "post_gap_rows": 12
+    }
+  ],
+  "cinematic_compare_parity": {
+    "spec": "TIM-705 Part A \u2014 scripts/cinematic-compare.py",
+    "methodology": "Python decoder vs ffmpeg libavcodec on MAIN.MIX VQA blobs",
+    "rerun_date": "2026-05-15",
+    "result_pre_tim740": "8/8 PASS, p99=0, SSIM=1.0000",
+    "result_post_tim740": "8/8 PASS, p99=0, SSIM=1.0000",
+    "note": "TIM-740 is a Wine + cnc-ddraw render-substrate workaround; it does not touch the VQA decoder. The decoder-vs-ffmpeg parity spec is therefore unchanged by the fix."
+  }
+}

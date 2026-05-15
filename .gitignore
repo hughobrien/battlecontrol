@@ -30,3 +30,9 @@ e2e/test-results/
 e2e/report/
 e2e/test-run.log
 playwright-report/
+
+# cinematic-compare.py (TIM-705) regenerates this per-run
+e2e/cinematic-compare/
+
+# Python caches
+__pycache__/
