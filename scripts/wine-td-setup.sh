@@ -1,29 +1,39 @@
 #!/usr/bin/env bash
-# TIM-711 — One-shot setup: install wine32 + extract C&C95.EXE from GDI95.iso.
+# TIM-711 — One-shot setup: install wine32 + extract C&C95.EXE + THIPX32.DLL
+#           from archive.org, then apply Wine-compatibility patch.
 #
-# C&C95.EXE is inside SETUP.Z (InstallShield v3 Z archive) on the GDI disc ISO.
-# The ISO is hosted at archive.org as part of the EA 2007 freeware release.
+# C&C95.EXE is the Win95 C&C Tiberian Dawn game binary.  It is extracted from
+# the "Command & Conquer Gold - Complete Edition (Repack for Modern PCs)" ZIP
+# at archive.org.  The file is stored inside the ZIP at:
+#   "Command & Conquer/C&C95.EXE"
+#   ZIP local-file-header offset: 48 bytes
+#   Compressed (deflate) data offset: 105 bytes
+#   Compressed size: 518,994 bytes
+#   Uncompressed size: 1,161,216 bytes
+#   SHA-256 (uncompressed): f606bee19de599daa5ccbc9586d61ee48b8f01f42a4f943196fe30d92a124d30
 #
-# Source: "Official C&C Tiberian Sun (+ C&C 95, + RA)" at archive.org
-#   https://archive.org/details/official-cn-ctiberian-sun_202510
-#   GDI95.iso (608,987,136 bytes) — EA 2007 freeware C&C Tiberian Dawn GDI disc
+# THIPX32.DLL is also in the same ZIP at:
+#   Compressed data offset: 674,675,836 bytes
+#   Compressed size: 22,573 bytes
+#   Uncompressed size: 44,032 bytes
+#   SHA-256 (uncompressed): 0e405776fb8a44c920d81d82a0d137335bf1b36749f84b56f0be4dc04408a042
+#
+# Source: "Command & Conquer Gold - Complete Edition (Repack for Modern PCs)"
+#   https://archive.org/details/command-aand-conquer-gold
+#   "Command & Conquer Gold.zip" (688,113,895 bytes)
 #
 # Legal status: EA released C&C Tiberian Dawn as freeware in 2007.
 #
-# ─── C&C95.EXE extraction notes ─────────────────────────────────────────────
-# The disc installer (SETUP.EXE) is a 16-bit Windows 3.x NE executable; Wine
-# 10.x cannot run it (exit 144 = STATUS_NOT_SUPPORTED, no WOW16 on Linux).
-# We extract directly from SETUP.Z using the IS v3 Z format instead:
+# Wine compatibility patch:
+#   C&C95.EXE calls SetCooperativeLevel with DDSCL_EXCLUSIVE|DDSCL_FULLSCREEN
+#   (0x11).  On Wine+Xvfb, fullscreen exclusive mode fails surface creation.
+#   Patch at 0x000bc6af: 0x11 -> 0x08 (DDSCL_NORMAL) so the game runs in
+#   windowed mode under Wine.
+#   Patch offset: 0x000bc6af  Original: 0x11  Patched: 0x08
+#   SHA-256 of original: f606bee19de599daa5ccbc9586d61ee48b8f01f42a4f943196fe30d92a124d30
+#   SHA-256 of patched:  (computed and displayed during setup)
 #
-#   • SETUP.Z is at ISO LBA 18086, size 23,501,276 bytes.
-#   • C&C95.EXE directory entry at SETUP.Z offset 0x16695d3:
-#       name_len=9, archive_offset=0x9BAF86, block_count=766, last_fill=199.
-#   • IS v3 Z block format: 2-byte LE compressed-data length + LZ payload.
-#     Flag byte (LSB-first): bit=1 literal, bit=0 back-ref (12-bit window,
-#     count = (b2 & 0xF) + 3).  Ring buffer: 4096 bytes, zero-initialized.
-#   • Uncompressed size: 765 × 1536 + 199 = 1,175,239 bytes.
-#
-# Usage:
+# ─── Usage ───────────────────────────────────────────────────────────────────
 #   bash scripts/wine-td-setup.sh
 #
 # After this runs, verify with:
@@ -31,10 +41,31 @@
 
 set -euo pipefail
 
-ISO_URL="https://archive.org/download/official-cn-ctiberian-sun_202510/GDI95.iso"
+ZIP_URL="https://archive.org/download/command-aand-conquer-gold/Command%20%26%20Conquer%20Gold.zip"
 OUT_DIR="/opt/tiberiandawn"
-WORK_DIR="$(mktemp -d /tmp/td-setup-XXXXXX)"
-trap "rm -rf $WORK_DIR" EXIT
+
+# C&C95.EXE stored inside the ZIP at "Command & Conquer/C&C95.EXE"
+# ZIP local header at offset 48, compressed data starts at offset 105
+# (header=30 + name=27 + extra=0 = 57 bytes after header sig,
+#  but local_offset=48 so data_at = 48 + 30 + 27 = 105)
+CC95_ZIP_DATA_OFFSET=105
+CC95_ZIP_COMP_SIZE=518994
+CC95_ZIP_END=$(( CC95_ZIP_DATA_OFFSET + CC95_ZIP_COMP_SIZE - 1 ))
+CC95_UNCOMPRESSED_SIZE=1161216
+CC95_SHA256="f606bee19de599daa5ccbc9586d61ee48b8f01f42a4f943196fe30d92a124d30"
+
+# THIPX32.DLL — required by C&C95.EXE for IPX networking
+THIPX_ZIP_DATA_OFFSET=674675836
+THIPX_ZIP_COMP_SIZE=22573
+THIPX_ZIP_END=$(( THIPX_ZIP_DATA_OFFSET + THIPX_ZIP_COMP_SIZE - 1 ))
+THIPX_UNCOMPRESSED_SIZE=44032
+THIPX_SHA256="0e405776fb8a44c920d81d82a0d137335bf1b36749f84b56f0be4dc04408a042"
+
+# Wine-compatibility patch: DDSCL_EXCLUSIVE|FULLSCREEN -> DDSCL_NORMAL
+# Allows C&C95 to run in windowed mode under Wine+Xvfb.
+CC95_DDSCL_PATCH_OFFSET=0xbc6af   # byte position of 0x11 in SetCooperativeLevel call
+CC95_DDSCL_ORIG=0x11              # DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN
+CC95_DDSCL_PATCHED=0x08           # DDSCL_NORMAL
 
 echo "=== TIM-711 Wine + C&C95.EXE setup ==="
 echo ""
@@ -61,137 +92,182 @@ sudo chmod 777 "$OUT_DIR"
 echo "  Output: $OUT_DIR"
 echo ""
 
-# ─── 3. Fetch SETUP.Z from ISO via HTTP range ────────────────────────────────
+# ─── 3. Extract C&C95.EXE from ZIP via HTTP range + Python zlib ──────────────
 
-echo "=== Step 3: Download SETUP.Z from GDI95.iso ==="
-SETUP_Z="$WORK_DIR/SETUP.Z"
-
-if [[ ! -f "$SETUP_Z" ]]; then
-    SETUP_Z_START=$(( 18086 * 2048 ))
-    SETUP_Z_END=$(( SETUP_Z_START + 23501276 - 1 ))
-    echo "  Downloading SETUP.Z (22.4 MB) via HTTP range request..."
-    curl -L -r "${SETUP_Z_START}-${SETUP_Z_END}" "$ISO_URL" \
-        -o "$SETUP_Z" --progress-bar
-    echo "  Size: $(ls -lh "$SETUP_Z" | awk '{print $5}')"
-else
-    echo "  SETUP.Z already present."
-fi
-echo ""
-
-# ─── 4. Extract C&C95.EXE using inline IS v3 Z decompressor ─────────────────
-
-echo "=== Step 4: Extract C&C95.EXE from SETUP.Z ==="
+echo "=== Step 3: Download and decompress C&C95.EXE from archive.org ==="
 CC95="$OUT_DIR/C&C95.EXE"
 
-python3 - "$SETUP_Z" "$CC95" << 'PYEOF'
-import sys, hashlib
-
-setup_z_path = sys.argv[1]
-out_path     = sys.argv[2]
-
-# C&C95.EXE directory entry (verified from SETUP.Z at offset 0x16695d3):
-#   1 byte  name_len = 9
-#   9 bytes name     = "C&C95.EXE"
-#   16 bytes null pad (total name field = 26 bytes)
-#   4 bytes f1 = 766  (number of IS-LZ blocks)
-#   4 bytes f2 = 199  (bytes used in last block)
-#   3 bytes archive_offset = 0x9BAF86 (LE)
-ARCHIVE_OFFSET    = 0x9BAF86
-NUM_BLOCKS        = 766
-LAST_BLOCK_FILL   = 199
-BLOCK_DECOMP_SIZE = 1536
-
-print(f"  Reading {setup_z_path} ...", flush=True)
-with open(setup_z_path, 'rb') as f:
-    data = bytearray(f.read())
-
-def islz_decomp(data, start, out_size):
-    """Decompress one IS v3 Z LZ block.
-
-    Block format: 2-byte LE compressed-data length, then payload.
-    Flag byte (LSB-first): bit=1 literal, bit=0 back-reference.
-    Back-ref encoding: offset = b1|(b2>>4)<<8, count = (b2&0xF)+3.
-    Ring buffer: 4096 bytes, zero-initialised, wrap with & 0xFFF.
-    Returns (decompressed_bytes, next_block_start).
-    """
-    comp_len = data[start] | (data[start + 1] << 8)
-    end = start + 2 + comp_len
-    pos = start + 2
-    out = bytearray()
-    ring = bytearray(4096)
-    rp = 0
-    while len(out) < out_size and pos < end:
-        if pos >= len(data):
-            break
-        flags = data[pos]; pos += 1
-        for bit in range(8):
-            if len(out) >= out_size or pos >= end:
-                break
-            if flags & (1 << bit):
-                b = data[pos]; pos += 1
-                out.append(b); ring[rp & 0xFFF] = b; rp += 1
-            else:
-                b1 = data[pos]; pos += 1
-                b2 = data[pos]; pos += 1
-                ov  = b1 | ((b2 >> 4) << 8)
-                cnt = (b2 & 0xF) + 3
-                src = (rp - ov - 1) & 0xFFF
-                for j in range(cnt):
-                    if len(out) >= out_size:
-                        break
-                    b = ring[(src + j) & 0xFFF]
-                    out.append(b); ring[rp & 0xFFF] = b; rp += 1
-    return bytes(out), end
-
-print(f"  Extracting {NUM_BLOCKS} IS-LZ blocks from 0x{ARCHIVE_OFFSET:x} ...", flush=True)
-pos = ARCHIVE_OFFSET
-result = bytearray()
-for i in range(NUM_BLOCKS):
-    sz = LAST_BLOCK_FILL if i == NUM_BLOCKS - 1 else BLOCK_DECOMP_SIZE
-    blk, pos = islz_decomp(data, pos, sz)
-    result += blk
-
-total = len(result)
-print(f"  Extracted {total:,} bytes")
-if result[:2] != b'MZ':
-    print(f"  WARN: first bytes {result[:2].hex()} != 4d5a (MZ) — extraction may need tuning")
-
-sha = hashlib.sha256(result).hexdigest()
-print(f"  SHA-256: {sha}")
-
-with open(out_path, 'wb') as f:
-    f.write(result)
-print(f"  Written: {out_path}")
-PYEOF
-
-echo ""
-
-# ─── 5. Verify ───────────────────────────────────────────────────────────────
-
-echo "=== Step 5: Verify C&C95.EXE ==="
 if [[ -f "$CC95" ]]; then
-    actual=$(sha256sum "$CC95" | awk '{print $1}')
-    sz=$(stat -c%s "$CC95")
-    echo "  Path:   $CC95"
-    echo "  Size:   $sz bytes"
-    echo "  SHA256: $actual"
-    if [[ $sz -gt 500000 ]]; then
-        echo "  OK: C&C95.EXE extracted"
-        echo "  Update C&C95_EXE_SHA256 in scripts/td-data-verify.py with:"
-        echo "  $actual"
+    existing_sha=$(sha256sum "$CC95" | awk '{print $1}')
+    if [[ "$existing_sha" == "$CC95_SHA256" ]]; then
+        echo "  C&C95.EXE already present and verified (sha256 matches original)."
+        SKIP_CC95_DOWNLOAD=1
     else
-        echo "  WARN: unexpected size — IS-LZ block parameters may need adjustment."
-        echo "  Expected ~1,175,239 bytes. Check ARCHIVE_OFFSET/NUM_BLOCKS/LAST_BLOCK_FILL."
+        echo "  Existing C&C95.EXE has wrong sha256, re-downloading..."
+        SKIP_CC95_DOWNLOAD=0
     fi
 else
-    echo "  ERROR: C&C95.EXE not written"
-    exit 1
+    SKIP_CC95_DOWNLOAD=0
 fi
 
+if [[ "${SKIP_CC95_DOWNLOAD:-0}" == "0" ]]; then
+    echo "  Downloading compressed C&C95.EXE (519 KB) from archive.org ZIP..."
+    echo "  ZIP byte range: ${CC95_ZIP_DATA_OFFSET}-${CC95_ZIP_END}"
+
+    TMP_COMP=$(mktemp /tmp/cc95-compressed-XXXXXX.bin)
+    trap "rm -f $TMP_COMP" EXIT
+
+    curl -L -r "${CC95_ZIP_DATA_OFFSET}-${CC95_ZIP_END}" "$ZIP_URL" \
+        -o "$TMP_COMP" --progress-bar
+
+    actual_comp=$(stat -c%s "$TMP_COMP")
+    echo "  Downloaded: $actual_comp bytes (expected $CC95_ZIP_COMP_SIZE)"
+    if [[ "$actual_comp" != "$CC95_ZIP_COMP_SIZE" ]]; then
+        echo "  FAIL: compressed size mismatch"
+        exit 1
+    fi
+
+    echo "  Decompressing (raw deflate via Python zlib)..."
+    python3 - "$TMP_COMP" "$CC95" << 'PYEOF'
+import sys, zlib
+
+src, dst = sys.argv[1], sys.argv[2]
+with open(src, 'rb') as f:
+    compressed = f.read()
+decompressed = zlib.decompress(compressed, -15)  # raw deflate, wbits=-15
+with open(dst, 'wb') as f:
+    f.write(decompressed)
+print(f"  Decompressed: {len(decompressed):,} bytes")
+PYEOF
+
+    # Verify SHA256
+    actual_sha=$(sha256sum "$CC95" | awk '{print $1}')
+    if [[ "$actual_sha" != "$CC95_SHA256" ]]; then
+        echo "  FAIL: C&C95.EXE sha256 mismatch!"
+        echo "    expected $CC95_SHA256"
+        echo "    actual   $actual_sha"
+        exit 1
+    fi
+    echo "  OK: sha256 matches reference — C&C95.EXE verified"
+fi
 echo ""
+
+# ─── 4. Extract THIPX32.DLL from the same ZIP ────────────────────────────────
+
+echo "=== Step 4: Download and decompress THIPX32.DLL from archive.org ==="
+THIPX="$OUT_DIR/THIPX32.DLL"
+
+if [[ -f "$THIPX" ]]; then
+    thipx_sha=$(sha256sum "$THIPX" | awk '{print $1}')
+    if [[ "$thipx_sha" == "$THIPX_SHA256" ]]; then
+        echo "  THIPX32.DLL already present and verified."
+        SKIP_THIPX_DOWNLOAD=1
+    else
+        echo "  Existing THIPX32.DLL wrong sha256, re-downloading..."
+        SKIP_THIPX_DOWNLOAD=0
+    fi
+else
+    SKIP_THIPX_DOWNLOAD=0
+fi
+
+if [[ "${SKIP_THIPX_DOWNLOAD:-0}" == "0" ]]; then
+    echo "  Downloading compressed THIPX32.DLL (22 KB) from archive.org ZIP..."
+    echo "  ZIP byte range: ${THIPX_ZIP_DATA_OFFSET}-${THIPX_ZIP_END}"
+
+    TMP_THIPX=$(mktemp /tmp/thipx-compressed-XXXXXX.bin)
+    trap "rm -f $TMP_COMP $TMP_THIPX" EXIT
+
+    curl -L -r "${THIPX_ZIP_DATA_OFFSET}-${THIPX_ZIP_END}" "$ZIP_URL" \
+        -o "$TMP_THIPX" --progress-bar
+
+    actual_thipx=$(stat -c%s "$TMP_THIPX")
+    echo "  Downloaded: $actual_thipx bytes (expected $THIPX_ZIP_COMP_SIZE)"
+    if [[ "$actual_thipx" != "$THIPX_ZIP_COMP_SIZE" ]]; then
+        echo "  FAIL: THIPX32.DLL compressed size mismatch"
+        exit 1
+    fi
+
+    python3 - "$TMP_THIPX" "$THIPX" << 'PYEOF'
+import sys, zlib
+
+src, dst = sys.argv[1], sys.argv[2]
+with open(src, 'rb') as f:
+    compressed = f.read()
+decompressed = zlib.decompress(compressed, -15)
+with open(dst, 'wb') as f:
+    f.write(decompressed)
+print(f"  Decompressed: {len(decompressed):,} bytes")
+PYEOF
+
+    thipx_actual_sha=$(sha256sum "$THIPX" | awk '{print $1}')
+    if [[ "$thipx_actual_sha" != "$THIPX_SHA256" ]]; then
+        echo "  FAIL: THIPX32.DLL sha256 mismatch!"
+        exit 1
+    fi
+    echo "  OK: sha256 matches reference — THIPX32.DLL verified"
+fi
+echo ""
+
+# ─── 5. Apply Wine-compatibility DDSCL patch to C&C95.EXE ───────────────────
+
+echo "=== Step 5: Apply Wine-compatibility patch to C&C95.EXE ==="
+echo "  Patch: offset 0x${CC95_DDSCL_PATCH_OFFSET##0x}bc6af:"
+echo "         SetCooperativeLevel flags 0x11 (DDSCL_EXCLUSIVE|FULLSCREEN)"
+echo "         -> 0x08 (DDSCL_NORMAL, windowed)"
+echo "  This allows C&C95.EXE to run under Wine+Xvfb without crashing."
+
+python3 - "$CC95" "${CC95_DDSCL_PATCH_OFFSET}" "${CC95_DDSCL_ORIG}" "${CC95_DDSCL_PATCHED}" "$CC95_SHA256" << 'PYEOF'
+import sys, hashlib, shutil
+
+path = sys.argv[1]
+patch_offset = int(sys.argv[2], 16)
+orig_byte = int(sys.argv[3], 16)
+patched_byte = int(sys.argv[4], 16)
+original_sha256 = sys.argv[5]
+
+with open(path, 'rb') as f:
+    data = bytearray(f.read())
+
+cur_sha = hashlib.sha256(bytes(data)).hexdigest()
+cur_byte = data[patch_offset]
+
+if cur_byte == patched_byte:
+    print(f"  Already patched (byte at 0x{patch_offset:06x} is 0x{patched_byte:02x})")
+    sys.exit(0)
+
+if cur_byte != orig_byte:
+    print(f"  WARN: unexpected byte at 0x{patch_offset:06x}: 0x{cur_byte:02x} (expected 0x{orig_byte:02x})")
+    print(f"  Skipping patch — may be a different C&C95.EXE build")
+    sys.exit(0)
+
+if cur_sha != original_sha256:
+    print(f"  WARN: SHA-256 does not match reference — skipping patch")
+    sys.exit(0)
+
+# Backup original (unpatched)
+backup = path + ".ddscl_orig"
+shutil.copy2(path, backup)
+print(f"  Backup: {backup}")
+
+# Apply patch
+data[patch_offset] = patched_byte
+with open(path, 'wb') as f:
+    f.write(data)
+
+patched_sha = hashlib.sha256(bytes(data)).hexdigest()
+print(f"  Patched 0x{patch_offset:06x}: 0x{orig_byte:02x} -> 0x{patched_byte:02x}")
+print(f"  Patched SHA-256: {patched_sha}")
+print(f"  OK: C&C95.EXE patched for Wine windowed mode")
+PYEOF
+echo ""
+
+# ─── 6. Summary ──────────────────────────────────────────────────────────────
+
 echo "=== Setup complete ==="
 echo "  wine: $(wine --version)"
-echo "  C&C95.EXE: $CC95"
+echo "  C&C95.EXE: $CC95 ($(stat -c%s "$CC95") bytes)"
+echo "  THIPX32.DLL: $THIPX ($(stat -c%s "$THIPX") bytes)"
 echo ""
 echo "  Run: bash scripts/wine-td.sh"
-echo "  Expected: game launches, shows C&C Tiberian Dawn title screen."
+echo "  Expected: game launches, shows DirectSound warning dialog (~8s),"
+echo "            dialog is dismissed automatically, game window appears."
