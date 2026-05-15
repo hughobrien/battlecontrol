@@ -969,6 +969,9 @@ void Do_Win(void)
 			fprintf(stderr, "[TIM-308] do_win frame=%ld mission_accomplished\n", (long)Frame);
 		}
 	}
+	/* TIM-697: unconditional log so Playwright can gate on Do_Win firing
+	 * without needing RA_AUTOSTART (which would suppress win VQAs). */
+	fprintf(stderr, "[RA] Do_Win: entered (frame=%ld)\n", (long)Frame); fflush(stderr);
 #endif
 	Map.Set_Default_Mouse(MOUSE_NORMAL);
 	Hide_Mouse();

@@ -87,6 +87,9 @@
   var quicksavetest = false;
   // TIM-621: ?debug=1 — enable frame-count logging (RA_DEBUG.FLAG) without autostart side-effects.
   var debugframes = false;
+  // TIM-697: ?cheat=1 — inject Flag_To_Win() at frame 200 for win-VQA verification.
+  // getenv("RA_CHEAT") returns NULL in PROXY_TO_PTHREAD worker; RA_CHEAT.FLAG is the fallback.
+  var cheat = false;
 
   // Hook into Emscripten runtime init.  noInitialRun:true in the Module
   // pre-definition means callMain() won't fire automatically; we call it
@@ -352,6 +355,16 @@
       }
     }
 
+    // TIM-697: ?cheat=1 — creates RA_CHEAT.FLAG so C++ _ra_cheat check fires on PROXY_TO_PTHREAD.
+    if (cheat) {
+      try {
+        FS.createDataFile(GAME_DIR, 'RA_CHEAT.FLAG', new Uint8Array([1]), true, true, false);
+        console.log('[preloader] cheat flag → ' + GAME_DIR + '/RA_CHEAT.FLAG');
+      } catch (e) {
+        console.warn('[preloader] could not create cheat flag file:', e.message);
+      }
+    }
+
     function launchGame() {
       setStatus('Starting game…');
       Module.callMain([]);
@@ -404,6 +417,10 @@
     // TIM-621: ?debug=1 — enable frame logging without autostart (RA_DEBUG.FLAG).
     if (params.get('debug') === '1') {
       debugframes = true;
+    }
+    // TIM-697: ?cheat=1 — Flag_To_Win() at game frame 200 for win-VQA verification.
+    if (params.get('cheat') === '1') {
+      cheat = true;
     }
 
     // ?src=<url> param: fetch MIX files from S3 / HTTP instead of local picker.
