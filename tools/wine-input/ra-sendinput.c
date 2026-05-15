@@ -40,6 +40,14 @@
 
 static HWND g_hwnd = NULL;
 static RECT g_client_screen = {0};
+/* When non-zero, send_move / send_click treat their (x,y) arguments as
+ * already in X-server screen coordinates and skip the ClientToScreen
+ * offset.  Set via the RA_SENDINPUT_ABS env var or by the *_abs commands.
+ * Reason: under Wine 11 + Xvfb + openbox, ClientToScreen for the cnc-ddraw
+ * window returns an offset that doesn't match the actual X-server window
+ * geometry (xwininfo reports (0,0); ClientToScreen reports (192,184)).
+ * Absolute mode bypasses that bug and uses the raw screen coords. */
+static int g_absolute_mode = 0;
 
 static void resolve_window(void) {
     g_hwnd = FindWindowA(NULL, "Red Alert");
@@ -57,10 +65,15 @@ static void resolve_window(void) {
     g_client_screen.top    += origin.y;
     g_client_screen.right  += origin.x;
     g_client_screen.bottom += origin.y;
-    fprintf(stderr, "window=%p client_screen=(%ld,%ld)-(%ld,%ld)\n",
+    const char *env = getenv("RA_SENDINPUT_ABS");
+    if (env && env[0] && env[0] != '0') {
+        g_absolute_mode = 1;
+    }
+    fprintf(stderr, "window=%p client_screen=(%ld,%ld)-(%ld,%ld) abs=%d\n",
             g_hwnd,
             g_client_screen.left, g_client_screen.top,
-            g_client_screen.right, g_client_screen.bottom);
+            g_client_screen.right, g_client_screen.bottom,
+            g_absolute_mode);
 }
 
 static void send_vk(WORD vk) {
@@ -75,8 +88,8 @@ static void send_vk(WORD vk) {
 }
 
 static void send_move(int cx, int cy) {
-    int sx = g_client_screen.left + cx;
-    int sy = g_client_screen.top  + cy;
+    int sx = g_absolute_mode ? cx : (g_client_screen.left + cx);
+    int sy = g_absolute_mode ? cy : (g_client_screen.top  + cy);
     /* SendInput MOUSEEVENTF_ABSOLUTE coords are normalized to 0..65535 over
      * the virtual screen, but Wine on a single-screen X server treats raw
      * screen pixel deltas from SetCursorPos identically — and that path is
