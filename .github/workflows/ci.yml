@@ -36,6 +36,9 @@ jobs:
       - name: Build RA native (cmake)
         run: cmake --build build --target ra --parallel
 
+      - name: Build TD native (cmake)
+        run: cmake --build build --target td --parallel
+
   vqa-pixel-diff:
     name: VQA codec pixel-diff
     runs-on: ubuntu-24.04
