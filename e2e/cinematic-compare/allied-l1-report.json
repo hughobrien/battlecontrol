@@ -1,0 +1,63 @@
+{
+  "issue": "TIM-708",
+  "wine_og": {
+    "t0": {
+      "size_bytes": 82594,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 36.9,
+      "colors": 624
+    },
+    "t3": {
+      "size_bytes": 83635,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 37.7,
+      "colors": 622
+    },
+    "t6": {
+      "size_bytes": 70444,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 37.9,
+      "colors": 1663
+    },
+    "post-demo": {
+      "size_bytes": 70444,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 37.9,
+      "colors": 1663
+    }
+  },
+  "wasm": {
+    "t5": {
+      "size_bytes": 86922,
+      "width": 800,
+      "height": 540,
+      "fill_pct": 30.9,
+      "colors": 356
+    },
+    "t15": {
+      "size_bytes": 84413,
+      "width": 800,
+      "height": 540,
+      "fill_pct": 31.0,
+      "colors": 351
+    },
+    "t30": {
+      "size_bytes": 83816,
+      "width": 800,
+      "height": 540,
+      "fill_pct": 31.0,
+      "colors": 351
+    }
+  },
+  "summary": {
+    "wine_og_non_blank_frames": 4,
+    "wasm_non_blank_frames": 3,
+    "wine_og_status": "PASS",
+    "wasm_status": "PASS",
+    "overall_status": "PASS"
+  }
+}

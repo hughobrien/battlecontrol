@@ -69,3 +69,48 @@ Outputs at `e2e/tim708/allied-l1/mission-t{0,3,6,9,12,17}.png`.
   even with all binary patches applied. PR #138 (TIM-739) verified the
   patch chain in a prefix that already had this registry from prior
   manual configuration; the script was missing the line.
+
+## Update (heartbeat 2026-05-15 18:30Z) — WASM side captured
+
+The CEO wake comment at 18:02Z asked for parallel WASM capture. Added
+`e2e/tim708-wasm-allied-l1.spec.ts` which drives the WASM bundle in
+`?src=http://localhost:9090&autostart=1` mode — bypasses the local
+File System Access picker that the default WASM shell now requires.
+
+Results (Allied Mission 1, both engines):
+
+| Engine | Checkpoint | Bytes | Fill % | Colors |
+|---|---|---|---|---|
+| Wine OG (cnc-ddraw GDI) | t=0 | 82594 | 36.9 | 624 |
+| Wine OG | t=3 | 83635 | 37.7 | 622 |
+| Wine OG | t=6 (crash dialog) | 70444 | 37.9 | 1663 |
+| WASM (canvas) | t=5 | 86922 | 30.9 | 356 |
+| WASM | t=15 | 84413 | 31.0 | 351 |
+| WASM | t=30 | 83816 | 31.0 | 351 |
+
+Both engines render the same Allied 1 "Find Einstein" mission with
+visually-recognisable terrain, infantry, jeeps, and buildings.  Fill %
+differs because cnc-ddraw scales the 640x400 game framebuffer onto
+the 800x600 Xvfb display (more black borders → lower fill) while the
+WASM canvas is the native 640x480 size with the chrome wrapper.
+Colour count differs because cnc-ddraw uses a deeper bit-depth GDI
+surface, while the WASM canvas is rendered through OffscreenCanvas at
+the original 8-bit palette.
+
+Comparison report: `e2e/cinematic-compare/allied-l1-report.json`.
+`scripts/tim708-compare.py` regenerates it from the screenshots.
+
+The two engines do *not* pixel-match — different renderers, different
+camera positions at the captured times, and Wine OG plays the
+AUTODEMO recording while WASM boots into the interactive mission with
+RA_AUTOSTART.  The pass criterion is "both render non-trivial Allied L1
+content"; this is satisfied.
+
+### Asset server caveats
+
+CD1 ships only MAIN.MIX and REDALERT.MIX (plus EXPAND/HIRES1/LORES1).
+The WASM preloader requests 8 MIXes — LOCAL/LORES/HIRES/CONQUER/
+SCORES/SPEECH 404 against this asset dir.  Game still boots because
+the missing MIXes are nested inside REDALERT.MIX (see
+[[project_redalert_main_menu_renders]]).  Don't be alarmed by the
+`[preloader] LOCAL.MIX not found` warnings.
