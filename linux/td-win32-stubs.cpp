@@ -27,6 +27,7 @@
 #include <SDL2/SDL.h>
 #include "sdl_input.h"   // SDL_Process_Input_Events declaration
 #include "sdl_window.h"  // SDL_Get_Main_Window / SDL_Set_Main_Window
+#include "vqa_player.h"  // Play_Movie_Linux (TIM-682)
 #endif
 
 // WIN32LIB headers — use explicit "WIN32LIB/" prefix where the header name
@@ -792,6 +793,43 @@ extern "C" void Set_DD_Palette(void *palette)
     Set_Palette(palette);  // also calls Update_SDL_Palette via Set_Palette
 }
 
+// TIM-682: SDL primary surface accessors shared with vqa_player.cpp.
+// Parallel to RA's DDRAW.CPP implementations; declared in TIBERIANDAWN/WIN32LIB/DDRAW.H.
+extern "C" bool SDL_Has_Primary_Surface(void) { return TD_SeenPixels != nullptr; }
+extern "C" unsigned char* SDL_Get_Primary_Pixels(void) { return TD_SeenPixels; }
+extern "C" int SDL_Get_Primary_Pitch(void) { return TD_SeenPitch; }
+
+// TIM-682: 6-bit VGA palette → 8-bit SDL colour table (matches RA DDRAW.CPP behaviour).
+// Called by vqa_player.cpp's CPL0 handler; updates TD_SDL_Palette used in Wait_Vert_Blank.
+extern "C" void Set_DD_Palette_8bit(const unsigned char* cpl0, int ncolors)
+{
+    if (!cpl0 || ncolors <= 0) return;
+    if (ncolors > 256) ncolors = 256;
+    for (int i = 0; i < ncolors; ++i) {
+        uint8_t r = (uint8_t)(cpl0[i * 3 + 0] << 2);
+        uint8_t g = (uint8_t)(cpl0[i * 3 + 1] << 2);
+        uint8_t b = (uint8_t)(cpl0[i * 3 + 2] << 2);
+        TD_SDL_Palette[i].r = (uint8_t)(r | ((r >> 6) & 0x3));
+        TD_SDL_Palette[i].g = (uint8_t)(g | ((g >> 6) & 0x3));
+        TD_SDL_Palette[i].b = (uint8_t)(b | ((b >> 6) & 0x3));
+        TD_SDL_Palette[i].a = 255;
+    }
+}
+
+// TIM-682: SDL_Audio_* stubs required by vqa_player.cpp (the real implementations
+// live in REDALERT/AUDIO.CPP which is not compiled into the TD target).
+// TD manages audio via td_sdl_audio_open/close in TIBERIANDAWN/AUDIO.CPP; returning
+// Is_Open=false means vqa_player skips the "steal" and opens its own device cleanly.
+extern "C" bool SDL_Audio_Is_Open(void) { return false; }
+extern "C" void SDL_Audio_Get_Params(int* rate, int* channels, int* bits)
+{
+    if (rate)     *rate     = 0;
+    if (channels) *channels = 0;
+    if (bits)     *bits     = 0;
+}
+extern "C" void SDL_Audio_Close(void) {}
+extern "C" bool SDL_Audio_Open(int, int, int) { return false; }
+
 // =========================================================================
 // Video mode and vertical blank — TIM-383 SDL2 path
 // =========================================================================
@@ -1320,7 +1358,12 @@ class SidebarGlyphxClass;
 
 void GlyphX_Debug_Print(const char *) {}
 void GlyphX_Assign_Houses(void)       {}
-void Play_Movie_GlyphX(const char *, ThemeType) {}
+// TIM-682: delegate to Play_Movie_Linux (vqa_player.cpp) instead of no-op.
+void Play_Movie_GlyphX(const char* movie_name, ThemeType) {
+#ifndef _MSC_VER
+    Play_Movie_Linux(movie_name);
+#endif
+}
 
 void On_Achievement_Event(const HouseClass *, const char *, const char *) {}
 void On_Sound_Effect(int, int, unsigned long)                             {}
