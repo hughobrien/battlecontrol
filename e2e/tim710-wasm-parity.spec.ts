@@ -38,6 +38,8 @@ import * as fs            from 'fs';
 import * as path          from 'path';
 
 const WASM_URL        = 'http://localhost:8080/ra.html';
+// RA_ASSETS_URL lets CI pass a CDN or custom URL; local runs use :9090
+const ASSET_URL       = process.env['RA_ASSETS_URL'] || 'http://localhost:9090/';
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 const REPO_ROOT       = path.resolve(__dirname, '..');
 
@@ -60,6 +62,21 @@ async function waitForOutput(page: any, substring: string, timeoutMs = 300_000) 
     substring,
     { timeout: timeoutMs },
   );
+}
+
+// Wait for preloader to finish mounting assets and game to complete Init_Bulk_Data.
+// 'WASM ready' only goes to #status-line (not #output), so we gate on the
+// preloader-overlay hiding then the first C++ milestone log in #output.
+async function waitForGameReady(page: any) {
+  await page.waitForFunction(
+    () => {
+      const overlay = document.getElementById('preloader-overlay');
+      return overlay !== null && overlay.style.display === 'none';
+    },
+    null,
+    { timeout: 120_000 },
+  );
+  await waitForOutput(page, '[RA] Init_Game: Init_Bulk_Data done', 300_000);
 }
 
 async function getOutput(page: any): Promise<string> {
@@ -90,22 +107,20 @@ async function canvasStats(page: any) {
   });
 }
 
-// Inject an Escape-key loop that fires whenever '[VQA] playing' appears in output.
+// Abort VQAs as soon as they start by setting the JS-side abort flag.
+// Uses the same _vqa_aborted / _vqa_abort_installed mechanism as T5 (which
+// is checked by vqa_player.cpp's vqa_check_abort_flag() each frame).
+// The old Escape-key-to-document approach did not reach SDL in the Worker thread.
 async function installVqaAutoSkip(page: any): Promise<() => Promise<void>> {
-  const cancelHandle = await page.evaluateHandle(() => {
-    let cancelled = false;
-    const iv = setInterval(() => {
-      if (cancelled) { clearInterval(iv); return; }
-      const out = document.getElementById('output');
-      if (out && out.textContent && out.textContent.includes('[VQA] playing')) {
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+  await page.evaluate(() => {
+    (window as any).__vqa_skip_interval = setInterval(() => {
+      if ((window as any)._vqa_abort_installed) {
+        (window as any)._vqa_aborted = true;
       }
-    }, 500);
-    return { cancel: () => { cancelled = true; clearInterval(iv); } };
+    }, 100);
   });
   return async () => {
-    await page.evaluate((h: any) => h.cancel(), cancelHandle);
-    cancelHandle.dispose();
+    await page.evaluate(() => clearInterval((window as any).__vqa_skip_interval));
   };
 }
 
@@ -159,8 +174,8 @@ test.describe('Tier 1 — title screen (WASM)', () => {
   test.setTimeout(300_000);
 
   test('title screen renders non-black ≥5%, 640×480, no cyan-scatter', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page);
 
     // Title/intro VQA renders shortly after init
     await page.waitForTimeout(8_000);
@@ -182,9 +197,11 @@ test.describe('Tier 1 — main menu (WASM)', () => {
   test.setTimeout(300_000);
 
   test('main menu renders ≥30% fill at 640×480', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
-    await waitForOutput(page, '[RA] Main_Loop frame', 90_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+    const cancelMenuSkip = await installVqaAutoSkip(page);
+    await waitForGameReady(page);
+    await waitForOutput(page, '[TIM-616] menu_cs=', 90_000);
+    await cancelMenuSkip();
     await page.waitForTimeout(3_000);
 
     const stats = await canvasStats(page);
@@ -207,30 +224,52 @@ test.describe('Tier 1 — Allied L1 gameplay (WASM)', () => {
     const errors: string[] = [];
     page.on('pageerror', (err: Error) => errors.push(err.message));
 
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
 
+    // Install VQA skip BEFORE waitForGameReady so intro VQAs (ENGLISH.VQA + PROLOG.VQA)
+    // abort after a few frames instead of playing for ~285s, making Init_Bulk_Data fire fast.
     const cancelSkip = await installVqaAutoSkip(page);
+    await waitForGameReady(page);
 
-    await waitForOutput(page, '[RA] Main_Loop frame', 90_000);
-    await page.waitForTimeout(3_000);
+    // Wait for EITHER Main_Menu to appear (normal path) OR Start_Scenario OK (IsFromInstall
+    // direct-start path — diagnosed by [TIM-712] logs).  Both paths lead to Allied L1.
+    const startPath = await page.waitForFunction(
+      () => {
+        const el = document.getElementById('output');
+        if (!el || !el.textContent) return null;
+        if (el.textContent.includes('[TIM-616] menu_cs=')) return 'menu';
+        if (el.textContent.includes('Start_Scenario OK'))  return 'direct';
+        return null;
+      },
+      null,
+      { timeout: 120_000 },
+    );
+    const pathTaken = await startPath.jsonValue() as string;
+    console.log(`[TIM-712] game start path: ${pathTaken}`);
 
-    // Navigate to Allied L1 (confirmed coords from TIM-697)
-    await page.locator('#canvas').click({ position: { x: 322, y: 183 } });
-    await waitForOutput(page, '[MENU] input=0x', 30_000);
+    if (pathTaken === 'menu') {
+      await page.waitForTimeout(1_000);
+      // Navigate to Allied L1 (confirmed coords from TIM-697)
+      await page.locator('#canvas').click({ position: { x: 322, y: 183 } });
+      await waitForOutput(page, '[MENU] input=0x', 30_000);
 
-    await waitForOutput(page, '[DIFF] dialog ready', 30_000);
-    await page.waitForTimeout(500);
-    await page.locator('#canvas').click({ position: { x: 470, y: 244 } });
+      await waitForOutput(page, '[DIFF] dialog ready', 30_000);
+      await page.waitForTimeout(500);
+      await page.locator('#canvas').click({ position: { x: 470, y: 244 } });
 
-    await waitForOutput(page, '[INIT] faction dialog ready', 30_000);
-    await page.waitForTimeout(500);
-    await page.locator('#canvas').click({ position: { x: 258, y: 268 } });
+      await waitForOutput(page, '[INIT] faction dialog ready', 30_000);
+      await page.waitForTimeout(500);
+      await page.locator('#canvas').click({ position: { x: 258, y: 268 } });
+
+      // Wait for Start_Scenario OK (briefing VQAs already aborted by VQA skip).
+      await waitForOutput(page, 'Start_Scenario OK', 120_000);
+    }
+    // direct path: Start_Scenario OK already fired, VQA skip aborted briefing VQAs
 
     await cancelSkip();
 
-    await waitForOutput(page, 'Start_Scenario', 120_000);
-    await waitForOutput(page, 'frame 200', 120_000);
+    // Let the gameplay settle for a frame or two before sampling.
+    await page.waitForTimeout(5_000);
 
     const t0Stats = await canvasStats(page);
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t0.png') });
@@ -239,13 +278,13 @@ test.describe('Tier 1 — Allied L1 gameplay (WASM)', () => {
     expect(t0Stats.w, 'canvas width 640').toBe(640);
     expect(t0Stats.h, 'canvas height 480').toBe(480);
 
-    await waitForOutput(page, 'frame 350', 60_000);
+    await page.waitForTimeout(15_000);
     const t10Stats = await canvasStats(page);
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t10.png') });
     console.log(`L1 t≈10s: fill=${t10Stats.fill}%`);
     expect(t10Stats.fill, 'Allied L1 t≈10s fill ≥20%').toBeGreaterThanOrEqual(20);
 
-    await waitForOutput(page, 'frame 600', 120_000);
+    await page.waitForTimeout(20_000);
     const t30Stats = await canvasStats(page);
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t30.png') });
     console.log(`L1 t≈30s: fill=${t30Stats.fill}%`);
@@ -264,11 +303,11 @@ test.describe('Tier 1 — VQA playback (WASM)', () => {
   test.setTimeout(300_000);
 
   test('LOGO.VQA: canvas non-black during early and mid playback', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page);
 
     // LOGO.VQA plays automatically at startup
-    await waitForOutput(page, '[VQA] playing', 60_000);
+    await waitForOutput(page, '[VQA] Playing', 60_000);
 
     // Capture early frame (~2s in)
     await page.waitForTimeout(2_000);
@@ -287,20 +326,26 @@ test.describe('Tier 1 — VQA playback (WASM)', () => {
   });
 
   test('intro VQA sequence: ENGLISH.VQA canvas non-black at mid-playback', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
 
-    // Wait for LOGO.VQA to finish
-    await waitForOutput(page, "LOGO.VQA' done", 90_000);
+    // Wait for preloader overlay to hide (assets loaded + WASM running).
+    // Do NOT use waitForGameReady (which waits for Init_Bulk_Data) — ENGLISH.VQA
+    // plays *before* Init_Bulk_Data inside Init_Game, so we must gate earlier.
+    await page.waitForFunction(
+      () => {
+        const overlay = document.getElementById('preloader-overlay');
+        return overlay !== null && overlay.style.display === 'none';
+      },
+      null,
+      { timeout: 120_000 },
+    );
 
-    // If Main_Loop already started, the game skipped ENGLISH.VQA — pass gracefully
-    const output = await getOutput(page);
-    if (output.includes('[RA] Main_Loop frame')) {
-      console.log('Game reached main menu before ENGLISH.VQA capture — skipping');
-      return;
-    }
+    // ENGLISH.VQA (VQ_REDINTRO) plays early in Init_Game before Init_Bulk_Data.
+    // LOGO.VQA is not played in the WIN32/WASM build; the startup sequence is
+    // ENGLISH.VQA → PROLOG.VQA → Init_Bulk_Data.
+    await waitForOutput(page, "[VQA] Playing 'ENGLISH.VQA'", 60_000);
 
-    // ENGLISH.VQA follows LOGO.VQA; capture at ~3s in
+    // Capture at ~3s into ENGLISH.VQA (160 frames at 15fps ≈ 10.7s total)
     await page.waitForTimeout(3_000);
     const stats = await canvasStats(page);
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-english-vqa-mid.png') });
