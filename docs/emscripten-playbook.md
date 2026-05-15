@@ -372,5 +372,40 @@ TIM-686 (T5 regression spec). See also `lens #1` (PROXY_TO_PTHREAD module contex
 
 ---
 
-*Last updated: 2026-05-14. Maintainer: EmscriptenExpert agent.*
-*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694.*
+---
+
+### 2026-05-15 — RA startup VQA sequence: ENGLISH+PROLOG play *before* Init_Bulk_Data (TIM-712)
+
+**Symptom:** E2e test waiting for `"LOGO.VQA' done"` before capturing ENGLISH.VQA
+times out because LOGO.VQA is never logged.  Tests gated on `[RA] Init_Game:
+Init_Bulk_Data done` see ENGLISH.VQA and PROLOG.VQA already complete.
+
+**Root cause:** The WIN32/non-MSVC startup path in `REDALERT/INIT.CPP:Play_Intro()`
+plays **ENGLISH.VQA (VQ_REDINTRO) then PROLOG.VQA (VQ_INTRO_MOVIE)** — both inside
+`Init_Game()` *before* `Init_Bulk_Data()` is called.  LOGO.VQA (VQ_TITLE) only plays
+in the legacy non-WIN32 branch.  The full Init_Game sequence is:
+
+```
+Play_Intro()   → ENGLISH.VQA (160 frames, 15 fps ≈ 11 s)
+                 PROLOG.VQA  (2856 frames, 15 fps ≈ 190 s)
+Init_Color_Remaps()
+Load_Title_Page()
+Init_Bulk_Data()   ← waitForGameReady() gates here
+```
+
+**Fix:** When writing e2e tests that need to capture ENGLISH.VQA:
+1. Gate on overlay-hide only (not full `waitForGameReady`).
+2. Then `waitForOutput(page, "[VQA] Playing 'ENGLISH.VQA'", 60_000)`.
+3. Capture after `waitForTimeout(3_000)`.
+
+When writing tests that need the game to start fast (menu, gameplay):
+- Install `installVqaAutoSkip()` **before** `waitForGameReady()`.  Without the skip,
+  PROLOG.VQA alone adds ~190s before Init_Bulk_Data fires.
+
+**Reference:** `REDALERT/INIT.CPP:Play_Intro()` (lines 1785–1821),
+`REDALERT/INIT.CPP:Init_Game()` (lines 399–470).  TIM-712.
+
+---
+
+*Last updated: 2026-05-15. Maintainer: EmscriptenExpert agent.*
+*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712.*
