@@ -13,10 +13,10 @@
  *   - Main-menu button layout matches synthetic-click coordinates (TIM-697 gate)
  *   - No cyan-scatter artefacts (TIM-590 regression gate)
  *
- * Tier 3 (Wine — skipped unless WINE_RA_READY=1 + REDALERT.EXE present):
- *   - Title-screen pixel fill matches OG reference within ±10 %
- *   - INI values read by OG game match REDALERT.INI on disk
- *   - Menu navigation to scenario select completes within 15 s
+ * Tier 3 (Wine — skipped unless WINE_RA_READY=1 + RA95.EXE present):
+ *   - OG title-screen screenshot present (wine-ra-title.png > 5 KB)
+ *   - Menu screenshot present (wine-ra-menu.png > 5 KB)
+ *   - WASM menu fill ≥30% (parity sanity)
  *
  * Setup (Tier 1 + 2):
  *   serve-coop.py on :8080   (WASM bundle from build-wasm/)
@@ -24,7 +24,10 @@
  *
  * Setup (Tier 3, additional):
  *   wine32 installed (sudo dpkg --add-architecture i386 && apt install wine32:i386)
- *   REDALERT.EXE at /opt/redalert/REDALERT.EXE (EA 2008 free release)
+ *   RA95.EXE at /opt/redalert/RA95.EXE  — extracted from archive.org ISO:
+ *     https://archive.org/download/cnc-red-alert/redalert_allied.iso
+ *     (LBA 45220, 2 181 632 bytes;
+ *      SHA-256 a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55)
  *   WINE_RA_READY=1 env var set
  *   Run: bash scripts/wine-ra.sh   (creates e2e/screenshots/wine-ra-*.png)
  *
