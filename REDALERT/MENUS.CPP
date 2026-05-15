@@ -820,6 +820,13 @@ int Main_Menu(unsigned long )
 				retval = -1;
 				process = false;
 			}
+#ifndef _MSC_VER
+			/* TIM-684: on native Linux, SDL_Process_Input_Events() is only called
+			 * from Wait_Vert_Blank(). When display=false the render path is skipped,
+			 * so mouse/keyboard events pile up in the SDL queue and never reach the
+			 * _Kbd ring buffer. Pump events every iteration so clicks register. */
+			Wait_Vert_Blank();
+#endif
 		}
 
 

@@ -860,10 +860,12 @@ extern "C" void Play_Movie_Linux(const char* name)
     // (mission briefing) from crashing via SDL_InitSubSystem in vqa_audio_open
     // (TIM-496 regression: Emscripten leaves SDL.audioContext undefined after
     // SDL_QuitSubSystem, causing TypeError on the subsequent InitSubSystem call).
+    // TIM-684: RA_SKIP_INTRO skips VQA without bypassing the menu (unlike RA_AUTOSTART).
     bool dump_frames = (getenv("RA_VQA_DUMP_FRAMES") != nullptr);
     if (!dump_frames &&
-        (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available())) {
-        fprintf(stderr, "[VQA] RA_AUTOSTART active — skipping '%s.VQA'\n", name);
+        (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()
+         || getenv("RA_SKIP_INTRO"))) {
+        fprintf(stderr, "[VQA] skipping '%s.VQA' (RA_AUTOSTART/RA_SKIP_INTRO active)\n", name);
         return;
     }
 
