@@ -979,7 +979,10 @@ bool Select_Game(bool fade)
 #ifndef _MSC_VER
 							/* TIM-206: inject KN_RETURN to auto-select Allies (curbutton=0)
 							 * for smoke test mission launch — avoids blocking on faction dialog.
-							 * TIM-626: gate on RA_AUTOSTART — normal users must choose faction. */
+							 * TIM-626: gate on RA_AUTOSTART — normal users must choose faction.
+							 * TIM-697: unconditional [INIT] faction dialog ready log for Playwright. */
+							fprintf(stderr, "[INIT] faction dialog ready\n");
+							fflush(stderr);
 							if (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
 								fprintf(stderr, "[INIT] injecting KN_RETURN for faction select (Allies)\n");
 								fflush(stderr);
