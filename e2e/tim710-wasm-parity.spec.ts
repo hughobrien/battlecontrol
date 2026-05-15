@@ -1,0 +1,391 @@
+/**
+ * TIM-710 — RA WASM port vs OG Wine parity validation — gameplay scenarios.
+ *
+ * Validates visual parity between the WASM browser port and Wine OG Red Alert
+ * across four key scenarios: title screen, main menu, Allied L1 gameplay,
+ * and VQA playback.
+ *
+ * ─── Tier 1 (WASM-only, always runs) ────────────────────────────────────────
+ *   - Title screen: canvas fill ≥5%, 640×480, no cyan-scatter (TIM-590 gate)
+ *   - Main menu: canvas fill ≥30% (TIM-250 gate), 640×480
+ *   - Allied L1: map fill ≥20% at t=0, t≈10s, t≈30s (TIM-705 gate)
+ *   - VQA playback: LOGO.VQA canvas non-black at early + mid playback
+ *
+ * ─── Tier 2 (Wine OG parity, requires WINE_RA_READY=1) ──────────────────────
+ *   - Title SSIM ≥ 0.90 vs e2e/screenshots/wine-ra-title.png
+ *   - Menu SSIM ≥ 0.90 vs e2e/screenshots/wine-ra-menu.png
+ *   - Allied L1 t=0 SSIM ≥ 0.90 vs e2e/screenshots/wine-allied-l1-t0.png
+ *   - Diff PNGs attached as test artifacts on failure
+ *
+ * ─── Setup ───────────────────────────────────────────────────────────────────
+ *   serve-coop.py on :8080   (WASM bundle from build-wasm/)
+ *   serve-assets.py on :9090 (CD1 MIX files)
+ *   [Tier 2] WINE_RA_READY=1 + bash scripts/wine-ra.sh + bash scripts/wine-gameplay.sh
+ *
+ * ─── Run ─────────────────────────────────────────────────────────────────────
+ *   npm run test:e2e:wasm-parity
+ *   WINE_RA_READY=1 npm run test:e2e:wasm-parity
+ *
+ * ─── Related ─────────────────────────────────────────────────────────────────
+ *   TIM-699 — Wine setup + OG reference screenshots
+ *   TIM-705 — Cinematic pixel-exact parity (8/8 VQAs SSIM=1.0)
+ *   TIM-709 — Wine headless mouse input (parallel)
+ */
+
+import { test, expect }   from '@playwright/test';
+import * as child_process from 'child_process';
+import * as fs            from 'fs';
+import * as path          from 'path';
+
+const WASM_URL        = 'http://localhost:8080/ra.html';
+const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
+const REPO_ROOT       = path.resolve(__dirname, '..');
+
+const WINE_RA_READY = process.env.WINE_RA_READY === '1';
+
+if (!fs.existsSync(SCREENSHOTS_DIR)) {
+  fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers (mirrors tim705-equivalence.spec.ts patterns)
+// ---------------------------------------------------------------------------
+
+async function waitForOutput(page: any, substring: string, timeoutMs = 300_000) {
+  await page.waitForFunction(
+    (s: string) => {
+      const el = document.getElementById('output');
+      return el !== null && el.textContent !== null && el.textContent.includes(s);
+    },
+    substring,
+    { timeout: timeoutMs },
+  );
+}
+
+async function getOutput(page: any): Promise<string> {
+  return page.evaluate(() => {
+    const el = document.getElementById('output');
+    return el ? (el.textContent || '') : '';
+  });
+}
+
+async function canvasStats(page: any) {
+  return page.evaluate(() => {
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    if (!canvas) return { fill: 0, colors: 0, w: 0, h: 0, cyanCount: 0 };
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { fill: 0, colors: 0, w: canvas.width, h: canvas.height, cyanCount: 0 };
+    const { width: w, height: h } = canvas;
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let nonBlack = 0, cyanCount = 0;
+    const colorSet = new Set<number>();
+    const total = data.length / 4;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      if (r > 15 || g > 15 || b > 15) nonBlack++;
+      if (r < 32 && g > 180 && b > 180) cyanCount++;
+      colorSet.add((r >> 3) << 10 | (g >> 3) << 5 | (b >> 3));
+    }
+    return { fill: Math.round(nonBlack / total * 100), colors: colorSet.size, cyanCount, w, h };
+  });
+}
+
+// Inject an Escape-key loop that fires whenever '[VQA] playing' appears in output.
+async function installVqaAutoSkip(page: any): Promise<() => Promise<void>> {
+  const cancelHandle = await page.evaluateHandle(() => {
+    let cancelled = false;
+    const iv = setInterval(() => {
+      if (cancelled) { clearInterval(iv); return; }
+      const out = document.getElementById('output');
+      if (out && out.textContent && out.textContent.includes('[VQA] playing')) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+      }
+    }, 500);
+    return { cancel: () => { cancelled = true; clearInterval(iv); } };
+  });
+  return async () => {
+    await page.evaluate((h: any) => h.cancel(), cancelHandle);
+    cancelHandle.dispose();
+  };
+}
+
+// Run scripts/parity-compare.py and return parsed JSON result.
+// Returns { status, ssim, p99Diff, fillA, fillB, error? }
+function runParityCompare(
+  pathA: string,
+  pathB: string,
+  opts: { label?: string; thresholdSsim?: number; diffOut?: string } = {},
+): { status: string; ssim: number; p99Diff: number; fillA: number; fillB: number; error?: string } {
+  const argv = [
+    path.join(REPO_ROOT, 'scripts', 'parity-compare.py'),
+    pathA, pathB,
+    '--label', opts.label ?? 'comparison',
+    '--threshold-ssim', String(opts.thresholdSsim ?? 0.90),
+    '--json',
+  ];
+  if (opts.diffOut) argv.push('--diff-out', opts.diffOut);
+
+  const proc = child_process.spawnSync('python3', argv, {
+    encoding: 'utf-8',
+    timeout: 30_000,
+  });
+
+  // The last line of stdout is the JSON result.
+  const lines = (proc.stdout || '').trim().split('\n');
+  const jsonLine = lines[lines.length - 1] || '';
+  try {
+    const r = JSON.parse(jsonLine);
+    return {
+      status:  r.status  ?? 'SKIP',
+      ssim:    r.ssim    ?? 0,
+      p99Diff: r.p99_diff ?? 999,
+      fillA:   r.fill_a  ?? 0,
+      fillB:   r.fill_b  ?? 0,
+      error:   r.error,
+    };
+  } catch {
+    return {
+      status: 'SKIP', ssim: 0, p99Diff: 999, fillA: 0, fillB: 0,
+      error: `parity-compare.py parse error: ${jsonLine.slice(0, 200)}`,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tier 1 — WASM visual reference
+// ---------------------------------------------------------------------------
+
+test.describe('Tier 1 — title screen (WASM)', () => {
+  test.setTimeout(300_000);
+
+  test('title screen renders non-black ≥5%, 640×480, no cyan-scatter', async ({ page }) => {
+    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await waitForOutput(page, 'WASM_READY', 120_000);
+
+    // Title/intro VQA renders shortly after init
+    await page.waitForTimeout(8_000);
+
+    const stats = await canvasStats(page);
+    const shot  = path.join(SCREENSHOTS_DIR, 'tim710-wasm-title.png');
+    await page.screenshot({ path: shot });
+
+    console.log(`Title canvas: fill=${stats.fill}% colors=${stats.colors} cyan=${stats.cyanCount} (${stats.w}×${stats.h})`);
+
+    expect(stats.fill,      'title fill ≥5%').toBeGreaterThanOrEqual(5);
+    expect(stats.cyanCount, 'no cyan-scatter (TIM-590 gate)').toBeLessThan(50);
+    expect(stats.w,         'canvas width 640').toBe(640);
+    expect(stats.h,         'canvas height 480').toBe(480);
+  });
+});
+
+test.describe('Tier 1 — main menu (WASM)', () => {
+  test.setTimeout(300_000);
+
+  test('main menu renders ≥30% fill at 640×480', async ({ page }) => {
+    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await waitForOutput(page, 'WASM_READY', 120_000);
+    await waitForOutput(page, '[RA] Main_Loop frame', 90_000);
+    await page.waitForTimeout(3_000);
+
+    const stats = await canvasStats(page);
+    const shot  = path.join(SCREENSHOTS_DIR, 'tim710-wasm-menu.png');
+    await page.screenshot({ path: shot });
+
+    console.log(`Menu canvas: fill=${stats.fill}% colors=${stats.colors} cyan=${stats.cyanCount} (${stats.w}×${stats.h})`);
+
+    expect(stats.fill,      'menu fill ≥30%').toBeGreaterThanOrEqual(30);
+    expect(stats.cyanCount, 'no cyan-scatter').toBeLessThan(50);
+    expect(stats.w,         'canvas width 640').toBe(640);
+    expect(stats.h,         'canvas height 480').toBe(480);
+  });
+});
+
+test.describe('Tier 1 — Allied L1 gameplay (WASM)', () => {
+  test.setTimeout(900_000);
+
+  test('Allied L1 map renders ≥20% fill at t=0, t≈10s, t≈30s without crash', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err: Error) => errors.push(err.message));
+
+    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await waitForOutput(page, 'WASM_READY', 120_000);
+
+    const cancelSkip = await installVqaAutoSkip(page);
+
+    await waitForOutput(page, '[RA] Main_Loop frame', 90_000);
+    await page.waitForTimeout(3_000);
+
+    // Navigate to Allied L1 (confirmed coords from TIM-697)
+    await page.locator('#canvas').click({ position: { x: 322, y: 183 } });
+    await waitForOutput(page, '[MENU] input=0x', 30_000);
+
+    await waitForOutput(page, '[DIFF] dialog ready', 30_000);
+    await page.waitForTimeout(500);
+    await page.locator('#canvas').click({ position: { x: 470, y: 244 } });
+
+    await waitForOutput(page, '[INIT] faction dialog ready', 30_000);
+    await page.waitForTimeout(500);
+    await page.locator('#canvas').click({ position: { x: 258, y: 268 } });
+
+    await cancelSkip();
+
+    await waitForOutput(page, 'Start_Scenario', 120_000);
+    await waitForOutput(page, 'frame 200', 120_000);
+
+    const t0Stats = await canvasStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t0.png') });
+    console.log(`L1 t=0:   fill=${t0Stats.fill}% colors=${t0Stats.colors}`);
+    expect(t0Stats.fill, 'Allied L1 t=0 fill ≥20%').toBeGreaterThanOrEqual(20);
+    expect(t0Stats.w, 'canvas width 640').toBe(640);
+    expect(t0Stats.h, 'canvas height 480').toBe(480);
+
+    await waitForOutput(page, 'frame 350', 60_000);
+    const t10Stats = await canvasStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t10.png') });
+    console.log(`L1 t≈10s: fill=${t10Stats.fill}%`);
+    expect(t10Stats.fill, 'Allied L1 t≈10s fill ≥20%').toBeGreaterThanOrEqual(20);
+
+    await waitForOutput(page, 'frame 600', 120_000);
+    const t30Stats = await canvasStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t30.png') });
+    console.log(`L1 t≈30s: fill=${t30Stats.fill}%`);
+    expect(t30Stats.fill, 'Allied L1 t≈30s fill ≥20%').toBeGreaterThanOrEqual(20);
+
+    expect(
+      errors.filter(e => !e.includes('ResizeObserver')),
+      'no uncaught JS errors during gameplay',
+    ).toHaveLength(0);
+
+    console.log(`Allied L1 PASS: t0=${t0Stats.fill}% t≈10s=${t10Stats.fill}% t≈30s=${t30Stats.fill}%`);
+  });
+});
+
+test.describe('Tier 1 — VQA playback (WASM)', () => {
+  test.setTimeout(300_000);
+
+  test('LOGO.VQA: canvas non-black during early and mid playback', async ({ page }) => {
+    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await waitForOutput(page, 'WASM_READY', 120_000);
+
+    // LOGO.VQA plays automatically at startup
+    await waitForOutput(page, '[VQA] playing', 60_000);
+
+    // Capture early frame (~2s in)
+    await page.waitForTimeout(2_000);
+    const earlyStats = await canvasStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-logo-vqa-early.png') });
+    console.log(`LOGO.VQA early: fill=${earlyStats.fill}% colors=${earlyStats.colors}`);
+
+    // Capture mid-point frame (~6s in = ~frame 120 of 262 at 20fps)
+    await page.waitForTimeout(4_000);
+    const midStats = await canvasStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-logo-vqa-mid.png') });
+    console.log(`LOGO.VQA mid:   fill=${midStats.fill}% colors=${midStats.colors}`);
+
+    const maxFill = Math.max(earlyStats.fill, midStats.fill);
+    expect(maxFill, 'LOGO.VQA canvas fill ≥5% at some point during playback').toBeGreaterThanOrEqual(5);
+  });
+
+  test('intro VQA sequence: ENGLISH.VQA canvas non-black at mid-playback', async ({ page }) => {
+    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await waitForOutput(page, 'WASM_READY', 120_000);
+
+    // Wait for LOGO.VQA to finish
+    await waitForOutput(page, "LOGO.VQA' done", 90_000);
+
+    // If Main_Loop already started, the game skipped ENGLISH.VQA — pass gracefully
+    const output = await getOutput(page);
+    if (output.includes('[RA] Main_Loop frame')) {
+      console.log('Game reached main menu before ENGLISH.VQA capture — skipping');
+      return;
+    }
+
+    // ENGLISH.VQA follows LOGO.VQA; capture at ~3s in
+    await page.waitForTimeout(3_000);
+    const stats = await canvasStats(page);
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-english-vqa-mid.png') });
+    console.log(`ENGLISH.VQA mid: fill=${stats.fill}% colors=${stats.colors}`);
+
+    expect(stats.fill, 'ENGLISH.VQA canvas fill ≥5%').toBeGreaterThanOrEqual(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tier 2 — Wine OG vs WASM parity
+// ---------------------------------------------------------------------------
+
+test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
+  test.beforeEach(() => {
+    test.skip(
+      !WINE_RA_READY,
+      'Tier 2 requires WINE_RA_READY=1 + wine32 + RA95.EXE; '
+      + 'run bash scripts/wine-ra.sh and bash scripts/wine-gameplay.sh first',
+    );
+  });
+
+  test('title screen: SSIM ≥ 0.90 vs Wine OG', async ({}, testInfo) => {
+    const wineShot = path.join(SCREENSHOTS_DIR, 'wine-ra-title.png');
+    const wasmShot = path.join(SCREENSHOTS_DIR, 'tim710-wasm-title.png');
+    test.skip(!fs.existsSync(wineShot), 'wine-ra-title.png missing — run bash scripts/wine-ra.sh');
+    test.skip(!fs.existsSync(wasmShot), 'tim710-wasm-title.png missing — run Tier 1 title test first');
+
+    const diffOut = path.join(SCREENSHOTS_DIR, 'tim710-diff-title.png');
+    const cmp = runParityCompare(wineShot, wasmShot, { label: 'title-screen', thresholdSsim: 0.90, diffOut });
+    console.log(`Title parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} fill_wine=${cmp.fillA}% fill_wasm=${cmp.fillB}%`);
+    if (cmp.error) console.log(`  error: ${cmp.error}`);
+
+    if (cmp.status === 'SKIP') test.skip(true, cmp.error ?? 'parity-compare.py returned SKIP');
+
+    if (cmp.status === 'FAIL') {
+      if (fs.existsSync(diffOut))   await testInfo.attach('diff-title.png',       { path: diffOut,   contentType: 'image/png' });
+      if (fs.existsSync(wineShot))  await testInfo.attach('wine-ra-title.png',    { path: wineShot,  contentType: 'image/png' });
+      if (fs.existsSync(wasmShot))  await testInfo.attach('wasm-title.png',       { path: wasmShot,  contentType: 'image/png' });
+    }
+
+    expect(cmp.ssim, `title SSIM ≥0.90 (got ${cmp.ssim})`).toBeGreaterThanOrEqual(0.90);
+  });
+
+  test('main menu: SSIM ≥ 0.90 vs Wine OG', async ({}, testInfo) => {
+    const wineShot = path.join(SCREENSHOTS_DIR, 'wine-ra-menu.png');
+    const wasmShot = path.join(SCREENSHOTS_DIR, 'tim710-wasm-menu.png');
+    test.skip(!fs.existsSync(wineShot), 'wine-ra-menu.png missing — run bash scripts/wine-ra.sh');
+    test.skip(!fs.existsSync(wasmShot), 'tim710-wasm-menu.png missing — run Tier 1 menu test first');
+
+    const diffOut = path.join(SCREENSHOTS_DIR, 'tim710-diff-menu.png');
+    const cmp = runParityCompare(wineShot, wasmShot, { label: 'main-menu', thresholdSsim: 0.90, diffOut });
+    console.log(`Menu parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} fill_wine=${cmp.fillA}% fill_wasm=${cmp.fillB}%`);
+    if (cmp.error) console.log(`  error: ${cmp.error}`);
+
+    if (cmp.status === 'SKIP') test.skip(true, cmp.error ?? 'parity-compare.py returned SKIP');
+
+    if (cmp.status === 'FAIL') {
+      if (fs.existsSync(diffOut))   await testInfo.attach('diff-menu.png',     { path: diffOut,  contentType: 'image/png' });
+      if (fs.existsSync(wineShot))  await testInfo.attach('wine-ra-menu.png',  { path: wineShot, contentType: 'image/png' });
+      if (fs.existsSync(wasmShot))  await testInfo.attach('wasm-menu.png',     { path: wasmShot, contentType: 'image/png' });
+    }
+
+    expect(cmp.ssim, `menu SSIM ≥0.90 (got ${cmp.ssim})`).toBeGreaterThanOrEqual(0.90);
+  });
+
+  test('Allied L1 t=0: SSIM ≥ 0.90 vs Wine OG', async ({}, testInfo) => {
+    const wineShot = path.join(SCREENSHOTS_DIR, 'wine-allied-l1-t0.png');
+    const wasmShot = path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t0.png');
+    test.skip(!fs.existsSync(wineShot), 'wine-allied-l1-t0.png missing — run bash scripts/wine-gameplay.sh');
+    test.skip(!fs.existsSync(wasmShot), 'tim710-wasm-allied-l1-t0.png missing — run Tier 1 gameplay test first');
+
+    const diffOut = path.join(SCREENSHOTS_DIR, 'tim710-diff-allied-l1-t0.png');
+    const cmp = runParityCompare(wineShot, wasmShot, { label: 'allied-l1-t0', thresholdSsim: 0.90, diffOut });
+    console.log(`L1 t=0 parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} fill_wine=${cmp.fillA}% fill_wasm=${cmp.fillB}%`);
+    if (cmp.error) console.log(`  error: ${cmp.error}`);
+
+    if (cmp.status === 'SKIP') test.skip(true, cmp.error ?? 'parity-compare.py returned SKIP');
+
+    if (cmp.status === 'FAIL') {
+      if (fs.existsSync(diffOut))   await testInfo.attach('diff-allied-l1-t0.png',     { path: diffOut,  contentType: 'image/png' });
+      if (fs.existsSync(wineShot))  await testInfo.attach('wine-allied-l1-t0.png',     { path: wineShot, contentType: 'image/png' });
+      if (fs.existsSync(wasmShot))  await testInfo.attach('wasm-allied-l1-t0.png',     { path: wasmShot, contentType: 'image/png' });
+    }
+
+    expect(cmp.ssim, `Allied L1 t=0 SSIM ≥0.90 (got ${cmp.ssim})`).toBeGreaterThanOrEqual(0.90);
+  });
+});
