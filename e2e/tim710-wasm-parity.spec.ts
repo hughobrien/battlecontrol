@@ -107,22 +107,20 @@ async function canvasStats(page: any) {
   });
 }
 
-// Inject an Escape-key loop that fires whenever '[VQA] playing' appears in output.
+// Abort VQAs as soon as they start by setting the JS-side abort flag.
+// Uses the same _vqa_aborted / _vqa_abort_installed mechanism as T5 (which
+// is checked by vqa_player.cpp's vqa_check_abort_flag() each frame).
+// The old Escape-key-to-document approach did not reach SDL in the Worker thread.
 async function installVqaAutoSkip(page: any): Promise<() => Promise<void>> {
-  const cancelHandle = await page.evaluateHandle(() => {
-    let cancelled = false;
-    const iv = setInterval(() => {
-      if (cancelled) { clearInterval(iv); return; }
-      const out = document.getElementById('output');
-      if (out && out.textContent && out.textContent.includes('[VQA] playing')) {
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+  await page.evaluate(() => {
+    (window as any).__vqa_skip_interval = setInterval(() => {
+      if ((window as any)._vqa_abort_installed) {
+        (window as any)._vqa_aborted = true;
       }
-    }, 500);
-    return { cancel: () => { cancelled = true; clearInterval(iv); } };
+    }, 100);
   });
   return async () => {
-    await page.evaluate((h: any) => h.cancel(), cancelHandle);
-    cancelHandle.dispose();
+    await page.evaluate(() => clearInterval((window as any).__vqa_skip_interval));
   };
 }
 
@@ -229,8 +227,10 @@ test.describe('Tier 1 — Allied L1 gameplay (WASM)', () => {
 
     const cancelSkip = await installVqaAutoSkip(page);
 
-    await waitForOutput(page, '[RA] Main_Loop frame', 90_000);
-    await page.waitForTimeout(3_000);
+    // [TIM-616] menu_cs= fires from MENUS.CPP when the main menu gadgets are live.
+    // Does not require _ra_debug_frames, so works with or without RA_DEBUG.FLAG.
+    await waitForOutput(page, '[TIM-616] menu_cs=', 120_000);
+    await page.waitForTimeout(1_000);
 
     // Navigate to Allied L1 (confirmed coords from TIM-697)
     await page.locator('#canvas').click({ position: { x: 322, y: 183 } });
@@ -244,10 +244,13 @@ test.describe('Tier 1 — Allied L1 gameplay (WASM)', () => {
     await page.waitForTimeout(500);
     await page.locator('#canvas').click({ position: { x: 258, y: 268 } });
 
+    // Keep VQA skip active to skip the Allied mission briefing VQAs
+    // (ALLY1.VQA + LANDING.VQA) so gameplay starts quickly.
+    await waitForOutput(page, 'Start_Scenario OK', 300_000);
     await cancelSkip();
 
-    await waitForOutput(page, 'Start_Scenario', 120_000);
-    await waitForOutput(page, 'frame 200', 120_000);
+    // Let the gameplay settle for a frame or two before sampling.
+    await page.waitForTimeout(5_000);
 
     const t0Stats = await canvasStats(page);
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t0.png') });
@@ -256,13 +259,13 @@ test.describe('Tier 1 — Allied L1 gameplay (WASM)', () => {
     expect(t0Stats.w, 'canvas width 640').toBe(640);
     expect(t0Stats.h, 'canvas height 480').toBe(480);
 
-    await waitForOutput(page, 'frame 350', 60_000);
+    await page.waitForTimeout(15_000);
     const t10Stats = await canvasStats(page);
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t10.png') });
     console.log(`L1 t≈10s: fill=${t10Stats.fill}%`);
     expect(t10Stats.fill, 'Allied L1 t≈10s fill ≥20%').toBeGreaterThanOrEqual(20);
 
-    await waitForOutput(page, 'frame 600', 120_000);
+    await page.waitForTimeout(20_000);
     const t30Stats = await canvasStats(page);
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'tim710-wasm-allied-l1-t30.png') });
     console.log(`L1 t≈30s: fill=${t30Stats.fill}%`);
