@@ -219,8 +219,8 @@ static constexpr int TD_VOICE_COUNT = 5;
 struct TdVoice {
     bool           active;
     std::uint8_t * decoded_pcm;  // malloc'd; freed when slot is reused or stopped
-    int            pcm_len;      // bytes of decoded PCM
-    double         cursor;       // byte cursor (double for fractional rate rescale)
+    int            pcm_len;      // bytes of decoded PCM (S16 mono → pcm_len/2 samples)
+    double         cursor;       // fractional source-sample index (TIM-704)
     int            source_rate;  // AUD sample rate (Hz)
     int            priority;
     int            volume;       // 0..255
@@ -259,13 +259,32 @@ static void td_sound_callback(void * /*userdata*/, Uint8 *stream, int len)
             if (v.active) v.active = false;
             continue;
         }
-        // Nearest-neighbour rate rescale: stride = bytes-per-sample * (src_rate / dst_rate).
-        double const stride = 2.0 * static_cast<double>(v.source_rate)
-                                  / static_cast<double>(g_td_actual_freq);
+        // TIM-704: linear-interpolation resample (was nearest-neighbour, which
+        // produced the same alias-band energy fixed for RA VQA in TIM-677).
+        // Cursor is a fractional source-sample index; stride is source samples
+        // per output frame.  AUD source is mono S16, so total_samples = pcm_len/2.
+        // Downsample (stride >= 1) keeps nearest-neighbour — TD voices rarely
+        // downsample (source 11025/22050, device typically 44100/48000).
+        double const stride = static_cast<double>(v.source_rate)
+                              / static_cast<double>(g_td_actual_freq);
+        int const total_samples = v.pcm_len / 2;
+        const int16_t * const src_pcm =
+            reinterpret_cast<const int16_t *>(v.decoded_pcm);
         for (int f = 0; f < frames; ++f) {
-            int const byte_idx = static_cast<int>(v.cursor);
-            if (byte_idx + 1 >= v.pcm_len) { v.active = false; break; }
-            int16_t const s = *reinterpret_cast<const int16_t *>(v.decoded_pcm + byte_idx);
+            int const i = static_cast<int>(v.cursor);
+            int16_t s;
+            if (stride < 1.0) {
+                if (i + 1 >= total_samples) { v.active = false; break; }
+                double const frac = v.cursor - static_cast<double>(i);
+                double const a    = static_cast<double>(src_pcm[i]);
+                double const b    = static_cast<double>(src_pcm[i + 1]);
+                double const iv   = (1.0 - frac) * a + frac * b;
+                int      const ir = static_cast<int>(iv + (iv >= 0.0 ? 0.5 : -0.5));
+                s = static_cast<int16_t>(std::clamp(ir, -32768, 32767));
+            } else {
+                if (i >= total_samples) { v.active = false; break; }
+                s = src_pcm[i];
+            }
             int32_t const scaled = (static_cast<int32_t>(s) * v.volume) / 255;
             if (channels == 2) {
                 int32_t const pan_pos = std::max(v.pan, 0);
