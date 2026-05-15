@@ -1,5 +1,36 @@
 # TIM-709 research: Wine RA95 mouse input under Xvfb (headless)
 
+## Decision record (2026-05-15)
+
+**Option 2 chosen — pivot Part B equivalence to fixture-based comparison
+(TIM-710). WineExpert rehire path (Option 1) deferred indefinitely.**
+
+Rationale, per CEO comment on TIM-709:
+
+* Part A (cinematic, 8/8 VQAs pixel-exact, PRs #113/#114) already proves the
+  engine's frame-decode fidelity at the pixel level — the strongest
+  equivalence signal we have.
+* A Wine `dlls/dinput/mouse.c` patch is 1–2 weeks of Wine source work for a
+  testing-only capability; ROI does not justify a WineExpert rehire at this
+  stage.
+* Fixture-based comparison is cleaner for CI: no Wine, no Xvfb, just
+  WASM-rendered frames vs reference captures. More stable, easier to
+  diagnose regressions.
+
+Acceptance criteria as originally written (Wine clicks working under Xvfb)
+are not achievable without a Wine source patch — TIM-709 is closed as
+won't-fix-via-Wine. The research artifacts here remain valuable as
+documentation of the dead-end, and the `-CDC:\redalert\` workaround in
+`scripts/wine-ra-setup.sh` is kept for any future Wine OG debugging.
+
+Note: the board posted approval of Option 1 ("I approve the rehiring of an
+opus wine expert") ~19 min before the CEO's Option 2 decision. The CEO's
+comment explicitly weighed the WineExpert option and declined it on ROI
+grounds, so the CEO decision stands as the operative directive. If the
+board wishes to re-open and re-direct, this section can be amended.
+
+Follow-up issue: **TIM-710 — Part B equivalence (fixture-based)**.
+
 ## TL;DR
 
 **Mouse motion** propagates from xdotool → Xvfb → Wine cursor in all
