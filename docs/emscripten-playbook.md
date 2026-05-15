@@ -321,5 +321,56 @@ a VQA header parse before porting a new title.
 
 ---
 
+## PROXY_TO_PTHREAD event proxy queue — mouse clicks silently dropped (TIM-694, 2026-05-14)
+
+**Symptom:** Real mouse clicks on the RA WASM menu do nothing. `SDL_PeepEvents` for
+`SDL_MOUSEBUTTONDOWN` always returns 0 even though Playwright / browser DevTools confirm
+the `mousedown` DOM event fires. No `[MENU] input=` log appears in `#output`.
+
+**Root cause:** Under `-sPROXY_TO_PTHREAD`, `SDL_InitSubSystem(SDL_INIT_VIDEO)` is called
+from the worker (game) thread. Emscripten's SDL2 backend therefore registers its DOM
+event callbacks (mousedown, mouseup, mousemove) with
+`EM_CALLBACK_THREAD_CONTEXT_CALLING_THREAD`, meaning the SDL callback runs on the worker,
+not the main thread. When a DOM event fires on the main thread, Emscripten queues a proxy
+call for the worker. That proxy call runs when the worker next calls
+`emscripten_current_thread_process_queued_calls()` — which normally happens inside blocking
+Emscripten internals (e.g. `emscripten_sleep`, futex waits). With `SDL_RENDERER_SOFTWARE`
+there is no vsync block: `SDL_RenderPresent` is fire-and-forget. The worker therefore
+never enters a blocking call, the proxy queue never drains, and `SDL_SendMouseButton` is
+never called — so `SDL_PeepEvents` sees an empty queue.
+
+Note: `SDL_PumpEvents()` is already a **no-op** in Emscripten's SDL2 backend, so the
+traditional "call `SDL_PumpEvents` before `SDL_PeepEvents`" pattern gives no relief here.
+
+**Fix:** Call `emscripten_current_thread_process_queued_calls()` explicitly in
+`SDL_Process_Input_Events()` before `SDL_PeepEvents`, guarded on
+`__EMSCRIPTEN__ && __EMSCRIPTEN_PTHREADS__`. This flushes all pending proxy calls (the
+DOM event callbacks that queued `SDL_SendMouseButton`) so the event queue is populated
+when `SDL_PeepEvents` reads it.
+
+```cpp
+// REDALERT/KEY.CPP — SDL_Process_Input_Events()
+#if defined(__EMSCRIPTEN__) && defined(__EMSCRIPTEN_PTHREADS__)
+    emscripten_current_thread_process_queued_calls();
+#endif
+    SDL_PumpEvents();   // no-op on Emscripten, kept for native builds
+```
+
+Add `#include <emscripten/threading.h>` in the `#ifndef _MSC_VER` block.
+
+**Verification gate:** After the fix, `[MENU] input=0x` appears in `#output` (stderr via
+`printErr`) within ~30 s of a real Playwright click. This log fires from `MENUS.CPP` when
+`commands->Input()` returns non-zero, confirming the event traversed the full
+SDL → `_Kbd` → `GadgetClass::Input()` pipeline.
+
+**Related:** TIM-684 (native Linux pump starvation fix), TIM-664 (WWKEY_VK_BIT mouse bug),
+TIM-686 (T5 regression spec). See also `lens #1` (PROXY_TO_PTHREAD module context) and
+`lens #4` (SDL_RENDERER_SOFTWARE).
+
+**Reference:** `emscripten_current_thread_process_queued_calls` in
+`<emscripten/threading.h>`; Emscripten wiki "Proxying" section.
+
+---
+
 *Last updated: 2026-05-14. Maintainer: EmscriptenExpert agent.*
-*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682.*
+*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694.*
