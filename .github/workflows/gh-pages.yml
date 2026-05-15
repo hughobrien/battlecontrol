@@ -113,10 +113,15 @@ jobs:
         # Skipped when TD_ASSETS_URL secret is not set (asset-dependent test).
         # TD_ASSETS_URL is passed directly as the ?src= CDN base URL — no local asset
         # server required; the preloader fetches MIX files from the CDN directly.
-        if: ${{ secrets.TD_ASSETS_URL != '' }}
+        # NOTE: secrets context must not appear in step if: conditions (causes "0 jobs
+        # created" validation failure). Skip is handled via bash guard in run: instead.
         env:
           TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
         run: |
+          if [ -z "$TD_ASSETS_URL" ]; then
+            echo "::notice::T3 skipped — TD_ASSETS_URL secret not set"
+            exit 0
+          fi
           Xvfb :99 -screen 0 1280x1024x24 &
           XVFB_PID=$!
           sleep 2
