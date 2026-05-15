@@ -86,6 +86,22 @@ else
     echo "  WARN: NoCD patch failed — game may show 'Please insert CD' dialog"
 fi
 
+# ─── 2c. Apply DDSCL patch ───────────────────────────────────────────────────
+# TIM-727: RA95.EXE calls IDirectDraw::SetCooperativeLevel with
+# DDSCL_EXCLUSIVE|DDSCL_FULLSCREEN.  On Wine, that path renders the primary
+# surface through wined3d/llvmpipe — never composited into the X11 window tree
+# — so X11 capture tools (ffmpeg x11grab, import, scrot) return blank frames.
+# Patching the flag to DDSCL_NORMAL makes Wine render DDraw via XPutImage in a
+# windowed surface that X11 capture can grab.  Unblocks TIM-708 (gameplay
+# screenshot capture under Xvfb + cage).
+echo ""
+echo "=== Step 2c: Apply DDSCL patch to RA95.EXE ==="
+if python3 scripts/ddscl-patch.py "${NOCD_TARGETS[@]}"; then
+    echo "  DDSCL patch OK — RA will use windowed DirectDraw under Wine"
+else
+    echo "  WARN: DDSCL patch failed — X11 screenshot capture will return black frames"
+fi
+
 # ─── 3. Required DLLs ────────────────────────────────────────────────────────
 
 echo ""
