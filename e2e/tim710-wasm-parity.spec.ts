@@ -38,6 +38,8 @@ import * as fs            from 'fs';
 import * as path          from 'path';
 
 const WASM_URL        = 'http://localhost:8080/ra.html';
+// RA_ASSETS_URL lets CI pass a CDN or custom URL; local runs use :9090
+const ASSET_URL       = process.env['RA_ASSETS_URL'] || 'http://localhost:9090/';
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 const REPO_ROOT       = path.resolve(__dirname, '..');
 
@@ -60,6 +62,21 @@ async function waitForOutput(page: any, substring: string, timeoutMs = 300_000) 
     substring,
     { timeout: timeoutMs },
   );
+}
+
+// Wait for preloader to finish mounting assets and game to complete Init_Bulk_Data.
+// 'WASM ready' only goes to #status-line (not #output), so we gate on the
+// preloader-overlay hiding then the first C++ milestone log in #output.
+async function waitForGameReady(page: any) {
+  await page.waitForFunction(
+    () => {
+      const overlay = document.getElementById('preloader-overlay');
+      return overlay !== null && overlay.style.display === 'none';
+    },
+    null,
+    { timeout: 120_000 },
+  );
+  await waitForOutput(page, '[RA] Init_Game: Init_Bulk_Data done', 300_000);
 }
 
 async function getOutput(page: any): Promise<string> {
@@ -159,8 +176,8 @@ test.describe('Tier 1 — title screen (WASM)', () => {
   test.setTimeout(300_000);
 
   test('title screen renders non-black ≥5%, 640×480, no cyan-scatter', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page);
 
     // Title/intro VQA renders shortly after init
     await page.waitForTimeout(8_000);
@@ -182,8 +199,8 @@ test.describe('Tier 1 — main menu (WASM)', () => {
   test.setTimeout(300_000);
 
   test('main menu renders ≥30% fill at 640×480', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page);
     await waitForOutput(page, '[RA] Main_Loop frame', 90_000);
     await page.waitForTimeout(3_000);
 
@@ -207,8 +224,8 @@ test.describe('Tier 1 — Allied L1 gameplay (WASM)', () => {
     const errors: string[] = [];
     page.on('pageerror', (err: Error) => errors.push(err.message));
 
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page);
 
     const cancelSkip = await installVqaAutoSkip(page);
 
@@ -264,8 +281,8 @@ test.describe('Tier 1 — VQA playback (WASM)', () => {
   test.setTimeout(300_000);
 
   test('LOGO.VQA: canvas non-black during early and mid playback', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page);
 
     // LOGO.VQA plays automatically at startup
     await waitForOutput(page, '[VQA] playing', 60_000);
@@ -287,8 +304,8 @@ test.describe('Tier 1 — VQA playback (WASM)', () => {
   });
 
   test('intro VQA sequence: ENGLISH.VQA canvas non-black at mid-playback', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
-    await waitForOutput(page, 'WASM_READY', 120_000);
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+    await waitForGameReady(page);
 
     // Wait for LOGO.VQA to finish
     await waitForOutput(page, "LOGO.VQA' done", 90_000);
