@@ -312,3 +312,78 @@ Same input-layer failure as in the 9 configurations table above. **Asset
 choice is not the variable** — Wine DirectInput drops the synthetic click
 identically with original or Remastered MIXes. The three CEO decision
 options stand.
+
+## Upstream-version audit (board note, 2026-05-15)
+
+The board followed up: "see if newer versions of those deps are available.
+debian is often slow". Hypothesis: Debian Trixie may be shipping a stale
+cage / wlrctl / wtype / wine, and the click-injection bug is fixed upstream.
+
+### Versions audited
+
+| Tool   | Debian Trixie | Upstream latest    | Gap                                            |
+|--------|---------------|---------------------|------------------------------------------------|
+| cage   | 0.2.0 (2022)  | **0.3.0** (Apr 2024) | 18 months, wlroots 0.16 → 0.20                 |
+| wlrctl | 0.2.2         | 0.2.2 + 7 trivial commits | current (no input-handling fixes since v0.2.2) |
+| wtype  | 0.4 (2022)    | 0.4 (2022)          | current — latest is from January 2022          |
+| wine   | 10.0          | **11.8** (devel via WineHQ apt) | 8 minor releases, active winewayland.drv work  |
+
+### What we tried
+
+1. **cage 0.3.0** — Debian experimental ships it, but its dep `libwlroots-0.20`
+   is not packaged in trixie / experimental / sid. Forky/sid's cage 0.2.1
+   needs libwlroots-0.19, also unavailable. Building wlroots 0.20 + cage 0.3.0
+   from source is the *only* path; estimated 1–2h of bring-up.
+
+2. **wine-devel 11.8 from WineHQ apt** — installed cleanly at
+   `/opt/wine-devel/` alongside Debian wine 10.0 at `/usr/bin/wine`.
+   Re-ran the cage + winewayland.drv + wlrctl click test.
+
+### Result with Wine 11.8 + winewayland.drv + cage 0.2.0
+
+* Wine 11.8 loads `winewayland.drv` correctly and renders notepad fullscreen
+  under cage (title-bar "Untitled - Notepad", File / Edit / Format / View /
+  Help menus visible, status bar showing "Ln 1, Col 1"). Screenshot
+  committed: `docs/tim709/wine118-notepad-rendered.png`.
+* `wlrctl pointer move 100 100` issued.
+* `wlrctl pointer click left` issued.
+* Screenshot after click is **byte-identical** to before-click — no File
+  menu, no visible cursor change, no response. Screenshot committed:
+  `docs/tim709/wine118-after-wlrctl-click.png`.
+
+**Same failure as Wine 10.0.** The Wine version was not the bottleneck.
+
+### Where the bug really lives
+
+Process of elimination, after this round:
+
+* **Wine winewayland.drv**: confirmed receiving render events (notepad
+  draws), confirmed connecting to the cage compositor. Not the issue.
+* **wlrctl**: emits `zwlr_virtual_pointer_v1.button` correctly — verified
+  in earlier round via `wayland-info` enumeration. Upstream has no
+  newer release; main has only zsh/meson/ARM fixes since v0.2.2.
+* **wtype**: same — current upstream, no recent fixes.
+* **cage 0.2.0**: most likely culprit. Uses wlroots 0.16 — between 0.16
+  and 0.20, wlroots saw substantial virtual-pointer event-forwarding
+  rework (multiple commits to `virtual_pointer.c` and seat focus).
+  Headless wlroots may also gate button events on a "real" input device
+  being present, which the headless backend doesn't simulate.
+
+### Operating recommendation (unchanged)
+
+Three options remain, ranked by effort:
+
+1. **Build wlroots 0.20 + cage 0.3.0 from source** (1–2h). Only the cage
+   layer is genuinely stale; this is the one upgrade with non-zero
+   probability of changing the outcome. If clicks still drop after this,
+   the problem is structurally in headless wlroots, not version drift.
+2. **Use the fixture-based equivalence framework already merged in
+   TIM-710** to converge on Wine behaviour without ever needing
+   click-injection. This is what the company has been shipping.
+3. **Run a real X server (Xorg dummy + evdev/uinput)** — punts the
+   problem to the actual Linux input stack, which is known to work
+   for headless game testing in other CI environments.
+
+Given (1) has bounded effort and clear yes/no value, queueing it as a
+delegated follow-up. (2) remains the operating mode for ongoing
+equivalence work.
