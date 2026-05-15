@@ -172,6 +172,39 @@ jobs:
             e2e/screenshots/t3-td-wasm-menu-*.png
             e2e/test-results/
 
+      - name: TD mission start test — real-click GDI L1 (T6 / TIM-755)
+        # TIM-755 regression T6: loads td.html (no ?autostart=1), clicks "Start New
+        # Game" at (321, 59), waits for Choose_Side GDI auto-select, asserts
+        # Start_Scenario(SCG01EA) fires and frame 200 has ≥20% canvas fill.
+        # Skipped when TD_ASSETS_URL secret is not set.
+        env:
+          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
+        run: |
+          if [ -z "$TD_ASSETS_URL" ]; then
+            echo "::notice::T6 skipped — TD_ASSETS_URL secret not set"
+            exit 0
+          fi
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          COOP_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T6-td-wasm-mission-start.spec.ts
+          T6_EXIT=$?
+          kill $COOP_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          exit $T6_EXIT
+
+      - name: Upload T6 mission start artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t6-td-wasm-mission-start-results
+          path: |
+            e2e/screenshots/t6-td-wasm-*.png
+            e2e/test-results/
+
       - name: TIM-695 TD WASM VQA — intro VQA verification (LOGO.VQA)
         # Runs the full TD VQA verification spec.  It auto-skips when LOGO.VQA
         # is not reachable at TIM695_ASSET_URL — copyrighted TD MOVIES.MIX
