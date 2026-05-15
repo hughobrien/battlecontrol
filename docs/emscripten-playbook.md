@@ -286,5 +286,40 @@ endif()
 
 ---
 
+---
+
+## Sharing a VQA player across C++ targets (TIM-682, 2026-05-14)
+
+**Symptom:** A second C++ game target (e.g. TiberiaDawn) has a no-op `Play_Movie_GlyphX`
+because `vqa_player.cpp` was never added to its build.
+
+**Root cause:** The glob that picks up `vqa_player.cpp` for Target A doesn't apply to
+Target B; each target has its own `*_STUB_SOURCES` list in CMakeLists.txt.
+
+**Fix:**
+
+1. Add `vqa_player.cpp` explicitly to the new target's `TD_STUB_SOURCES`.
+2. `vqa_player.cpp` calls four symbols that are only defined for the RA target in
+   `REDALERT/WIN32LIB/DDRAW.CPP`: `SDL_Has_Primary_Surface`, `SDL_Get_Primary_Pixels`,
+   `SDL_Get_Primary_Pitch`, `Set_DD_Palette_8bit`. Provide equivalents in the new
+   target's stub file that delegate to its own pixel-buffer state (e.g. `TD_SeenPixels`,
+   `TD_SDL_Palette`). Declare them in the target's `WIN32LIB/DDRAW.H` behind
+   `#ifndef _MSC_VER` guards.
+3. `vqa_player.cpp` also references `SDL_Audio_*` functions from `sdl_audio.h`
+   (implemented in `REDALERT/AUDIO.CPP`). If the new target has its own audio
+   substrate, add extern "C" no-op stubs: `Is_Open=false` makes vqa_player skip the
+   "audio steal" and open its own device cleanly.
+4. Add a `TD_AUTOSTART` (or equivalent) skip guard to `Play_Movie_Linux` alongside the
+   existing `RA_AUTOSTART` guard so CI e2e tests that expect immediate scenario start
+   are not blocked by VQA playback.
+
+**Blocksize note:** All TD VQA files use `blockH=2` (same as RA PROLOG.VQA), so the
+existing solid-marker handling (TIM-613) is already correct. Always verify `blockH` from
+a VQA header parse before porting a new title.
+
+**Reference:** TIM-682 commit 3d48765; TIM-613 (blockH-dependent solid-marker).
+
+---
+
 *Last updated: 2026-05-14. Maintainer: EmscriptenExpert agent.*
-*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620.*
+*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682.*
