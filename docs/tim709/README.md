@@ -1,5 +1,73 @@
 # TIM-709 research: Wine RA95 mouse input under Xvfb (headless)
 
+## winewayland.drv update (2026-05-15, second board correction)
+
+Board pushback on the first Wayland round: *"isn't modern wine wayland
+native?"* — and they're right. Wine 10.0 ships `winewayland.drv` for both
+i386 and x86_64 (verified at `/usr/lib/{i386,x86_64}-linux-gnu/wine/.../winewayland.{so,drv}`).
+My first Wayland round routed Wine through Xwayland, which rebuilt the
+same XInput/XTest stack we were trying to escape.
+
+Re-tested with `winewayland.drv` directly (no Xwayland in the path):
+
+* Set up a fresh prefix at `~/.wine-ra-wayland`, with
+  `HKCU\Software\Wine\Drivers\Graphics = "wayland,x11"` so the wayland
+  driver is preferred when `WAYLAND_DISPLAY` is set and `DISPLAY` unset.
+* Compositor: `cage` with `WLR_BACKENDS=headless WLR_RENDERER=pixman
+  WLR_LIBINPUT_NO_DEVICES=1` (cage's pixman software renderer works
+  without a DRM render node).
+
+### What worked
+
+* Wine loads `winewayland.drv` cleanly. Log: `0024:err:waylanddrv:wayland_process_init
+  Wayland compositor doesn't support optional zwp_pointer_constraints_v1`
+  (warning, not fatal — pointer locking unavailable, motion/buttons still
+  work).
+* `wine notepad` renders the **actual Notepad UI**: title bar, File/Edit/
+  Search/View/Help menus, edit area with a blinking caret. See
+  `winewayland-notepad-rendered.png` in this dir.
+* `wlrctl pointer move` propagates through cage → Wine, just like under
+  Xwayland.
+
+### What's still broken
+
+* `wlrctl pointer click` events: do not reach Wine. (Same finding as the
+  first Wayland round — confirmed independent of Xwayland.)
+* `wlrctl keyboard type` events: do not reach Wine notepad (no text appears
+  in the edit area after `wtype "hello"` or `wlrctl keyboard type "hello"`).
+* `wtype`: also fails to deliver keystrokes — same wlroots virtual-keyboard
+  protocol, same drop.
+* `RA95.EXE` under `winewayland`: black screen (likely Wine winewayland's
+  DDraw-on-software-renderer path not handling 1996-era exclusive-mode
+  fullscreen DDraw). This is a separate problem from input injection.
+
+### Diagnosis
+
+Cage exposes the right protocols — verified via `wayland-info`:
+* `zwp_virtual_keyboard_manager_v1 v1`
+* `zwlr_virtual_pointer_manager_v1 v2`
+* `zwp_relative_pointer_manager_v1 v1`
+
+So the protocols are wired. The issue is in the **tools**: `wlrctl 0.2.2`
+and `wtype 0.4` both propagate motion frames correctly but their
+button/key frames are silently dropped on the path to clients. This may be
+a version-specific bug or a frame-sequencing issue in the tool's protocol
+client.
+
+### Path forward (estimated effort)
+
+| Step | Effort |
+|------|-------|
+| Write a custom 100-line C client using `libwayland-client` that binds `zwlr_virtual_pointer_manager_v1` and emits `button`/`frame` events directly — bypassing wlrctl. | 2–3 hours |
+| Get RA95.EXE to render under winewayland (DDraw → wayland surface). Likely requires `WLR_RENDERER=gles2` + `swrast` libGL + `WINEPREFIX=...` registry adjustments to make Wine route DDraw through GDI fallback instead of DDraw. Or run a different DDraw-friendly compositor (gnome-mutter headless with virtual GPU). | 0.5–1 day |
+| Wire it into `e2e/tim705-equivalence.spec.ts` Part B; capture reference frames; remove the `WINE_RA_READY` skip. | 0.5 day |
+
+Total: 1–2 days of focused work. Materially less than the original
+estimate of patching Wine `dlls/dinput/mouse.c` (Option 1, 1–2 weeks).
+
+The board's correction unlocked a viable path. Whether to commit the
+1–2 days now or stick with TIM-710 fixture parity remains a board call.
+
 ## Decision record (2026-05-15)
 
 **Option 2 chosen — pivot Part B equivalence to fixture-based comparison
