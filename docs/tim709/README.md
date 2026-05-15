@@ -94,3 +94,41 @@ under headless X servers**.
   posting a click RA's GUI observes.
 * `wine-click-not-propagated.png` — Insert-CD dialog after `xdotool click`
   at OK button position; cursor on OK, click silently dropped.
+
+## Asset audit (board note, 2026-05-15)
+
+The board flagged: "the /cncremastered assets may be slightly different than
+what the original binary expects. better to get original assets."
+
+Verification:
+
+| File | Source A: `/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1/` | Source B: archive.org `redalert_allied.iso` | Identical? |
+|------|----------------------------------------------------------|-----------------------------------------------|-----------:|
+| `MAIN.MIX`     | 454,605,294 bytes  sha1=`99104379472bbcfb70c7e378de18d5aa86918bd4` | same | ✓ |
+| `REDALERT.MIX` (INSTALL/) | 25,046,328 bytes  sha1=`0e58f4b54f44f6cd29fecf8cf379d33cf2d4caef` | same | ✓ |
+
+The two main game-data MIXes are bit-identical between the Remastered
+Collection's CD1 dir and the original 1996 Allied CD ISO. The Remastered
+overlay we use is the original 1996 file set unmodified.
+
+Extras present in `/CnCRemastered/CD1/` but NOT on the original Allied CD:
+`EXPAND.MIX`, `EXPAND2.MIX` (Counterstrike/Aftermath expansion content),
+`HIRES1.MIX`, `LORES1.MIX` (later-patch high/low-res asset deltas), and
+`REDALERT.INI` (config file the installer would normally generate). Their
+presence is what causes RA95.EXE to skip the "Please insert CD" dialog and
+boot straight to the main menu — the original game's installer copied
+analogous content to the install directory.
+
+Mouse-input behaviour with a pure-original stage
+(`MAIN.MIX + REDALERT.MIX + REDALERT.INI + RA95.EXE` from the Allied ISO,
+no Remastered overlays):
+
+* Wine boots, shows the "Please insert a Red Alert CD" dialog (640×480
+  Red Alert window, screenshot indistinguishable from prior runs).
+* `xdotool mousemove 505 270` → cursor visibly moves to Cancel button.
+* `xdotool click 1` → no effect, dialog stays.
+
+Same input-layer failure as in the 9 configurations table above. **Asset
+choice is not the variable** — Wine DirectInput drops the synthetic click
+identically with original or Remastered MIXes. The three CEO decision
+options stand.
