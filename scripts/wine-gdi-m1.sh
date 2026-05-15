@@ -1,22 +1,33 @@
 #!/usr/bin/env bash
 # TIM-724 — Drive C&C95.EXE through GDI Mission 1 under headless Wine.
 #
-# Adapts the TIM-708 RA substrate for Tiberian Dawn:
+# Rendering strategy (TIM-743 investigation):
+#   The C&C95.EXE binary at /opt/tiberiandawn is the CnCNet build.  It uses
+#   DDSCL_NORMAL (windowed) rather than DDSCL_EXCLUSIVE|FULLSCREEN, and falls
+#   back to its own built-in GDI renderer when Wine's SetDisplayMode fails.
+#   This is the correct/simpler path — no cnc-ddraw needed.
 #
-#   rendering:
-#     - cnc-ddraw (TIM-732)   drop-in ddraw.dll, renderer=gdi, windowed=true
-#     - Xvfb + openbox        real WM so cnc-ddraw can create a managed window
+#   With ddraw=b (Wine builtin):
+#     SetCooperativeLevel(NORMAL)   → OK
+#     SetDisplayMode(640,400,8)     → DDERR_UNSUPPORTED (Wine can't change mode)
+#     → CnCNet binary falls to GDI render path → writes to X window via Win32 GDI
+#     → capturable by ffmpeg x11grab
+#
+#   With ddraw=n (cnc-ddraw):
+#     SetDisplayMode succeeds → binary stays in DirectDraw path
+#     → primary surface stays black (cnc-ddraw GDI blit never fires for CnCNet binary)
 #
 #   filesystem:
 #     - d:=cdrom registry + staged MIX/INI symlinks
 #
-#   binary patches:
-#     - TBD — TD-specific patch sites differ from RA's (different binary).
-#       This script first smokes the unpatched binary; subsequent patches
-#       will be filed as child issues once TD's failure modes are observed.
+#   binary patches (TIM-743):
+#     - td-focus-skip-patch.py    NOP 3 GameInFocus spin-loops
+#     - td-game-in-focus-patch.py entry-detour pin 0x53dd44=1
+#     - td-vqa-skip-patch.py      Play_Movie entry -> ret
+#     - td-activateapp-patch.py   NOP WM_ACTIVATEAPP GameInFocus store
 #
 # Outputs in $ARTIFACT_DIR (default: e2e/tim724/gdi-m1/):
-#   menu.png, mission-t0.png, mission-t3.png, ..., wine.log
+#   t05-initial.png, t10.png, t20.png, t30.png, t60.png, wine.log
 set -euo pipefail
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -26,7 +37,6 @@ WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim724-gdi}"
 TD_EXE_PATH="${TD_EXE_PATH:-/opt/tiberiandawn/C&C95.EXE}"
 TD_DLL_DIR="${TD_DLL_DIR:-/opt/tiberiandawn}"
 DATA_DIR="${DATA_DIR:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
-CNC_DDRAW_DIR="${CNC_DDRAW_DIR:-/tmp/cnc-ddraw}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-e2e/tim724/gdi-m1}"
 
 mkdir -p "$ARTIFACT_DIR"
@@ -40,11 +50,9 @@ for tool in "$WINE" Xvfb openbox ffmpeg; do
 done
 [[ -f "$TD_EXE_PATH" ]] || { echo "FAIL: $TD_EXE_PATH missing"; exit 2; }
 [[ -d "$DATA_DIR" ]] || { echo "FAIL: $DATA_DIR missing"; exit 1; }
-[[ -f "$CNC_DDRAW_DIR/ddraw.dll" ]] || { echo "FAIL: cnc-ddraw at $CNC_DDRAW_DIR missing"; exit 1; }
 
 echo "  wine:       $($WINE --version)"
 echo "  exe:        $TD_EXE_PATH ($(sha256sum "$TD_EXE_PATH" | cut -c1-12)...)"
-echo "  cnc-ddraw:  $CNC_DDRAW_DIR/ddraw.dll"
 echo "  prefix:     $WINEPREFIX"
 echo "  data:       $DATA_DIR"
 echo "  artifacts:  $ARTIFACT_DIR"
@@ -70,22 +78,44 @@ for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
     [[ -e "$f" ]] && ln -sf "$f" "$STAGE/$(basename "$f")"
 done
 cp "$TD_EXE_PATH" "$STAGE/C&C95.EXE"
+
+# ─── Binary patches (TIM-743) ─────────────────────────────────────────────────
+# Apply TD-specific patches analogous to the RA focus/vqa chain in TIM-708.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "  applying TD binary patches..."
+python3 "$SCRIPT_DIR/td-focus-skip-patch.py"      "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-game-in-focus-patch.py"   "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-vqa-skip-patch.py"        "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-activateapp-patch.py"     "$STAGE/C&C95.EXE"
+echo "  patch chain done: $(sha256sum "$STAGE/C&C95.EXE" | cut -c1-12)..."
 [[ -f "$TD_DLL_DIR/THIPX32.DLL" ]] && cp "$TD_DLL_DIR/THIPX32.DLL" "$STAGE/THIPX32.DLL"
 
-# CRLF CONQUER.INI — TD's PROFILE.CPP uses strchr('\r') so LF-only is silently
-# ignored.  (Per TIM-695 memory note.)  We need a real game-config INI here so
-# the launcher takes our settings instead of falling back to its defaults.
-printf '[Options]\r\nHardwareFills=0\r\nVideoBackBuffer=0\r\nVideoBackBufferAllowed=0\r\nAllowHardwareBlitFills=0\r\nIsFromInstall=true\r\n' > "$STAGE/CONQUER.INI"
+# TEMPERAT.PAL — TD's Init_Game reads this directly (not via MIX) before TEMPERAT.MIX
+# is loaded, and MixFileClass::Calculate_CRC produces a different hash than what's stored
+# in TEMPERAT.MIX.  Without this file the render loop spins issuing 1M+ failed open()
+# calls per run, leaving the primary surface all-black.
+# Extract the 768-byte palette entry from TEMPERAT.MIX (offset 57071, id 0x35f90a09).
+python3 - "$DATA_DIR/TEMPERAT.MIX" "$STAGE/TEMPERAT.PAL" <<'PYEOF'
+import struct, sys
+with open(sys.argv[1], 'rb') as f:
+    data = f.read()
+num_files = struct.unpack_from('<H', data, 0)[0]
+body_offset = 6 + num_files * 12
+for i in range(num_files):
+    off = 6 + i * 12
+    file_id, file_offset, file_size = struct.unpack_from('<III', data, off)
+    if file_size == 768:
+        pal_data = data[body_offset + file_offset:body_offset + file_offset + 768]
+        with open(sys.argv[2], 'wb') as f:
+            f.write(pal_data)
+        break
+PYEOF
+[[ -f "$STAGE/TEMPERAT.PAL" ]] && echo "  TEMPERAT.PAL extracted (768 bytes)" || echo "  WARNING: TEMPERAT.PAL extraction failed"
 
-# cnc-ddraw drop-in: same config used for RA in TIM-708.
-cp "$CNC_DDRAW_DIR/ddraw.dll" "$STAGE/ddraw.dll"
-cat > "$STAGE/ddraw.ini" <<'EOF'
-[ddraw]
-renderer=gdi
-windowed=true
-hook=0
-window_state=normal
-EOF
+# CRLF CONQUER.INI — TD's PROFILE.CPP uses strchr('\r') so LF-only is silently
+# ignored.  (Per TIM-695 memory note.)  IsFromInstall=true skips the intro and
+# auto-selects SEL_START_NEW_GAME so the game proceeds without user input.
+printf '[Options]\r\nIsFromInstall=true\r\nPlayIntro=No\r\n' > "$STAGE/CONQUER.INI"
 
 # ─── Wine prefix + d:=cdrom ──────────────────────────────────────────────────
 
@@ -124,6 +154,10 @@ cleanup() {
 trap cleanup EXIT
 
 # ─── Launch C&C95.EXE ────────────────────────────────────────────────────────
+#
+# ddraw=b: use Wine's builtin ddraw so SetDisplayMode fails, triggering the
+# CnCNet binary's own GDI renderer.  With ddraw=n (cnc-ddraw), SetDisplayMode
+# succeeds but the primary surface stays black (TIM-743 investigation).
 
 echo
 echo "=== launching C&C95.EXE ==="
@@ -131,7 +165,7 @@ echo "=== launching C&C95.EXE ==="
     cd "$STAGE"
     DISPLAY="$XDISP" WAYLAND_DISPLAY= \
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
-        WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
+        WINEDLLOVERRIDES="ddraw=b;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
         timeout 180 "$WINE" 'C&C95.EXE'
 ) > "$ARTIFACT_DIR/wine.log" 2>&1 &
@@ -154,12 +188,19 @@ done
 shoot() {
     local name="$1"
     local png="$ARTIFACT_DIR/${name}.png"
-    ffmpeg -nostdin -loglevel error -f x11grab -video_size 800x600 \
-        -i "$XDISP" -frames:v 1 -y "$png" 2>/dev/null || true
+    # x11grab captures what Wine's GDI renderer committed to the X window
+    ffmpeg -nostdin -loglevel error -f x11grab -video_size 640x400 \
+        -i "${XDISP}+0,0" -frames:v 1 -y "$png" 2>/dev/null || true
     if [[ -f "$png" ]]; then
         local sz=$(stat -c%s "$png")
         local sha=$(sha256sum "$png" | cut -c1-12)
-        echo "  shot $name: $sz B sha=$sha"
+        local colors
+        colors=$(python3 -c "
+from PIL import Image
+img = Image.open('$png').convert('RGB')
+print(len(set(img.getdata())))
+" 2>/dev/null || echo "?")
+        echo "  shot $name: ${sz}B sha=${sha} colors=${colors}"
     fi
 }
 
@@ -172,18 +213,11 @@ if ! kill -0 $TD_PID 2>/dev/null; then
     exit 3
 fi
 
-# Dismiss any startup dialog
-DISPLAY="$XDISP" xdotool key Return 2>/dev/null || true
-sleep 1
-DISPLAY="$XDISP" xdotool key Return 2>/dev/null || true
-sleep 4
-shoot "t10-after-dismiss"
-
-# Settle into menu / first-render
+# Settle into menu / first-render (IsFromInstall auto-starts new game)
 sleep 5
-shoot "t15-menu-or-intro"
+shoot "t10"
 
-sleep 5
+sleep 10
 shoot "t20"
 
 sleep 10
