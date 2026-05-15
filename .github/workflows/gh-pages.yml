@@ -78,6 +78,35 @@ jobs:
             e2e/screenshots/tim595-smoke-after-init.png
             e2e/test-results/
 
+      - name: WASM parity tests — TIM-699 Tier 2 visual reference
+        # Runs Tier 2 tests from e2e/tim699-ra-compare.spec.ts against the freshly
+        # built ra.wasm.  Requires game assets reachable via RA_ASSETS_URL (set as
+        # a repository variable or secret; CDN base URL with CORS headers).
+        # When RA_ASSETS_URL is unset the Tier 2 tests skip gracefully — job passes.
+        env:
+          RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/tim699-ra-compare.spec.ts \
+            --grep "Tier 2" --reporter=line
+          PW_EXIT=$?
+          kill "$SERVER_PID" 2>/dev/null || true
+          kill "$XVFB_PID"  2>/dev/null || true
+          exit $PW_EXIT
+
+      - name: Upload wasm-parity screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-parity-screenshots
+          path: e2e/screenshots/tim699-wasm-*.png
+          if-no-files-found: ignore
+
       - name: Build td.wasm
         run: cmake --build build-wasm --target td --parallel
 

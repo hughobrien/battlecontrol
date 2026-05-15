@@ -41,10 +41,19 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const WASM_URL        = 'http://localhost:8080/ra.html';
+const WASM_BASE_URL   = 'http://localhost:8080/ra.html';
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 const REPO_ROOT       = path.resolve(__dirname, '..');
 const DATA_DIR        = '/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1';
+
+// When RA_ASSETS_URL is set (CDN base URL, e.g. CI secret), the preloader fetches
+// MIX files from that URL instead of prompting the user with the folder picker.
+// Without it Tier 2 tests require serve-assets.py on :9090 + DATA_DIR present.
+const RA_ASSETS_URL   = process.env.RA_ASSETS_URL || '';
+const WASM_PARAMS     = RA_ASSETS_URL ? `src=${encodeURIComponent(RA_ASSETS_URL)}&` : '';
+// Whether game assets are reachable (CDN configured or local data dir present).
+const HAS_ASSETS      = Boolean(RA_ASSETS_URL) || fs.existsSync(DATA_DIR);
+const WASM_URL        = WASM_BASE_URL;  // kept for backwards-compat; use WASM_PARAMS for ?src=
 
 // OG reference values derived from the EA/GOG Remastered Collection CD1 dataset.
 const REFERENCE = {
@@ -137,8 +146,16 @@ test.describe('Tier 1 — reference data integrity', () => {
 // ─── Tier 2: WASM visual reference (no Wine) ─────────────────────────────────
 
 test.describe('Tier 2 — WASM port visual reference', () => {
+  test.beforeEach(() => {
+    // Tier 2 requires a running WASM server (serve-coop.py on :8080) and game
+    // assets.  In CI set RA_ASSETS_URL to a CDN serving RA MIX files.  Locally,
+    // start serve-assets.py pointing at DATA_DIR and mount /CnCRemastered.
+    test.skip(!HAS_ASSETS,
+      'Tier 2 skipped — no game assets: set RA_ASSETS_URL env or mount /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1');
+  });
+
   test('title screen renders non-black (TIM-250 gate)', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await page.goto(`${WASM_URL}?${WASM_PARAMS}autostart=0`, { timeout: 120_000 });
 
     // Wait for WASM init and early title rendering.
     await waitForOutput(page, 'WASM_READY', 120_000);
@@ -161,7 +178,7 @@ test.describe('Tier 2 — WASM port visual reference', () => {
 
   test('menu renders and synthetic click reaches scenario select (TIM-697 gate)', async ({ page }) => {
     // This test mirrors the TIM-697 acceptance path: autostart=0, real click.
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await page.goto(`${WASM_URL}?${WASM_PARAMS}autostart=0`, { timeout: 120_000 });
     await waitForOutput(page, 'WASM_READY', 120_000);
 
     // Wait for intro VQA / title to clear and menu to render.
@@ -187,7 +204,7 @@ test.describe('Tier 2 — WASM port visual reference', () => {
   });
 
   test('VQA frame count matches declared header (LOGO.VQA = 262 frames)', async ({ page }) => {
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await page.goto(`${WASM_URL}?${WASM_PARAMS}autostart=0`, { timeout: 120_000 });
     await waitForOutput(page, 'WASM_READY', 120_000);
 
     // LOGO.VQA is played during init.
@@ -234,9 +251,12 @@ test.describe('Tier 3 — Wine OG comparison [tag:wine]', () => {
   test('OG menu screenshot matches WASM fill range', async ({ page }) => {
     const ogShot  = path.join(SCREENSHOTS_DIR, 'wine-ra-menu.png');
     test.skip(!fs.existsSync(ogShot), 'wine-ra-menu.png missing — run wine-ra.sh first');
+    // Also requires WASM server + game assets (serve-coop.py on :8080 + RA_ASSETS_URL or DATA_DIR).
+    test.skip(!HAS_ASSETS,
+      'WASM comparison skipped — no game assets: set RA_ASSETS_URL env or mount /CnCRemastered');
 
     // Get fill % from WASM menu screenshot for comparison.
-    await page.goto(`${WASM_URL}?autostart=0`, { timeout: 120_000 });
+    await page.goto(`${WASM_URL}?${WASM_PARAMS}autostart=0`, { timeout: 120_000 });
     await waitForOutput(page, 'WASM_READY', 120_000);
     await waitForOutput(page, '[RA] Main_Loop frame', 60_000);
     await page.waitForTimeout(3_000);
