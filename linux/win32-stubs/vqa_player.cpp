@@ -600,7 +600,25 @@ static void vqa_webaudio_push(const int16_t* pcm, size_t count)
         src.buffer = buf;
         src.connect(ctx.destination);
         // Schedule 20 ms ahead of current playback position to absorb jitter.
+        // TIM-658 diagnostic: when nextTime < currentTime, the decoder fell
+        // behind realtime, which forces the scheduler to clamp to
+        // (currentTime + 0.020) and leaves an audible silence gap between the
+        // previous buffer's end and this buffer's start.  At the 15 fps SND
+        // chunk rate that surfaces as ~15 Hz "low frequency clicking".  Log
+        // each underrun once per ~1 s so the live thread doesn't drown the
+        // console; the warning makes H1 visible without a recording.
         var t = Math.max(ctx.currentTime + 0.020, va.nextTime);
+        var lag = va.nextTime - ctx.currentTime;
+        if (va.nextTime > 0 && lag < 0) {
+            if (!va.lastUnderrunLog || ctx.currentTime - va.lastUnderrunLog > 1.0) {
+                var msg = '[VQA] audio underrun: nextTime ' + va.nextTime.toFixed(3)
+                        + ' is ' + (-lag * 1000).toFixed(1) + ' ms behind currentTime '
+                        + ctx.currentTime.toFixed(3) + ' — scheduler clamping, silence gap '
+                        + ((t - va.nextTime) * 1000).toFixed(1) + ' ms';
+                console.warn(msg);
+                va.lastUnderrunLog = ctx.currentTime;
+            }
+        }
         src.start(t);
         va.nextTime = t + buf.duration;
     }, (intptr_t)pcm, frames, ch);
