@@ -86,3 +86,86 @@ jobs:
             echo "SKIP: build/run-172/MAIN.MIX not found — game data absent"
             exit 0
           fi
+
+  wine-comparison:
+    name: Wine OG comparison
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright and Chromium
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Install Wine32 + system tools
+        # wine32:i386 provides 32-bit Wine support needed to run RA95.EXE (16/32-bit Win).
+        # imagemagick provides `import` (screenshot capture used by wine-ra.sh).
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            wine32:i386 xvfb xdotool imagemagick
+
+      - name: Cache RA95.EXE
+        # Keyed on RA95.EXE SHA-256 — immutable file, cache never expires.
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ra95-cache
+          key: ra95-exe-a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55
+
+      - name: Prepare RA95.EXE
+        # Pre-populate /opt/redalert from cache so wine-ra-setup.sh skips the 2.2 MB download.
+        # wine-ra-setup.sh handles its own SHA verification, so a cache hit is safe.
+        run: |
+          sudo mkdir -p /opt/redalert && sudo chmod 777 /opt/redalert
+          if [ -f "$RUNNER_TEMP/ra95-cache/RA95.EXE" ]; then
+            echo "::notice::RA95 cache hit — copying to /opt/redalert"
+            cp "$RUNNER_TEMP"/ra95-cache/* /opt/redalert/
+          else
+            echo "::notice::RA95 cache miss — downloading from archive.org"
+            bash scripts/wine-ra-setup.sh
+            mkdir -p "$RUNNER_TEMP/ra95-cache"
+            cp /opt/redalert/*.EXE /opt/redalert/*.DLL "$RUNNER_TEMP/ra95-cache/" 2>/dev/null || true
+          fi
+          wine --version || true
+
+      - name: Run OG Red Alert under Wine
+        # wine-ra.sh requires DATA_DIR (/CnCRemastered/...) with MIX files.
+        # On a fresh runner this directory is absent so the script exits 1 — we
+        # catch that with || and record wine_ok=false so the test tier skips.
+        id: wine-run
+        run: |
+          bash scripts/wine-ra.sh \
+            && echo "wine_ok=true"  >> "$GITHUB_OUTPUT" \
+            || echo "wine_ok=false" >> "$GITHUB_OUTPUT"
+
+      - name: Set WINE_RA_READY when screenshots were captured
+        if: steps.wine-run.outputs.wine_ok == 'true'
+        run: echo "WINE_RA_READY=1" >> "$GITHUB_ENV"
+
+      - name: Run Tier 1 + Tier 3 comparison tests
+        # Tier 1 (MIX checksums) skips when /CnCRemastered is absent.
+        # Tier 3 (Wine OG) skips when WINE_RA_READY is not set (wine-ra.sh failed).
+        # On a fresh runner both tiers skip — job exits 0 (no failures).
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          npx playwright test e2e/tim699-ra-compare.spec.ts \
+            --grep "Tier 1|Tier 3" \
+            --reporter=line
+          PW_EXIT=$?
+          kill "$XVFB_PID" 2>/dev/null || true
+          exit $PW_EXIT
+
+      - name: Upload comparison screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-comparison-screenshots
+          path: e2e/screenshots/
+          if-no-files-found: ignore
