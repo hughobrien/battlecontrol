@@ -1,0 +1,23 @@
+# RA window WM_ACTIVATEAPP focus trace (cage+Xwayland+winex11)
+# Source: wine-focus-trace.log.gz
+# Filtered to Red Alert window 0x20062 + focus messages
+0024:trace:message:spy_enter_message (0x20062) L"{Red Alert}"   [0081] WM_NCCREATE sent from self wp=00000000 lp=0021f8f0
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [0081] WM_NCCREATE returned 00000001
+0024:trace:message:spy_enter_message (0x20062) L"Red Alert"     [0046] WM_WINDOWPOSCHANGING sent from self wp=00000000 lp=0021f7e4
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [0046] WM_WINDOWPOSCHANGING returned 00000000
+0024:trace:message:spy_enter_message (0x20062) L"Red Alert"     [0047] WM_WINDOWPOSCHANGED sent from self wp=00000000 lp=0021f7e4
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [0047] WM_WINDOWPOSCHANGED returned 00000000
+0024:trace:message:spy_enter_message (0x20062) L"Red Alert"     [0046] WM_WINDOWPOSCHANGING sent from self wp=00000000 lp=0021faf4
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [0046] WM_WINDOWPOSCHANGING returned 00000000
+0024:trace:message:spy_enter_message (0x20062) L"Red Alert"     [030f] WM_QUERYNEWPALETTE sent from self wp=00000000 lp=00000000
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [030f] WM_QUERYNEWPALETTE returned 00000000
+0024:trace:message:spy_enter_message (0x20062) L"Red Alert"     [001c] WM_ACTIVATEAPP sent from self wp=00000001 lp=00000000
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [001c] WM_ACTIVATEAPP returned 00000000
+0024:trace:message:spy_enter_message (0x20062) L"Red Alert"     [0086] WM_NCACTIVATE sent from self wp=00000001 lp=00000000
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [0086] WM_NCACTIVATE returned 00000001
+0024:trace:message:spy_enter_message (0x20062) L"Red Alert"     [0006] WM_ACTIVATE sent from self wp=00000001 lp=00000000
+0024:trace:message:spy_enter_message         (0x20062) L"Red Alert"     [0007] WM_SETFOCUS sent from self wp=00000000 lp=00000000
+0024:trace:message:spy_exit_message          (0x20062) L"Red Alert"     [0007] WM_SETFOCUS returned 00000000
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [0006] WM_ACTIVATE returned 00000000
+0024:trace:message:spy_enter_message (0x20062) L"Red Alert"     [0047] WM_WINDOWPOSCHANGED sent from self wp=00000000 lp=0021faf4
+0024:trace:message:spy_exit_message  (0x20062) L"Red Alert"     [0047] WM_WINDOWPOSCHANGED returned 00000000
