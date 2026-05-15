@@ -115,10 +115,32 @@ for dll in THIPX32.DLL THIPX16.DLL; do
     done
 done
 
+# Apply VQA skip patch so the game bypasses the ENGLISH.VQA intro that blocks on
+# audio-position sync under Wine (no hardware audio device).  Play_Movie returns
+# immediately for all VQA calls; cut-scenes are skipped.
+PATCH_SCRIPT="$(dirname "$0")/vqa-skip-patch.py"
+if [[ -f "$PATCH_SCRIPT" ]]; then
+    python3 "$PATCH_SCRIPT" "$RA_STAGE/RA95.EXE" || echo "  WARN: vqa-skip-patch returned non-zero"
+else
+    echo "  WARN: $PATCH_SCRIPT not found — VQA intro may block"
+fi
+
+# Write the Windows volume label so RA's Get_CD_Index() matches "CD1".
+# Without this, Init_CDROM_Access() loops forever even after the nocd patch.
+printf 'CD1' > "$RA_STAGE/.windows-label"
+
 if [[ ! -d "$WINE_PREFIX" ]]; then
     echo "Creating 32-bit Wine prefix..."
     WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
+
+# Map the staging directory as drive d: (cdrom type) so Init_CDROM_Access finds it.
+# RA reads the volume label from .windows-label in the root of the mapped dir.
+mkdir -p "$WINE_PREFIX/dosdevices"
+ln -sfT "$RA_STAGE" "$WINE_PREFIX/dosdevices/d:"
+rm -f "$WINE_PREFIX/dosdevices/d::"   # device node causes ACCESS_DENIED
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+    'HKEY_LOCAL_MACHINE\Software\Wine\Drives' /v 'd:' /t REG_SZ /d 'cdrom' /f 2>/dev/null || true
 
 # Configure Wine for screenshot capture:
 # 1. Virtual desktop mode: game runs in a managed window (not exclusive/fullscreen)
@@ -207,16 +229,23 @@ find_wine_win() {
     return 1
 }
 
-# Get the (x, y) origin of the Wine Desktop window's client area on screen.
-# openbox adds a ~20px title bar; we measure it directly.
+# Get the (x, y) origin of the Wine Desktop window's game-client area on screen.
+# The Wine Desktop window includes a title bar (drawn by Wine) at the top. We
+# compute its height as (window_height - 480) so that click coordinates passed to
+# xdo_click land in the correct 640x480 game area, not in the title bar.
 wine_win_origin() {
     local wid="$1"
     local geom
-    geom=$(DISPLAY="$DISPLAY_NUM" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || { echo "0 20"; return; }
-    local wx wy
+    geom=$(DISPLAY="$DISPLAY_NUM" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || { echo "0 22"; return; }
+    local wx wy wh
     wx=$(echo "$geom" | grep '^X=' | cut -d= -f2)
     wy=$(echo "$geom" | grep '^Y=' | cut -d= -f2)
-    echo "${wx:-0} ${wy:-20}"
+    wh=$(echo "$geom" | grep '^HEIGHT=' | cut -d= -f2)
+    # title bar height = total window height minus the 480-px game viewport
+    local title_h=$(( ${wh:-502} - 480 ))
+    if [[ $title_h -lt 0 || $title_h -gt 80 ]]; then title_h=22; fi
+    local client_oy=$(( ${wy:-0} + title_h ))
+    echo "${wx:-0} ${client_oy}"
 }
 
 WINE_WIN_ID=""
