@@ -64,6 +64,9 @@
 #include <SDL2/SDL.h>
 #include "sdl_input.h"
 #include "sdl_window.h"
+#if defined(__EMSCRIPTEN__) && defined(__EMSCRIPTEN_PTHREADS__)
+#include <emscripten/threading.h>
+#endif
 
 // TIM-145 pass-43C: storage for the cursor cells GetCursorPos reads
 // from. Declared extern "C" in linux/win32-stubs/windows.h. Updated
@@ -158,6 +161,16 @@ extern "C" void SDL_Process_Input_Events(void)
 {
 	if (_Kbd == NULL) return;
 
+#if defined(__EMSCRIPTEN__) && defined(__EMSCRIPTEN_PTHREADS__)
+	/* TIM-694: Under -sPROXY_TO_PTHREAD, SDL mouse/keyboard DOM event callbacks
+	 * are proxied from the browser main thread to this worker. SDL_PumpEvents()
+	 * is a no-op in Emscripten's SDL2 backend. With SDL_RENDERER_SOFTWARE there
+	 * is no vsync block, so the worker never sleeps on a sync primitive and the
+	 * proxy queue never drains automatically. Flush it explicitly so that all
+	 * SDL_SendMouseButton / SDL_SendKeyboardKey calls from the DOM callbacks land
+	 * in the SDL event queue before SDL_PeepEvents reads below. */
+	emscripten_current_thread_process_queued_calls();
+#endif
 	SDL_PumpEvents();
 
 	SDL_Event events[16];

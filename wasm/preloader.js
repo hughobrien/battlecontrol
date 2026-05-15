@@ -129,6 +129,8 @@
     // Hide the local-picker UI; S3 mode starts loading immediately.
     var overlay = document.getElementById('preloader-overlay');
     if (overlay) overlay.style.display = 'none';
+    var _canvas = document.getElementById('canvas');
+    if (_canvas) _canvas.focus();
 
     setStatus('Fetching game data from ' + base + '…');
     showProgressBar();
@@ -228,6 +230,8 @@
     setStatus('Loaded ' + files.size + '/' + MIX_FILES.length + ' files — mounting…');
     var overlay = document.getElementById('preloader-overlay');
     if (overlay) overlay.style.display = 'none';
+    var _canvas = document.getElementById('canvas');
+    if (_canvas) _canvas.focus();
 
     pendingFiles = files;
 
