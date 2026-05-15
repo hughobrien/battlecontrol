@@ -108,15 +108,34 @@ if [[ -d "$REMASTERED_CD1" ]]; then
 fi
 
 cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
-THIPX_DIR="$(dirname "$RA_EXE_PATH")"
+# Look for THIPX DLLs next to the EXE first, then in DATA_DIR
 for dll in THIPX32.DLL THIPX16.DLL; do
-    [[ -f "$THIPX_DIR/$dll" ]] && cp "$THIPX_DIR/$dll" "$RA_STAGE/$dll"
+    for search_dir in "$(dirname "$RA_EXE_PATH")" "$DATA_DIR"; do
+        [[ -f "$search_dir/$dll" ]] && cp "$search_dir/$dll" "$RA_STAGE/$dll" && break
+    done
 done
 
 if [[ ! -d "$WINE_PREFIX" ]]; then
     echo "Creating 32-bit Wine prefix..."
     WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
+
+# Configure Wine for screenshot capture:
+# 1. Virtual desktop mode: game runs in a managed window (not exclusive/fullscreen)
+#    so the Xvfb framebuffer includes the game content.
+# 2. GDI/software DirectDraw renderer: renders via X11 XPutImage (visible to
+#    x11grab/import) instead of the default OpenGL path (invisible to all X11
+#    capture tools because OpenGL renders into its own surface).
+# 3. Kill and restart wineserver so registry changes take effect before launch.
+echo "Configuring Wine virtual desktop + GDI DirectDraw renderer..."
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+    'HKCU\Software\Wine\Explorer' /v Desktop /t REG_SZ /d Default /f 2>/dev/null || true
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+    'HKCU\Software\Wine\Explorer\Desktops\Default' /v Resolution /t REG_SZ /d '800x600' /f 2>/dev/null || true
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+    'HKCU\Software\Wine\Direct3D' /v renderer /t REG_SZ /d gdi /f 2>/dev/null || true
+WINEPREFIX="$WINE_PREFIX" wineserver -k 2>/dev/null || true
+sleep 2
 
 # ─── Xvfb ────────────────────────────────────────────────────────────────────
 
@@ -155,8 +174,9 @@ else
     WM_PID=""
 fi
 
-# Screenshot helper — uses ffmpeg x11grab because ImageMagick's import on Xvfb
-# captures a 1-bit empty PNG (~176 bytes) when no window manager is present.
+# Screenshot helper — ffmpeg x11grab captures the full Xvfb framebuffer.
+# Requires Wine virtual desktop mode (HKCU\Software\Wine\Explorer\Desktop=Default)
+# so that RA's DirectDraw output is composited into the X11 framebuffer.
 take_shot() {
     local name="$1"
     local out="$SCREENSHOT_DIR/$name"
@@ -165,7 +185,8 @@ take_shot() {
             -i "$DISPLAY_NUM" -frames:v 1 -y "$out" 2>/dev/null \
             && echo "  Screenshot: $out"
     elif command -v import >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null && echo "  Screenshot: $out (import)"
+        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null \
+            && echo "  Screenshot: $out (import)"
     else
         echo "  WARN: no screenshot tool (ffmpeg/import) found"
     fi
@@ -214,11 +235,10 @@ xdo_click() {
 
 xdo_key() {
     local key="$1"
-    if [[ -n "$WINE_WIN_ID" ]]; then
-        DISPLAY="$DISPLAY_NUM" xdotool key --window "$WINE_WIN_ID" "$key" 2>/dev/null || true
-    else
-        DISPLAY="$DISPLAY_NUM" xdotool key "$key" 2>/dev/null || true
-    fi
+    # Always use XTEST (no --window) so events go through the X11 device layer
+    # and are indistinguishable from real hardware — this reaches Win32 GetKeyState
+    # and DirectInput. XSendEvent (via --window) is marked synthetic and filtered.
+    DISPLAY="$DISPLAY_NUM" xdotool key "$key" 2>/dev/null || true
     sleep 0.3
 }
 
@@ -230,7 +250,7 @@ LOG="$(mktemp /tmp/wine-gameplay-XXXXXX.log)"
     cd "$RA_STAGE"
     DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
     WINEDEBUG=-all AUDIODEV=null \
-    timeout 180 wine RA95.EXE
+    timeout 300 wine RA95.EXE
 ) > "$LOG" 2>&1 &
 RA_PID=$!
 trap "kill $RA_PID 2>/dev/null || true; cleanup_all" EXIT
@@ -296,10 +316,28 @@ echo "  Selecting Allied faction at game (258, 268)..."
 xdo_click 258 268
 sleep 1
 
-# ─── Step 6: Wait for briefing VQA + mission load ────────────────────────────
+# ─── Step 7: Dismiss mission briefing screen ─────────────────────────────────
+# After faction selection the game shows a mission briefing screen (custom
+# DirectDraw rendering, NOT a VQA).  The player must press Space or click
+# anywhere to start the mission.  Without this the game stays on the briefing
+# screen for the entire observation window.
 
-echo "  Waiting for briefing VQA and mission load (~30s)..."
-sleep 30
+echo "  Waiting for briefing screen (~8s)..."
+sleep 8
+take_shot "wine-gameplay-briefing.png"
+echo "  Dismissing briefing (Space key + click)..."
+xdo_key "space"
+sleep 1
+# Click centre of screen as fallback in case Space didn't land
+xdo_click 320 240
+sleep 1
+xdo_key "Return"
+sleep 1
+
+# ─── Step 8: Wait for mission load ───────────────────────────────────────────
+
+echo "  Waiting for mission to load (~15s)..."
+sleep 15
 
 # ─── Step 7: t=0 screenshot ──────────────────────────────────────────────────
 
