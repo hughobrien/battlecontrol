@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # TIM-623 — regression suite runner.
 #
-# Runs the 6 regression test-points defined in e2e/regression/README.md.
+# Runs the regression test-points defined in e2e/regression/README.md.
 # Tiers:
 #   REGRESSION_TIER=ci    — T1 + T2 only (asset-free, hermetic, CI default).
-#   REGRESSION_TIER=full  — all six (T3–T6 need licensed CnC Remastered MIX
+#   REGRESSION_TIER=full  — all tests (T3+ need licensed CnC Remastered MIX
 #                          files in /CnCRemastered/Data/CNCDATA/{RED_ALERT,
 #                          TIBERIAN_DAWN}/CD1).
 #
@@ -12,7 +12,8 @@
 #
 # Servers managed by this script (started + torn down):
 #   serve-coop.py    on :8080  — build-wasm/ (T1–T4)
-#   serve-assets.py  on :9090  — RA CD1/    (T3, T4)
+#   serve-assets.py  on :9090  — RA CD1/    (T3-ra, T4, T5)
+#   serve-assets.py  on :9091  — TD CD1/    (T3-td)  TIM-696
 #
 # Hard timeout per Playwright test: enforced by `test.setTimeout(60_000)`.
 # Hard timeout per shell test: enforced by `timeout` inside each script.
@@ -21,6 +22,7 @@ set -u
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TIER="${REGRESSION_TIER:-ci}"
 RA_ASSETS="${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
+TD_ASSETS="${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
 
 cd "$REPO_ROOT"
 
@@ -65,7 +67,13 @@ if [ "$TIER" = "full" ]; then
     if [ -d "$RA_ASSETS" ]; then
         start_server "serve-assets.py :9090" "python3 wasm/serve-assets.py '$RA_ASSETS' 9090"
     else
-        echo "[regression] WARN: RA assets dir $RA_ASSETS missing — T3, T4 will fail to load assets"
+        echo "[regression] WARN: RA assets dir $RA_ASSETS missing — T3-ra, T4, T5 will fail to load assets"
+    fi
+    # TIM-696: TD asset server for T3-td-wasm-menu
+    if [ -d "$TD_ASSETS" ]; then
+        start_server "serve-assets.py :9091" "python3 wasm/serve-assets.py '$TD_ASSETS' 9091"
+    else
+        echo "[regression] WARN: TD assets dir $TD_ASSETS missing — T3-td will fail to load assets"
     fi
 fi
 
@@ -106,6 +114,7 @@ run_playwright e2e/regression/T2-td-wasm-boot.spec.ts
 
 if [ "$TIER" = "full" ]; then
     run_playwright e2e/regression/T3-ra-wasm-menu.spec.ts
+    run_playwright e2e/regression/T3-td-wasm-menu.spec.ts   # TIM-696
     run_playwright e2e/regression/T4-ra-wasm-vqa.spec.ts
     run_playwright e2e/regression/T5-ra-wasm-menu-click.spec.ts
     run_shell      scripts/regression/T5-td-native-menu.sh
