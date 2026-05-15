@@ -55,6 +55,15 @@ if [[ ! -f "$GAME_IN_FOCUS" ]]; then
     echo "warn: $GAME_IN_FOCUS not present; render guards will stay shut"
     GAME_IN_FOCUS=""
 fi
+# cdlabel-patch.py (TIM-739) patches _CD_Volume_Label[0] from "CD1" to "" so
+# Wine's empty-label D:\ passes Get_CD_Index's label check (CONQUER.CPP:4701).
+# Without this, Get_CD_Index spins forever because the CIFS-backed D:\ returns
+# an empty volume label and the "CD1" comparison never matches.
+CDLABEL_PATCH="$THIS_DIR/cdlabel-patch.py"
+if [[ ! -f "$CDLABEL_PATCH" ]]; then
+    echo "warn: $CDLABEL_PATCH not present; CD label spin-loop will block rendering"
+    CDLABEL_PATCH=""
+fi
 
 rm -rf "$ARTIFACT"
 mkdir -p "$ARTIFACT"
@@ -75,6 +84,9 @@ if [[ -n "$FOCUS_SKIP" ]]; then
 fi
 if [[ -n "$GAME_IN_FOCUS" ]]; then
     python3 "$GAME_IN_FOCUS" "$STAGE/RA95.EXE" 2>&1 | tail -5
+fi
+if [[ -n "$CDLABEL_PATCH" ]]; then
+    python3 "$CDLABEL_PATCH" "$STAGE/RA95.EXE" 2>&1 | tail -5
 fi
 
 # cnc-ddraw drop-in (gdi renderer, windowed, no hook).
@@ -163,6 +175,8 @@ if [[ "$SZ" -gt 5500 && "$SZ" -lt 6500 ]]; then
     echo "RESULT: 'Red Alert' titled window with black DDraw surface (Wine 10 expected pattern)."
 elif [[ "$SZ" -gt 10000 && "$SZ" -lt 12000 ]]; then
     echo "RESULT: bare white 640x400 rectangle (Wine 11.x regression pattern)."
+elif [[ "$SZ" -gt 20000 ]]; then
+    echo "RESULT: non-black RA content rendered — title screen or menu visible."
 else
     echo "RESULT: unexpected frame size — inspect $ARTIFACT/t20.png."
 fi
