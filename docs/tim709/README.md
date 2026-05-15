@@ -126,6 +126,87 @@ under headless X servers**.
 * `wine-click-not-propagated.png` — Insert-CD dialog after `xdotool click`
   at OK button position; cursor on OK, click silently dropped.
 
+## Wayland / sway research (board note, 2026-05-15)
+
+The board followed up: "research if a wayland / swaywm approach would work
+here instead". The hypothesis: maybe Wine's dinput filter only drops *XTest*
+synthetic events, and routing through a Wayland compositor + Xwayland would
+launder events into "real" master-pointer input that Wine accepts.
+
+**Result: this path also fails under the headless toolchains available in
+Debian 13.** Details below; if the board wants to push further, the deeper
+follow-up is sway + libinput + uinput, estimated 0.5–1 day of debugging
+with no guarantee.
+
+### Stack tested
+
+* `weston 14.0.2` (headless backend) via `xwfb-run` (default)
+* `cage 0.2.0` (wlroots-based kiosk compositor, `WLR_BACKENDS=headless`)
+  via `xwfb-run -c cage`
+* `Xwayland` on top of each compositor
+* Synthetic input: `xdotool` (XTest), `wlrctl 0.2.2` (wl_virtual_pointer_v1),
+  `ydotool 1.0.4` (uinput via `/dev/uinput`)
+
+### Findings
+
+| Config | Cursor moves | X ButtonPress observed (xev) | Wine WM_MOUSEMOVE | Wine WM_LBUTTONDOWN | Dialog dismisses |
+|--------|:-:|:-:|:-:|:-:|:-:|
+| Xvfb + xdotool (baseline) | ✓ | ✓ (XTest) | ✓ | ✗ (dinput drops by XISourceID) | ✗ |
+| `xwfb-run` (weston) + xdotool | ✓ | ✓ (`synthetic NO`) | ✓ | ✗ | ✗ |
+| `xwfb-run -c cage` + xdotool | ✓ | ✓ (XTest, via XTEST slave) | ✓ | ✗ | ✗ |
+| `xwfb-run -c cage` + wlrctl pointer move | ✓ | n/a | ✓ | n/a | ✗ |
+| `xwfb-run -c cage` + wlrctl pointer click | n/a | **✗ (zero events)** | n/a | **✗** | ✗ |
+| ydotool / `/dev/uinput` | n/a (headless compositor has no libinput backend) | – | – | – | ✗ |
+
+The most surprising negative result is the `cage + wlrctl` row: `wlrctl
+pointer move` correctly delivers `MotionNotify` to X clients and Wine emits
+`WM_MOUSEMOVE`, but `wlrctl pointer click` produces **zero** `ButtonPress`
+events at the X layer. Reproducible via `bash /tmp/cage-wlrctl-xev.sh`
+(committed as commit reference only — not in tree).
+
+The `xwayland-pointer:6` floating-slave device DOES appear in `xinput list`
+under cage, confirming the wlr_virtual_pointer_v1 protocol is wired up.
+But the button-frame path is broken — likely a wlrctl ↔ cage ↔ Xwayland
+bridge bug specific to virtual-pointer buttons. wlrctl's motion frame
+flushes through; the button frame doesn't.
+
+### Why ydotool / `/dev/uinput` doesn't work here
+
+`ydotool` writes synthetic events to the kernel's `/dev/uinput`, which
+creates a virtual evdev device that real Wayland compositors read via
+`libinput`. Under `WLR_BACKENDS=headless`, cage/wlroots does NOT initialize
+the libinput backend — the virtual evdev device exists in `/dev/input/`
+but is invisible to the headless compositor. Setting
+`WLR_BACKENDS=headless,libinput` is documented but not tested here.
+
+### What this means for TIM-709
+
+The simple Wayland substitution (replace Xvfb with `xwfb-run`) does **not**
+solve the click-injection problem — Wine still drops XTest clicks, and the
+Wayland virtual-pointer protocol has its own broken-button path. To actually
+unblock headless Wine gameplay tests on Linux, one of these is still
+required:
+
+* Patch Wine's `dlls/dinput/mouse.c` to accept XTest source IDs in
+  `DISCL_EXCLUSIVE` polling (Option 1 from the original decision).
+* Run a *real* X server (Xorg with the dummy display driver and an evdev
+  input driver) backed by ydotool/uinput synthetic devices. This was not
+  tried in this round.
+* Build out `WLR_BACKENDS=headless,libinput` + ydotool + sway custom-bind
+  the libinput device. Possible but undocumented.
+
+Given that the fixture-based approach (TIM-710, already merged in PR #115)
+achieves equivalence without any of this, the operating recommendation is
+unchanged: TIM-709 stays closed as won't-fix. If the board still wants to
+prosecute the Wayland angle, the next concrete experiment to run is
+"sway-headless + ydotool with libinput-via-uinput-passthrough", which
+needs ~0.5–1 day of bring-up.
+
+Screenshots committed: `wayland-weston-no-click.png` (Xwayland default —
+dialog after xdotool click, unchanged) and `wayland-cage-{before,after}-sweep.png`
+(cage + wlrctl click sweep across the dialog — dialog unchanged across all
+50 attempted click positions).
+
 ## Asset audit (board note, 2026-05-15)
 
 The board flagged: "the /cncremastered assets may be slightly different than
