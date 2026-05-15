@@ -72,6 +72,20 @@ if [[ ! -f "$OUT_DIR/RA95.EXE" ]]; then
     echo "  RA95.EXE downloaded and verified (sha256=$RA95_SHA)"
 fi
 
+# ─── 2b. Apply NoCD patch ────────────────────────────────────────────────────
+# TIM-720: Wine's GetDriveType returns DRIVE_REMOTE (4) for symlinked/network
+# directories instead of DRIVE_CDROM (5), triggering the "insert CD" dialog.
+# Patch: NOP the jne at 0x1a54a1 that branches to the CD error dialog.
+echo ""
+echo "=== Step 2b: Apply NoCD patch to RA95.EXE ==="
+NOCD_TARGETS=("$OUT_DIR/RA95.EXE")
+[[ -f "$OUT_DIR/game/RA95.EXE" ]] && NOCD_TARGETS+=("$OUT_DIR/game/RA95.EXE")
+if python3 scripts/nocd-patch.py "${NOCD_TARGETS[@]}"; then
+    echo "  NoCD patch OK"
+else
+    echo "  WARN: NoCD patch failed — game may show 'Please insert CD' dialog"
+fi
+
 # ─── 3. Required DLLs ────────────────────────────────────────────────────────
 
 echo ""
