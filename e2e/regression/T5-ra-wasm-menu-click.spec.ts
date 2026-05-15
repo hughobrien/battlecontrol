@@ -161,8 +161,16 @@ test('T5 — RA WASM menu-click: New Campaign triggers canvas change (TIM-683 ga
   await page.locator('#canvas').click({ position: { x: 322, y: 183 } });
   console.log('[T5] clicked New Campaign at (322, 183)');
 
-  // ── Wait for canvas response ──────────────────────────────────────────────
-  await page.waitForTimeout(5_000);
+  // ── Wait for C++ gadget pipeline to process the click ────────────────────
+  // [MENU] input= fires from MENUS.CPP when commands->Input() returns non-zero.
+  // shell.html routes printErr to #output as '[err] <text>'.
+  // This is the TIM-694 gate: confirms emscripten_current_thread_process_queued_calls()
+  // flushed the DOM event proxy so SDL_PeepEvents saw the button event.
+  await waitForOutput(page, '[err] [MENU] input=0x', 30_000);
+  console.log('[T5] C++ gadget pipeline processed click — [MENU] input= logged');
+
+  // Brief settle for canvas to render the resulting screen change.
+  await page.waitForTimeout(1_000);
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 't5-04-after-click.png') });
 
   const after  = await sampleCanvas(page);
@@ -176,15 +184,17 @@ test('T5 — RA WASM menu-click: New Campaign triggers canvas change (TIM-683 ga
   console.log(`  VQA skip:           PASS`);
   console.log(`  Main menu up:       PASS`);
   console.log(`  Click method:       real Playwright locator.click() — no synthetic injection`);
+  console.log(`  C++ input pipeline: ${output.includes('[err] [MENU] input=0x') ? 'PASS' : 'FAIL'} (TIM-694 gate)`);
   console.log(`  Pixel diff:         ${diff} (must be > 0 — TIM-683 gate)`);
   console.log(`  No crash:           ${!output.includes('SIGSEGV') && !output.includes('Aborted(') ? 'PASS' : 'FAIL'}`);
   console.log(`  No page errors:     ${pageErrors.length === 0 ? 'PASS' : 'FAIL (' + pageErrors.length + ')'}`);
   console.log('  Screenshots:        t5-01..04');
 
+  // TIM-694 gate: C++ must log that it saw the click through the proxy flush.
+  expect(output, 'C++ gadget pipeline must process click (TIM-694 gate)').toContain('[err] [MENU] input=0x');
   expect(output, 'no SIGSEGV').not.toContain('SIGSEGV');
   expect(output, 'no Aborted').not.toContain('Aborted(');
   expect(pageErrors.length, 'no page errors').toBe(0);
-  // Primary TIM-683 regression gate: the canvas must change after a real click.
-  // Pre-fix this always returned 0 because the SDL pump was missing in Main_Menu.
-  expect(diff, 'canvas must change after real New Campaign click (TIM-683 regression gate)').toBeGreaterThan(0);
+  // TIM-683 regression gate: the canvas must change after a real click.
+  expect(diff, 'canvas must change after real New Campaign click (TIM-683/TIM-694 gate)').toBeGreaterThan(0);
 });
