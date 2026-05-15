@@ -140,7 +140,7 @@ grim "$ARTIFACT_DIR/wine-ra-cage-input-t8.png" 2>/dev/null || true
 
 # Periodic captures
 for t in 15 30 60 90 120; do
-    sleep $((t > 15 ? 15 : t - 8))
+    sleep \$(( t > 15 ? 15 : t - 8 ))
     grim "$ARTIFACT_DIR/wine-ra-cage-input-t\${t}.png" 2>/dev/null || true
 done
 
