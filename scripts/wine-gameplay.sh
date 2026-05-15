@@ -55,6 +55,7 @@ DATA_DIR="${2:-/opt/redalert/game}"
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
 WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-ra}"
 DISPLAY_NUM="${WINE_DISPLAY:-:97}"  # Use :97 to avoid collision with wine-ra.sh (:98)
+WINE_WM="${WINE_WM:-openbox}"       # Lightweight WM so Wine gets a managed window for input
 
 mkdir -p "$SCREENSHOT_DIR"
 
@@ -107,9 +108,11 @@ if [[ -d "$REMASTERED_CD1" ]]; then
 fi
 
 cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
-THIPX_DIR="$(dirname "$RA_EXE_PATH")"
+# Look for THIPX DLLs next to the EXE first, then in DATA_DIR
 for dll in THIPX32.DLL THIPX16.DLL; do
-    [[ -f "$THIPX_DIR/$dll" ]] && cp "$THIPX_DIR/$dll" "$RA_STAGE/$dll"
+    for search_dir in "$(dirname "$RA_EXE_PATH")" "$DATA_DIR"; do
+        [[ -f "$search_dir/$dll" ]] && cp "$search_dir/$dll" "$RA_STAGE/$dll" && break
+    done
 done
 
 if [[ ! -d "$WINE_PREFIX" ]]; then
@@ -117,12 +120,28 @@ if [[ ! -d "$WINE_PREFIX" ]]; then
     WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
 
+# Configure Wine for screenshot capture:
+# 1. Virtual desktop mode: game runs in a managed window (not exclusive/fullscreen)
+#    so the Xvfb framebuffer includes the game content.
+# 2. GDI/software DirectDraw renderer: renders via X11 XPutImage (visible to
+#    x11grab/import) instead of the default OpenGL path (invisible to all X11
+#    capture tools because OpenGL renders into its own surface).
+# 3. Kill and restart wineserver so registry changes take effect before launch.
+echo "Configuring Wine virtual desktop + GDI DirectDraw renderer..."
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+    'HKCU\Software\Wine\Explorer' /v Desktop /t REG_SZ /d Default /f 2>/dev/null || true
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+    'HKCU\Software\Wine\Explorer\Desktops\Default' /v Resolution /t REG_SZ /d '800x600' /f 2>/dev/null || true
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+    'HKCU\Software\Wine\Direct3D' /v renderer /t REG_SZ /d gdi /f 2>/dev/null || true
+WINEPREFIX="$WINE_PREFIX" wineserver -k 2>/dev/null || true
+sleep 2
+
 # ─── Xvfb ────────────────────────────────────────────────────────────────────
 
 echo "=== Starting Xvfb $DISPLAY_NUM ==="
 pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
-# Wine creates an 800x600 virtual desktop when no WM is present; size Xvfb to
-# match so the Red Alert window (640x400 inside Wine Desktop) renders correctly.
+# 800x600 so the Wine Desktop window (640x480 + openbox title bar) fits.
 Xvfb "$DISPLAY_NUM" -screen 0 800x600x24 -ac &
 XVFB_PID=$!
 cleanup_all() {
@@ -133,8 +152,31 @@ trap "cleanup_all" EXIT
 sleep 1
 echo "  Xvfb pid=$XVFB_PID"
 
-# Screenshot helper — uses ffmpeg x11grab because ImageMagick's import on Xvfb
-# captures a 1-bit empty PNG (~176 bytes) when no window manager is present.
+# ─── Window Manager ───────────────────────────────────────────────────────────
+# A lightweight WM is required so Wine's DirectInput layer attaches to a
+# managed window, which in turn allows X11 input events (from xdotool) to
+# reach the game's Win32 message queue.
+
+echo "=== Starting $WINE_WM WM ==="
+if command -v "$WINE_WM" >/dev/null 2>&1; then
+    DISPLAY="$DISPLAY_NUM" "$WINE_WM" &
+    WM_PID=$!
+    cleanup_all() {
+        kill -9 "$WM_PID" 2>/dev/null || true
+        kill -9 "$XVFB_PID" 2>/dev/null || true
+        rm -rf "$RA_STAGE"
+    }
+    trap "cleanup_all" EXIT
+    sleep 2
+    echo "  WM pid=$WM_PID"
+else
+    echo "  WARN: $WINE_WM not found — input may not reach the game"
+    WM_PID=""
+fi
+
+# Screenshot helper — ffmpeg x11grab captures the full Xvfb framebuffer.
+# Requires Wine virtual desktop mode (HKCU\Software\Wine\Explorer\Desktop=Default)
+# so that RA's DirectDraw output is composited into the X11 framebuffer.
 take_shot() {
     local name="$1"
     local out="$SCREENSHOT_DIR/$name"
@@ -143,21 +185,60 @@ take_shot() {
             -i "$DISPLAY_NUM" -frames:v 1 -y "$out" 2>/dev/null \
             && echo "  Screenshot: $out"
     elif command -v import >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null && echo "  Screenshot: $out (import)"
+        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null \
+            && echo "  Screenshot: $out (import)"
     else
         echo "  WARN: no screenshot tool (ffmpeg/import) found"
     fi
 }
 
-# xdotool click at (x,y) relative to screen
+# Find the Wine Desktop window ID (retries for up to $1 seconds).
+find_wine_win() {
+    local deadline=$(( SECONDS + ${1:-30} ))
+    while (( SECONDS < deadline )); do
+        local wid
+        wid=$(DISPLAY="$DISPLAY_NUM" xdotool search --name "Wine Desktop" 2>/dev/null | tail -1)
+        if [[ -n "$wid" ]]; then
+            echo "$wid"
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+# Get the (x, y) origin of the Wine Desktop window's client area on screen.
+# openbox adds a ~20px title bar; we measure it directly.
+wine_win_origin() {
+    local wid="$1"
+    local geom
+    geom=$(DISPLAY="$DISPLAY_NUM" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || { echo "0 20"; return; }
+    local wx wy
+    wx=$(echo "$geom" | grep '^X=' | cut -d= -f2)
+    wy=$(echo "$geom" | grep '^Y=' | cut -d= -f2)
+    echo "${wx:-0} ${wy:-20}"
+}
+
+WINE_WIN_ID=""
+WIN_OX=0
+WIN_OY=20  # fallback: 20px title bar
+
+# xdotool click at game-coordinates (x,y) — offset by the window's screen origin.
 xdo_click() {
-    local x="$1" y="$2"
-    DISPLAY="$DISPLAY_NUM" xdotool mousemove "$x" "$y" click 1 2>/dev/null || true
+    local gx="$1" gy="$2"
+    local sx=$(( WIN_OX + gx ))
+    local sy=$(( WIN_OY + gy ))
+    echo "  click game=($gx,$gy) screen=($sx,$sy)"
+    DISPLAY="$DISPLAY_NUM" xdotool mousemove "$sx" "$sy" click 1 2>/dev/null || true
     sleep 0.5
 }
 
 xdo_key() {
-    DISPLAY="$DISPLAY_NUM" xdotool key "$1" 2>/dev/null || true
+    local key="$1"
+    # Always use XTEST (no --window) so events go through the X11 device layer
+    # and are indistinguishable from real hardware — this reaches Win32 GetKeyState
+    # and DirectInput. XSendEvent (via --window) is marked synthetic and filtered.
+    DISPLAY="$DISPLAY_NUM" xdotool key "$key" 2>/dev/null || true
     sleep 0.3
 }
 
@@ -169,49 +250,94 @@ LOG="$(mktemp /tmp/wine-gameplay-XXXXXX.log)"
     cd "$RA_STAGE"
     DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
     WINEDEBUG=-all AUDIODEV=null \
-    timeout 180 wine RA95.EXE
+    timeout 300 wine RA95.EXE
 ) > "$LOG" 2>&1 &
 RA_PID=$!
 trap "kill $RA_PID 2>/dev/null || true; cleanup_all" EXIT
 
-# ─── Step 1: Dismiss DirectSound dialog ──────────────────────────────────────
+# ─── Step 1: Find Wine Desktop window and resolve click origin ───────────────
 
-echo "  Waiting for DirectSound dialog (~7s)..."
-sleep 7
+echo "  Waiting for Wine Desktop window (up to 30s)..."
+WINE_WIN_ID=$(find_wine_win 30) || { echo "FAIL: Wine Desktop window never appeared"; exit 1; }
+echo "  Wine Desktop wid=$WINE_WIN_ID"
+read WIN_OX WIN_OY < <(wine_win_origin "$WINE_WIN_ID")
+echo "  Window origin: ($WIN_OX, $WIN_OY)"
+DISPLAY="$DISPLAY_NUM" xdotool windowfocus --sync "$WINE_WIN_ID" 2>/dev/null || true
+
+# ─── Step 1a: Handle CD-ROM dialog if it appears ─────────────────────────────
+# The game may show "Please insert a Red Alert CD" if it cannot find required
+# data on CD drive D:. Dismiss with Return (OK button). This can appear before
+# the DirectSound warning.
+
+echo "  Waiting for game to settle (~5s)..."
+sleep 5
+take_shot "wine-gameplay-t5.png"
+
+# Dismiss any pending dialog (CD check or first message) with Return.
+xdo_key "Return"
+sleep 1
+xdo_key "Return"
+sleep 1
+
+# ─── Step 2: Dismiss DirectSound dialog ──────────────────────────────────────
+
+echo "  Waiting for DirectSound dialog (~5s more)..."
+sleep 5
 echo "  Dismissing DirectSound warning..."
 xdo_key "Return"
 sleep 1
 xdo_key "Return"
 sleep 1
 
-# ─── Step 2: Wait for main menu ──────────────────────────────────────────────
+# ─── Step 3: Wait for main menu ──────────────────────────────────────────────
 
 echo "  Waiting for main menu (~5s)..."
 sleep 5
 take_shot "wine-gameplay-menu.png"
 
-# ─── Step 3: Click New Campaign ──────────────────────────────────────────────
+# ─── Step 4: Click New Campaign ──────────────────────────────────────────────
+# Main menu button coordinates are relative to the 640×480 game client area.
+# "New Campaign" button center: approx game-x=322, game-y=183.
 
-echo "  Clicking New Campaign at (322, 183)..."
+echo "  Clicking New Campaign at game (322, 183)..."
 xdo_click 322 183
 sleep 2
+take_shot "wine-gameplay-after-newgame.png"
 
-# ─── Step 4: Difficulty dialog → Easy/OK ─────────────────────────────────────
+# ─── Step 5: Difficulty dialog → Easy/OK ─────────────────────────────────────
 
-echo "  Accepting difficulty dialog at (470, 244)..."
+echo "  Accepting difficulty dialog at game (470, 244)..."
 xdo_click 470 244
 sleep 1
 
-# ─── Step 5: Faction dialog → Allied ─────────────────────────────────────────
+# ─── Step 6: Faction dialog → Allied ─────────────────────────────────────────
 
-echo "  Selecting Allied faction at (258, 268)..."
+echo "  Selecting Allied faction at game (258, 268)..."
 xdo_click 258 268
 sleep 1
 
-# ─── Step 6: Wait for briefing VQA + mission load ────────────────────────────
+# ─── Step 7: Dismiss mission briefing screen ─────────────────────────────────
+# After faction selection the game shows a mission briefing screen (custom
+# DirectDraw rendering, NOT a VQA).  The player must press Space or click
+# anywhere to start the mission.  Without this the game stays on the briefing
+# screen for the entire observation window.
 
-echo "  Waiting for briefing VQA and mission load (~30s)..."
-sleep 30
+echo "  Waiting for briefing screen (~8s)..."
+sleep 8
+take_shot "wine-gameplay-briefing.png"
+echo "  Dismissing briefing (Space key + click)..."
+xdo_key "space"
+sleep 1
+# Click centre of screen as fallback in case Space didn't land
+xdo_click 320 240
+sleep 1
+xdo_key "Return"
+sleep 1
+
+# ─── Step 8: Wait for mission load ───────────────────────────────────────────
+
+echo "  Waiting for mission to load (~15s)..."
+sleep 15
 
 # ─── Step 7: t=0 screenshot ──────────────────────────────────────────────────
 
