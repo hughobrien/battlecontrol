@@ -387,3 +387,65 @@ Three options remain, ranked by effort:
 Given (1) has bounded effort and clear yes/no value, queueing it as a
 delegated follow-up. (2) remains the operating mode for ongoing
 equivalence work.
+
+## Source-build outcome (board note, 2026-05-15)
+
+The board followed up: "yeah build them. should be easy". So we built.
+
+### What we built
+
+* **wlroots 0.20.0** from `gitlab.freedesktop.org/wlroots/wlroots`, with
+  meson subprojects for wayland 1.24, libxkbcommon 1.13, pixman 0.46, and
+  libdrm 2.4.129 (pinned tag — `revision=HEAD` ships GCC-14-incompatible
+  i915 headers). Installed to `/usr/local/lib/x86_64-linux-gnu/`.
+* **cage 0.3.0** from `github.com/cage-kiosk/cage`, linked against the
+  above. Installed to `/usr/local/bin/cage`.
+
+Reproduce with: `bash scripts/build-cage-headless.sh` (~15 min). Script
+documents every meson flag and dep.
+
+### Smoke result: notepad
+
+Running `wine notepad` under cage 0.3.0 with input injection:
+
+* `wlrctl pointer click left` after `wlrctl pointer move 18 40` →
+  screenshot **changes** vs. before.
+* `wtype HELLO` → notepad's text area shows the typed characters and
+  the status bar advances from `Ln 1, Col 1` to `Ln 1, Col 4` (a few
+  chars dropped on the focus-transition edge, but **input is delivered**).
+
+Screenshot committed: `docs/tim709/cage030-after-wtype-typed.png` —
+clearly shows "LLO" in the notepad edit control.
+
+**This is the smoking gun.** cage 0.2.0 / wlroots 0.16 was indeed the
+bottleneck. The wlroots 0.16→0.20 generation fixed virtual_pointer
+event forwarding to client surfaces, and wlrctl/wtype now deliver input
+that Wayland clients actually receive.
+
+### RA95.EXE under cage 0.3.0: separate rendering bug
+
+Running RA95.EXE (the original target) under cage 0.3.0 + wine 11.8 +
+winewayland.drv: wine creates Wayland surfaces (visible in cage's
+`-D` debug log as multiple `New wlr_surface` events) but **never commits
+any visible buffer**. Screenshots before/after are byte-identical black
+frames (2759 bytes, the empty cage backdrop).
+
+This is **not** the same problem as the input-injection block we just
+fixed. It's a winewayland.drv + DirectDraw-fullscreen interaction issue
+specific to RA95's 640×480 exclusive-mode rendering. Out of scope for
+TIM-709 (which was about input). Tracked as a follow-up issue.
+
+### Operating recommendation (updated)
+
+* **Input substrate problem is solved** at the layer the board asked
+  about. cage 0.3.0 + wlroots 0.20 routes virtual-pointer button and
+  virtual-keyboard events to Wayland clients correctly.
+* The original TIM-709 acceptance criterion ("Wine RA95.EXE under Xvfb
+  responds to synthetic mouse clicks") is now moot — we're on cage/
+  Wayland, not Xvfb. The reformulated acceptance ("Wine RA95.EXE under
+  cage 0.3.0 + winewayland responds to synthetic mouse clicks") is
+  blocked behind the RA95-renders-black issue, which is a separate
+  rendering bug.
+* For Allied L1 gameplay equivalence: TIM-710 fixture-based testing
+  remains the operating mode; the cage 0.3.0 path can be re-prosecuted
+  once RA95 renders.
