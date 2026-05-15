@@ -91,12 +91,19 @@ fi
 
 # cnc-ddraw drop-in (gdi renderer, windowed, no hook).
 cp "$CNC_DDRAW_DIR/ddraw.dll" "$STAGE/ddraw.dll"
+# TIM-740: scanline_double=true in [ra95] turns on the row-doubling
+# workaround for the RA VQA player. Requires the patched cnc-ddraw build
+# (see scripts/build-cnc-ddraw.sh). Stock v7.1.0.0 will ignore the key
+# and the intro will render with alternate scanlines black.
 cat > "$STAGE/ddraw.ini" <<'EOF'
 [ddraw]
 renderer=gdi
 windowed=true
 hook=0
 debug=true
+
+[ra95]
+scanline_double=true
 EOF
 
 # Prefix initialisation is idempotent — assume already done.
