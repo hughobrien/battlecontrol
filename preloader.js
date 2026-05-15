@@ -87,6 +87,14 @@
   var quicksavetest = false;
   // TIM-621: ?debug=1 — enable frame-count logging (RA_DEBUG.FLAG) without autostart side-effects.
   var debugframes = false;
+  // TIM-697: ?cheat=1 — inject Flag_To_Win() at frame 200 for win-VQA verification.
+  // getenv("RA_CHEAT") returns NULL in PROXY_TO_PTHREAD worker; RA_CHEAT.FLAG is the fallback.
+  var cheat = false;
+  // TIM-695: ?vqa=NAME[,NAME...] — fetch extra standalone VQA file(s) from ?src= base URL and
+  // drop them into /game/.  Used by the TD WASM VQA regression test (which needs LOGO.VQA from
+  // MOVIES.MIX, but loading the full 425MB MIX is too expensive for a CI run).  Each name is
+  // suffixed with .VQA if not already.
+  var extraVqaList = [];
 
   // Hook into Emscripten runtime init.  noInitialRun:true in the Module
   // pre-definition means callMain() won't fire automatically; we call it
@@ -129,6 +137,8 @@
     // Hide the local-picker UI; S3 mode starts loading immediately.
     var overlay = document.getElementById('preloader-overlay');
     if (overlay) overlay.style.display = 'none';
+    var _canvas = document.getElementById('canvas');
+    if (_canvas) _canvas.focus();
 
     setStatus('Fetching game data from ' + base + '…');
     showProgressBar();
@@ -167,7 +177,26 @@
       return;
     }
 
-    setStatus('Fetched ' + files.size + '/' + MIX_FILES.length + ' files — mounting…');
+    // TIM-695: also fetch extra standalone VQA files when ?vqa=NAME[,NAME...] is set.
+    // These are NOT counted against the MIX_FILES progress denominator; they are
+    // best-effort (404 is logged but does not block launch).
+    for (var v = 0; v < extraVqaList.length; v++) {
+      var vname = extraVqaList[v];
+      try {
+        var vresp = await fetch(base + vname);
+        if (!vresp.ok) {
+          console.warn('[preloader] extra VQA ' + vname + ' fetch failed: HTTP ' + vresp.status);
+          continue;
+        }
+        var vbuf = await vresp.arrayBuffer();
+        files.set(vname, new Uint8Array(vbuf));
+        console.log('[preloader] fetched extra ' + vname + ' (' + vbuf.byteLength + ' bytes)');
+      } catch (verr) {
+        console.warn('[preloader] extra VQA ' + vname + ' fetch error: ' + verr.message);
+      }
+    }
+
+    setStatus('Fetched ' + files.size + ' file(s) — mounting…');
     pendingFiles = files;
 
     if (wasmReady) {
@@ -228,6 +257,8 @@
     setStatus('Loaded ' + files.size + '/' + MIX_FILES.length + ' files — mounting…');
     var overlay = document.getElementById('preloader-overlay');
     if (overlay) overlay.style.display = 'none';
+    var _canvas = document.getElementById('canvas');
+    if (_canvas) _canvas.focus();
 
     pendingFiles = files;
 
@@ -255,15 +286,35 @@
     // Synthesize the required INI config file if not already in the asset bundle.
     // TIM-399: RA STARTUP.CPP gates init on RawFileClass("REDALERT.INI").Is_Available().
     // TIM-404: TD STARTUP.CPP gates init on RawFileClass("CONQUER.INI").Is_Available().
-    // PlayIntro=True sets Special.IsFromInstall; the Linux path clears it after reading.
+    //
+    // TIM-695: TD uses PlayIntro=No so STARTUP.CPP clears Special.IsFromInstall.
+    // IsFromInstall=true in TD silently fast-forwards Select_Game to
+    // SEL_START_NEW_GAME (INIT.CPP:1068) AND skips Play_Intro entirely
+    // (INIT.CPP:598).  Setting PlayIntro=No restores the canonical first-run
+    // path: LOGO.VQA → title screen → main menu.  TD_AUTOSTART tests still
+    // bypass the menu via the explicit TD_AUTOSTART check (INIT.CPP:992).
+    //
+    // RA keeps PlayIntro=True because its Init_Game path uses IsFromInstall
+    // differently (ENGLISH.VQA / PROLOG.VQA fire from Play_Intro regardless,
+    // gated only on RA_AUTOSTART).
+    // TIM-695: Use CRLF (\r\n) line endings — WWGetPrivateProfileString
+    // (TIBERIANDAWN/PROFILE.CPP:378) requires '\r' to find the end of a value:
+    //     altworkptr = strchr(workptr, '\r');
+    // With LF-only line endings, altworkptr == NULL and the value parse aborts
+    // back to the caller's default — PlayIntro silently falls back to "Yes",
+    // setting Special.IsFromInstall = true and bypassing Play_Intro entirely.
     if (isTD) {
       if (!pendingFiles.has('CONQUER.INI')) {
-        var tdIni = '[Intro]\nPlayIntro=True\n[Options]\n';
+        var tdIni = '[Intro]\r\nPlayIntro=No\r\n[Options]\r\n';
         var tdIniBytes = new TextEncoder().encode(tdIni);
         FS.createDataFile(GAME_DIR, 'CONQUER.INI', tdIniBytes, true, true, false);
         console.log('[preloader] synthesized ' + GAME_DIR + '/CONQUER.INI');
       }
     } else {
+      // RA's INIClass (REDALERT/INI.CPP) tokenises on '\n' and never inspects
+      // '\r', so LF-only line endings are intentional here.  Switching to
+      // CRLF would leave a stray '\r' in the parsed value (e.g. "True\r"),
+      // and ini.Get_Bool would misparse it.
       if (!pendingFiles.has('REDALERT.INI')) {
         var raIni = '[Intro]\nPlayIntro=True\n[Options]\n';
         var raIniBytes = new TextEncoder().encode(raIni);
@@ -348,6 +399,16 @@
       }
     }
 
+    // TIM-697: ?cheat=1 — creates RA_CHEAT.FLAG so C++ _ra_cheat check fires on PROXY_TO_PTHREAD.
+    if (cheat) {
+      try {
+        FS.createDataFile(GAME_DIR, 'RA_CHEAT.FLAG', new Uint8Array([1]), true, true, false);
+        console.log('[preloader] cheat flag → ' + GAME_DIR + '/RA_CHEAT.FLAG');
+      } catch (e) {
+        console.warn('[preloader] could not create cheat flag file:', e.message);
+      }
+    }
+
     function launchGame() {
       setStatus('Starting game…');
       Module.callMain([]);
@@ -400,6 +461,22 @@
     // TIM-621: ?debug=1 — enable frame logging without autostart (RA_DEBUG.FLAG).
     if (params.get('debug') === '1') {
       debugframes = true;
+    }
+    // TIM-697: ?cheat=1 — Flag_To_Win() at game frame 200 for win-VQA verification.
+    if (params.get('cheat') === '1') {
+      cheat = true;
+    }
+    // TIM-695: ?vqa=NAME[,NAME...] — extra standalone VQA files to fetch alongside the MIX
+    // bundle.  Only applies in ?src= S3 mode.  Each entry is normalised to upper-case
+    // and suffixed with .VQA if missing.
+    var vqaParam = params.get('vqa');
+    if (vqaParam) {
+      extraVqaList = vqaParam.split(',').map(function (s) {
+        s = s.trim().toUpperCase();
+        if (!s) return null;
+        if (!s.endsWith('.VQA')) s += '.VQA';
+        return s;
+      }).filter(function (s) { return s !== null; });
     }
 
     // ?src=<url> param: fetch MIX files from S3 / HTTP instead of local picker.
