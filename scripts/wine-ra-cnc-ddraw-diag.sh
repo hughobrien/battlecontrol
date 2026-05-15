@@ -107,6 +107,14 @@ EOF
 }
 mkdir -p "$WINEPREFIX/dosdevices"
 ln -sfT "$DATA_DIR" "$WINEPREFIX/dosdevices/d:"
+# Register d: as DRIVE_CDROM in the Wine registry so RA's GetDriveType
+# check passes.  Without this the prefix treats d: as DRIVE_FIXED and
+# the title screen never renders even with the focus-skip + game-in-focus
+# + cdlabel chain applied.  (TIM-708 follow-up; was missing in PR #138.)
+WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all "$WINE" reg add \
+    'HKEY_LOCAL_MACHINE\Software\Wine\Drives' /v 'd:' /t REG_SZ /d 'cdrom' /f 2>/dev/null || true
+WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
+sleep 1
 
 # Pick a free X display so this can run alongside other agents.
 pick_display() {

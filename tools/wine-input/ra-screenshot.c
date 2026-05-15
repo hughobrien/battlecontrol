@@ -108,19 +108,23 @@ int main(int argc, char **argv) {
     HBITMAP bmp = CreateCompatibleBitmap(src, w, h);
     HBITMAP old = (HBITMAP)SelectObject(mem, bmp);
 
-    /* PrintWindow uses the window's own WM_PRINT handler, which Wine
-     * implements for DDraw surfaces by reading the wined3d frontbuffer
-     * back into a GDI DC. This is what makes the capture see the actual
-     * rendered frame instead of an empty X11 backing store. */
-    BOOL pw_ok = PrintWindow(hwnd, mem, 0);
-    fprintf(stderr, "PrintWindow returned %d\n", pw_ok);
+    /* BitBlt from the HWND's DC. cnc-ddraw with renderer=gdi renders
+     * windowed DDraw surfaces directly to the Win32 window's HDC, so
+     * BitBlt from that DC produces the actual rendered frame.
+     *
+     * PrintWindow is unreliable here: on a window that has no
+     * WM_PRINT handler (typical for game windows), Wine returns 1
+     * but writes nothing — the resulting bitmap is all-zero. We tried
+     * it first historically; switching to BitBlt-only matches what
+     * cnc-ddraw + GDI gives back. */
+    BOOL bb = BitBlt(mem, 0, 0, w, h, src, 0, 0, SRCCOPY);
+    fprintf(stderr, "BitBlt returned %d\n", bb);
 
-    /* Fall back to BitBlt — Wine's GDI BitBlt from a HWND DC also hits
-     * the CPU-side mirror of the primary DDraw surface, so this catches
-     * cases where PrintWindow returns 0 (no WM_PRINT handler). */
-    if (!pw_ok) {
-        BOOL bb = BitBlt(mem, 0, 0, w, h, src, 0, 0, SRCCOPY);
-        fprintf(stderr, "BitBlt fallback returned %d\n", bb);
+    /* If BitBlt fails, fall back to PrintWindow (rare path; kept for
+     * the case where the source DC is locked by the renderer). */
+    if (!bb) {
+        BOOL pw_ok = PrintWindow(hwnd, mem, 0);
+        fprintf(stderr, "PrintWindow fallback returned %d\n", pw_ok);
     }
 
     int rc = save_bmp(out, bmp, w, h);
