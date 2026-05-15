@@ -719,6 +719,11 @@ int Main_Menu(unsigned long timeout)
 	Fancy_Text_Print(TXT_NONE, 0, 0, CC_GREEN, TBLACK, TPF_CENTER|TPF_6PT_GRAD|TPF_USE_GRAD_PAL|TPF_NOSHADOW);
 	while (Get_Mouse_State() > 0) Show_Mouse();
 
+	/* TIM-696: signal that button gadgets are live and the main loop is starting.
+	 * Mirrors [TIM-616] menu_cs= in REDALERT/MENUS.CPP; used as the reliable
+	 * "menu ready" gate in Playwright regression tests (T3-td-wasm-menu). */
+	fprintf(stderr, "[TD] Main_Menu: gadgets up\n"); fflush(stderr);
+
 	/*
 	**	Main Processing Loop.
 	*/
