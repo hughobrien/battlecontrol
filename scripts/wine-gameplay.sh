@@ -55,6 +55,7 @@ DATA_DIR="${2:-/opt/redalert/game}"
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
 WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-ra}"
 DISPLAY_NUM="${WINE_DISPLAY:-:97}"  # Use :97 to avoid collision with wine-ra.sh (:98)
+WINE_WM="${WINE_WM:-openbox}"       # Lightweight WM so Wine gets a managed window for input
 
 mkdir -p "$SCREENSHOT_DIR"
 
@@ -121,8 +122,7 @@ fi
 
 echo "=== Starting Xvfb $DISPLAY_NUM ==="
 pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
-# Wine creates an 800x600 virtual desktop when no WM is present; size Xvfb to
-# match so the Red Alert window (640x400 inside Wine Desktop) renders correctly.
+# 800x600 so the Wine Desktop window (640x480 + openbox title bar) fits.
 Xvfb "$DISPLAY_NUM" -screen 0 800x600x24 -ac &
 XVFB_PID=$!
 cleanup_all() {
@@ -132,6 +132,28 @@ cleanup_all() {
 trap "cleanup_all" EXIT
 sleep 1
 echo "  Xvfb pid=$XVFB_PID"
+
+# ─── Window Manager ───────────────────────────────────────────────────────────
+# A lightweight WM is required so Wine's DirectInput layer attaches to a
+# managed window, which in turn allows X11 input events (from xdotool) to
+# reach the game's Win32 message queue.
+
+echo "=== Starting $WINE_WM WM ==="
+if command -v "$WINE_WM" >/dev/null 2>&1; then
+    DISPLAY="$DISPLAY_NUM" "$WINE_WM" &
+    WM_PID=$!
+    cleanup_all() {
+        kill -9 "$WM_PID" 2>/dev/null || true
+        kill -9 "$XVFB_PID" 2>/dev/null || true
+        rm -rf "$RA_STAGE"
+    }
+    trap "cleanup_all" EXIT
+    sleep 2
+    echo "  WM pid=$WM_PID"
+else
+    echo "  WARN: $WINE_WM not found — input may not reach the game"
+    WM_PID=""
+fi
 
 # Screenshot helper — uses ffmpeg x11grab because ImageMagick's import on Xvfb
 # captures a 1-bit empty PNG (~176 bytes) when no window manager is present.
@@ -149,15 +171,54 @@ take_shot() {
     fi
 }
 
-# xdotool click at (x,y) relative to screen
+# Find the Wine Desktop window ID (retries for up to $1 seconds).
+find_wine_win() {
+    local deadline=$(( SECONDS + ${1:-30} ))
+    while (( SECONDS < deadline )); do
+        local wid
+        wid=$(DISPLAY="$DISPLAY_NUM" xdotool search --name "Wine Desktop" 2>/dev/null | tail -1)
+        if [[ -n "$wid" ]]; then
+            echo "$wid"
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+# Get the (x, y) origin of the Wine Desktop window's client area on screen.
+# openbox adds a ~20px title bar; we measure it directly.
+wine_win_origin() {
+    local wid="$1"
+    local geom
+    geom=$(DISPLAY="$DISPLAY_NUM" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || { echo "0 20"; return; }
+    local wx wy
+    wx=$(echo "$geom" | grep '^X=' | cut -d= -f2)
+    wy=$(echo "$geom" | grep '^Y=' | cut -d= -f2)
+    echo "${wx:-0} ${wy:-20}"
+}
+
+WINE_WIN_ID=""
+WIN_OX=0
+WIN_OY=20  # fallback: 20px title bar
+
+# xdotool click at game-coordinates (x,y) — offset by the window's screen origin.
 xdo_click() {
-    local x="$1" y="$2"
-    DISPLAY="$DISPLAY_NUM" xdotool mousemove "$x" "$y" click 1 2>/dev/null || true
+    local gx="$1" gy="$2"
+    local sx=$(( WIN_OX + gx ))
+    local sy=$(( WIN_OY + gy ))
+    echo "  click game=($gx,$gy) screen=($sx,$sy)"
+    DISPLAY="$DISPLAY_NUM" xdotool mousemove "$sx" "$sy" click 1 2>/dev/null || true
     sleep 0.5
 }
 
 xdo_key() {
-    DISPLAY="$DISPLAY_NUM" xdotool key "$1" 2>/dev/null || true
+    local key="$1"
+    if [[ -n "$WINE_WIN_ID" ]]; then
+        DISPLAY="$DISPLAY_NUM" xdotool key --window "$WINE_WIN_ID" "$key" 2>/dev/null || true
+    else
+        DISPLAY="$DISPLAY_NUM" xdotool key "$key" 2>/dev/null || true
+    fi
     sleep 0.3
 }
 
@@ -174,37 +235,64 @@ LOG="$(mktemp /tmp/wine-gameplay-XXXXXX.log)"
 RA_PID=$!
 trap "kill $RA_PID 2>/dev/null || true; cleanup_all" EXIT
 
-# ─── Step 1: Dismiss DirectSound dialog ──────────────────────────────────────
+# ─── Step 1: Find Wine Desktop window and resolve click origin ───────────────
 
-echo "  Waiting for DirectSound dialog (~7s)..."
-sleep 7
+echo "  Waiting for Wine Desktop window (up to 30s)..."
+WINE_WIN_ID=$(find_wine_win 30) || { echo "FAIL: Wine Desktop window never appeared"; exit 1; }
+echo "  Wine Desktop wid=$WINE_WIN_ID"
+read WIN_OX WIN_OY < <(wine_win_origin "$WINE_WIN_ID")
+echo "  Window origin: ($WIN_OX, $WIN_OY)"
+DISPLAY="$DISPLAY_NUM" xdotool windowfocus --sync "$WINE_WIN_ID" 2>/dev/null || true
+
+# ─── Step 1a: Handle CD-ROM dialog if it appears ─────────────────────────────
+# The game may show "Please insert a Red Alert CD" if it cannot find required
+# data on CD drive D:. Dismiss with Return (OK button). This can appear before
+# the DirectSound warning.
+
+echo "  Waiting for game to settle (~5s)..."
+sleep 5
+take_shot "wine-gameplay-t5.png"
+
+# Dismiss any pending dialog (CD check or first message) with Return.
+xdo_key "Return"
+sleep 1
+xdo_key "Return"
+sleep 1
+
+# ─── Step 2: Dismiss DirectSound dialog ──────────────────────────────────────
+
+echo "  Waiting for DirectSound dialog (~5s more)..."
+sleep 5
 echo "  Dismissing DirectSound warning..."
 xdo_key "Return"
 sleep 1
 xdo_key "Return"
 sleep 1
 
-# ─── Step 2: Wait for main menu ──────────────────────────────────────────────
+# ─── Step 3: Wait for main menu ──────────────────────────────────────────────
 
 echo "  Waiting for main menu (~5s)..."
 sleep 5
 take_shot "wine-gameplay-menu.png"
 
-# ─── Step 3: Click New Campaign ──────────────────────────────────────────────
+# ─── Step 4: Click New Campaign ──────────────────────────────────────────────
+# Main menu button coordinates are relative to the 640×480 game client area.
+# "New Campaign" button center: approx game-x=322, game-y=183.
 
-echo "  Clicking New Campaign at (322, 183)..."
+echo "  Clicking New Campaign at game (322, 183)..."
 xdo_click 322 183
 sleep 2
+take_shot "wine-gameplay-after-newgame.png"
 
-# ─── Step 4: Difficulty dialog → Easy/OK ─────────────────────────────────────
+# ─── Step 5: Difficulty dialog → Easy/OK ─────────────────────────────────────
 
-echo "  Accepting difficulty dialog at (470, 244)..."
+echo "  Accepting difficulty dialog at game (470, 244)..."
 xdo_click 470 244
 sleep 1
 
-# ─── Step 5: Faction dialog → Allied ─────────────────────────────────────────
+# ─── Step 6: Faction dialog → Allied ─────────────────────────────────────────
 
-echo "  Selecting Allied faction at (258, 268)..."
+echo "  Selecting Allied faction at game (258, 268)..."
 xdo_click 258 268
 sleep 1
 
