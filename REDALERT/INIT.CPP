@@ -618,6 +618,8 @@ bool Select_Game(bool fade)
 	GameActive = true;
 #ifndef _MSC_VER
 	SDL_Clear_Quit();   /* TIM-237: reset sticky quit flag on each game restart */
+	fprintf(stderr, "[TIM-712] Select_Game entered: IsFromInstall=%d Session.Type=%d\n",
+		(int)Special.IsFromInstall, (int)Session.Type); fflush(stderr);
 #endif
 	DoList.Init();
 	#ifdef MIRROR_QUEUE
@@ -783,6 +785,10 @@ bool Select_Game(bool fade)
 			/*
 			**	Display menu and fetch selection from player.
 			*/
+#ifndef _MSC_VER
+			fprintf(stderr, "[TIM-712] Select_Game while-loop: IsFromInstall=%d selection=%d\n",
+				(int)Special.IsFromInstall, selection); fflush(stderr);
+#endif
 			if (Special.IsFromInstall) selection = SEL_START_NEW_GAME;
 
 #ifndef WOLAPI_INTEGRATION
