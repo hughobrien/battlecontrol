@@ -107,6 +107,7 @@ run_playwright e2e/regression/T2-td-wasm-boot.spec.ts
 if [ "$TIER" = "full" ]; then
     run_playwright e2e/regression/T3-ra-wasm-menu.spec.ts
     run_playwright e2e/regression/T4-ra-wasm-vqa.spec.ts
+    run_playwright e2e/regression/T5-ra-wasm-menu-click.spec.ts
     run_shell      scripts/regression/T5-td-native-menu.sh
     run_shell      scripts/regression/T6-ra-native-smoke.sh
 fi
