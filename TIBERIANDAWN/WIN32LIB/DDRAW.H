@@ -3114,4 +3114,19 @@ typedef struct _DDSURFACEDESC
 };
 #endif
 
+/* TIM-682: SDL surface accessor declarations for the Linux VQA player.
+ * Implemented in linux/td-win32-stubs.cpp; used by linux/win32-stubs/vqa_player.cpp. */
+#ifndef _MSC_VER
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern bool             SDL_Has_Primary_Surface(void);
+extern unsigned char *  SDL_Get_Primary_Pixels(void);
+extern int              SDL_Get_Primary_Pitch(void);
+extern void             Set_DD_Palette_8bit(const unsigned char* cpl0, int ncolors);
+#ifdef __cplusplus
+}
+#endif
+#endif /* !_MSC_VER */
+
 #endif
