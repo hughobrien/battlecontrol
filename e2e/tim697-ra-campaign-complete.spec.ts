@@ -199,13 +199,15 @@ test.describe('TIM-697 — RA WASM campaign path', () => {
     await waitForOutput(page, '[MENU] input=0x', 30_000);
     console.log('[T1] [MENU] input= logged — TIM-694 proxy flush confirmed');
 
-    // Difficulty auto-accept (SPECIAL.CPP KN_RETURN injection).
-    await waitForOutput(page, '[DIFF] injecting KN_RETURN', 30_000);
-    console.log('[T1] difficulty auto-accepted');
+    // Difficulty dialog: wait for it to be ready, then press Enter to accept (Easy/OK).
+    await waitForOutput(page, '[DIFF] dialog ready', 30_000);
+    await page.locator('#canvas').press('Return');
+    console.log('[T1] difficulty dialog: pressed Enter to accept');
 
-    // Faction auto-accept (INIT.CPP KN_RETURN injection).
-    await waitForOutput(page, '[INIT] injecting KN_RETURN', 30_000);
-    console.log('[T1] faction auto-selected');
+    // Faction dialog: wait for it to be ready, then press Enter to select Allies.
+    await waitForOutput(page, '[INIT] faction dialog ready', 30_000);
+    await page.locator('#canvas').press('Return');
+    console.log('[T1] faction dialog: pressed Enter to select Allies');
 
     await cancelBriefSkip();
 
@@ -275,9 +277,11 @@ test.describe('TIM-697 — RA WASM campaign path', () => {
     console.log('[T2] clicked New Campaign');
 
     await waitForOutput(page, '[MENU] input=0x', 30_000);
-    await waitForOutput(page, '[DIFF] injecting KN_RETURN', 30_000);
-    await waitForOutput(page, '[INIT] injecting KN_RETURN', 30_000);
-    console.log('[T2] difficulty + faction auto-accepted');
+    await waitForOutput(page, '[DIFF] dialog ready', 30_000);
+    await page.locator('#canvas').press('Return');
+    await waitForOutput(page, '[INIT] faction dialog ready', 30_000);
+    await page.locator('#canvas').press('Return');
+    console.log('[T2] difficulty + faction dialogs accepted via Enter');
 
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'T2-02-after-faction-select.png'), fullPage: true });
 
@@ -366,9 +370,11 @@ test.describe('TIM-697 — RA WASM campaign path', () => {
     console.log('[T3] clicked New Campaign');
 
     await waitForOutput(page, '[MENU] input=0x', 30_000);
-    await waitForOutput(page, '[DIFF] injecting KN_RETURN', 30_000);
-    await waitForOutput(page, '[INIT] injecting KN_RETURN', 30_000);
-    console.log('[T3] difficulty + faction auto-accepted');
+    await waitForOutput(page, '[DIFF] dialog ready', 30_000);
+    await page.locator('#canvas').press('Return');
+    await waitForOutput(page, '[INIT] faction dialog ready', 30_000);
+    await page.locator('#canvas').press('Return');
+    console.log('[T3] difficulty + faction dialogs accepted via Enter');
 
     await cancelBriefSkip();
 
