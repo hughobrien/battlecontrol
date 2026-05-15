@@ -125,11 +125,13 @@ list(FILTER TD_ALL_SOURCES EXCLUDE REGEX ".*/DLLInterface[^/]*\\.([Cc][Pp][Pp])$
 
 # TIM-341: comprehensive link stubs for all WIN32LIB and DLL-host symbols.
 # TIM-343: add posix_fileio.cpp so CreateFileA/CloseHandle resolve for TD.
+# TIM-682: add vqa_player.cpp so Play_Movie_GlyphX plays TD intro movies.
 set(TD_STUB_SOURCES
     "${CMAKE_SOURCE_DIR}/linux/td-win32-stubs.cpp"
     "${CMAKE_SOURCE_DIR}/linux/win32-stubs/kernel32-stub.cpp"
     "${CMAKE_SOURCE_DIR}/linux/win32-stubs/sdl_window.cpp"
     "${CMAKE_SOURCE_DIR}/linux/win32-stubs/posix_fileio.cpp"
+    "${CMAKE_SOURCE_DIR}/linux/win32-stubs/vqa_player.cpp"
     # stop-execution-stub.cpp excluded: STARTUP.CPP defines DLL_Startup;
     # Stop_Execution is in td-win32-stubs.cpp.
 )

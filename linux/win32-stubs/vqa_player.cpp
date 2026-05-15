@@ -855,6 +855,8 @@ extern "C" void Play_Movie_Linux(const char* name)
     if (!name || !*name) return;
 
     // TIM-506/TIM-507: skip all VQA playback when RA_AUTOSTART is active.
+    // TIM-682: also skip when TD_AUTOSTART is active (same pattern; avoids
+    // VQA hanging TD CI e2e tests that expect immediate scenario start).
     // PROXY_TO_PTHREAD makes getenv() return NULL in the worker thread, so
     // check the MEMFS flag file (TIM-471 pattern).  This prevents ALLY1.VQA
     // (mission briefing) from crashing via SDL_InitSubSystem in vqa_audio_open
@@ -864,6 +866,11 @@ extern "C" void Play_Movie_Linux(const char* name)
     if (!dump_frames &&
         (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available())) {
         fprintf(stderr, "[VQA] RA_AUTOSTART active — skipping '%s.VQA'\n", name);
+        return;
+    }
+    if (!dump_frames &&
+        (getenv("TD_AUTOSTART") || RawFileClass("TD_AUTOSTART.FLAG").Is_Available())) {
+        fprintf(stderr, "[VQA] TD_AUTOSTART active — skipping '%s.VQA'\n", name);
         return;
     }
 
