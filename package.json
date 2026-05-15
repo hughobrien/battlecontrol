@@ -9,7 +9,9 @@
     "test:e2e:tim705": "playwright test e2e/tim705-equivalence.spec.ts",
     "test:e2e:tim705:wine": "WINE_RA_READY=1 playwright test e2e/tim705-equivalence.spec.ts --grep wine",
     "cinematic-compare": "python3 scripts/cinematic-compare.py",
-    "wine-gameplay": "bash scripts/wine-gameplay.sh"
+    "wine-gameplay": "bash scripts/wine-gameplay.sh",
+    "test:e2e:wasm-parity": "playwright test e2e/tim710-wasm-parity.spec.ts",
+    "test:e2e:wasm-parity:wine": "WINE_RA_READY=1 playwright test e2e/tim710-wasm-parity.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.0",
