@@ -95,12 +95,71 @@ echo "  THIPX16.DLL: $(ls -lh "$OUT_DIR/THIPX16.DLL" | awk '{print $5}')"
 
 # ─── 4. Summary ──────────────────────────────────────────────────────────────
 
+# ─── 4. Original game data MIXes (optional, ~480 MB) ────────────────────────
+#
+# Fetches MAIN.MIX (454 MB) and REDALERT.MIX (25 MB) directly from the
+# archive.org ISO viewer.  These are the unmodified 1996 Allied CD assets
+# (verified bit-identical to /CnCRemastered/CD1's MAIN.MIX/REDALERT.MIX).
+# Set RA_FETCH_DATA=1 to fetch them.
+#
+# Background: TIM-709 board note 2026-05-15 — confirmed Remastered Collection's
+# CD1 dir contains the original 1996 files unchanged for MAIN.MIX and
+# REDALERT.MIX. Other files there (EXPAND.MIX, HIRES1.MIX, LORES1.MIX,
+# REDALERT.INI) are post-1996 expansion/patch content the Allied CD lacked.
+
+if [[ "${RA_FETCH_DATA:-0}" == "1" ]]; then
+    echo ""
+    echo "=== Step 4: Download original game data (~480 MB) ==="
+    DATA_DIR="$OUT_DIR/data-og"
+    mkdir -p "$DATA_DIR"
+
+    MAIN_SHA="99104379472bbcfb70c7e378de18d5aa86918bd4"
+    REDALERT_SHA="0e58f4b54f44f6cd29fecf8cf379d33cf2d4caef"
+
+    if [[ ! -f "$DATA_DIR/MAIN.MIX" ]] || \
+       ! sha1sum "$DATA_DIR/MAIN.MIX" 2>/dev/null | grep -q "^$MAIN_SHA "; then
+        echo "  Downloading MAIN.MIX (~454 MB)..."
+        curl -sL "https://archive.org/download/cnc-red-alert/redalert_allied.iso/MAIN.MIX" \
+            -o "$DATA_DIR/MAIN.MIX" --progress-bar
+        actual=$(sha1sum "$DATA_DIR/MAIN.MIX" | awk '{print $1}')
+        if [[ "$actual" != "$MAIN_SHA" ]]; then
+            echo "  ERROR: MAIN.MIX SHA-1 mismatch: $actual"; exit 1
+        fi
+        echo "  MAIN.MIX verified (sha1=$MAIN_SHA)"
+    else
+        echo "  MAIN.MIX already present and verified."
+    fi
+
+    if [[ ! -f "$DATA_DIR/REDALERT.MIX" ]] || \
+       ! sha1sum "$DATA_DIR/REDALERT.MIX" 2>/dev/null | grep -q "^$REDALERT_SHA "; then
+        echo "  Downloading REDALERT.MIX (~25 MB)..."
+        curl -sL "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FREDALERT.MIX" \
+            -o "$DATA_DIR/REDALERT.MIX" --progress-bar
+        actual=$(sha1sum "$DATA_DIR/REDALERT.MIX" | awk '{print $1}')
+        if [[ "$actual" != "$REDALERT_SHA" ]]; then
+            echo "  ERROR: REDALERT.MIX SHA-1 mismatch: $actual"; exit 1
+        fi
+        echo "  REDALERT.MIX verified (sha1=$REDALERT_SHA)"
+    else
+        echo "  REDALERT.MIX already present and verified."
+    fi
+
+    echo "  Original MIXes available at: $DATA_DIR"
+    echo "  Note: 1996 Allied CD does NOT include EXPAND/HIRES1/LORES1.MIX or"
+    echo "  REDALERT.INI — those are post-1996 expansion/patch content."
+fi
+
+# ─── Summary ────────────────────────────────────────────────────────────────
+
 echo ""
 echo "=== Setup complete ==="
 echo "  wine: $(wine --version)"
 echo "  RA95.EXE: $OUT_DIR/RA95.EXE ($(ls -lh "$OUT_DIR/RA95.EXE" | awk '{print $5}'))"
 echo "  THIPX32.DLL: $OUT_DIR/THIPX32.DLL"
 echo "  THIPX16.DLL: $OUT_DIR/THIPX16.DLL"
+if [[ -f "$OUT_DIR/data-og/MAIN.MIX" ]]; then
+    echo "  Original MIXes: $OUT_DIR/data-og/"
+fi
 echo ""
 echo "  Run: bash scripts/wine-ra.sh"
 echo "  Expected: game launches, shows RA menu background (#283870 dark navy)."
