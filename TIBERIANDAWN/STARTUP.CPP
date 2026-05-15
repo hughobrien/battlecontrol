@@ -1030,6 +1030,11 @@ int main(int argc, char * argv[])
             } else {
                 Special.IsFromInstall = true;
             }
+            // TIM-695: log so it is clear which branch was taken — Play_Intro
+            // is gated on !IsFromInstall (INIT.CPP:598), and an LF-only
+            // CONQUER.INI silently falls back to "Yes" via PROFILE.CPP:378.
+            fprintf(stderr, "[TD] CONQUER.INI Intro/PlayIntro=[%s] IsFromInstall=%d\n",
+                    tempbuff, (int)Special.IsFromInstall); fflush(stderr);
 
             SlowPalette = WWGetPrivateProfileInt("Options", "SlowPalette", 1, buffer);
 

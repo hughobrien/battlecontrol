@@ -595,7 +595,14 @@ bool Init_Game(int , char *[])
 	**	Play the introduction movies.
 	*/
 	CCDebugString ("C&C95 - About to play the intro movie\n");
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] before Play_Intro IsFromInstall=%d IsFromWChat=%d\n",
+	        (int)Special.IsFromInstall, (int)Special.IsFromWChat); fflush(stderr);
+#endif
 	if (!Special.IsFromInstall && !Special.IsFromWChat) Play_Intro(true);
+#ifndef _MSC_VER
+	fprintf(stderr, "[TD INIT] after Play_Intro\n"); fflush(stderr);
+#endif
 
 	/*
 	**	Wait for a VSync; during the vertical blank, set the game palette & blit
@@ -1882,7 +1889,16 @@ bool Select_Game(bool fade)
  *=============================================================================================*/
 static void Play_Intro(bool for_real)
 {
-	return; // No game intro movies. - LLL
+#ifdef _MSC_VER
+	return; // No game intro movies. - LLL (upstream MSVC build)
+#else
+	// TIM-695: re-enable LOGO.VQA on the Linux/WASM build so the VQA pipeline
+	// is exercised on every boot (regression coverage for the WebAudio bypass
+	// in linux/win32-stubs/vqa_player.cpp).  Play_Movie_Linux silently no-ops
+	// when LOGO.VQA is absent from the loaded MIX set, so this is harmless on
+	// asset-free smoke tests.  vqa_player.cpp::Play_Movie_Linux short-circuits
+	// when TD_AUTOSTART(.FLAG) is set, keeping gameplay e2e tests fast.
+#endif
 
 	bool playright = !Key_Down(KN_LCTRL) || !Key_Down(KN_RCTRL);
 	static int _counter = -1;
