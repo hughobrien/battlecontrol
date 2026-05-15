@@ -106,6 +106,38 @@ jobs:
             e2e/screenshots/t2-td-wasm-boot.png
             e2e/test-results/
 
+      - name: WASM menu navigation test — TD menu click (T3 / TIM-696)
+        # TIM-696 regression T3: loads td.html with TD game assets from TD_ASSETS_URL,
+        # waits for "[TD] Main_Menu: gadgets up", clicks "Start New Game" at (321,59),
+        # and asserts the canvas changes (proves real mouse input reaches GadgetClass).
+        # Skipped when TD_ASSETS_URL secret is not set (asset-dependent test).
+        # TD_ASSETS_URL is passed directly as the ?src= CDN base URL — no local asset
+        # server required; the preloader fetches MIX files from the CDN directly.
+        if: ${{ secrets.TD_ASSETS_URL != '' }}
+        env:
+          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          COOP_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T3-td-wasm-menu.spec.ts
+          T3_EXIT=$?
+          kill $COOP_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          exit $T3_EXIT
+
+      - name: Upload T3 menu test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-td-wasm-menu-results
+          path: |
+            e2e/screenshots/t3-td-wasm-menu-*.png
+            e2e/test-results/
+
       - name: Validate WASM binaries
         # TIM-593: Sanity-check that both binaries are valid WASM and non-trivially
         # large.  This catches silent build failures and the class of Binaryen
