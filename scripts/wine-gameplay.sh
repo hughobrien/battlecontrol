@@ -50,8 +50,8 @@
 
 set -euo pipefail
 
-RA_EXE_PATH="${1:-${RA_EXE_PATH:-/opt/redalert/RA95.EXE}}"
-DATA_DIR="${2:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
+RA_EXE_PATH="${1:-${RA_EXE_PATH:-/opt/redalert/game/RA95.EXE}}"
+DATA_DIR="${2:-/opt/redalert/game}"
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
 WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-ra}"
 DISPLAY_NUM="${WINE_DISPLAY:-:97}"  # Use :97 to avoid collision with wine-ra.sh (:98)
@@ -88,9 +88,24 @@ echo ""
 
 RA_STAGE="$(mktemp -d)"
 trap "rm -rf $RA_STAGE" EXIT
+
+# Stage from DATA_DIR first
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
     [[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
 done
+
+# If a secondary REMASTERED_CD1 is set or autodiscovered, overlay its files for
+# any that are missing in DATA_DIR (e.g. HIRES1.MIX / LORES1.MIX which the OG
+# install at /opt/redalert/game lacks but the remastered CD1 ships).
+REMASTERED_CD1="${REMASTERED_CD1:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
+if [[ -d "$REMASTERED_CD1" ]]; then
+    for f in "$REMASTERED_CD1"/*.MIX; do
+        [[ -e "$f" ]] || continue
+        local_name="$(basename "$f")"
+        [[ -e "$RA_STAGE/$local_name" ]] || ln -sf "$f" "$RA_STAGE/$local_name"
+    done
+fi
+
 cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
 THIPX_DIR="$(dirname "$RA_EXE_PATH")"
 for dll in THIPX32.DLL THIPX16.DLL; do
@@ -106,7 +121,9 @@ fi
 
 echo "=== Starting Xvfb $DISPLAY_NUM ==="
 pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
-Xvfb "$DISPLAY_NUM" -screen 0 640x480x24 -ac &
+# Wine creates an 800x600 virtual desktop when no WM is present; size Xvfb to
+# match so the Red Alert window (640x400 inside Wine Desktop) renders correctly.
+Xvfb "$DISPLAY_NUM" -screen 0 800x600x24 -ac &
 XVFB_PID=$!
 cleanup_all() {
     kill -9 "$XVFB_PID" 2>/dev/null || true
@@ -116,16 +133,19 @@ trap "cleanup_all" EXIT
 sleep 1
 echo "  Xvfb pid=$XVFB_PID"
 
-# Screenshot helper
+# Screenshot helper — uses ffmpeg x11grab because ImageMagick's import on Xvfb
+# captures a 1-bit empty PNG (~176 bytes) when no window manager is present.
 take_shot() {
     local name="$1"
     local out="$SCREENSHOT_DIR/$name"
-    if command -v import >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null && echo "  Screenshot: $out"
-    elif command -v scrot >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" scrot "$out" 2>/dev/null && echo "  Screenshot: $out"
+    if command -v ffmpeg >/dev/null 2>&1; then
+        ffmpeg -nostdin -loglevel error -f x11grab -video_size 800x600 \
+            -i "$DISPLAY_NUM" -frames:v 1 -y "$out" 2>/dev/null \
+            && echo "  Screenshot: $out"
+    elif command -v import >/dev/null 2>&1; then
+        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null && echo "  Screenshot: $out (import)"
     else
-        echo "  WARN: no screenshot tool (import/scrot) found"
+        echo "  WARN: no screenshot tool (ffmpeg/import) found"
     fi
 }
 
