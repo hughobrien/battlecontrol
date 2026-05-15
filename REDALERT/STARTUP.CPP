@@ -826,6 +826,7 @@ int main(int argc, char * argv[])
 				// so ini.Save(cfile) would spin writing to a read-only handle.
 				// No intro movies on Linux yet — skip the save and clear the flag.
 				Special.IsFromInstall = false;
+				fprintf(stderr, "[RA] STARTUP: IsFromInstall reset to false\n"); fflush(stderr);
 #endif
 			}
 
