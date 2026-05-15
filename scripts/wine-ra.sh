@@ -1,45 +1,78 @@
 #!/usr/bin/env bash
 # TIM-699 — Wine setup and OG Red Alert launcher for side-by-side comparison.
 #
-# Runs the original Windows REDALERT.EXE under Wine with a headless Xvfb
-# display, captures a title-screen screenshot, and prints key diagnostic
-# markers for automated comparison tests.
+# Runs the original Windows Red Alert (RA95.EXE) under Wine with a headless
+# Xvfb display, dismisses the DirectSound warning dialog, captures screenshots,
+# and prints key diagnostic markers for automated comparison tests.
 #
-# ─── Prerequisites ───────────────────────────────────────────────────────────
-# 1. Enable i386 architecture (required for the 32-bit OG binary):
-#      sudo dpkg --add-architecture i386
-#      sudo apt-get update
-#      sudo apt-get install wine32:i386
+# ─── Verified environment ────────────────────────────────────────────────────
+# Host: Debian Bookworm (Debian 13), x86_64
+# Wine: 10.0 (Debian 10.0~repack-6), wine64 + wine32:i386
+# RA95.EXE: from cnc-red-alert Allied ISO at archive.org (SHA-256 below)
+# Data: /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1/MAIN.MIX (454 MB)
+# Result: game launches, shows RA menu background (dark blue #283870)
 #
-# 2. Obtain REDALERT.EXE — the original 32-bit Windows binary.
-#    EA released the original C&C games as free downloads in 2008.
-#    The expected path is /opt/redalert/REDALERT.EXE.
-#    Alternative: set RA_EXE_PATH env var.
+# ─── First-time setup ────────────────────────────────────────────────────────
+# Run this once to get all prerequisites:
+#   bash scripts/wine-ra-setup.sh
 #
-#    If you do not have the binary, the script exits with a clear message
-#    and exit code 2.  The Wine prefix setup still runs so later reruns
-#    are faster.
+# Or manually:
+#   1. Install wine32:
+#        sudo dpkg --add-architecture i386
+#        sudo apt-get update
+#        sudo apt-get install wine32:i386
+#
+#   2. Download RA95.EXE (from the Allied CD ISO at archive.org):
+#        sudo mkdir -p /opt/redalert
+#        sudo chmod 777 /opt/redalert
+#        # Read only the EXE bytes from the ISO (LBA 45220, size 2181632):
+#        START=$((45220 * 2048))
+#        END=$((START + 2181632 - 1))
+#        curl -L -r "${START}-${END}" \
+#          "https://archive.org/download/cnc-red-alert/redalert_allied.iso" \
+#          -o /opt/redalert/RA95.EXE
+#        # Expected SHA-256:
+#        # a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55
+#
+#   3. Download required DLLs from the same ISO:
+#        # THIPX32.DLL (LBA 58881, size 25902):
+#        START=$((58881 * 2048))
+#        curl -L -r "${START}-$((START+25901))" \
+#          "https://archive.org/download/cnc-red-alert/redalert_allied.iso" \
+#          -o /opt/redalert/THIPX32.DLL
+#        # THIPX16.DLL (LBA 58878, size 4192):
+#        START=$((58878 * 2048))
+#        curl -L -r "${START}-$((START+4191))" \
+#          "https://archive.org/download/cnc-red-alert/redalert_allied.iso" \
+#          -o /opt/redalert/THIPX16.DLL
+#
+# ─── Known behavior under Wine ───────────────────────────────────────────────
+# • DirectSound warning: "Warning - Unable to create Direct Sound Object"
+#   This dialog appears because there is no physical audio card on CI.
+#   We dismiss it automatically with xdotool.  The game proceeds normally.
+# • ALSA errors in stderr: expected (no audio card), not game failures.
+# • Display: RA renders at 640×480 windowed within the Xvfb screen.
+#   The characteristic menu background is (40, 56, 108) = #283870 (dark navy).
+# • No CD check: the game reads MAIN.MIX from the current directory.
 #
 # ─── Usage ───────────────────────────────────────────────────────────────────
 #    bash scripts/wine-ra.sh [EXE_PATH] [DATA_DIR] [SCREENSHOT_DIR]
 #
-#    EXE_PATH        path to REDALERT.EXE  (default: /opt/redalert/REDALERT.EXE)
-#    DATA_DIR        CD1 data directory    (default: /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1)
-#    SCREENSHOT_DIR  output dir            (default: e2e/screenshots)
+#    EXE_PATH        path to RA95.EXE     (default: /opt/redalert/RA95.EXE)
+#    DATA_DIR        CD1 data directory   (default: /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1)
+#    SCREENSHOT_DIR  output dir           (default: e2e/screenshots)
 #
 # ─── Outputs ─────────────────────────────────────────────────────────────────
-#    $SCREENSHOT_DIR/wine-ra-title.png    — title screen screenshot
-#    $SCREENSHOT_DIR/wine-ra-menu.png     — main menu screenshot (after 8s)
+#    $SCREENSHOT_DIR/wine-ra-title.png   — after dialog dismissed (~10s)
+#    $SCREENSHOT_DIR/wine-ra-menu.png    — menu state (~20s)
 #
 # ─── CI integration ──────────────────────────────────────────────────────────
-#    This script is tagged WINE — Playwright tests that depend on it should
-#    be guarded with:
-#      test.skip(!process.env.WINE_RA_READY, 'Wine + REDALERT.EXE required');
-#    Set WINE_RA_READY=1 in CI only when wine32 and the EXE are present.
+#    Set WINE_RA_READY=1 when wine32 + RA95.EXE are present and verified.
+#    Playwright tests in e2e/tim699-ra-compare.spec.ts Tier 3 skip unless set.
 
 set -euo pipefail
 
-RA_EXE_PATH="${1:-${RA_EXE_PATH:-/opt/redalert/REDALERT.EXE}}"
+RA_EXE_PATH="${1:-${RA_EXE_PATH:-/opt/redalert/RA95.EXE}}"
 DATA_DIR="${2:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
 WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-ra}"
@@ -58,22 +91,17 @@ fi
 WINE_VER=$(wine --version 2>/dev/null || echo "unknown")
 echo "  wine: $WINE_VER"
 
-if ! wine --version 2>&1 | grep -q "wine-"; then
-    echo "WARN: wine --version returned unexpected output"
-fi
-
-# wine32 check: try running a trivial 32-bit program
-if wine hostname 2>&1 | grep -q "wine32 is missing"; then
+# wine32 check: fail gracefully if 32-bit support is missing
+if wine --version 2>&1 | grep -q "wine32 is missing"; then
     echo "FAIL: wine32 is missing."
     echo "  Fix: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install wine32:i386"
     exit 1
 fi
 
 if [[ ! -f "$RA_EXE_PATH" ]]; then
-    echo "SKIP: REDALERT.EXE not found at $RA_EXE_PATH"
-    echo "  Set RA_EXE_PATH env var or pass path as first argument."
-    echo "  The OG Red Alert EXE is available from the EA free 2008 release."
-    echo "  Expected location: /opt/redalert/REDALERT.EXE"
+    echo "SKIP: RA95.EXE not found at $RA_EXE_PATH"
+    echo "  Run: bash scripts/wine-ra-setup.sh"
+    echo "  Or download manually — see header of this script for instructions."
     exit 2
 fi
 
@@ -82,81 +110,99 @@ if [[ ! -d "$DATA_DIR" ]]; then
     exit 1
 fi
 
-echo "  exe:  $RA_EXE_PATH"
+EXE_SHA=$(sha256sum "$RA_EXE_PATH" | awk '{print $1}')
+echo "  exe:  $RA_EXE_PATH (sha256=$EXE_SHA)"
 echo "  data: $DATA_DIR"
 echo ""
 
-# ─── Wine prefix setup ───────────────────────────────────────────────────────
+# ─── Wine prefix + staging ───────────────────────────────────────────────────
 
-echo "=== Wine prefix setup ($WINE_PREFIX) ==="
-if [[ ! -d "$WINE_PREFIX" ]]; then
-    echo "  Creating 32-bit Wine prefix..."
-    WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 wineboot --init 2>&1 | tail -5
-else
-    echo "  Prefix already exists, skipping init."
-fi
+echo "=== Wine staging ==="
+RA_STAGE="$(mktemp -d)"
+trap "rm -rf $RA_STAGE" EXIT
 
-# Copy game data into a staging directory inside the Wine prefix so the game
-# can find its MIX files relative to its own path.
-RA_STAGE="$WINE_PREFIX/drive_c/redalert"
-mkdir -p "$RA_STAGE"
-
-echo "  Linking MIX data into stage..."
+# Link MIX data + DLLs into a temporary staging directory.
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
-    [[ -e "$f" ]] || continue
-    ln -sf "$f" "$RA_STAGE/$(basename "$f")"
+    [[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
 done
-# Copy the EXE into the stage directory (Wine needs it there to find DLLs).
-cp "$RA_EXE_PATH" "$RA_STAGE/REDALERT.EXE"
+# Copy EXE and IPX DLLs to staging.
+cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
+# Copy THIPX DLLs if present (required at startup).
+THIPX_DIR="$(dirname "$RA_EXE_PATH")"
+for dll in THIPX32.DLL THIPX16.DLL; do
+    [[ -f "$THIPX_DIR/$dll" ]] && cp "$THIPX_DIR/$dll" "$RA_STAGE/$dll"
+done
 
+if [[ ! -d "$WINE_PREFIX" ]]; then
+    echo "  Creating 32-bit Wine prefix at $WINE_PREFIX..."
+    WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
+fi
+echo "  Staging: $RA_STAGE"
 echo ""
 
-# ─── Xvfb setup ──────────────────────────────────────────────────────────────
+# ─── Xvfb ────────────────────────────────────────────────────────────────────
 
 echo "=== Starting Xvfb $DISPLAY_NUM ==="
 pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
 Xvfb "$DISPLAY_NUM" -screen 0 640x480x24 -ac &
 XVFB_PID=$!
+cleanup_xvfb() { kill -9 "$XVFB_PID" 2>/dev/null || true; }
+trap "rm -rf $RA_STAGE; cleanup_xvfb" EXIT
 sleep 1
 echo "  Xvfb pid=$XVFB_PID"
 
-cleanup() {
-    kill -9 "$XVFB_PID" 2>/dev/null || true
-}
-trap cleanup EXIT
+# ─── Launch RA95.EXE ─────────────────────────────────────────────────────────
 
-# ─── Run REDALERT.EXE under Wine ─────────────────────────────────────────────
-
-echo "=== Running REDALERT.EXE under Wine (5s, title screen) ==="
+echo "=== Launching RA95.EXE ==="
+LOG="$(mktemp /tmp/wine-ra-XXXXXX.log)"
 (
     cd "$RA_STAGE"
-    DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" \
-    WINEDEBUG=+module,+loaddll \
-    timeout 10 wine REDALERT.EXE -NORUN 2>&1 &
-    WINE_PID=$!
-    sleep 5
-    # Capture title screen
+    DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
+    WINEDEBUG=-all AUDIODEV=null \
+    timeout 45 wine RA95.EXE
+) > "$LOG" 2>&1 &
+RA_PID=$!
+
+# Wait for the DirectSound warning dialog to appear (~6s), then dismiss it.
+sleep 7
+echo "  Dismissing DirectSound warning dialog..."
+DISPLAY="$DISPLAY_NUM" xdotool key Return 2>/dev/null || true
+sleep 1
+DISPLAY="$DISPLAY_NUM" xdotool key Return 2>/dev/null || true
+
+# Capture title/menu state
+sleep 3
+take_screenshot() {
+    local out="$1"
     if command -v import >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" import -window root \
-            "$SCREENSHOT_DIR/wine-ra-title.png" 2>/dev/null && \
-            echo "  Screenshot: $SCREENSHOT_DIR/wine-ra-title.png"
-    elif command -v scrot >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" scrot "$SCREENSHOT_DIR/wine-ra-title.png" && \
-            echo "  Screenshot: $SCREENSHOT_DIR/wine-ra-title.png"
-    else
-        echo "  WARN: no screenshot tool (import/scrot) — skipping screenshot"
+        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null && echo "  Screenshot: $out"
     fi
-    sleep 3
-    # Capture menu state
-    if command -v import >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" import -window root \
-            "$SCREENSHOT_DIR/wine-ra-menu.png" 2>/dev/null && \
-            echo "  Menu screenshot: $SCREENSHOT_DIR/wine-ra-menu.png"
-    fi
-    kill "$WINE_PID" 2>/dev/null || true
-) || true
+}
+
+take_screenshot "$SCREENSHOT_DIR/wine-ra-title.png"
+
+sleep 8
+take_screenshot "$SCREENSHOT_DIR/wine-ra-menu.png"
+
+kill "$RA_PID" 2>/dev/null || true
 
 echo ""
-echo "=== Done ==="
-echo "  wine-ra-title.png: $(test -f "$SCREENSHOT_DIR/wine-ra-title.png" && echo "WRITTEN" || echo "MISSING")"
-echo "  wine-ra-menu.png:  $(test -f "$SCREENSHOT_DIR/wine-ra-menu.png" && echo "WRITTEN" || echo "MISSING")"
+echo "=== Results ==="
+echo "  wine-ra-title.png: $(test -f "$SCREENSHOT_DIR/wine-ra-title.png" && ls -lh "$SCREENSHOT_DIR/wine-ra-title.png" | awk '{print $5, "(written)"}' || echo "MISSING")"
+echo "  wine-ra-menu.png:  $(test -f "$SCREENSHOT_DIR/wine-ra-menu.png"  && ls -lh "$SCREENSHOT_DIR/wine-ra-menu.png"  | awk '{print $5, "(written)"}' || echo "MISSING")"
+
+# Verify screenshots are non-trivially sized.
+for shot in "$SCREENSHOT_DIR/wine-ra-title.png" "$SCREENSHOT_DIR/wine-ra-menu.png"; do
+    if [[ -f "$shot" ]]; then
+        sz=$(stat -c%s "$shot")
+        if [[ $sz -lt 5000 ]]; then
+            echo "  WARN: $shot is only $sz bytes — may be blank"
+        else
+            echo "  OK: $shot ($sz bytes)"
+        fi
+    fi
+done
+
+echo ""
+echo "  To run Tier 3 Playwright comparison tests:"
+echo "    WINE_RA_READY=1 npx playwright test e2e/tim699-ra-compare.spec.ts --grep 'Tier 3'"

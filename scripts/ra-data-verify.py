@@ -21,6 +21,12 @@ import sys
 
 DATA_DIR_DEFAULT = '/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1'
 
+# SHA-256 of RA95.EXE (Windows 95 game executable).
+# Extracted from INSTALL/ directory of the Allied CD ISO at archive.org
+# (cnc-red-alert/redalert_allied.iso, LBA 45220, 2 181 632 bytes).
+RA95_EXE_SHA256 = 'a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55'
+RA95_EXE_DEFAULT = '/opt/redalert/RA95.EXE'
+
 # SHA-256 of each file in the reference CD1 dataset (Remastered Collection).
 # Computed from the EA/GOG release shipped with the CnC Remastered Collection.
 REFERENCE_CHECKSUMS: dict[str, str] = {
@@ -101,8 +107,25 @@ def check_ini(data_dir: str) -> list[str]:
     return errors
 
 
+def check_exe(exe_path: str) -> list[str]:
+    if not os.path.exists(exe_path):
+        return [f'INFO: RA95.EXE not found at {exe_path} (run scripts/wine-ra-setup.sh)']
+    actual = sha256_file(exe_path)
+    if actual == RA95_EXE_SHA256:
+        size = os.path.getsize(exe_path)
+        print(f'  OK      RA95.EXE ({size:,} bytes) — sha256 matches reference')
+    else:
+        return [
+            f'MISMATCH RA95.EXE\n'
+            f'          expected {RA95_EXE_SHA256}\n'
+            f'          actual   {actual}'
+        ]
+    return []
+
+
 def main() -> int:
     data_dir = sys.argv[1] if len(sys.argv) > 1 else DATA_DIR_DEFAULT
+    exe_path = sys.argv[2] if len(sys.argv) > 2 else RA95_EXE_DEFAULT
 
     print(f'Red Alert reference data verification')
     print(f'Data directory: {data_dir}')
@@ -121,6 +144,14 @@ def main() -> int:
 
     print('=== REDALERT.INI values ===')
     all_errors += check_ini(data_dir)
+    print()
+
+    print('=== RA95.EXE (OG Win95 binary) ===')
+    errors = check_exe(exe_path)
+    for e in errors:
+        print(f'  {e}')
+    # INFO messages are not failures; only count actual checksum errors.
+    all_errors += [e for e in errors if not e.startswith('INFO:')]
     print()
 
     if all_errors:
