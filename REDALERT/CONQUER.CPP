@@ -2462,8 +2462,12 @@ Mono_Set_Cursor(0,0);
 	}
 	/* RA_CHEAT=1: inject cheat actions at fixed frames.
 	 * Bypasses xdotool since SDL keyboard is not yet fully wired.
-	 * Mirrors Debug_Cheat (level=98) / Debug_Unshroud / Flag_To_Win. */
-	if (getenv("RA_CHEAT") && PlayerPtr) {
+	 * Mirrors Debug_Cheat (level=98) / Debug_Unshroud / Flag_To_Win.
+	 * TIM-697: check RA_CHEAT.FLAG as fallback — getenv() returns NULL in
+	 * PROXY_TO_PTHREAD workers; flag file is MEMFS-shared across all threads. */
+	static bool _ra_cheat = getenv("RA_CHEAT") != nullptr
+	                        || RawFileClass("RA_CHEAT.FLAG").Is_Available();
+	if (_ra_cheat && PlayerPtr) {
 		if (_ra_frame_count == 30) {
 			PlayerPtr->Credits += 10000;
 			fprintf(stderr, "[RA-CHEAT] frame %ld: +10000 credits (total=%d)\n",
