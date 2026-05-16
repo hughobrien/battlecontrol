@@ -25,6 +25,9 @@
 // TIM-383: SDL2 graphics + input for TiberiaDawn native Linux play.
 #ifndef _MSC_VER
 #include <SDL2/SDL.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/threading.h>  // emscripten_current_thread_process_queued_calls
+#endif
 #include "sdl_input.h"   // SDL_Process_Input_Events declaration
 #include "sdl_window.h"  // SDL_Get_Main_Window / SDL_Set_Main_Window
 #include "vqa_player.h"  // Play_Movie_Linux (TIM-682)
@@ -183,6 +186,18 @@ int SDL_Cursor_Y = 0;
 extern "C" void SDL_Process_Input_Events(void)
 {
     if (_Kbd == nullptr) return;
+
+#if defined(__EMSCRIPTEN__) && defined(__EMSCRIPTEN_PTHREADS__)
+    /* TIM-858: Under -sPROXY_TO_PTHREAD, SDL mouse/keyboard DOM event callbacks
+     * are proxied from the browser main thread to this worker. SDL_PumpEvents()
+     * is a no-op in Emscripten's SDL2 backend. With SDL_RENDERER_SOFTWARE there
+     * is no vsync block, so the worker never sleeps on a sync primitive and the
+     * proxy queue never drains automatically. Flush it explicitly so that all
+     * SDL_SendMouseButton / SDL_SendKeyboardKey calls from the DOM callbacks land
+     * in the SDL event queue before SDL_PeepEvents reads below.
+     * Mirrors RA KEY.CPP TIM-694 fix. */
+    emscripten_current_thread_process_queued_calls();
+#endif
     SDL_PumpEvents();
     SDL_Event ev[16];
     int n;
@@ -228,7 +243,10 @@ extern "C" void SDL_Process_Input_Events(void)
                 case SDL_BUTTON_RIGHT:  vk = VK_RBUTTON; break;
                 default: continue;
                 }
-                vk |= WWKEY_VK_BIT;
+                /* TIM-858 / TIM-664: do NOT add WWKEY_VK_BIT to mouse events.
+                 * KN_LMOUSE == VK_LBUTTON == 0x01; game compares key==KN_LMOUSE with no
+                 * masking, so storing 0x1001 means LEFTPRESS is never set.
+                 * Is_Mouse_Key() masks &0xFF so it correctly pops the coords either way. */
                 if (type == SDL_MOUSEBUTTONUP) vk |= WWKEY_RLS_BIT;
                 _Kbd->Put((int)vk);
                 _Kbd->Put((int)(be.x / TD_SDL_Scale));
@@ -924,15 +942,30 @@ extern "C" void Wait_Vert_Blank(void)
         if (!TD_SDL_Texture || !TD_SDL_ARGB) return;
     }
 
-    // Wrap the registered indexed pixel buffer in a temporary SDL_Surface
-    // so SDL_BlitSurface can perform the palette-aware indexed→ARGB conversion.
-    SDL_Surface* src = SDL_CreateRGBSurfaceWithFormatFrom(
-        TD_SeenPixels, w, h, 8, TD_SeenPitch, SDL_PIXELFORMAT_INDEX8);
-    if (!src) return;
-    SDL_SetPaletteColors(src->format->palette, TD_SDL_Palette, 0, 256);
-
-    SDL_BlitSurface(src, nullptr, TD_SDL_ARGB, nullptr);
-    SDL_FreeSurface(src);
+    // TIM-858: Manual indexed→ARGB expansion using TD_SDL_Palette[] instead of
+    // SDL_BlitSurface.  Emscripten's USE_SDL=2 port does not reliably use the
+    // SDL surface palette when blitting INDEX8→ARGB8888 from a Worker thread
+    // (PROXY_TO_PTHREAD), producing wrong colours.  TD_SDL_Palette[] is
+    // populated directly by Set_DD_Palette / Set_DD_Palette_8bit, so it is
+    // always authoritative regardless of SDL surface-palette state.
+    // Mirrors RA DDRAW.CPP TIM-573 fix.
+    {
+        const uint8_t* src     = (const uint8_t*)TD_SeenPixels;
+        uint32_t*      dst     = (uint32_t*)TD_SDL_ARGB->pixels;
+        int            srcPitch = TD_SeenPitch;
+        int            dstPitch32 = TD_SDL_ARGB->pitch / 4;
+        for (int y = 0; y < h; ++y) {
+            for (int x = 0; x < w; ++x) {
+                uint8_t idx = src[y * srcPitch + x];
+                const SDL_Color& c = TD_SDL_Palette[idx];
+                dst[y * dstPitch32 + x] =
+                    ((uint32_t)0xFF << 24) |
+                    ((uint32_t)c.r  << 16) |
+                    ((uint32_t)c.g  <<  8) |
+                    ((uint32_t)c.b);
+            }
+        }
+    }
 
     SDL_UpdateTexture(TD_SDL_Texture, nullptr, TD_SDL_ARGB->pixels, TD_SDL_ARGB->pitch);
     SDL_RenderClear(TD_SDL_Renderer);
