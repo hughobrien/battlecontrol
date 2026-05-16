@@ -25,6 +25,7 @@ jobs:
   build-and-deploy:
     name: Build WASM + deploy to GitHub Pages
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -35,15 +36,13 @@ jobs:
           version: '5.0.6'
           actions-cache-folder: 'emsdk-cache'
 
-      - name: Cache Emscripten build
+      - name: Cache Emscripten system libraries
         uses: actions/cache@v4
         with:
-          path: |
-            build-wasm
-            ~/.emscripten_cache
-          key: emscripten-build-${{ github.sha }}
+          path: ~/.emscripten_cache
+          key: emscripten-cache-${{ github.sha }}
           restore-keys: |
-            emscripten-build-
+            emscripten-cache-
 
       - name: Install build deps
         run: |
@@ -471,6 +470,9 @@ jobs:
             sed -i 's|<head>|<head>\n  <script src="coi-serviceworker.min.js"></script>|' "$f"
           done
 
+      - name: Capture Emscripten version
+        run: echo "EMSDK_VERSION=$(emcc --version | head -1 | sed 's/.*emcc.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/')" >> "$GITHUB_ENV"
+
       - name: Generate version manifest
         run: |
           cat > wasm/deploy/version.json <<'EOF'
@@ -478,7 +480,7 @@ jobs:
             "commit": "${{ github.sha }}",
             "workflow_run_id": "${{ github.run_id }}",
             "build_time": "${{ github.action_start_time }}",
-            "emsdk_version": "${{ env.EMSDK_VERSION || '5.0.6' }}"
+            "emsdk_version": "${{ env.EMSDK_VERSION }}"
           }
           EOF
 
