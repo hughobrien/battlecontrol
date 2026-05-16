@@ -135,6 +135,33 @@ jobs:
             e2e/screenshots/t2-td-wasm-boot.png
             e2e/test-results/
 
+      - name: WASM smoke test — ra.wasm loads without crash (T1 / TIM-623)
+        # TIM-623 regression T1: asset-free RA boot gate. Mirrors T2 exactly.
+        # Asserts ra.wasm initializes without a pageerror in 30 s, catching WASM
+        # parse errors, null-function traps (TIM-593/TIM-620 class), and
+        # Emscripten init-time JS exceptions.
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts
+          SMOKE_EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID  2>/dev/null || true
+          exit $SMOKE_EXIT
+
+      - name: Upload T1 smoke artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t1-ra-wasm-boot-results
+          path: |
+            e2e/screenshots/t1-ra-wasm-boot.png
+            e2e/test-results/
+
       - name: WASM menu navigation test — TD menu click (T3 / TIM-696)
         # TIM-696 regression T3: loads td.html with TD game assets from TD_ASSETS_URL,
         # waits for "[TD] Main_Menu: gadgets up", clicks "Start New Game" at (321,59),
@@ -205,6 +232,41 @@ jobs:
             e2e/screenshots/t6-td-wasm-*.png
             e2e/test-results/
 
+      - name: RA mission start test — real-click Allied L1 (T9 / TIM-773)
+        # TIM-773 regression T9: loads ra.html (no ?autostart=1), skips VQAs via
+        # window._vqa_aborted interval, waits for "[TIM-616] menu_cs=", clicks
+        # "New Campaign" at (322, 183), auto-accepts difficulty+faction via
+        # KN_RETURN injections, asserts Start_Scenario(SCG01EA) fires and
+        # frame 100 has ≥5% canvas fill.
+        # Skipped when RA_ASSETS_URL is not set.
+        env:
+          RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
+        run: |
+          if [ -z "$RA_ASSETS_URL" ]; then
+            echo "::notice::T9 skipped — RA_ASSETS_URL not set"
+            exit 0
+          fi
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          COOP_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T9-ra-wasm-mission-start.spec.ts
+          T9_EXIT=$?
+          kill $COOP_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          exit $T9_EXIT
+
+      - name: Upload T9 mission start artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t9-ra-wasm-mission-start-results
+          path: |
+            e2e/screenshots/t9-ra-wasm-*.png
+            e2e/test-results/
+
       - name: TD audio pitch probe (T7 / TIM-767)
         # TIM-767 regression T7: loads td.html with autostart=1 (skips menu,
         # starts GDI L1), injects an AnalyserNode FFT tap, waits for frame 100,
@@ -240,6 +302,45 @@ jobs:
             e2e/screenshots/t7-td-*.png
             e2e/screenshots/t7-td-fft-*.json
             e2e/screenshots/t7-td-console.log
+            e2e/test-results/
+
+      - name: RA WASM audio pitch probe (T8 / TIM-773)
+        # TIM-773 regression T8: loads ra.html, waits for ENGLISH.VQA to finish
+        # (~10 s), then PROLOG.VQA starts (Hell March).  Injects AnalyserNode FFT
+        # tap and samples dominant peak at t=5 s and t=20 s after PROLOG starts.
+        # Asserts min(dominantHz_t5s, dominantHz_t20s) < 90 Hz — detects the
+        # TIM-602 class of 2× pitch regression where 22050 Hz VQA PCM is fed raw
+        # to a 44100/48000 Hz AudioContext.  Using min (not max) per TIM-766 to
+        # resist false positives from single-window percussion transients.
+        # Skipped when RA_ASSETS_URL is not set (needs MIX files for VQAs).
+        env:
+          RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
+        run: |
+          if [ -z "$RA_ASSETS_URL" ]; then
+            echo "::notice::T8 skipped — RA_ASSETS_URL not set"
+            exit 0
+          fi
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          COOP_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T8-ra-audio-pitch.spec.ts
+          T8_EXIT=$?
+          kill $COOP_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          exit $T8_EXIT
+
+      - name: Upload T8 audio pitch artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t8-ra-audio-pitch-results
+          path: |
+            e2e/screenshots/t8-ra-*.png
+            e2e/screenshots/t8-ra-fft-*.json
+            e2e/screenshots/t8-ra-console.log
             e2e/test-results/
 
       - name: TIM-695 TD WASM VQA — intro VQA verification (LOGO.VQA)
