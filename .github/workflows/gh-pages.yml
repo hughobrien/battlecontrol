@@ -1,5 +1,9 @@
 name: GitHub Pages Deploy
 
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 500M
+
 concurrency:
   group: gh-pages-${{ github.ref }}
   cancel-in-progress: true
@@ -47,10 +51,27 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ninja-build cmake xvfb
+          sudo apt-get install -y --no-install-recommends ninja-build cmake xvfb ccache
+
+      - name: Configure ccache
+        run: |
+          ccache --zero-stats
+          ccache --max-size 500M
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-ghpages-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'installer/CMakeLists.txt') }}
+          restore-keys: |
+            ccache-ghpages-
+            ccache-
 
       - name: Configure WASM build
-        run: emcmake cmake --preset wasm
+        run: |
+          export CCACHE_DIR=${{ env.CCACHE_DIR }}
+          emcmake cmake --preset wasm \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build ra.wasm
         run: cmake --build build-wasm --target ra --parallel
@@ -61,12 +82,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Playwright and Chromium
+      - name: Install Playwright and browsers
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium firefox
 
-      - name: WASM smoke test — ra.wasm loads without crash
+      - name: WASM smoke test — ra.wasm (chromium)
         # Serves the freshly-built ra.wasm via serve-coop.py (COOP+COEP headers
         # required for SharedArrayBuffer / pthreads). Fails the build if the
         # binary crashes during Emscripten runtime init, blocking the deploy.
@@ -77,7 +98,8 @@ jobs:
           python3 wasm/serve-coop.py &
           SERVER_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts
+          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts \
+            --project=chromium
           SMOKE_EXIT=$?
           kill $SERVER_PID 2>/dev/null || true
           kill $XVFB_PID  2>/dev/null || true
@@ -90,6 +112,30 @@ jobs:
           name: wasm-smoke-results
           path: |
             e2e/screenshots/tim595-smoke-after-init.png
+            e2e/test-results/
+
+      - name: WASM smoke test — ra.wasm (firefox)
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts \
+            --project=firefox
+          SMOKE_EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID  2>/dev/null || true
+          exit $SMOKE_EXIT
+
+      - name: Upload Firefox smoke test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-smoke-firefox-results
+          path: |
+            e2e/screenshots/
             e2e/test-results/
 
       - name: WASM parity tests — TIM-699 Tier 2 visual reference
@@ -134,7 +180,8 @@ jobs:
           python3 wasm/serve-coop.py &
           SERVER_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts
+          DISPLAY=:99 npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts \
+            --project=chromium
           SMOKE_EXIT=$?
           kill $SERVER_PID 2>/dev/null || true
           kill $XVFB_PID  2>/dev/null || true
@@ -149,6 +196,30 @@ jobs:
             e2e/screenshots/t2-td-wasm-boot.png
             e2e/test-results/
 
+      - name: WASM smoke test — td.wasm loads without crash (T2 / firefox)
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts \
+            --project=firefox
+          SMOKE_EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID  2>/dev/null || true
+          exit $SMOKE_EXIT
+
+      - name: Upload T2 firefox smoke artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t2-td-wasm-boot-firefox-results
+          path: |
+            e2e/screenshots/
+            e2e/test-results/
+
       - name: WASM smoke test — ra.wasm loads without crash (T1 / TIM-623)
         # TIM-623 regression T1: asset-free RA boot gate. Mirrors T2 exactly.
         # Asserts ra.wasm initializes without a pageerror in 30 s, catching WASM
@@ -161,7 +232,8 @@ jobs:
           python3 wasm/serve-coop.py &
           SERVER_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts
+          DISPLAY=:99 npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts \
+            --project=chromium
           SMOKE_EXIT=$?
           kill $SERVER_PID 2>/dev/null || true
           kill $XVFB_PID  2>/dev/null || true
@@ -174,6 +246,30 @@ jobs:
           name: t1-ra-wasm-boot-results
           path: |
             e2e/screenshots/t1-ra-wasm-boot.png
+            e2e/test-results/
+
+      - name: WASM smoke test — ra.wasm loads without crash (T1 / firefox)
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts \
+            --project=firefox
+          SMOKE_EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID  2>/dev/null || true
+          exit $SMOKE_EXIT
+
+      - name: Upload T1 firefox smoke artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t1-ra-wasm-boot-firefox-results
+          path: |
+            e2e/screenshots/
             e2e/test-results/
 
       - name: WASM menu navigation test — TD menu click (T3 / TIM-696)
