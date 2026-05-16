@@ -481,12 +481,12 @@ test.describe('Tier 1 — Soviet L1 frame 500 (WASM)', () => {
     await page.locator('#canvas').click({ position: { x: 470, y: 244 } });
     console.log('[SOV-L1] difficulty accepted');
 
-    // Faction dialog — click Soviet (third button, rightmost).
-    // FIXIT_VERSION_3: Allies (258,268) / Cancel / Soviet (382,268).
+    // Faction dialog — click Soviet (center button).
+    // FIXIT_VERSION_3 buttons at y=244: Allies (~220) / Soviet (280) / Cancel (~340+).
     await waitForOutput(page, '[INIT] faction dialog ready', 30_000);
     await page.waitForTimeout(500);
-    await page.locator('#canvas').click({ position: { x: 382, y: 268 } });
-    console.log('[SOV-L1] clicked Soviet faction at (382, 268)');
+    await page.locator('#canvas').click({ position: { x: 280, y: 244 } });
+    console.log('[SOV-L1] clicked Soviet faction at (280, 244)');
 
     // Wait for scenario to start.
     await waitForOutput(page, '[RA] Select_Game: Start_Scenario OK', 120_000);
