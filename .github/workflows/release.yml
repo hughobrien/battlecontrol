@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-linux-x86_64:
-    name: Build Linux x86_64
+    name: Build RA Linux x86_64
     runs-on: ubuntu-24.04
 
     steps:
@@ -38,9 +38,119 @@ jobs:
           name: redalert-linux-x86_64
           path: redalert-linux-x86_64.tar.gz
 
+  build-td-linux:
+    name: Build TD Linux x86_64
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            g++ \
+            cmake \
+            ninja-build \
+            libsdl2-dev \
+            libsdl2-ttf-dev \
+            binutils
+
+      - name: Configure
+        run: cmake --preset linux-native
+
+      - name: Build TD
+        run: cmake --build build --target td --parallel
+
+      - name: Strip and package
+        run: |
+          strip build/td
+          cp build/td td
+          tar czf td-linux-x86_64.tar.gz td
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: td-linux-x86_64
+          path: td-linux-x86_64.tar.gz
+
+  build-ra-wasm:
+    name: Build RA WASM
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '5.0.6'
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ninja-build cmake
+
+      - name: Configure WASM build
+        run: emcmake cmake --preset wasm
+
+      - name: Build ra.wasm
+        run: cmake --build build-wasm --target ra --parallel
+
+      - name: Package ra-wasm.zip
+        run: |
+          mkdir ra-wasm
+          cp build-wasm/ra.html build-wasm/ra.js build-wasm/ra.wasm ra-wasm/
+          cp wasm/preloader.js wasm/coi-serviceworker.min.js ra-wasm/
+          zip -r ra-wasm.zip ra-wasm/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ra-wasm
+          path: ra-wasm.zip
+
+  build-td-wasm:
+    name: Build TD WASM
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '5.0.6'
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ninja-build cmake
+
+      - name: Configure WASM build
+        run: emcmake cmake --preset wasm
+
+      - name: Build td.wasm
+        run: cmake --build build-wasm --target td --parallel
+
+      - name: Package td-wasm.zip
+        run: |
+          mkdir td-wasm
+          cp build-wasm/td.html build-wasm/td.js build-wasm/td.wasm td-wasm/
+          cp wasm/preloader.js wasm/coi-serviceworker.min.js td-wasm/
+          zip -r td-wasm.zip td-wasm/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: td-wasm
+          path: td-wasm.zip
+
   release:
     name: Create GitHub Release
-    needs: [build-linux-x86_64]
+    needs: [build-linux-x86_64, build-td-linux, build-ra-wasm, build-td-wasm]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -54,5 +164,7 @@ jobs:
       - name: Create release and attach artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: "*.tar.gz"
+          files: |
+            *.tar.gz
+            *.zip
           generate_release_notes: true
