@@ -234,6 +234,28 @@ static inline char* ltoa(long value, char* buffer, int radix)
 // memicmp directly. Inline wrappers preserve the MSVC contract (returns
 // 0 on match, sign of first differing byte otherwise) without touching
 // upstream call sites.
+// TIM-820: _aligned_malloc / _aligned_free shims for clang's mm_malloc.h.
+// clang 18 ships a version of mm_malloc.h that calls _aligned_malloc /
+// _aligned_free on the `#ifdef _WIN32` path without also checking for
+// MSVC.  wwstd.h defines _WIN32 when WIN32 is absent (Watcom compat),
+// so any TU reaching wwstd.h triggers the failure on clang 18.
+// These shims provide the symbols so mm_malloc.h compiles regardless
+// of the compiler version's header behaviour.
+#ifndef _ALIGNED_MALLOC_DEFINED
+#define _ALIGNED_MALLOC_DEFINED
+#include <stdlib.h>
+static inline void* _aligned_malloc(size_t size, size_t alignment) {
+    void* ptr = NULL;
+    if (posix_memalign(&ptr, alignment, size) != 0) {
+        return NULL;
+    }
+    return ptr;
+}
+static inline void _aligned_free(void* ptr) {
+    free(ptr);
+}
+#endif
+
 #ifndef _MSVC_STRICMP_DEFINED
 #define _MSVC_STRICMP_DEFINED
 #ifdef __cplusplus
