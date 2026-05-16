@@ -197,6 +197,7 @@ else()
         "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
         -fmax-errors=20
         -fpermissive   # TIM-339: allows extra qualifications + two-phase lookup as warnings
+        -Wno-register
         -w             # suppress warnings (errors already suppressed by fpermissive)
     )
     # TIM-341: SDL2 required by sdl_window.cpp (MainWindow, SDL_Window_Show, ...).
@@ -317,6 +318,7 @@ else()
         "-include" "${CMAKE_SOURCE_DIR}/linux/win32-stubs/msvc-compat.h"
         -fmax-errors=20
         -fpermissive
+        -Wno-register
         -w
     )
     target_link_libraries(ra PRIVATE SDL2::SDL2)
