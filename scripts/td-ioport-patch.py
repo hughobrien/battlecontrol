@@ -42,18 +42,18 @@ Fix — four-site NOP:
     `in al,dx; and al,0x08; xor al,ah; je -12`  →  NOP×7
     NOP the "spin until VBlank inactive" helper entirely.
 
-Expected input SHA-256 (C&C95.EXE after TIM-743+TIM-747 setcoop-hwnd chain):
-  935b32578dfc39d3e4bd928fe87d7703e39a974f7eb2e827a2249e119d925429
+Expected input SHA-256 (C&C95.EXE after TIM-743+TIM-747 full chain: ddmode + setcoop-hwnd):
+  19ab8620eadfe1b31ce340922fc426b7fcd407a044ba890b543144f25d1dbf58
 
 Expected output SHA-256:
-  4538a19f0947022a898a39ef2da8c4de61dc027acf60d2706c50e2dd5812d8ea
+  42664f2aa13fe1dc661326ecbf01ad7c6b8c0c2e7b1bd1bc01938fa2e98e31d0
 """
 import sys
 import hashlib
 import shutil
 
-INPUT_SHA256   = "935b32578dfc39d3e4bd928fe87d7703e39a974f7eb2e827a2249e119d925429"
-PATCHED_SHA256 = "4538a19f0947022a898a39ef2da8c4de61dc027acf60d2706c50e2dd5812d8ea"
+INPUT_SHA256   = "19ab8620eadfe1b31ce340922fc426b7fcd407a044ba890b543144f25d1dbf58"
+PATCHED_SHA256 = "42664f2aa13fe1dc661326ecbf01ad7c6b8c0c2e7b1bd1bc01938fa2e98e31d0"
 
 SITES = [
     # (offset, orig_bytes, patched_bytes, description)
@@ -93,7 +93,7 @@ def patch(path: str, dry_run: bool = False) -> int:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected: {INPUT_SHA256}")
         print(f"       apply td-focus-skip, td-game-in-focus, td-vqa-skip,")
-        print(f"       td-activateapp, td-setcoop-hwnd patches first")
+        print(f"       td-activateapp, td-ddmode, td-setcoop-hwnd patches first")
         return 1
 
     for offset, orig, patched, desc in SITES:

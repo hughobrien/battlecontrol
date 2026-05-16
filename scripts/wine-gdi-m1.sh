@@ -40,6 +40,7 @@
 #     - td-game-in-focus-patch.py entry-detour pin 0x53dd44=1
 #     - td-vqa-skip-patch.py      Play_Movie entry -> ret
 #     - td-activateapp-patch.py   NOP WM_ACTIVATEAPP GameInFocus store
+#     - td-ddmode-patch.py        stub SetDisplayMode → DD_OK (xr eax+NOP pushes)
 #     - td-setcoop-hwnd-patch.py  code-cave: SetCooperativeLevel with real HWND
 #     - td-ioport-patch.py        NOP VGA port 0x3DA spin-loop (PRIV_INSN flood)
 #
@@ -112,6 +113,7 @@ python3 "$SCRIPT_DIR/td-focus-skip-patch.py"      "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-game-in-focus-patch.py"   "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-vqa-skip-patch.py"        "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-activateapp-patch.py"     "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-ddmode-patch.py"          "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-setcoop-hwnd-patch.py"    "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-ioport-patch.py"          "$STAGE/C&C95.EXE"
 echo "  patch chain done: $(sha256sum "$STAGE/C&C95.EXE" | cut -c1-12)..."
