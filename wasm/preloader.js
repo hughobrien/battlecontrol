@@ -400,10 +400,12 @@
     }
 
     // TIM-697: ?cheat=1 — creates RA_CHEAT.FLAG so C++ _ra_cheat check fires on PROXY_TO_PTHREAD.
+    // TIM-774: also creates TD_CHEAT.FLAG for TD build (same pattern; getenv() fails in worker).
     if (cheat) {
+      var cheatFlagFile = isTD ? 'TD_CHEAT.FLAG' : 'RA_CHEAT.FLAG';
       try {
-        FS.createDataFile(GAME_DIR, 'RA_CHEAT.FLAG', new Uint8Array([1]), true, true, false);
-        console.log('[preloader] cheat flag → ' + GAME_DIR + '/RA_CHEAT.FLAG');
+        FS.createDataFile(GAME_DIR, cheatFlagFile, new Uint8Array([1]), true, true, false);
+        console.log('[preloader] cheat flag → ' + GAME_DIR + '/' + cheatFlagFile);
       } catch (e) {
         console.warn('[preloader] could not create cheat flag file:', e.message);
       }
