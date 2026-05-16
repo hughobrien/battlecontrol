@@ -168,10 +168,14 @@ REGRESSION_TIER=full bash scripts/regression-suite.sh
 5. Drop Playwright specs under `e2e/regression/` and shell scripts under
    `scripts/regression/`.
 6. Update this README's table and pass/fail section.
-7. If CI-runnable, add a step to `.github/workflows/gh-pages.yml`.
-   Asset-gated steps must use a bash `if [ -z "$ASSET_URL" ]; then exit 0; fi`
-   guard — not a YAML `if:` condition (secrets in `if:` cause "0 jobs created"
-   validation failures).
+7. If CI-runnable:
+   - Asset-free tests (T1/T2 class): wire into both
+     `.github/workflows/ci.yml` (PR gate) and
+     `.github/workflows/gh-pages.yml` (deploy gate).
+   - Asset-gated tests: wire into `.github/workflows/gh-pages.yml` only.
+     Use a bash `if [ -z "$ASSET_URL" ]; then exit 0; fi` guard — not a
+     YAML `if:` condition (secrets in `if:` cause "0 jobs created"
+     validation failures).
 
 ## Design notes
 
