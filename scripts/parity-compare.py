@@ -15,6 +15,7 @@ Options:
   --label LABEL            label for the comparison (default: "comparison")
   --threshold-ssim FLOAT   minimum SSIM to pass (default: 0.90)
   --diff-out PATH          write amplified abs-diff PNG to this path
+  --side-by-side-out PATH  write side-by-side comparison PNG (ref|test) to path
   --json                   output only the JSON result line (no human-readable prefix)
   --crop-bottom N          remove N rows from bottom of both images before comparing
                            (use to mask known-different regions like command bar)
@@ -207,6 +208,75 @@ def _write_diff(arr_a, arr_b, out_path):
     Image.fromarray(amplified).save(out_path)
 
 
+def _write_side_by_side(arr_a, arr_b, out_path, label_a='Reference', label_b='Test',
+                         ssim=None, p99=None, fill_a=None, fill_b=None):
+    """Write a side-by-side composite PNG comparing img_a (left) and img_b (right).
+
+    A thin gap separates the two images, and a top banner shows labels + stats.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    import numpy as np
+
+    ha, wa = arr_a.shape[:2]
+    hb, wb = arr_b.shape[:2]
+    gap = 4
+    banner_h = 36 if (ssim is not None or label_a or label_b) else 0
+    inter_img_gap = 2
+
+    out_w = wa + gap + wb
+    out_h = banner_h + max(ha, hb)
+
+    composite = Image.new('RGB', (out_w, out_h), (32, 32, 32))
+    draw = ImageDraw.Draw(composite)
+
+    # Draw banner background
+    draw.rectangle([(0, 0), (out_w - 1, banner_h - 1)], fill=(24, 24, 24))
+    # Divider line below banner
+    draw.line([(0, banner_h - 1), (out_w - 1, banner_h - 1)], fill=(80, 80, 80))
+
+    # Labels
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+
+    info_a = label_a
+    info_b = label_b
+    if ssim is not None:
+        info_a += f'  SSIM={ssim:.4f}'
+        info_b += f'  SSIM={ssim:.4f}'
+    if fill_a is not None:
+        info_a += f'  fill={fill_a}%'
+    if fill_b is not None:
+        info_b += f'  fill={fill_b}%'
+    if p99 is not None:
+        suffix = f'  p99={p99}'
+        info_a += suffix
+        info_b += suffix
+
+    if font:
+        draw.text((6, 2), info_a, fill=(180, 220, 180), font=font)
+        draw.text((wa + gap + 6, 2), info_b, fill=(180, 180, 220), font=font)
+    else:
+        draw.text((6, 2), info_a, fill=(180, 220, 180))
+        draw.text((wa + gap + 6, 2), info_b, fill=(180, 180, 220))
+
+    # Paste images
+    img_a_pil = Image.fromarray(arr_a)
+    img_b_pil = Image.fromarray(arr_b)
+    composite.paste(img_a_pil, (0, banner_h))
+    composite.paste(img_b_pil, (wa + gap, banner_h))
+
+    # Thin vertical divider between the two images
+    if gap >= 2:
+        draw.line([(wa, banner_h), (wa, out_h - 1)], fill=(80, 80, 80))
+        if gap > 2:
+            draw.line([(wa + 1, banner_h), (wa + 1, out_h - 1)], fill=(48, 48, 48))
+            draw.line([(wa + gap - 1, banner_h), (wa + gap - 1, out_h - 1)], fill=(48, 48, 48))
+
+    composite.save(out_path)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -215,6 +285,8 @@ def main():
     ap.add_argument('--label',            default='comparison')
     ap.add_argument('--threshold-ssim',   type=float, default=0.90)
     ap.add_argument('--diff-out',         default=None)
+    ap.add_argument('--side-by-side-out', default=None,
+                    help='write side-by-side comparison PNG to this path')
     ap.add_argument('--json',             action='store_true')
     ap.add_argument('--crop-bottom',      type=int, default=0,
                     help='remove N rows from bottom of both images before comparing')
@@ -326,6 +398,14 @@ def main():
     if args.diff_out:
         _write_diff(arr_a, arr_b, args.diff_out)
         result['diff_out'] = args.diff_out
+
+    if args.side_by_side_out:
+        _write_side_by_side(
+            arr_a, arr_b, args.side_by_side_out,
+            label_a=args.label + ' (ref)', label_b=args.label + ' (test)',
+            ssim=ssim, p99=p99, fill_a=fill_a, fill_b=fill_b,
+        )
+        result['side_by_side_out'] = args.side_by_side_out
 
     emit(result)
     return 0 if passed else 1

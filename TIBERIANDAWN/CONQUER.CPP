@@ -1528,9 +1528,10 @@ bool Main_Loop()
 	}
 #endif
 	/* TIM-360: inject cheat actions at fixed frames when TD_CHEAT=1 is set.
-	 * Bypasses the xdotool path since SDL keyboard input is not yet wired in TD.
-	 * Mirrors the actions of the M+Shift / C / F4 / Alt+W debug keys.
-	 * TIM-774: check TD_CHEAT.FLAG as fallback — getenv() returns NULL in the
+	 * Kept for automated smoke testing now that SDL keyboard input is wired
+	 * (TIM-383 + TIM-856). Mirrors the actions of the M+Shift / C / F4 / Alt+W
+	 * debug keys. TIM-774: check TD_CHEAT.FLAG as fallback — getenv() returns
+	 * NULL in the
 	 * PROXY_TO_PTHREAD worker thread; the flag file is shared across threads. */
 	static bool _td_cheat = getenv("TD_CHEAT") != nullptr
 	                        || RawFileClass("TD_CHEAT.FLAG").Is_Available();

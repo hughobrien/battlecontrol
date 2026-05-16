@@ -12,27 +12,43 @@ export default defineConfig({
     baseURL: 'http://localhost:8080',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
-    // Use headed Chrome on Xvfb :99 so OffscreenCanvas + WebGL work via SwiftShader.
-    // Headless shell does not support the PROXY_TO_PTHREAD OffscreenCanvas GL context.
+    // Headed mode required: headless Xvfb with OffscreenCanvas GL context needed
     headless: false,
-    launchOptions: {
-      env: { DISPLAY: ':99' },
-      args: [
-        '--enable-features=SharedArrayBuffer',
-        '--disable-web-security',
-        '--autoplay-policy=no-user-gesture-required',
-        '--enable-webgl',
-        '--enable-unsafe-swiftshader',
-        '--ignore-gpu-blocklist',
-        '--disable-gpu-sandbox',
-      ],
-    },
   },
 
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          env: { DISPLAY: ':99' },
+          args: [
+            '--enable-features=SharedArrayBuffer',
+            '--disable-web-security',
+            '--autoplay-policy=no-user-gesture-required',
+            '--enable-webgl',
+            '--enable-unsafe-swiftshader',
+            '--ignore-gpu-blocklist',
+            '--disable-gpu-sandbox',
+          ],
+        },
+      },
+    },
+    {
+      name: 'firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          env: { DISPLAY: ':99' },
+          firefoxUserPrefs: {
+            'media.autoplay.default': 0,
+            'media.autoplay.enabled': true,
+            'media.volume_scale': '1.0',
+            'webgl.force-enabled': true,
+          },
+        },
+      },
     },
   ],
 });

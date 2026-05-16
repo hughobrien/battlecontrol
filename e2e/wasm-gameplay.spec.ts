@@ -1,6 +1,7 @@
 /**
  * TIM-399 — WASM browser gameplay end-to-end verification.
  * TIM-429 — Visual audit: units, buildings, UI sprites at frames 100/300/500.
+ * TIM-849 — SSIM golden image comparison against committed goldens.
  *
  * Tests run against a live WASM bundle served by serve-coop.py (port 8080),
  * with MIX assets served by serve-assets.py (port 9090).
@@ -12,16 +13,25 @@
  *   2. Mission starts     — Start_Scenario OK in game output
  *   3. Game loop runs     — 100+ frames confirmed in output
  *   4. Audio              — document outcome (expected: silently skipped or active)
- *   6. Visual audit       — non-black pixels and colour diversity at 100/300/500
+ *   6. Visual audit       — non-black pixels, colour diversity, and SSIM ≥ 0.95 at 100/300/500
  */
 
 import { test, expect } from '@playwright/test';
+import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const WASM_URL = 'http://localhost:8080/ra.html';
-const ASSET_URL = 'http://localhost:9090/';
+// Env var overrides for CI — RA_WASM_URL default matches local serve-coop.py on :8080.
+// RA_ASSETS_URL can point to a CDN (e.g. GitHub Pages with CORS headers) for CI runs.
+const WASM_URL  = process.env['RA_WASM_URL']  || 'http://localhost:8080/ra.html';
+const ASSET_URL = process.env['RA_ASSETS_URL'] || 'http://localhost:9090/';
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
+const GOLDENS_DIR = path.join(__dirname, 'goldens');
+const REPO_ROOT = path.resolve(__dirname, '..');
+
+const GOLDEN_F100 = path.join(GOLDENS_DIR, 'ra-gameplay-f100.png');
+const GOLDEN_F300 = path.join(GOLDENS_DIR, 'ra-gameplay-f300.png');
+const GOLDEN_F500 = path.join(GOLDENS_DIR, 'ra-gameplay-f500.png');
 
 // Ensure screenshots directory exists.
 if (!fs.existsSync(SCREENSHOTS_DIR)) {
@@ -128,6 +138,45 @@ async function canvasPixelStats(page: any): Promise<{
       height: h,
     };
   });
+}
+
+function runParityCompare(
+  pathA: string, pathB: string,
+  opts: { label?: string; thresholdSsim?: number; diffOut?: string; sideBySideOut?: string } = {},
+): { status: string; ssim: number; p99Diff: number; fillA: number; fillB: number; error?: string } {
+  const argv = [
+    path.join(REPO_ROOT, 'scripts', 'parity-compare.py'),
+    pathA, pathB,
+    '--label', opts.label ?? 'comparison',
+    '--threshold-ssim', String(opts.thresholdSsim ?? 0.95),
+    '--json',
+  ];
+  if (opts.diffOut) argv.push('--diff-out', opts.diffOut);
+  if (opts.sideBySideOut) argv.push('--side-by-side-out', opts.sideBySideOut);
+
+  const proc = child_process.spawnSync('python3', argv, {
+    encoding: 'utf-8',
+    timeout: 30_000,
+  });
+
+  const lines = (proc.stdout || '').trim().split('\n');
+  const jsonLine = lines[lines.length - 1] || '';
+  try {
+    const r = JSON.parse(jsonLine);
+    return {
+      status:  r.status   ?? 'SKIP',
+      ssim:    r.ssim     ?? 0,
+      p99Diff: r.p99_diff ?? 999,
+      fillA:   r.fill_a   ?? 0,
+      fillB:   r.fill_b   ?? 0,
+      error:   r.error,
+    };
+  } catch {
+    return {
+      status: 'SKIP', ssim: 0, p99Diff: 999, fillA: 0, fillB: 0,
+      error: `parity-compare.py parse error: ${jsonLine.slice(0, 200)}`,
+    };
+  }
 }
 
 test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
@@ -312,23 +361,53 @@ test.describe('Red Alert WASM — browser gameplay (TIM-399)', () => {
     // --- Frame 100 ---
     await waitForOutput(page, '[RA] Main_Loop frame 100', 240_000);
     await page.waitForTimeout(200);
-    const stats100 = await canvasPixelStats(page);
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'ra-visual-frame-100.png'), fullPage: true });
+    let stats100 = await canvasPixelStats(page);
+    const shot100 = path.join(SCREENSHOTS_DIR, 'ra-visual-frame-100.png');
+    await page.screenshot({ path: shot100, fullPage: true });
     console.log(`[frame 100] canvas ${stats100.width}x${stats100.height}  fill=${stats100.fillPct}%  uniqueColors=${stats100.uniqueColors}  hasContent=${stats100.hasContent}`);
+    if (fs.existsSync(GOLDEN_F100)) {
+      const cmp100 = runParityCompare(GOLDEN_F100, shot100, { label: 'f100', thresholdSsim: 0.95 });
+      console.log(`[frame 100] SSIM=${cmp100.ssim}  p99=${cmp100.p99Diff}  golden: fill=${cmp100.fillA}%  test: fill=${cmp100.fillB}%`);
+      expect(cmp100.ssim, `frame 100 SSIM ≥ 0.95 (got ${cmp100.ssim})`).toBeGreaterThanOrEqual(0.95);
+    } else {
+      fs.mkdirSync(GOLDENS_DIR, { recursive: true });
+      fs.copyFileSync(shot100, GOLDEN_F100);
+      console.warn(`[frame 100] golden not found — saved candidate to ${GOLDEN_F100}`);
+    }
 
     // --- Frame 300 ---
     await waitForOutput(page, '[RA] Main_Loop frame 300', 300_000);
     await page.waitForTimeout(200);
-    const stats300 = await canvasPixelStats(page);
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'ra-visual-frame-300.png'), fullPage: true });
+    let stats300 = await canvasPixelStats(page);
+    const shot300 = path.join(SCREENSHOTS_DIR, 'ra-visual-frame-300.png');
+    await page.screenshot({ path: shot300, fullPage: true });
     console.log(`[frame 300] canvas ${stats300.width}x${stats300.height}  fill=${stats300.fillPct}%  uniqueColors=${stats300.uniqueColors}  hasContent=${stats300.hasContent}`);
+    if (fs.existsSync(GOLDEN_F300)) {
+      const cmp300 = runParityCompare(GOLDEN_F300, shot300, { label: 'f300', thresholdSsim: 0.95 });
+      console.log(`[frame 300] SSIM=${cmp300.ssim}  p99=${cmp300.p99Diff}  golden: fill=${cmp300.fillA}%  test: fill=${cmp300.fillB}%`);
+      expect(cmp300.ssim, `frame 300 SSIM ≥ 0.95 (got ${cmp300.ssim})`).toBeGreaterThanOrEqual(0.95);
+    } else {
+      fs.mkdirSync(GOLDENS_DIR, { recursive: true });
+      fs.copyFileSync(shot300, GOLDEN_F300);
+      console.warn(`[frame 300] golden not found — saved candidate to ${GOLDEN_F300}`);
+    }
 
     // --- Frame 500 ---
     await waitForOutput(page, '[RA] Main_Loop frame 500', 300_000);
     await page.waitForTimeout(200);
-    const stats500 = await canvasPixelStats(page);
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'ra-visual-frame-500.png'), fullPage: true });
+    let stats500 = await canvasPixelStats(page);
+    const shot500 = path.join(SCREENSHOTS_DIR, 'ra-visual-frame-500.png');
+    await page.screenshot({ path: shot500, fullPage: true });
     console.log(`[frame 500] canvas ${stats500.width}x${stats500.height}  fill=${stats500.fillPct}%  uniqueColors=${stats500.uniqueColors}  hasContent=${stats500.hasContent}`);
+    if (fs.existsSync(GOLDEN_F500)) {
+      const cmp500 = runParityCompare(GOLDEN_F500, shot500, { label: 'f500', thresholdSsim: 0.95 });
+      console.log(`[frame 500] SSIM=${cmp500.ssim}  p99=${cmp500.p99Diff}  golden: fill=${cmp500.fillA}%  test: fill=${cmp500.fillB}%`);
+      expect(cmp500.ssim, `frame 500 SSIM ≥ 0.95 (got ${cmp500.ssim})`).toBeGreaterThanOrEqual(0.95);
+    } else {
+      fs.mkdirSync(GOLDENS_DIR, { recursive: true });
+      fs.copyFileSync(shot500, GOLDEN_F500);
+      console.warn(`[frame 500] golden not found — saved candidate to ${GOLDEN_F500}`);
+    }
 
     // Verify no crash during the run.
     const output = await getOutput(page);

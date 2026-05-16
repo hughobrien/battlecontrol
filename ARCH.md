@@ -100,8 +100,12 @@ maps SDL keysyms to Westwood `VK_*` codes, packs `WWKEY_*BIT` modifier bits,
 and calls `_Kbd->Put()`. Mouse button and motion events update `SDL_Cursor_X/Y`
 (read by `GetCursorPos` stubs).
 
-TD does not yet have SDL keyboard wired in; keyboard cheats are injected
-directly via the frame-counter hook in `TIBERIANDAWN/CONQUER.CPP`.
+TD has SDL keyboard wired via the same `SDL_Process_Input_Events` pump in
+`linux/td-win32-stubs.cpp` (TIM-383 + TIM-856). `WWKeyboardClass::Check()`
+calls `Wait_Vert_Blank()` → `SDL_Process_Input_Events()` on every poll, so
+SDL_KEYDOWN/KEYUP events reach the engine keyboard buffer through all code
+paths including the main menu gadget system. Frame-counter cheat injection
+(`TD_CHEAT=1`) is kept for automated smoke testing.
 
 ### Win32 CRT shims
 

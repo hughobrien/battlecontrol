@@ -88,8 +88,8 @@ async function canvasStats(page: any) {
 
 function runParityCompare(
   pathA: string, pathB: string,
-  opts: { label?: string; thresholdSsim?: number; diffOut?: string } = {},
-): { status: string; ssim: number; p99Diff: number; fillA: number; fillB: number; error?: string } {
+  opts: { label?: string; thresholdSsim?: number; diffOut?: string; sideBySideOut?: string } = {},
+): { status: string; ssim: number; p99Diff: number; fillA: number; fillB: number; error?: string; sideBySideOut?: string } {
   const argv = [
     path.join(REPO_ROOT, 'scripts', 'parity-compare.py'),
     pathA, pathB,
@@ -98,6 +98,7 @@ function runParityCompare(
     '--json',
   ];
   if (opts.diffOut) argv.push('--diff-out', opts.diffOut);
+  if (opts.sideBySideOut) argv.push('--side-by-side-out', opts.sideBySideOut);
 
   const proc = child_process.spawnSync('python3', argv, {
     encoding: 'utf-8',
@@ -115,11 +116,13 @@ function runParityCompare(
       fillA:   r.fill_a   ?? 0,
       fillB:   r.fill_b   ?? 0,
       error:   r.error,
+      sideBySideOut: r.side_by_side_out,
     };
   } catch {
     return {
       status: 'SKIP', ssim: 0, p99Diff: 999, fillA: 0, fillB: 0,
       error: `parity-compare.py parse error: ${jsonLine.slice(0, 200)}`,
+      sideBySideOut: undefined,
     };
   }
 }
@@ -238,8 +241,9 @@ test.describe('T10 — RA WASM post-game menu-bleed regression (TIM-777)', () =>
     await page.screenshot({ path: postGameShot });
 
     const diffOut = path.join(SCREENSHOTS_DIR, 't10-diff-menu-bleed.png');
+    const sbsOut  = path.join(SCREENSHOTS_DIR, 't10-sbs-menu-bleed.png');
     const cmp = runParityCompare(CLEAN_GOLDEN, postGameShot, {
-      label: 'menu-bleed', thresholdSsim: 0.90, diffOut,
+      label: 'menu-bleed', thresholdSsim: 0.90, diffOut, sideBySideOut: sbsOut,
     });
 
     console.log(`[T10-2] parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} ` +
@@ -249,6 +253,7 @@ test.describe('T10 — RA WASM post-game menu-bleed regression (TIM-777)', () =>
     // Attach artifacts on failure
     if (cmp.status !== 'PASS') {
       if (fs.existsSync(diffOut))       await testInfo.attach('diff-menu-bleed.png',     { path: diffOut,     contentType: 'image/png' });
+      if (fs.existsSync(sbsOut))        await testInfo.attach('sbs-menu-bleed.png',      { path: sbsOut,      contentType: 'image/png' });
       if (fs.existsSync(CLEAN_GOLDEN))  await testInfo.attach('clean-menu-golden.png',    { path: CLEAN_GOLDEN, contentType: 'image/png' });
       if (fs.existsSync(postGameShot))  await testInfo.attach('postgame-menu.png',        { path: postGameShot, contentType: 'image/png' });
     }

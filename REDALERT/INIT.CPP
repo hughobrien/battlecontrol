@@ -728,11 +728,20 @@ bool Select_Game(bool fade)
 #endif
 
 #ifndef _MSC_VER
+		/* TIM-839: run RA_AUTOSTART scenario at most once.
+		 * After one scenario completes, return false on the next
+		 * entry so the game loop exits cleanly instead of looping. */
+		static bool _ra_autostart_completed = false;
 		/* TIM-206: bypass menu entirely when RA_AUTOSTART is set.
 		 * TIM-471: also check RA_AUTOSTART.FLAG in MEMFS — getenv() returns NULL
 		 * under Emscripten PROXY_TO_PTHREAD (C environ not propagated to worker),
 		 * so preloader.js creates the flag file as a cross-thread fallback. */
 		if (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
+			if (_ra_autostart_completed) {
+				fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART already completed, exiting\n"); fflush(stderr);
+				return false;
+			}
+			_ra_autostart_completed = true;
 			fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI (EASY)\n"); fflush(stderr);
 			Scen.CDifficulty = DIFF_EASY;
 			Scen.Difficulty = DIFF_EASY;
@@ -745,6 +754,28 @@ bool Select_Game(bool fade)
 			Session.Type = GAME_NORMAL;
 			selection = SEL_START_NEW_GAME;
 			process = false;
+		}
+
+		/* TIM-812: ?scenario=SCU02EA URL param — override the autostart mission.
+		 * preloader.js writes RA_AUTOSTART_SCENARIO.FLAG in MEMFS with the
+		 * scenario name (e.g. "SCU02EA.INI").  Read it and override Scen. */
+		{
+			RawFileClass scenFile("RA_AUTOSTART_SCENARIO.FLAG");
+			if (scenFile.Is_Available()) {
+				char scenBuf[32] = {};
+				scenFile.Open(READ);
+				scenFile.Read(scenBuf, sizeof(scenBuf) - 1);
+				scenFile.Close();
+				/* Strip trailing whitespace/newlines. */
+				for (int si = 0; scenBuf[si]; si++) {
+					if (scenBuf[si] == '\n' || scenBuf[si] == '\r' || scenBuf[si] == ' ') {
+						scenBuf[si] = '\0';
+						break;
+					}
+				}
+				fprintf(stderr, "[RA] RA_AUTOSTART_SCENARIO.FLAG → overriding scenario to %s\n", scenBuf); fflush(stderr);
+				Scen.Set_Scenario_Name(scenBuf);
+			}
 		}
 #endif
 
