@@ -1,0 +1,125 @@
+{
+  "issue": "TIM-768",
+  "wine_og": {
+    "t05-initial": {
+      "path": "t05-initial.png",
+      "size_bytes": 110353,
+      "full_width": 800,
+      "full_height": 600,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 13.9,
+      "colors": 4046
+    },
+    "t10-pre-side": {
+      "path": "t10-pre-side.png",
+      "size_bytes": 110015,
+      "full_width": 800,
+      "full_height": 600,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 13.9,
+      "colors": 3973
+    },
+    "t15-post-gdi-click": {
+      "path": "t15-post-gdi-click.png",
+      "size_bytes": 111701,
+      "full_width": 800,
+      "full_height": 600,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 13.9,
+      "colors": 4115
+    },
+    "t25-briefing": {
+      "path": "t25-briefing-advance.png",
+      "size_bytes": 24099,
+      "full_width": 800,
+      "full_height": 600,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 30.5,
+      "colors": 1124
+    },
+    "t35-post-map": {
+      "path": "t35-post-map.png",
+      "size_bytes": 25621,
+      "full_width": 800,
+      "full_height": 600,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 30.7,
+      "colors": 1210
+    },
+    "t45-frame100": {
+      "path": "t45-frame100.png",
+      "size_bytes": 30354,
+      "full_width": 800,
+      "full_height": 600,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 31.1,
+      "colors": 1370
+    },
+    "t60-frame250": {
+      "path": "t60-frame250.png",
+      "size_bytes": 32543,
+      "full_width": 800,
+      "full_height": 600,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 31.4,
+      "colors": 1454
+    },
+    "t90-frame500": {
+      "path": "t90-frame500.png",
+      "size_bytes": 32814,
+      "full_width": 800,
+      "full_height": 600,
+      "width": 800,
+      "height": 600,
+      "fill_pct": 31.4,
+      "colors": 1457
+    }
+  },
+  "wasm": {
+    "frame100": {
+      "path": "td-visual-frame-100.png",
+      "size_bytes": 94255,
+      "full_width": 1280,
+      "full_height": 720,
+      "width": 640,
+      "height": 480,
+      "fill_pct": 24.2,
+      "colors": 103
+    },
+    "frame300": {
+      "path": "td-visual-frame-300.png",
+      "size_bytes": 127519,
+      "full_width": 1280,
+      "full_height": 720,
+      "width": 640,
+      "height": 480,
+      "fill_pct": 32.9,
+      "colors": 104
+    },
+    "frame500": {
+      "path": "td-visual-frame-500.png",
+      "size_bytes": 140368,
+      "full_width": 1280,
+      "full_height": 720,
+      "width": 640,
+      "height": 480,
+      "fill_pct": 36.7,
+      "colors": 108
+    }
+  },
+  "palette_overlap_pct": 0.9,
+  "summary": {
+    "wine_og_frames_above_20pct": 5,
+    "wasm_frames_above_20pct": 3,
+    "wine_og_status": "PASS",
+    "wasm_status": "PASS",
+    "overall_status": "PASS"
+  }
+}
