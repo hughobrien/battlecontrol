@@ -935,9 +935,6 @@ void Free_Sample(void const * sample)
 int File_Stream_Sample_Vol(char const * filename, int volume, BOOL real_time_start)
 {
     (void)real_time_start;     // pre-fill happens unconditionally; no async-start
-    fprintf(stderr, "[RA] File_Stream_Sample_Vol: filename=%s volume=%d audio_open=%d\n",
-            filename ? filename : "(null)", volume, (int)g_audio_open);
-    fflush(stderr);
     if (filename == NULL || !g_audio_open) return 0;
 
     // Replace any prior song. Stop_Sample takes the SDL lock; Music_Teardown
