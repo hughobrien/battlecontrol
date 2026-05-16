@@ -413,18 +413,6 @@ void Simple_Text_Print(char const * text, unsigned x, unsigned y, RemapControlTy
 
 	forecolor = fore->Color;
 
-#ifndef _MSC_VER
-	{
-		static int _txt_diag = 0;
-		if (_txt_diag < 3) {
-			_txt_diag++;
-			fprintf(stderr, "[TEXT] Simple_Text_Print: fore->Color=%d fore->Bright=%d back=%d\n",
-				(int)fore->Color, (int)fore->Bright, (int)back);
-			fflush(stderr);
-		}
-	}
-#endif
-
 	/*
 	**	A gradient font always requires special fixups for the palette
 	*/
