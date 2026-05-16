@@ -452,5 +452,92 @@ but returns real queue size when another consumer (the game) happens to have dev
 
 ---
 
-*Last updated: 2026-05-15. Maintainer: EmscriptenExpert agent.*
-*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712.*
+## 11. SDL_BlitSurface palette conversion under PROXY_TO_PTHREAD (2026-05-16)
+
+**Symptom:** Game rendering produces wrong colours in WASM build; native build is correct.
+Colours are shifted or completely wrong for palette-indexed source surfaces.
+
+**Root cause:** Emscripten's `USE_SDL=2` port does not reliably use the SDL surface palette
+when `SDL_BlitSurface` performs an INDEX8→ARGB8888 blit from a Worker thread (created by
+`PROXY_TO_PTHREAD`). The SDL surface-palette state (set via `SDL_SetPaletteColors`) can be
+stale or uninitialised when accessed from the Worker's SDL context.
+
+**Fix:** Replace `SDL_BlitSurface` with manual indexed→ARGB expansion using the
+authoritative palette array (populated by `Set_DD_Palette` / `Set_DD_Palette_8bit`):
+
+```cpp
+// Instead of:
+//   SDL_Surface* src = SDL_CreateRGBSurfaceWithFormatFrom(buf, w, h, 8, pitch,
+//                                                           SDL_PIXELFORMAT_INDEX8);
+//   SDL_SetPaletteColors(src->format->palette, my_palette, 0, 256);
+//   SDL_BlitSurface(src, nullptr, argb_surf, nullptr);
+//   SDL_FreeSurface(src);
+
+// Do manual expansion:
+const uint8_t* src = (const uint8_t*)indexed_pixels;
+uint32_t*      dst = (uint32_t*)argb_surf->pixels;
+int srcPitch = indexed_pitch;
+int dstPitch32 = argb_surf->pitch / 4;
+for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+        uint8_t idx = src[y * srcPitch + x];
+        const SDL_Color& c = my_palette[idx];
+        dst[y * dstPitch32 + x] =
+            ((uint32_t)0xFF << 24) |
+            ((uint32_t)c.r  << 16) |
+            ((uint32_t)c.g  <<  8) |
+            ((uint32_t)c.b);
+    }
+}
+```
+
+This is a CPU-bounded inner loop (640×480 = 307,200 pixels per frame); the manual
+expansion has comparable performance to SDL_BlitSurface on modern WASM VMs and is
+not a bottleneck.
+
+*(Landed in TIM-858 for TD; originally established as TIM-573 for RA in DDRAW.CPP.)*
+
+**Reference:** RA `DDRAW.CPP:Wait_Vert_Blank` (lines 1052–1087), TD `td-win32-stubs.cpp:Wait_Vert_Blank`.
+
+---
+
+## 12. EMULATE_FUNCTION_POINTER_CASTS for residual audio null-function traps (2026-05-16)
+
+**Symptom:** RA WASM audio produces an intermittent null-function trap at ~50% rate even
+after applying the TIM-593 (-O2 link) and TIM-604 (remove `SDL_AUDIO_ALLOW_FREQUENCY_CHANGE`)
+fixes. A single CI run may pass; cold-cache runs fail non-deterministically.
+
+**Root cause:** RA compiles at `-O3` per-TU with `-O2` link-time Binaryen optimisation.
+At `-O3`, LLVM can inline or transform `Sound_Mixer_Callback` (and other function pointers)
+in ways that make the function's table entry appear unused to Binaryen's liveness analysis,
+even at `-O2`. On newer emsdk versions (post Binaryen 129), the pruner is more aggressive
+and removes `HandleAudioProcess` and similar SDL2 internal function-table entries that are
+only reached from JavaScript via `dynCall('vp', ptr, [dev])`.
+
+**Fix:** Add `-sEMULATE_FUNCTION_POINTER_CASTS=1` to the WASM link flags. This routes all
+indirect function calls through a JavaScript dispatcher that maps function indices to real
+WASM function references, making Binaryen's function-table pruning harmless. The performance
+overhead is 2–5% and is acceptable for this use case.
+
+```cmake
+target_link_options(my_game PRIVATE
+    -sEMULATE_FUNCTION_POINTER_CASTS=1
+)
+```
+
+This flag should be used on any target that:
+- Compiles at `-O3` or higher per-TU, AND
+- Links at `-O2` or higher, AND
+- Uses `SDL_OpenAudioDevice` (or any library that registers WASM function pointers via `dynCall`)
+
+TD (which compiles at `-O2`) does not need this flag; removing `SDL_AUDIO_ALLOW_FREQUENCY_CHANGE`
+is sufficient to prevent its audio null-function trap.
+
+*(Landed in TIM-858.)*
+
+**Reference:** [Emscripten EMULATE_FUNCTION_POINTER_CASTS doc](https://emscripten.org/docs/porting/guidelines/function_pointer_issues.html#emulate-function-pointer-casts)
+
+---
+
+*Last updated: 2026-05-16. Maintainer: EmscriptenExpert agent.*
+*Source issues: TIM-399, TIM-489, TIM-555, TIM-573, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712, TIM-757, TIM-858.*

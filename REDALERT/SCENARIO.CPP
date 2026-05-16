@@ -565,13 +565,23 @@ bool Read_Scenario(char * name)
 		// TIM-310/TIM-308: smoke-test probes — only active when RA_AUTOSTART is set.
 		// Without this gate, every user playing via `nix run` would get forced wins after
 		// 200 frames and Mammoth tanks spawned at mission start (TIM-416).
-		if (getenv("RA_AUTOSTART")) {
+		// TIM-835: RA_AUTOSTART_ONCE=1 / RA_AUTOSTART_ONCE.FLAG limits autostart to one cycle
+		// so the scenario win doesn't loop indefinitely.
+		if (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
 			// TIM-310: pass-90 — track restart cycle; arm per-cycle win trigger 5 frames out
 			{
 				static int s_cycle = 0;
 				s_cycle++;
-				g_tim310_restart_frame = Frame;  // signal CONQUER.CPP to force win at Frame+200
-				fprintf(stderr, "[TIM-310] read_scenario_ok cycle=%d frame=%ld\n", s_cycle, (long)Frame);
+				bool once = getenv("RA_AUTOSTART_ONCE") != nullptr
+				            || RawFileClass("RA_AUTOSTART_ONCE.FLAG").Is_Available();
+				if (once && s_cycle > 1) {
+					g_tim310_restart_frame = -1;
+					fprintf(stderr, "[TIM-835] autostart_once: disarmed after cycle=%d frame=%ld\n",
+					        s_cycle, (long)Frame);
+				} else {
+					g_tim310_restart_frame = Frame;  // signal CONQUER.CPP to force win at Frame+200
+					fprintf(stderr, "[TIM-310] read_scenario_ok cycle=%d frame=%ld\n", s_cycle, (long)Frame);
+				}
 			}
 			// TIM-308: pass-89 — inject 5 Allied Mammoth tanks near player start (retained for combat coverage)
 			if (Session.Type == GAME_NORMAL && PlayerPtr != NULL) {
@@ -1255,7 +1265,7 @@ void Do_Lose(void)
 {
 #ifndef _MSC_VER
 	// TIM-489: same as Do_Win guard — modal dialog blocks game loop in audit mode.
-	if (getenv("RA_AUTOSTART")) {
+	if (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
 		fprintf(stderr, "[RA] Do_Lose() suppressed (autostart fps audit)\n");
 		return;
 	}

@@ -1090,6 +1090,17 @@ extern "C" void Play_Movie_Linux(const char* name)
             }
             continue;
         }
+        // TIM-845: Handle CPL0 at the top level — some VQA files
+        // place palette chunks between VQFR frames instead of inside VQFR.
+        if (chunk_eq(chk, "CPL0")) {
+            long rd = (long)std::min((uint32_t)768u, chk_sz);
+            uint8_t buf[768];
+            f.Read(buf, rd);
+            if (rd > 768) f.Seek(rd - 768, SEEK_CUR);
+            memcpy(palette, buf, (size_t)rd);
+            if (chk_sz & 1) f.Seek(1, SEEK_CUR);
+            continue;
+        }
         if (!chunk_eq(chk, "VQFR")) {
             // Unknown top-level chunk — skip
             if (chk_sz) f.Seek((long)chk_sz + (chk_sz & 1), SEEK_CUR);
