@@ -99,16 +99,14 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ninja-build cmake
 
-      - name: Cache Emscripten build
+      - name: Cache Emscripten system libraries
         uses: actions/cache@v4
         with:
-          path: |
-            build-wasm
-            ~/.emscripten_cache
-          key: emscripten-ra-${{ github.sha }}
+          path: ~/.emscripten_cache
+          key: emscripten-cache-ra-${{ github.sha }}
           restore-keys: |
-            emscripten-ra-
-            emscripten-
+            emscripten-cache-ra-
+            emscripten-cache-
 
       - name: Configure WASM build
         run: emcmake cmake --preset wasm
@@ -148,16 +146,14 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ninja-build cmake
 
-      - name: Cache Emscripten build
+      - name: Cache Emscripten system libraries
         uses: actions/cache@v4
         with:
-          path: |
-            build-wasm
-            ~/.emscripten_cache
-          key: emscripten-td-${{ github.sha }}
+          path: ~/.emscripten_cache
+          key: emscripten-cache-td-${{ github.sha }}
           restore-keys: |
-            emscripten-td-
-            emscripten-
+            emscripten-cache-td-
+            emscripten-cache-
 
       - name: Configure WASM build
         run: emcmake cmake --preset wasm
