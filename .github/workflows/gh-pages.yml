@@ -205,6 +205,43 @@ jobs:
             e2e/screenshots/t6-td-wasm-*.png
             e2e/test-results/
 
+      - name: TD audio pitch probe (T7 / TIM-767)
+        # TIM-767 regression T7: loads td.html with autostart=1 (skips menu,
+        # starts GDI L1), injects an AnalyserNode FFT tap, waits for frame 100,
+        # then samples the spectral centroid at t=5s and t=20s.  Asserts mean
+        # centroid < 700 Hz — detects the TIM-555 class of 2× pitch regression
+        # where 22050 Hz PCM is fed raw to a 44100/48000 Hz AudioContext.
+        # Skipped when TD_ASSETS_URL secret is not set.
+        env:
+          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
+        run: |
+          if [ -z "$TD_ASSETS_URL" ]; then
+            echo "::notice::T7 skipped — TD_ASSETS_URL secret not set"
+            exit 0
+          fi
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          COOP_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T7-td-audio-pitch.spec.ts
+          T7_EXIT=$?
+          kill $COOP_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          exit $T7_EXIT
+
+      - name: Upload T7 audio pitch artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t7-td-audio-pitch-results
+          path: |
+            e2e/screenshots/t7-td-*.png
+            e2e/screenshots/t7-td-fft-*.json
+            e2e/screenshots/t7-td-console.log
+            e2e/test-results/
+
       - name: TIM-695 TD WASM VQA — intro VQA verification (LOGO.VQA)
         # Runs the full TD VQA verification spec.  It auto-skips when LOGO.VQA
         # is not reachable at TIM695_ASSET_URL — copyrighted TD MOVIES.MIX
