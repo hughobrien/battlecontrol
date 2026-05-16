@@ -1010,6 +1010,37 @@ bool Select_Game(bool fade)
 			selection      = SEL_START_NEW_GAME;
 			process        = false;
 		}
+		/* TIM-812: ?scenario=SCG02EA URL param — override the autostart mission.
+		 * preloader.js writes TD_AUTOSTART_SCENARIO.FLAG with the scenario name
+		 * (e.g. "SCG02EA").  Parse it and override Scenario/ScenPlayer/ScenDir/ScenVar. */
+		{
+			RawFileClass scenFile("TD_AUTOSTART_SCENARIO.FLAG");
+			if (scenFile.Is_Available()) {
+				char scenBuf[24] = {};
+				scenFile.Open(READ);
+				scenFile.Read(scenBuf, sizeof(scenBuf) - 1);
+				scenFile.Close();
+				/* Strip trailing whitespace/newlines. */
+				for (int si = 0; scenBuf[si]; si++) {
+					if (scenBuf[si] == '\n' || scenBuf[si] == '\r' || scenBuf[si] == ' ') {
+						scenBuf[si] = '\0';
+						break;
+					}
+				}
+				int len = (int)strlen(scenBuf);
+				if (len >= 7) {
+					Scenario       = (scenBuf[3] - '0') * 10 + (scenBuf[4] - '0');
+					ScenPlayer     = (scenBuf[2] == 'B') ? SCEN_PLAYER_NOD : SCEN_PLAYER_GDI;
+					ScenDir        = (scenBuf[5] == 'W') ? SCEN_DIR_WEST : SCEN_DIR_EAST;
+					ScenVar        = (ScenarioVarType)((scenBuf[6] - 'A') + SCEN_VAR_A);
+					Set_Scenario_Name(ScenarioName, Scenario, ScenPlayer, ScenDir, ScenVar);
+					fprintf(stderr, "[TD] TD_AUTOSTART_SCENARIO.FLAG → %s (Scenario=%d)\n", ScenarioName, Scenario); fflush(stderr);
+				} else {
+					fprintf(stderr, "[TD] TD_AUTOSTART_SCENARIO.FLAG ignored — short content '%s'\n", scenBuf); fflush(stderr);
+				}
+			}
+		}
+
 		/* TIM-360: TD_CHEAT=1 sets Debug_Flag without a PARM obfuscated string.
 		 * Enables CHEAT_KEYS processing (M+Shift credits, C tech-unlock, F4 shroud). */
 		if (getenv("TD_CHEAT")) {

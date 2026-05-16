@@ -746,6 +746,28 @@ bool Select_Game(bool fade)
 			selection = SEL_START_NEW_GAME;
 			process = false;
 		}
+
+		/* TIM-812: ?scenario=SCU02EA URL param — override the autostart mission.
+		 * preloader.js writes RA_AUTOSTART_SCENARIO.FLAG in MEMFS with the
+		 * scenario name (e.g. "SCU02EA.INI").  Read it and override Scen. */
+		{
+			RawFileClass scenFile("RA_AUTOSTART_SCENARIO.FLAG");
+			if (scenFile.Is_Available()) {
+				char scenBuf[32] = {};
+				scenFile.Open(READ);
+				scenFile.Read(scenBuf, sizeof(scenBuf) - 1);
+				scenFile.Close();
+				/* Strip trailing whitespace/newlines. */
+				for (int si = 0; scenBuf[si]; si++) {
+					if (scenBuf[si] == '\n' || scenBuf[si] == '\r' || scenBuf[si] == ' ') {
+						scenBuf[si] = '\0';
+						break;
+					}
+				}
+				fprintf(stderr, "[RA] RA_AUTOSTART_SCENARIO.FLAG → overriding scenario to %s\n", scenBuf); fflush(stderr);
+				Scen.Set_Scenario_Name(scenBuf);
+			}
+		}
 #endif
 
 		while (process) {
