@@ -93,7 +93,7 @@ jobs:
           PASS=0; FAIL=0
           for bin in ra td; do
             echo "::group::smoke: $bin"
-            DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 5 "build/$bin" > "/tmp/smoke-${bin}.log" 2>&1; RC=$?
+            DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 5 "build/$bin" > "/tmp/smoke-${bin}.log" 2>&1 && RC=$? || RC=$?
             LOG=$(cat "/tmp/smoke-${bin}.log")
             echo "$LOG"
             if echo "$LOG" | grep -qE "SIGSEGV|Segmentation fault|signal 11|CRASH|Aborted"; then
