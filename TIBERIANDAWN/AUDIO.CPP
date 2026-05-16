@@ -538,9 +538,6 @@ int  Get_Digi_Handle(void) { return g_td_audio_device > 0 ? static_cast<int>(g_t
 // success so Sample_Status() can track play-state; -1 on any failure.
 int File_Stream_Sample_Vol(char const *filename, int volume, BOOL /*real_time_start*/)
 {
-    fprintf(stderr, "[TD] File_Stream_Sample_Vol: file=%s vol=%d open=%d\n",
-            filename ? filename : "(null)", volume, (int)g_td_audio_open);
-    fflush(stderr);
     if (!filename || !g_td_audio_open) return -1;
 
     // Stop any prior music in the reserved slot.
