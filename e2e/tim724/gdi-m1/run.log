@@ -1,0 +1,101 @@
+=== preflight ===
+  wine:       wine-10.0 (Debian 10.0~repack-6)
+  exe:        /opt/tiberiandawn/C&C95.EXE (3ead491cf25e...)
+  ddraw:      cnc-ddraw (ddraw=n, renderer=gdi)
+  prefix:     /home/hugh/.wine-tim724-gdi
+  data:       /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1
+  artifacts:  /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1
+  display:    :92
+  applying TD binary patches...
+  Backup: /tmp/tim724-gdi-n9aV/C&C95.EXE.td_focus_orig
+  Patched 0x1e3b4: GameInFocus spin loop #1
+  Patched 0x448f7: GameInFocus spin loop #2
+  Patched 0x6c5fb: GameInFocus spin loop #3
+/tmp/tim724-gdi-n9aV/C&C95.EXE: td-focus-skip patch applied (53d1670fc4122dac…)
+  Backup: /tmp/tim724-gdi-n9aV/C&C95.EXE.td_game_in_focus_orig
+  Patched entry at 0xca094 -> jmp 0x4e5c58
+  Patched code cave at 0xd6058 (22 bytes)
+  Re-pinned spin site at 0x1e3ad
+  Re-pinned spin site at 0x448f0
+  Re-pinned spin site at 0x6c5f4
+/tmp/tim724-gdi-n9aV/C&C95.EXE: td-game-in-focus pin applied (460bf72d18447a93…)
+  Backup: /tmp/tim724-gdi-n9aV/C&C95.EXE.td_vqa_orig
+  Patched 0x1d330: Play_Movie entry -> ret
+/tmp/tim724-gdi-n9aV/C&C95.EXE: td-vqa-skip patch applied (5f0f37829a7db69d…)
+  Backup: /tmp/tim724-gdi-n9aV/C&C95.EXE.td_activateapp_orig
+  Patched 0x1341: WM_ACTIVATEAPP GameInFocus store -> NOP x6
+/tmp/tim724-gdi-n9aV/C&C95.EXE: td-activateapp patch applied (46a6d902963e4f61…)
+  Backup: /tmp/tim724-gdi-n9aV/C&C95.EXE.ddmode_orig
+  Patched 0xbc6c3: 0x57 -> 0x90  [NOP push %edi (bpp arg to SetDisplayMode)]
+  Patched 0xbc6c8: 0x51 -> 0x90  [NOP push %ecx (height arg to SetDisplayMode)]
+  Patched 0xbc6ce: 0x56 -> 0x90  [NOP push %esi (width arg to SetDisplayMode)]
+  Patched 0xbc6d1: 0x50 -> 0x90  [NOP push %eax (this/IDirectDraw* arg)]
+  Patched 0xbc6d2: 0xff -> 0x31  [SetDisplayMode call -> xor eax,eax (fake DD_OK)]
+  Patched 0xbc6d3: 0x53 -> 0xc0  [SetDisplayMode call -> xor eax,eax (cont)]
+  Patched 0xbc6d4: 0x54 -> 0x90  [SetDisplayMode call -> nop]
+/tmp/tim724-gdi-n9aV/C&C95.EXE: patched OK (46dc1eb4a8114361…)
+  Backup: /tmp/tim724-gdi-n9aV/C&C95.EXE.setcoop_hwnd_orig
+  Patched 0xbc6ae: jmp → cave at VA 0x4e5f9b
+  Patched 0xd639b: code cave (24 bytes) with real HWND
+/tmp/tim724-gdi-n9aV/C&C95.EXE: td-setcoop-hwnd patch applied (19ab8620eadfe1b3…)
+  Backup: /tmp/tim724-gdi-n9aV/C&C95.EXE.ioport_orig
+  Patched 0xcd9b4: in al,dx → xor eax,eax (timing loop fake read)
+  Patched 0xcd9bf: jge → nop nop (timing-loop back-edge)
+  Patched 0xd2edc: VBlank-sync helper 1: spin-until-active → nop×7
+  Patched 0xd2ef9: VBlank-sync helper 2: spin-until-inactive → nop×7
+/tmp/tim724-gdi-n9aV/C&C95.EXE: td-ioport patch applied (42664f2aa13fe1dc…)
+  Backup: /tmp/tim724-gdi-n9aV/C&C95.EXE.td_side_preview_orig
+  Patched 0x168a: je 0x4112b8 → jmp 0x4112b8 (skip NULL preview-frame copy)
+/tmp/tim724-gdi-n9aV/C&C95.EXE: td-side-preview-skip applied (700e61a8fba5b23a…)
+  patch chain done: 700e61a8fba5...
+  D: label set to GDI95 via .windows-label
+  cnc-ddraw installed: /tmp/cnc-ddraw/ddraw.dll → /tmp/tim724-gdi-n9aV/ddraw.dll
+  TEMPERAT.PAL extracted (768 bytes)
+  stub VQP files created (all GDI/NOD mission briefings)
+reg: The operation completed successfully
+
+=== starting Xvfb + openbox on :92 ===
+
+=== launching C&C95.EXE ===
+  waiting for 'Command & Conquer' window...
+  game window appeared after 3s (wid=12582917)
+  shot t05-initial: 110590B sha=e4b669a8adb1 colors=4600
+  window origin: client=(193,202) titlebar=0px
+  phase 1: advance to side-select menu...
+  inject key vk=0x0D
+  inject key vk=0x0D
+  inject key vk=0x20
+  shot t10-pre-side: 110103B sha=e691d8758ed0 colors=4604
+  phase 2: click GDI side...
+  xdo_click game=(160,180) screen=(353,382)
+  shot t15-post-gdi-click: 111701B sha=998e465099a9 colors=4771
+  phase 3: advance through briefing → strategic map → mission start...
+  xdo_click game=(320,200) screen=(513,402)
+  inject key vk=0x0D
+  inject key vk=0x0D
+  shot t25-briefing-advance: 24102B sha=1779cb3abd1e colors=1547
+  xdo_click game=(110,175) screen=(303,377)
+  inject key vk=0x0D
+  shot t35-post-map: 24577B sha=db3379520d2a colors=1573
+  phase 5: capture gameplay frames...
+  shot t45-frame100: 25725B sha=105b73e88b9c colors=1668
+  shot t60-frame250: 32403B sha=e05a3c6aa344 colors=1860
+  shot t90-frame500: 32583B sha=168865254c94 colors=1868
+
+=== final ===
+  TD alive: yes
+  window: Default IME
+  window: Default IME
+  window: Command & Conquer
+
+=== screenshots ===
+-rw-rw-r-- 1 hugh hugh 110590 May 15 21:19 /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1/t05-initial.png
+-rw-rw-r-- 1 hugh hugh 110103 May 15 21:19 /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1/t10-pre-side.png
+-rw-rw-r-- 1 hugh hugh 111701 May 15 21:19 /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1/t15-post-gdi-click.png
+-rw-rw-r-- 1 hugh hugh  24102 May 15 21:19 /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1/t25-briefing-advance.png
+-rw-rw-r-- 1 hugh hugh  24577 May 15 21:19 /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1/t35-post-map.png
+-rw-rw-r-- 1 hugh hugh  25725 May 15 21:19 /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1/t45-frame100.png
+-rw-rw-r-- 1 hugh hugh  32403 May 15 21:20 /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1/t60-frame250.png
+-rw-rw-r-- 1 hugh hugh  32583 May 15 21:20 /home/hugh/.paperclip/instances/default/projects/383ed49e-8193-4717-814c-434585b89ce8/65c59b6b-89a8-4b57-8f47-4693ee406ec8/_default/.claude/worktrees/TIM-724/e2e/tim724/gdi-m1/t90-frame500.png
+
+=== wine.log tail ===
