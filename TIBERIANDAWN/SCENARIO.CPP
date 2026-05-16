@@ -382,6 +382,7 @@ void Clear_Scenario(void)
  *=============================================================================================*/
 void Do_Win(void)
 {
+	fprintf(stderr, "[TD] Do_Win: entered (WinMovie=%s)\n", WinMovie); fflush(stderr);
 	Map.Set_Default_Mouse(MOUSE_NORMAL);
 	Hide_Mouse();
 
