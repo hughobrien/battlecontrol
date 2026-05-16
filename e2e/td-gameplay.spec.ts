@@ -19,8 +19,10 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const WASM_URL = 'http://localhost:8082/td.html';  // port 8082: _default/build-wasm/ (8080 is TIM-399)
-const ASSET_URL = 'http://localhost:9091/';          // TD assets on port 9091 (RA uses 9090)
+// Env var overrides for CI — TD_WASM_URL default matches local serve-coop.py on :8080.
+// TD_ASSETS_URL can point to a CDN (e.g. GitHub Pages with CORS headers) for CI runs.
+const WASM_URL  = process.env['TD_WASM_URL']  || 'http://localhost:8082/td.html';
+const ASSET_URL = process.env['TD_ASSETS_URL'] || 'http://localhost:9091/';
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 
 if (!fs.existsSync(SCREENSHOTS_DIR)) {
