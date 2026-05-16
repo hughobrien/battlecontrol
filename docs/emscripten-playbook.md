@@ -585,5 +585,42 @@ optimised WASM in headless Chrome. Solutions:
 
 ---
 
+## 13. RA/TD rendering code duplication — TD WASM porting gaps (2026-05-16)
+
+**Symptom:** A WASM fix works for RA but the same bug is still present in TD.
+Alternatively, TD WASM compiles and loads but mouse clicks are dropped, file I/O
+silently fails, or colors are wrong.
+
+**Root cause:** The RA and TD SDL2 rendering layers live in different files and were
+ported independently:
+
+| Layer | RA | TD |
+|---|---|---|
+| SDL2 renderer | `REDALERT/WIN32LIB/DDRAW.CPP` (`#ifndef _MSC_VER`) | `linux/td-win32-stubs.cpp` |
+| Input | `REDALERT/KEY.CPP` | `linux/td-win32-stubs.cpp` `SDL_Process_Input_Events` |
+| Palette | `REDALERT/WIN32LIB/DDRAW.CPP` | `linux/td-win32-stubs.cpp` |
+
+Every RA renderer fix must be checked against TD and mirrored manually. Known gaps
+as of 2026-05-16 (TIM-832 audit):
+
+1. **`-sFORCE_FILESYSTEM=1` missing in TD** — `CMakeLists.txt:177-188`; IDBFS stripped,
+   all filesystem calls silently fail.
+2. **Proxy queue flush missing in TD** — `emscripten_current_thread_process_queued_calls()`
+   not called before `SDL_PeepEvents` → mouse clicks dropped (same as TIM-694 for RA).
+3. **Keyboard/touch hints missing in TD** — `SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT`
+   and `SDL_HINT_TOUCH_MOUSE_EVENTS` not set before `SDL_CreateWindow` (TIM-582 analog).
+4. **`SDL_BlitSurface` palette conversion** — TD uses `SDL_BlitSurface` for
+   INDEX8→ARGB8888 conversion, which is unreliable under `PROXY_TO_PTHREAD` (same as
+   TIM-573). RA uses a manual per-pixel expansion from its palette array.
+
+**Fix:** When applying a WASM fix to RA's DDRAW.CPP or KEY.CPP, check whether TD's
+`linux/td-win32-stubs.cpp` needs the same fix. Long-term: consolidate both renderers
+into a single shared module (e.g. `linux/win32-stubs/sdl_renderer.cpp`) to eliminate
+the duplication.
+
+**Reference:** TIM-832 audit; TIM-573 (palette), TIM-582 (keyboard hints), TIM-694 (proxy queue).
+
+---
+
 *Last updated: 2026-05-16. Maintainer: EmscriptenExpert agent.*
-*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712, TIM-757, TIM-826.*
+*Source issues: TIM-399, TIM-489, TIM-555, TIM-573, TIM-582, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712, TIM-757, TIM-826, TIM-832.*
