@@ -1,5 +1,9 @@
 name: Release
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 on:
   push:
     tags:
@@ -161,10 +165,25 @@ jobs:
         with:
           merge-multiple: true
 
+      - name: Generate checksums and release manifest
+        run: |
+          sha256sum *.tar.gz *.zip > checksums.sha256
+          cat > release-manifest.txt <<MANIFEST
+          Release: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Run ID: ${{ github.run_id }}
+          Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          Artifacts:
+          $(sha256sum *.tar.gz *.zip | sed 's/^/  /')
+          MANIFEST
+
       - name: Create release and attach artifacts
         uses: softprops/action-gh-release@v2
         with:
           files: |
             *.tar.gz
             *.zip
+            checksums.sha256
+            release-manifest.txt
           generate_release_notes: true
+          fail_on_unmatched_files: false
