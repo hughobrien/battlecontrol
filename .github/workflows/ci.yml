@@ -17,6 +17,7 @@ jobs:
   build:
     name: Compile and link (${{ matrix.compiler }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       matrix:
         compiler: [gcc, clang]
@@ -68,6 +69,7 @@ jobs:
   vqa-pixel-diff:
     name: VQA codec pixel-diff
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -116,6 +118,7 @@ jobs:
   wine-comparison:
     name: Wine OG comparison
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -202,6 +205,7 @@ jobs:
   build-wasm:
     name: Build WASM
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
