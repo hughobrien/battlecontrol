@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
-# TIM-869 — Drive C&C95.EXE into GDI Mission 2 under headless Wine and
+# TIM-869 — Drive C&C95.EXE into Nod Mission 1 under headless Wine and
 # capture mission-start + frame-500 reference screenshots.
 #
 # Approach: td-scenario-patch.py replaces the "SC%c%02d%c%c.INI" format string
-# at 0xdb375 with fixed "SCG02EA.INI" so Set_Scenario_Name always loads GDI M2.
-# IsFromInstall=true + side-select GDI + VQA-skipped briefing = direct mission entry.
+# at 0xdb375 with fixed "SCB01EA.INI" so Set_Scenario_Name always loads Nod M1.
+# IsFromInstall=true + side-select Nod (right half) + VQA-skipped briefing.
 #
-# Outputs in $ARTIFACT_DIR (default: e2e/tim869/gdi-m2/):
+# Outputs in $ARTIFACT_DIR (default: e2e/tim869/nod-l1/):
 #   mission-start.png, frame-500.png, wine.log, xvfb.log, openbox.log
 #
 # Exit 0 if frame-500.png >=5 KB and >=64 unique colours.
 set -euo pipefail
 
 WINE="${WINE:-/usr/bin/wine}"
-WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim869-gdi-m2}"
+WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim869-nod-l1}"
 TD_EXE_PATH="${TD_EXE_PATH:-/opt/tiberiandawn/C&C95.EXE}"
 TD_DLL_DIR="${TD_DLL_DIR:-/opt/tiberiandawn}"
 CNC_DDRAW_DIR="${CNC_DDRAW_DIR:-/tmp/cnc-ddraw-master}"
 DATA_DIR="${DATA_DIR:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
-ARTIFACT_DIR="${ARTIFACT_DIR:-e2e/tim869/gdi-m2}"
-SCENARIO="${SCENARIO:-SCG02EA}"
+ARTIFACT_DIR="${ARTIFACT_DIR:-e2e/tim869/nod-l1}"
+SCENARIO="${SCENARIO:-SCB01EA}"
 
 THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$ARTIFACT_DIR"
@@ -44,7 +44,7 @@ XDISP="${XDISP:-$(pick_display)}"
 echo "  display: $XDISP  artifacts: $ARTIFACT_DIR"
 
 # Stage
-STAGE=$(mktemp -d "/tmp/tim869-gdi-m2-XXXX")
+STAGE=$(mktemp -d "/tmp/tim869-nod-l1-XXXX")
 trap 'rm -rf "$STAGE"' EXIT
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
     [[ -e "$f" ]] && ln -sf "$f" "$STAGE/$(basename "$f")"
@@ -65,7 +65,7 @@ echo "  td-scenario-patch.py: $SCENARIO"
 python3 "$THIS_DIR/td-scenario-patch.py" "$STAGE/C&C95.EXE" "$SCENARIO"
 echo "  final sha256: $(sha256sum "$STAGE/C&C95.EXE" | cut -d' ' -f1)"
 
-printf 'GDI95' > "$STAGE/.windows-label"
+printf 'NOD95' > "$STAGE/.windows-label"
 [[ -f "$TD_DLL_DIR/THIPX32.DLL" ]] && cp "$TD_DLL_DIR/THIPX32.DLL" "$STAGE/THIPX32.DLL"
 
 # cnc-ddraw
@@ -202,15 +202,15 @@ resolve_origin
 sleep 2; inject_key 0x0D; sleep 1; inject_key 0x0D; sleep 1; inject_key 0x20; sleep 5
 shoot "t10-pre-side"
 
-# Phase 2: click GDI side (left half, centre ~160,180)
-xdo_click 160 180; sleep 3
-shoot "t15-post-gdi-click"
+# Phase 2: click Nod side (right half, centre ~480,180)
+xdo_click 480 180; sleep 3
+shoot "t15-post-nod-click"
 
 # Phase 3: advance briefing -> mission
 xdo_click 320 200; sleep 2; inject_key 0x0D; sleep 2; inject_key 0x0D; sleep 5
 shoot "t25-mission-start"
 
-# Phase 4: gameplay frames (TD 15 Hz, frame-500 ~33s)
+# Phase 4: gameplay frames
 sleep 5; shoot "t35-frame100"
 sleep 10; shoot "t50-frame250"
 sleep 20; shoot "t75-frame500"
@@ -223,7 +223,7 @@ if [[ -f "$TARGET" ]]; then
     nc=$(python3 -c "from PIL import Image; print(len(set(Image.open('$TARGET').convert('RGB').getdata())))" 2>/dev/null || echo "0")
     echo "  frame-500: ${sz}B ${nc}colours"
     if [[ "$sz" -ge 5000 && "$nc" -ge 64 ]]; then
-        echo "RESULT: PASS - GDI M2 ($SCENARIO)"
+        echo "RESULT: PASS - Nod M1 ($SCENARIO)"
         exit 0
     fi
 fi
