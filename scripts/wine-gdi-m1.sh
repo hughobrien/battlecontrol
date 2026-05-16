@@ -12,11 +12,12 @@
 #     When the game writes 8bpp pixels into a 32bpp surface the pitch is wrong
 #     and it crashes.  cnc-ddraw handles the 8→32bpp conversion internally.
 #
-#   Why virtual desktop (explorer /desktop):
-#     NtUserChangeDisplaySettings on Xvfb returns DISP_CHANGE_FAILED.  The
-#     virtual desktop virtualises mode switches so TD's SetDisplayMode(640,400,8)
-#     is accepted. cnc-ddraw intercepts the call anyway and manages its own
-#     surface, so the virtual-desktop also acts as a no-op for SetDisplayMode.
+#   Why no virtual desktop:
+#     cnc-ddraw with windowed=true intercepts SetDisplayMode and returns DD_OK
+#     without calling NtUserChangeDisplaySettings at all.  So Xvfb's
+#     DISP_CHANGE_FAILED limitation is irrelevant.  Running without the
+#     virtual desktop gives C&C95.EXE a real top-level X11 window, which
+#     x11grab can capture directly via the X11 backing store.
 #
 #   HWND fix:
 #     The CnCNet binary calls SetCooperativeLevel(hwnd=0, DDSCL_NORMAL).
@@ -40,6 +41,7 @@
 #     - td-vqa-skip-patch.py      Play_Movie entry -> ret
 #     - td-activateapp-patch.py   NOP WM_ACTIVATEAPP GameInFocus store
 #     - td-setcoop-hwnd-patch.py  code-cave: SetCooperativeLevel with real HWND
+#     - td-ioport-patch.py        NOP VGA port 0x3DA spin-loop (PRIV_INSN flood)
 #
 # Outputs in $ARTIFACT_DIR (default: e2e/tim724/gdi-m1/):
 #   t05-initial.png, t10.png, t20.png, t30.png, t60.png, wine.log
@@ -102,6 +104,8 @@ cp "$TD_EXE_PATH" "$STAGE/C&C95.EXE"
 # intercepts SetDisplayMode internally and returns DD_OK without calling
 # NtUserChangeDisplaySettings, so the ddmode stub is redundant.
 # setcoop-hwnd-patch expects the activateapp output SHA directly.
+# td-ioport-patch NOPs the VGA port 0x3DA spin-loop that floods the main
+# thread with EXCEPTION_PRIV_INSTRUCTION and prevents Init_Game from running.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "  applying TD binary patches..."
 python3 "$SCRIPT_DIR/td-focus-skip-patch.py"      "$STAGE/C&C95.EXE"
@@ -109,6 +113,7 @@ python3 "$SCRIPT_DIR/td-game-in-focus-patch.py"   "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-vqa-skip-patch.py"        "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-activateapp-patch.py"     "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-setcoop-hwnd-patch.py"    "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-ioport-patch.py"          "$STAGE/C&C95.EXE"
 echo "  patch chain done: $(sha256sum "$STAGE/C&C95.EXE" | cut -c1-12)..."
 
 # Give D: the volume label "GDI95" so Wine's GetVolumeInformationA returns it.
@@ -131,10 +136,9 @@ cat > "$STAGE/ddraw.ini" <<'DDRAWINI'
 [ddraw]
 renderer=gdi
 windowed=true
-hook=1
+hook=0
 window_state=normal
-width=640
-height=400
+keytogglefullscreen=0x00
 DDRAWINI
 echo "  cnc-ddraw installed: $CNC_DDRAW_DIR/ddraw.dll → $STAGE/ddraw.dll"
 
@@ -181,8 +185,7 @@ sleep 1
 
 # ─── Xvfb + openbox ──────────────────────────────────────────────────────────
 
-# TD is a 640x400 game (vs RA's 640x480) — Xvfb screen sized accordingly,
-# but with extra headroom for the window manager titlebar.
+# TD is 640x400; 800x600 gives headroom for the window manager titlebar.
 echo
 echo "=== starting Xvfb + openbox on $XDISP ==="
 Xvfb "$XDISP" -screen 0 800x600x24 -ac > "$ARTIFACT_DIR/xvfb.log" 2>&1 &
@@ -207,9 +210,9 @@ trap cleanup EXIT
 # cnc-ddraw handles 8bpp→32bpp palette conversion internally and uses the GDI
 # renderer (XPutImage) so ffmpeg x11grab can capture real game frames.
 # td-setcoop-hwnd-patch rewrites the DDSCL_NORMAL preamble so SetCooperativeLevel
-# receives the real HWND from [0x567848] instead of hwnd=0.
-# The virtual desktop virtualises NtUserChangeDisplaySettings — cnc-ddraw also
-# intercepts SetDisplayMode and returns DD_OK, so Xvfb mode limits are irrelevant.
+# receives the real HWND from [0x567848] instead of hwnd=0 (belt-and-suspenders).
+# No virtual desktop needed — cnc-ddraw with windowed=true intercepts
+# SetDisplayMode internally without calling NtUserChangeDisplaySettings.
 
 echo
 echo "=== launching C&C95.EXE ==="
@@ -219,32 +222,62 @@ echo "=== launching C&C95.EXE ==="
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
         WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
-        timeout 180 "$WINE" explorer '/desktop=tim724,640x400' 'C&C95.EXE'
+        timeout 180 "$WINE" 'C&C95.EXE'
 ) > "$ARTIFACT_DIR/wine.log" 2>&1 &
 TD_PID=$!
 
-# Wait for a TD window
-echo "  waiting for game window..."
+# Wait for the C&C95 game window
+echo "  waiting for 'Command & Conquer' window..."
 WINDOW_NAME=""
 for i in $(seq 1 30); do
-    if NAME=$(DISPLAY="$XDISP" xdotool search --onlyvisible --name . 2>/dev/null | head -1); then
+    if WID=$(DISPLAY="$XDISP" xdotool search --name "Command & Conquer" 2>/dev/null | head -1); then
+        if [[ -n "$WID" ]]; then
+            WINDOW_NAME="Command & Conquer"
+            echo "  game window appeared after ${i}s (wid=$WID)"
+            break
+        fi
+    fi
+    # Also accept any visible window in case the title differs
+    if NAME=$(DISPLAY="$XDISP" xdotool search --onlyvisible --name "." 2>/dev/null | head -1); then
         if [[ -n "$NAME" ]]; then
             WINDOW_NAME=$(DISPLAY="$XDISP" xdotool getwindowname "$NAME" 2>/dev/null || echo "(noname)")
-            echo "  window appeared after ${i}s: '$WINDOW_NAME'"
-            break
+            [[ "$WINDOW_NAME" != "Default IME" ]] && { echo "  window appeared after ${i}s: '$WINDOW_NAME'"; break; }
         fi
     fi
     sleep 1
 done
 
+TD_SCREENSHOT="${TD_SCREENSHOT:-$(dirname "$SCRIPT_DIR")/tools/wine-input/td-screenshot.exe}"
+
 shoot() {
     local name="$1"
     local png="$ARTIFACT_DIR/${name}.png"
-    # cnc-ddraw's GDI renderer commits frames via XPutImage into the X11
-    # backing store; ffmpeg x11grab reads from that backing store directly.
-    DISPLAY="$XDISP" ffmpeg -nostdin -loglevel error \
-        -f x11grab -video_size 800x600 -i "$XDISP" \
-        -frames:v 1 -y "$png" 2>/dev/null || true
+
+    # Primary: in-Wine BitBlt capture via td-screenshot.exe.
+    # cnc-ddraw's GDI renderer does BitBlt from its backbuffer to the game
+    # HWND's DC; capturing via another Win32 BitBlt reads that same DC.
+    # Z: = Linux root in Wine; path must use backslashes.
+    local bmp_linux="/tmp/td-shot-${name}.bmp"
+    local bmp_wine="Z:$(echo "$bmp_linux" | tr '/' '\\')"
+    if [[ -f "$TD_SCREENSHOT" ]]; then
+        DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+            WINEDEBUG=-all \
+            "$WINE" "$TD_SCREENSHOT" "$bmp_wine" 2>/dev/null || true
+        if [[ -f "$bmp_linux" ]]; then
+            python3 -c "
+from PIL import Image
+Image.open('$bmp_linux').convert('RGB').save('$png')
+" 2>/dev/null && rm -f "$bmp_linux" || true
+        fi
+    fi
+
+    # Fallback: ffmpeg x11grab from X11 backing store (captures desktop chrome).
+    if [[ ! -f "$png" ]]; then
+        DISPLAY="$XDISP" ffmpeg -nostdin -loglevel error \
+            -f x11grab -video_size 800x600 -i "$XDISP" \
+            -frames:v 1 -y "$png" 2>/dev/null || true
+    fi
+
     if [[ -f "$png" ]]; then
         local sz=$(stat -c%s "$png")
         local sha=$(sha256sum "$png" | cut -c1-12)
