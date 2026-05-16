@@ -1,55 +1,79 @@
 #!/usr/bin/env python3
 """
-TIM-747 — NOP the VGA vblank port-I/O polling loop in C&C95.EXE (CnCNet build).
+TIM-747 — NOP all VGA port-I/O polling loops in C&C95.EXE (CnCNet build).
 
 Why:
-  C&C95.EXE contains a dual-phase VGA vertical-blanking sync loop at VA 0x4CD5B4
-  (file offset 0xcd9b4).  The loop reads I/O port 0x3DA (VGA Input Status
-  Register 1) via the `in al, dx` instruction in a tight spin, waiting for
-  bit 3 (VBlank active) to cycle.
+  C&C95.EXE contains multiple VGA vertical-blanking synchronization loops that
+  poll I/O port 0x3DA (VGA Input Status Register 1) via the `in al, dx`
+  instruction.  On Linux, user-mode code cannot execute I/O port instructions;
+  Wine generates EXCEPTION_PRIV_INSTRUCTION (c0000096) on each attempt.
 
-  On Linux, user-mode code cannot execute `in`/`out` I/O port instructions.
-  Wine generates EXCEPTION_PRIV_INSTRUCTION (c0000096) on each attempt and
-  delivers it as an SEH exception.  With the game stuck in the tight spin, the
-  main thread processes thousands of these exceptions per second and never
-  reaches Init_Game.  The result is a black primary surface for the entire run.
+  The game has two kinds of port-I/O loops:
 
-Fix — two-site NOP:
-  1. File offset 0xcd9b4 (3 bytes):
-       ec a8 08  →  31 c0 90
-       `in al, dx; test al, 0x08`  →  `xor eax, eax; nop`
-     al is now always 0 after the synthetic "read".  The subsequent
-     `jz +3` (74 03) is taken every time — the inner loop exits immediately
-     instead of spinning on the port.
+  1. Timing loop at VA 0x4CD5B4 (file 0xcd9b4): reads port 0x3DA and loops on
+     `jge -0x34` counting down a frame timer.  Generates thousands of exceptions
+     per second → Init_Game never runs → game window stays black.
 
-  2. File offset 0xcd9bf (2 bytes):
-       7d cc  →  90 90
-       `jge -0x34`  →  NOP NOP
-     The outer loop back-edge is removed so the timing function falls through
-     after one pass, eliminating the PRIV_INSTRUCTION flood entirely.
+  2. Dual-phase VBlank sync helpers at VA 0x4D3EDC/0x4D3EF9 (file 0xd2edc /
+     0xd2ef9): two small functions that spin until bit 3 of port 0x3DA matches
+     an expected VBlank state (active / inactive).  Called from the render loop;
+     each call generates a fresh exception flood.
+
+Fix — four-site NOP:
+
+  Site 1: file 0xcd9b4 (3 bytes)
+    ec a8 08  →  31 c0 90
+    `in al,dx; test al,0x08`  →  `xor eax,eax; nop`
+    Fake port read returns 0 (VBlank bit clear); subsequent `jz +3` exits inner
+    loop immediately.
+
+  Site 2: file 0xcd9bf (2 bytes)
+    7d cc  →  90 90
+    `jge -0x34`  →  NOP NOP
+    Removes outer timing-loop back-edge; function falls through.
+
+  Site 3: file 0xd2edc (7 bytes)
+    ec 24 08 32 c4 75 f4  →  90×7
+    `in al,dx; and al,0x08; xor al,ah; jne -12`  →  NOP×7
+    NOP the "spin until VBlank active" helper entirely.
+
+  Site 4: file 0xd2ef9 (7 bytes)
+    ec 24 08 32 c4 74 f4  →  90×7
+    `in al,dx; and al,0x08; xor al,ah; je -12`  →  NOP×7
+    NOP the "spin until VBlank inactive" helper entirely.
 
 Expected input SHA-256 (C&C95.EXE after TIM-743+TIM-747 setcoop-hwnd chain):
   935b32578dfc39d3e4bd928fe87d7703e39a974f7eb2e827a2249e119d925429
 
 Expected output SHA-256:
-  29d3d9d15fbe6332f9834508ab581dded4962bd3ac48bd473a75641ee69b4749
+  4538a19f0947022a898a39ef2da8c4de61dc027acf60d2706c50e2dd5812d8ea
 """
 import sys
 import hashlib
 import shutil
 
 INPUT_SHA256   = "935b32578dfc39d3e4bd928fe87d7703e39a974f7eb2e827a2249e119d925429"
-PATCHED_SHA256 = "29d3d9d15fbe6332f9834508ab581dded4962bd3ac48bd473a75641ee69b4749"
+PATCHED_SHA256 = "4538a19f0947022a898a39ef2da8c4de61dc027acf60d2706c50e2dd5812d8ea"
 
-# Site 1: replace `in al,dx; test al,0x08` with `xor eax,eax; nop`
-SITE1_OFFSET  = 0xcd9b4
-SITE1_ORIG    = bytes.fromhex("eca808")   # in al,dx; test al,0x08
-SITE1_PATCHED = bytes.fromhex("31c090")   # xor eax,eax; nop
-
-# Site 2: NOP the outer timing-loop back-edge `jge -0x34`
-SITE2_OFFSET  = 0xcd9bf
-SITE2_ORIG    = bytes.fromhex("7dcc")     # jge -0x34
-SITE2_PATCHED = bytes.fromhex("9090")     # nop nop
+SITES = [
+    # (offset, orig_bytes, patched_bytes, description)
+    (0xcd9b4,
+     bytes.fromhex("eca808"),
+     bytes.fromhex("31c090"),
+     "in al,dx → xor eax,eax (timing loop fake read)"),
+    (0xcd9bf,
+     bytes.fromhex("7dcc"),
+     bytes.fromhex("9090"),
+     "jge → nop nop (timing-loop back-edge)"),
+    (0xd2edc,
+     bytes.fromhex("ec240832c475f4"),
+     bytes.fromhex("90909090909090"),
+     "VBlank-sync helper 1: spin-until-active → nop×7"),
+    (0xd2ef9,
+     bytes.fromhex("ec240832c474f4"),
+     bytes.fromhex("90909090909090"),
+     "VBlank-sync helper 2: spin-until-inactive → nop×7"),
+]
 
 
 def sha256(data: bytes) -> str:
@@ -72,29 +96,25 @@ def patch(path: str, dry_run: bool = False) -> int:
         print(f"       td-activateapp, td-setcoop-hwnd patches first")
         return 1
 
-    if bytes(data[SITE1_OFFSET:SITE1_OFFSET + len(SITE1_ORIG)]) != SITE1_ORIG:
-        print(f"ERROR: guard bytes mismatch at 0x{SITE1_OFFSET:x}: "
-              f"{bytes(data[SITE1_OFFSET:SITE1_OFFSET + len(SITE1_ORIG)]).hex()} "
-              f"!= {SITE1_ORIG.hex()}")
-        return 1
-
-    if bytes(data[SITE2_OFFSET:SITE2_OFFSET + len(SITE2_ORIG)]) != SITE2_ORIG:
-        print(f"ERROR: guard bytes mismatch at 0x{SITE2_OFFSET:x}: "
-              f"{bytes(data[SITE2_OFFSET:SITE2_OFFSET + len(SITE2_ORIG)]).hex()} "
-              f"!= {SITE2_ORIG.hex()}")
-        return 1
+    for offset, orig, patched, desc in SITES:
+        actual = bytes(data[offset:offset + len(orig)])
+        if actual != orig:
+            print(f"ERROR: guard bytes mismatch at 0x{offset:x}: "
+                  f"{actual.hex()} != {orig.hex()}")
+            return 1
 
     if dry_run:
-        print(f"{path}: DRY RUN — would patch 0x{SITE1_OFFSET:x} (in→xor) "
-              f"and 0x{SITE2_OFFSET:x} (jge→nop)")
+        for offset, orig, patched, desc in SITES:
+            print(f"  DRY RUN 0x{offset:x}: {desc}")
         return 0
 
     backup = path + ".ioport_orig"
     shutil.copy2(path, backup)
     print(f"  Backup: {backup}")
 
-    data[SITE1_OFFSET:SITE1_OFFSET + len(SITE1_PATCHED)] = SITE1_PATCHED
-    data[SITE2_OFFSET:SITE2_OFFSET + len(SITE2_PATCHED)] = SITE2_PATCHED
+    for offset, orig, patched, desc in SITES:
+        data[offset:offset + len(patched)] = patched
+        print(f"  Patched 0x{offset:x}: {desc}")
 
     with open(path, "wb") as f:
         f.write(data)
@@ -104,8 +124,6 @@ def patch(path: str, dry_run: bool = False) -> int:
         print(f"ERROR: post-patch SHA-256 mismatch: {out_digest}")
         return 1
 
-    print(f"  Patched 0x{SITE1_OFFSET:x}: in al,dx → xor eax,eax (fake VGA port read)")
-    print(f"  Patched 0x{SITE2_OFFSET:x}: jge → nop nop (remove timing-loop back-edge)")
     print(f"{path}: td-ioport patch applied ({out_digest[:16]}…)")
     return 0
 
