@@ -148,10 +148,24 @@
     // ?debug=1 → show the stderr console below the canvas and inject TD_DEBUG env.
     var _debugMode = _params.get('debug') === '1';
     if (_debugMode) { outputEl.style.display = 'block'; }
+    // TIM-858: ?autostart=1 → inject TD_AUTOSTART so C++ skips VQA sequences
+    // and starts the scenario directly (mirrors RA shell's RA_AUTOSTART).
+    // ?gameclk=1 → inject TD_GAME_CLICK for Playwright-driven click automation.
+    var _envFromUrl = {};
+    if (_params.get('autostart') === '1') {
+      _envFromUrl['TD_AUTOSTART'] = '1';
+    }
+    if (_debugMode) {
+      _envFromUrl['TD_DEBUG'] = '1';
+    }
+    if (_params.get('gameclk') === '1') {
+      _envFromUrl['TD_GAME_CLICK'] = '1';
+      outputEl.style.display = 'block';
+    }
     var Module = {
       canvas: document.getElementById('canvas'),
-      noInitialRun: true,
-      ENV: _debugMode ? { 'TD_DEBUG': '1' } : {},
+      noInitialRun: true,   // preloader.js calls callMain() after files are mounted
+      ENV: _envFromUrl,
       print: function(text) {
         outputEl.textContent += text + '\n';
         outputEl.scrollTop = outputEl.scrollHeight;
