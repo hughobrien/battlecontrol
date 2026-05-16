@@ -407,5 +407,50 @@ When writing tests that need the game to start fast (menu, gameplay):
 
 ---
 
+## 10. SDL Audio Drain Loop — WASM Sentinel Collision (2026-05-15)
+
+**Symptom:** VQA playback finishes visually (all frames render) but the `[VQA] '...' done`
+log message never appears in `#output`. The test spec's `waitForOutput(..., 300_000)` fires
+a 300-second timeout. The failure rate is ~30% — intermittent, never a JS exception.
+
+**Root cause:** The VQA audio drain loop calls `SDL_GetQueuedAudioSize(vqa_audio_dev)` after
+the frame loop exits. On WASM the WebAudio bypass sets `vqa_audio_dev = 1` as a sentinel
+("audio open, but not a real SDL device"). However, SDL2 assigns device IDs starting at 1,
+so the game's *real* SDL audio device (opened by the game's audio subsystem) is also ID 1.
+`SDL_GetQueuedAudioSize(1)` therefore queries the game's audio queue — which is continuously
+fed by the game's audio thread — and the drain condition `> 4096` never becomes false,
+spinning forever.
+
+The intermittency comes from a race: if the game opens its SDL audio device *before*
+ENGLISH.VQA's frame loop finishes, the drain spins indefinitely (FAIL ~30%). If the game
+hasn't opened audio yet when the drain loop runs, `SDL_GetQueuedAudioSize(1)` returns 0
+(device not found) and exits immediately (PASS ~70%).
+
+**Fix:** Guard the drain loop with `#ifndef __EMSCRIPTEN__`. On WASM, WebAudio
+`AudioBufferSourceNode` objects are self-draining (each node plays its scheduled buffer and
+stops automatically). No SDL queue drain is needed or meaningful.
+
+```cpp
+// Drain remaining audio before returning (native Linux only).
+// On WASM, vqa_audio_dev=1 is a sentinel that coincides with the game's SDL
+// audio device ID 1.  SDL_GetQueuedAudioSize(1) would query the *game* device,
+// which is permanently fed by the game's audio thread → infinite spin.
+// WebAudio AudioBufferSourceNodes are self-draining; no explicit drain needed.
+#ifndef __EMSCRIPTEN__
+if (audio_ok) {
+    while (SDL_GetQueuedAudioSize(vqa_audio_dev) > 4096)
+        SDL_Delay(10);
+}
+#endif
+```
+
+**Landed in:** TIM-757. File: `linux/win32-stubs/vqa_player.cpp`.
+
+**Reference:** SDL2 [`SDL_GetQueuedAudioSize`](https://wiki.libsdl.org/SDL2/SDL_GetQueuedAudioSize):
+"Returns the number of bytes … or 0 if there is no audio open" — returns 0 for unknown IDs,
+but returns real queue size when another consumer (the game) happens to have device ID 1.
+
+---
+
 *Last updated: 2026-05-15. Maintainer: EmscriptenExpert agent.*
 *Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712.*
