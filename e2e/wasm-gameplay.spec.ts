@@ -21,7 +21,9 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const WASM_URL = 'http://localhost:8080/ra.html';
+// Env var overrides for CI — RA_WASM_URL default matches local serve-coop.py on :8080.
+// RA_ASSETS_URL can point to a CDN (e.g. GitHub Pages with CORS headers) for CI runs.
+const WASM_URL  = process.env['RA_WASM_URL']  || 'http://localhost:8080/ra.html';
 const ASSET_URL = process.env['RA_ASSETS_URL'] || 'http://localhost:9090/';
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 const GOLDENS_DIR = path.join(__dirname, 'goldens');
