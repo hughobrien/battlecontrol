@@ -36,15 +36,13 @@ jobs:
           version: '5.0.6'
           actions-cache-folder: 'emsdk-cache'
 
-      - name: Cache Emscripten build
+      - name: Cache Emscripten system libraries
         uses: actions/cache@v4
         with:
-          path: |
-            build-wasm
-            ~/.emscripten_cache
-          key: emscripten-build-${{ github.sha }}
+          path: ~/.emscripten_cache
+          key: emscripten-cache-${{ github.sha }}
           restore-keys: |
-            emscripten-build-
+            emscripten-cache-
 
       - name: Install build deps
         run: |
