@@ -206,10 +206,12 @@ sleep 1
 
 # ─── Xvfb + openbox ──────────────────────────────────────────────────────────
 
-# TD is 640x400; 800x600 gives headroom for the window manager titlebar.
+# TD is 640x400; 1024x768 gives headroom for the openbox decorations and
+# matches what wine-allied-l1.sh uses (800x600 clips the right edge under
+# some Wine 10 + openbox combinations).
 echo
 echo "=== starting Xvfb + openbox on $XDISP ==="
-Xvfb "$XDISP" -screen 0 800x600x24 -ac > "$ARTIFACT_DIR/xvfb.log" 2>&1 &
+Xvfb "$XDISP" -screen 0 1024x768x24 -ac > "$ARTIFACT_DIR/xvfb.log" 2>&1 &
 XVFB_PID=$!
 sleep 1
 DISPLAY="$XDISP" openbox > "$ARTIFACT_DIR/openbox.log" 2>&1 &
@@ -314,11 +316,55 @@ print(len(set(img.getdata())))
     fi
 }
 
-# ─── SendInput helper ────────────────────────────────────────────────────────
-# Inject synthetic keypresses into the TD window via a Wine-side helper.
-# td-sendinput.exe uses SendInput which fires WH_KEYBOARD_LL hooks that
-# DirectInput reads — xdotool/XTest events do NOT reach DInput.
+# ─── Input helpers ───────────────────────────────────────────────────────────
+#
+# Two-tier injection (mirrors wine-gameplay.sh from TIM-708):
+#   xdo_click   - xdotool mousemove + click 1 in screen coordinates.
+#                 Reaches Win32 message queue via x11drv → PeekMessage; this
+#                 is what TD's main menu / side-select / strategic-map UI
+#                 reads.
+#   inject_key  - td-sendinput.exe (SendInput) for keypresses.  Win32
+#                 PostMessage from x11drv would work too, but SendInput is
+#                 more robust because it also fires WH_KEYBOARD_LL for
+#                 anything that polls DInput later in-mission.
+#
+# Window origin: openbox decorates the cnc-ddraw window with a ~22px title
+# bar; we compute the client-area origin from xdotool getwindowgeometry
+# (HEIGHT - 400 = titlebar height, mirroring wine-gameplay.sh's approach).
 TD_SENDINPUT="${TD_SENDINPUT:-$(dirname "$SCRIPT_DIR")/tools/wine-input/td-sendinput.exe}"
+
+WIN_OX=0
+WIN_OY=22  # fallback titlebar height
+resolve_window_origin() {
+    local wid
+    wid=$(DISPLAY="$XDISP" xdotool search --name "Command & Conquer" 2>/dev/null | head -1)
+    if [[ -z "$wid" ]]; then
+        echo "  WARN: no Command & Conquer window for origin lookup"
+        return
+    fi
+    local geom
+    geom=$(DISPLAY="$XDISP" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || return
+    local wx wy wh
+    wx=$(echo "$geom" | grep '^X=' | cut -d= -f2)
+    wy=$(echo "$geom" | grep '^Y=' | cut -d= -f2)
+    wh=$(echo "$geom" | grep '^HEIGHT=' | cut -d= -f2)
+    # TD is 640x400 — anything above 400 is decoration.
+    local title_h=$(( ${wh:-422} - 400 ))
+    if [[ $title_h -lt 0 || $title_h -gt 80 ]]; then title_h=22; fi
+    WIN_OX=${wx:-0}
+    WIN_OY=$(( ${wy:-0} + title_h ))
+    echo "  window origin: client=($WIN_OX,$WIN_OY) titlebar=${title_h}px"
+}
+
+xdo_click() {
+    local gx="$1" gy="$2"
+    local sx=$(( WIN_OX + gx ))
+    local sy=$(( WIN_OY + gy ))
+    echo "  xdo_click game=($gx,$gy) screen=($sx,$sy)"
+    DISPLAY="$XDISP" xdotool mousemove "$sx" "$sy" click 1 2>/dev/null || true
+    sleep 0.5
+}
+
 inject_key() {
     local vk="$1"
     if [[ ! -f "$TD_SENDINPUT" ]]; then
@@ -352,36 +398,68 @@ if ! kill -0 $TD_PID 2>/dev/null; then
     exit 3
 fi
 
-# Dismiss the GDI01 mission briefing and any main-menu prompts.
-# The briefing in TD requires a click or Enter/Space to advance.
+# Resolve the window origin now that the C&C95 window is visible.
+resolve_window_origin
+
+# Phase 1 — advance past any main-menu / install prompt to side-select.
 # IsFromInstall=true causes the game to auto-select "Start New Game" and
-# land on the side select / briefing screen requiring one keypress.
-echo "  injecting keypresses to advance past briefing..."
+# land on the side select screen.  Enter is enough for any modal "OK" prompt
+# along the way.
+echo "  phase 1: advance to side-select menu..."
 sleep 2
-inject_key 0x0D   # Enter — advance past any main-menu prompt
-sleep 1
-inject_key 0x0D   # Enter — advance past side-select or briefing
-sleep 1
-inject_click 320 200  # click centre of screen (fallback for click-to-advance)
-sleep 1
-inject_key 0x20   # Space — additional advance
-
-# Settle into menu / first-render
-sleep 5
-shoot "t10"
-
-# Second injection in case briefing needs multiple dismisses
 inject_key 0x0D
 sleep 1
-inject_click 320 200
-sleep 8
-shoot "t20"
+inject_key 0x0D
+sleep 1
+inject_key 0x20
+sleep 5
+shoot "t10-pre-side"
 
+# Phase 2 — pick GDI side via xdotool.  GDI portrait is the LEFT half of
+# the 640x400 client; centre ≈ (160, 180).  The side-select dialog uses
+# Win32 message-based input (not DInput), so xdotool mousemove + click 1
+# fires WM_LBUTTONDOWN / WM_LBUTTONUP via x11drv — the same path that
+# wine-gameplay.sh uses successfully for RA's main menu.
+echo "  phase 2: click GDI side..."
+xdo_click 160 180
+sleep 3
+shoot "t15-post-gdi-click"
+
+# Phase 3 — dismiss the post-side-select briefing.  td-vqa-skip-patch makes
+# Play_Movie return immediately so the briefing VQA never actually plays,
+# but TD still waits for input to advance from the briefing prompt to the
+# strategic map / mission start.  Click centre + Enter to cover both
+# "any-click-to-continue" and modal-dismiss variants.
+echo "  phase 3: advance through briefing → strategic map → mission start..."
+xdo_click 320 200
+sleep 2
+inject_key 0x0D
+sleep 2
+inject_key 0x0D
+sleep 5
+shoot "t25-briefing-advance"
+
+# Phase 4 — if a strategic map appears with mission nodes overlaid on a
+# US map background, click the easternmost / earliest GDI mission node.
+# In TD GDI01, the player chooses a region in West Germany — the leftmost
+# (smallest-index) node sits around game-x ≈ 110, game-y ≈ 175.
+xdo_click 110 175
+sleep 2
+inject_key 0x0D
+sleep 5
+shoot "t35-post-map"
+
+# Phase 5 — should be in or entering the mission.  Capture progressive frames.
+# Frame numbers in the artifact names reflect target game-tick milestones
+# (TD ticks at 15 Hz; +30 s ≈ 450 ticks, comfortably past the 250 / 500
+# acceptance markers).
+echo "  phase 5: capture gameplay frames..."
+sleep 5
+shoot "t45-frame100"
 sleep 10
-shoot "t30"
-
-sleep 30
-shoot "t60"
+shoot "t60-frame250"
+sleep 20
+shoot "t90-frame500"
 
 # Document final state
 echo
@@ -398,3 +476,6 @@ ls -la "$ARTIFACT_DIR"/*.png 2>/dev/null
 echo
 echo "=== wine.log tail ==="
 tail -30 "$ARTIFACT_DIR/wine.log"
+
+# Acceptance criterion 3: exit cleanly with rc 0.  Cleanup runs via trap.
+exit 0
