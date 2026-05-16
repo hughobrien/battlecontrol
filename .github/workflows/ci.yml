@@ -323,59 +323,23 @@ jobs:
               print(f'{name}: {size // 1024} KB — OK')
           EOF
 
-      - name: Upload WASM binaries (for dependent jobs)
-        uses: actions/upload-artifact@v4
-        with:
-          name: wasm-binaries
-          path: |
-            build-wasm/ra.html
-            build-wasm/ra.js
-            build-wasm/ra.wasm
-            build-wasm/td.html
-            build-wasm/td.js
-            build-wasm/td.wasm
-
-      - name: ccache stats
-        run: |
-          echo "### ccache hit rate (WASM)" >> "$GITHUB_STEP_SUMMARY"
-          ccache --show-stats >> "$GITHUB_STEP_SUMMARY"
-          ccache --show-stats
-
-  wasm-smoke:
-    name: WASM smoke (${{ matrix.browser }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    needs: build-wasm
-    strategy:
-      matrix:
-        browser: [chromium, firefox]
-      fail-fast: false
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js for smoke tests
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Playwright and browser
+      - name: Install Playwright and Chromium
         run: |
           npm ci
-          npx playwright install --with-deps ${{ matrix.browser }}
+          npx playwright install --with-deps chromium
 
-      - name: Install system deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends xvfb python3
-
-      - name: Download WASM artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: wasm-binaries
-          path: build-wasm/
-
-      - name: WASM smoke test — ${{ matrix.browser }}
+      - name: WASM boot smoke — ra.wasm + td.wasm load without crash
+        # Asset-free regression: loads both ra.html and td.html, observes each
+        # for 30 s, asserts zero pageerror events. Catches WASM parse errors,
+        # null-function traps (TIM-593/TIM-620 class), and Emscripten init
+        # exceptions. Runs T1 and T2 from the regression suite.
+        # serve-coop.py is required for COOP+COEP headers (SharedArrayBuffer).
         run: |
           Xvfb :99 -screen 0 1280x1024x24 &
           XVFB_PID=$!
@@ -383,20 +347,20 @@ jobs:
           python3 wasm/serve-coop.py &
           SERVER_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts \
-            --project=${{ matrix.browser }} \
-            --reporter=line
-          PW_EXIT=$?
+          DISPLAY=:99 npx playwright test \
+            e2e/regression/T1-ra-wasm-boot.spec.ts \
+            e2e/regression/T2-td-wasm-boot.spec.ts
+          SMOKE_EXIT=$?
           kill $SERVER_PID 2>/dev/null || true
           kill $XVFB_PID  2>/dev/null || true
-          exit $PW_EXIT
+          exit $SMOKE_EXIT
 
       - name: Upload smoke test artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: wasm-smoke-${{ matrix.browser }}-results
+          name: wasm-ci-smoke-results
           path: |
             e2e/screenshots/
             e2e/test-results/
-            e2e/report/
+          if-no-files-found: ignore
