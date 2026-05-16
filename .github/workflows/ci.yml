@@ -12,7 +12,7 @@ on:
 
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
-  CCACHE_MAXSIZE: 500M
+  EM_CACHE_DIR: ${{ github.workspace }}/.emscripten-cache
 
 jobs:
   build:
@@ -278,6 +278,14 @@ jobs:
           version: '5.0.6'
           actions-cache-folder: 'emsdk-cache'
 
+      - name: Cache Emscripten system libraries
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.EM_CACHE_DIR }}
+          key: emcc-cache-5.0.6-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
+          restore-keys: |
+            emcc-cache-5.0.6-
+
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -298,15 +306,18 @@ jobs:
             ccache-
 
       - name: Configure WASM build
-        run: |
-          export CCACHE_DIR=${{ env.CCACHE_DIR }}
-          emcmake cmake --preset wasm \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        env:
+          EM_CACHE: ${{ env.EM_CACHE_DIR }}
+        run: emcmake cmake --preset wasm
 
       - name: Build ra.wasm
+        env:
+          EM_CACHE: ${{ env.EM_CACHE_DIR }}
         run: cmake --build build-wasm --target ra --parallel
 
       - name: Build td.wasm
+        env:
+          EM_CACHE: ${{ env.EM_CACHE_DIR }}
         run: cmake --build build-wasm --target td --parallel
 
       - name: Validate WASM binaries
