@@ -832,7 +832,7 @@ void BuildingClass::Decode_Pointers(void)
 	Decode the Factory value, subtracting off the '1' we added when coding it
 	------------------------------------------------------------------------*/
 	if (Factory) {
-		Factory = Factories.Raw_Ptr((int)Factory - 1);
+		Factory = Factories.Raw_Ptr((int)(intptr_t)Factory - 1);
 		Check_Ptr((void *)Factory,__FILE__,__LINE__);
 	}
 
