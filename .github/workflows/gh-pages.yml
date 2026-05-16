@@ -450,7 +450,6 @@ jobs:
           path: |
             e2e/screenshots/ra-visual-*.png
             e2e/test-results/
-
       - name: TD audio pitch probe (T7 / TIM-767)
         # TIM-767 regression T7: loads td.html with autostart=1 (skips menu,
         # starts GDI L1), injects an AnalyserNode FFT tap, waits for frame 100,
