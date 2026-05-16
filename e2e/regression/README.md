@@ -17,6 +17,7 @@ audio / gameplay path for Red Alert and Tiberian Dawn WASM builds.
 | T7-td-audio-pitch        | TD WASM game audio pitch probe           | TD     | WASM    | yes (TD MIX) | yes\*\* | 600 s  |
 | T8-ra-audio-pitch        | RA WASM PROLOG.VQA audio pitch probe     | RA     | WASM    | yes (RA MIX) | yes\*\* | 600 s  |
 | T9-ra-wasm-mission-start | RA WASM real-click Allied L1             | RA     | WASM    | yes (RA MIX) | yes\*\* | 600 s  |
+| T10-ra-wasm-post-game-menu | RA WASM post-game menu parity (TIM-810) | RA     | WASM    | yes (RA MIX) | yes\*\* | 600 s  |
 | (shell) T5-td-native-menu   | TD native main menu renders           | TD     | native  | yes          | no\*    | 30 s   |
 | (shell) T6-ra-native-smoke  | RA native short-run smoke             | RA     | native  | yes          | no\*    | 45 s   |
 
@@ -95,6 +96,13 @@ Same shape as T1 but loads `td.html`.
   frame 100 canvas fill ≥5 %.
 - **Fails on:** RA menu-click or mission-start regressions (analogous to T6 for TD).
 
+### T10-ra-wasm-post-game-menu — RA WASM post-game menu parity (CI when RA_ASSETS_URL set)
+
+- **Pass:** autostart=1 → SCG01EA starts, frame 100 reached, Escape→Quit→Abort
+  returns to main menu, `[TIM-616] menu_cs=` re-fires, post-game menu canvas
+  SSIM ≥ 0.90 vs clean menu golden.
+- **Fails on:** TIM-777 class bug (map bleeds into menu after game exit).
+
 ### (shell) T5-td-native-menu — TD native main menu (with TD assets, local)
 
 Runs `build/td/td` under Xvfb :99 for 5 s, asserts non-black fill ≥10 %.
@@ -119,6 +127,7 @@ no SIGSEGV / Aborted.  Shell: `scripts/regression/T6-ra-native-smoke.sh`.
 | T7-td-audio-pitch        | `e2e/regression/T7-td-audio-pitch.spec.ts`              | Playwright |
 | T8-ra-audio-pitch        | `e2e/regression/T8-ra-audio-pitch.spec.ts`              | Playwright |
 | T9-ra-wasm-mission-start | `e2e/regression/T9-ra-wasm-mission-start.spec.ts`       | Playwright |
+| T10-ra-wasm-post-game-menu | `e2e/regression/T10-ra-wasm-post-game-menu.spec.ts`    | Playwright |
 | (shell) T5-td-native-menu   | `scripts/regression/T5-td-native-menu.sh`            | Shell      |
 | (shell) T6-ra-native-smoke  | `scripts/regression/T6-ra-native-smoke.sh`           | Shell      |
 
