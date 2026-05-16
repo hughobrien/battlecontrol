@@ -997,8 +997,12 @@ bool Select_Game(bool fade)
 		 * is not propagated to the worker thread, so the preloader writes a flag
 		 * file (TD_AUTOSTART.FLAG) in the game directory as a fallback. */
 		if (getenv("TD_AUTOSTART") || RawFileClass("TD_AUTOSTART.FLAG").Is_Available()) {
-			fprintf(stderr, "[TD] Select_Game: TD_AUTOSTART active → SCG01EA (GDI m1 easy)\n"); fflush(stderr);
-			Scenario       = 1;
+			const char* td_scene_str = getenv("TD_SCENE");
+			int td_scene_num = td_scene_str ? atoi(td_scene_str) : 1;
+			if (td_scene_num < 1) td_scene_num = 1;
+			fprintf(stderr, "[TD] Select_Game: TD_AUTOSTART active → SCG%02dEA (GDI m%d easy)\n",
+			        td_scene_num, td_scene_num); fflush(stderr);
+			Scenario       = td_scene_num;
 			ScenPlayer     = SCEN_PLAYER_GDI;
 			ScenDir        = SCEN_DIR_EAST;
 			ScenVar        = SCEN_VAR_A;
