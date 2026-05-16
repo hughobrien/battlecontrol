@@ -66,6 +66,31 @@ jobs:
       - name: ccache stats
         run: ccache --show-stats
 
+      - name: RA native smoke test
+        # TIM-825: verify the compiled ra binary initialises SDL, creates a
+        # window, and runs without crashing for at least 15 s.  Runs under
+        # Xvfb (headless framebuffer) since CI has no physical display.
+        # No game data required — RA_AUTOSTART=1 enters the game loop even
+        # without MIX files.  Exit code 124 (timeout=alive) or 0 (clean exit)
+        # indicates a healthy binary; other codes mean a crash or abort.
+        run: |
+          Xvfb :99 -screen 0 640x480x24 -ac &
+          XVFB_PID=$!
+          sleep 1
+          DISPLAY=:99 SDL_AUDIODRIVER=dummy RA_AUTOSTART=1 \
+            timeout 15 ./build/ra > ra-smoke.log 2>&1
+          RC=$?
+          kill "$XVFB_PID" 2>/dev/null || true
+          if [ "$RC" -eq 124 ]; then
+            echo "SMOKE PASS: ra native binary ran for 15 s without crash (timeout=alive)"
+          elif [ "$RC" -eq 0 ]; then
+            echo "SMOKE PASS: ra native binary exited cleanly"
+          else
+            echo "SMOKE FAIL: ra native binary exited with code $RC — possible crash"
+            cat ra-smoke.log
+            exit 1
+          fi
+
   vqa-pixel-diff:
     name: VQA codec pixel-diff
     runs-on: ubuntu-24.04
