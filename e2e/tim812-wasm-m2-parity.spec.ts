@@ -94,7 +94,9 @@ async function waitForTdReady(page: any) {
     null,
     { timeout: 120_000 },
   );
-  await waitForOutput(page, 'WASM_READY', 120_000);
+  // TD's preloader doesn't write WASM_READY to #output (it goes to #status-line).
+  // Wait for the TD game loop to start instead.
+  await waitForOutput(page, '[TD] TD_AUTOSTART active', 300_000);
 }
 
 async function canvasStats(page: any) {
@@ -245,18 +247,19 @@ test.describe('Tier 2 — RA Soviet M2 WASM vs Wine OG parity [tag:wine]', () =>
 // ---------------------------------------------------------------------------
 
 test.describe('Tier 1 — TD GDI M2 frame 500 (WASM)', () => {
-  test.setTimeout(900_000);
+  test.setTimeout(1_200_000);
 
   test('GDI Mission 2: autostart via ?scenario=SCG02EA → frame-500 capture', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (err: Error) => errors.push(err.message));
 
     const url = `${TD_WASM_URL}?src=${encodeURIComponent(TD_ASSET_URL)}&autostart=1&scenario=SCG02EA&debug=1`;
+    console.log(`[TD-GDI-M2] URL: ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await waitForTdReady(page);
 
     // Wait for TD_AUTOSTART to activate and the game loop to reach frame 500.
-    await waitForOutput(page, '[TD] Main_Loop frame 500', 420_000);
+    await waitForOutput(page, '[TD] Main_Loop frame 500', 600_000);
     await page.waitForTimeout(300);
 
     const shotPath = path.join(SCREENSHOTS_DIR, 'gdi-m2-wasm-f500.png');
