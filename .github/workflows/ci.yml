@@ -93,18 +93,20 @@ jobs:
           PASS=0; FAIL=0
           for bin in ra td; do
             echo "::group::smoke: $bin"
-            DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 5 "build/$bin" > "/tmp/smoke-${bin}.log" 2>&1 && RC=$? || RC=$?
-            LOG=$(cat "/tmp/smoke-${bin}.log")
+            LOG=$(DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 5 "build/$bin" 2>&1); RC=$?
             echo "$LOG"
-            if echo "$LOG" | grep -qE "SIGSEGV|Segmentation fault|signal 11|CRASH|Aborted"; then
+            if echo "$LOG" | grep -qE "SIGSEGV|Segmentation fault|Aborted|signal 11|CRASH"; then
               echo "::error::$bin: crash signal in output"
               FAIL=$((FAIL+1))
-            elif [ "$RC" -eq 124 ] || [ "$RC" -eq 143 ]; then
+            elif [ "$RC" -eq 124 ]; then
               echo "::notice::$bin: alive — timed out (5 s)"
               PASS=$((PASS+1))
-            else
-              echo "::notice::$bin: exited with code $RC (non-crash)"
+            elif [ "$RC" -eq 0 ]; then
+              echo "::notice::$bin: clean exit"
               PASS=$((PASS+1))
+            else
+              echo "::error::$bin: unexpected exit code $RC"
+              FAIL=$((FAIL+1))
             fi
             echo "::endgroup::"
           done
