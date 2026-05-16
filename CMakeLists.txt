@@ -184,7 +184,11 @@ if(EMSCRIPTEN)
         -sPTHREAD_POOL_SIZE=4
         -sPROXY_TO_PTHREAD=1
         "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"callMain\"]"
-        "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/shell.html"
+        # TIM-858: include IDBFS so preloader.js can mount FS.filesystems.IDBFS.
+        # Without this flag, IDBFS is absent from td.js and the preloader throws a
+        # TypeError on FS.mount, silently aborting the Promise chain before callMain.
+        -sFORCE_FILESYSTEM=1
+        "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/td-shell.html"
     )
     add_custom_command(TARGET td POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
@@ -300,6 +304,13 @@ if(EMSCRIPTEN)
         # it into a Web Worker so it can block without stalling the browser UI thread.
         -sPROXY_TO_PTHREAD=1
         "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"callMain\"]"
+        # TIM-858: SDL2's HandleAudioProcess is called from JavaScript via
+        # dynCall('vp', ptr, [dev]) — Binaryen at -O2 can still prune its
+        # function-table entry on newer emsdk versions (~50% intermittency).
+        # EMULATE_FUNCTION_POINTER_CASTS prevents all table pruning by routing
+        # indirect calls through a JS dispatcher that maps indices to real
+        # function references, eliminating the null-function trap.
+        -sEMULATE_FUNCTION_POINTER_CASTS=1
         # TIM-399: include IDBFS so preloader.js can mount FS.filesystems.IDBFS.
         # Without this flag, IDBFS is absent from ra.js and the preloader throws a
         # TypeError on FS.mount, silently aborting the Promise chain before callMain.
