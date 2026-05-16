@@ -12,6 +12,7 @@ on:
 
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 500M
 
 jobs:
   build:
@@ -40,11 +41,16 @@ jobs:
             ccache \
             libsdl2-ttf-dev
 
+      - name: Configure ccache
+        run: |
+          ccache --zero-stats
+          ccache --max-size 500M
+
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ matrix.compiler }}-${{ github.sha }}
+          key: ccache-${{ matrix.compiler }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'installer/CMakeLists.txt') }}
           restore-keys: |
             ccache-${{ matrix.compiler }}-
             ccache-
@@ -63,8 +69,24 @@ jobs:
       - name: Build TD native
         run: cmake --build build --target td --parallel
 
+      - name: Verify native binaries
+        run: |
+          for bin in ra td; do
+            path="build/$bin"
+            if ! file "$path" 2>/dev/null | grep -q "ELF 64-bit"; then
+              echo "::error::$bin: invalid or missing at $path"
+              exit 1
+            fi
+            size=$(stat -c%s "$path")
+            echo "::notice::$bin: OK ($(numfmt --to=iec $size), ELF 64-bit)"
+            timeout 3 "./$path" 2>&1 | head -3 || true
+          done
+
       - name: ccache stats
-        run: ccache --show-stats
+        run: |
+          echo "### ccache hit rate" >> "$GITHUB_STEP_SUMMARY"
+          ccache --show-stats >> "$GITHUB_STEP_SUMMARY"
+          ccache --show-stats
 
   vqa-pixel-diff:
     name: VQA codec pixel-diff
