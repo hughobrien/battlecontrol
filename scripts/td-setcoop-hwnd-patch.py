@@ -34,18 +34,18 @@ Patch sites:
            ff 53 50                 call [ebx+0x50]      (SetCooperativeLevel)
            e9 09 63 fe ff           jmp 0x4cc2bc         (resume after call)
 
-Expected input SHA-256 (C&C95.EXE after TIM-743 chain + td-ddmode-patch):
-  46dc1eb4a81143610161e4f1930aec7a95a76f0b367e99454d08b01a6a3ccc9c
+Expected input SHA-256 (C&C95.EXE after TIM-743 chain: focus-skip + game-in-focus + vqa-skip + activateapp):
+  46a6d902963e4f613d550704877f4abae173b4c2e43d6a478518b2fba6fcda4a
 
 Expected output SHA-256:
-  19ab8620eadfe1b31ce340922fc426b7fcd407a044ba890b543144f25d1dbf58
+  935b32578dfc39d3e4bd928fe87d7703e39a974f7eb2e827a2249e119d925429
 """
 import sys
 import hashlib
 import shutil
 
-INPUT_SHA256   = "46dc1eb4a81143610161e4f1930aec7a95a76f0b367e99454d08b01a6a3ccc9c"
-PATCHED_SHA256 = "19ab8620eadfe1b31ce340922fc426b7fcd407a044ba890b543144f25d1dbf58"
+INPUT_SHA256   = "46a6d902963e4f613d550704877f4abae173b4c2e43d6a478518b2fba6fcda4a"
+PATCHED_SHA256 = "935b32578dfc39d3e4bd928fe87d7703e39a974f7eb2e827a2249e119d925429"
 
 # 5-byte jmp at 0xbc6ae replacing the DDSCL_NORMAL path preamble
 JMP_OFFSET  = 0xbc6ae
@@ -87,7 +87,7 @@ def patch(path: str, dry_run: bool = False) -> int:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected: {INPUT_SHA256}")
         print(f"       apply td-focus-skip, td-game-in-focus, td-vqa-skip,")
-        print(f"       td-activateapp, td-ddmode patches first")
+        print(f"       td-activateapp patches first (do NOT apply td-ddmode for cnc-ddraw path)")
         return 1
 
     if bytes(data[GUARD_OFFSET:GUARD_OFFSET + len(GUARD_BYTES)]) != GUARD_BYTES:
