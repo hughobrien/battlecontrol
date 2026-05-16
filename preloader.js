@@ -90,6 +90,10 @@
   // TIM-697: ?cheat=1 — inject Flag_To_Win() at frame 200 for win-VQA verification.
   // getenv("RA_CHEAT") returns NULL in PROXY_TO_PTHREAD worker; RA_CHEAT.FLAG is the fallback.
   var cheat = false;
+  // TIM-812: ?scenario=SCU02EA — override the autostart scenario name.
+  // Used to start a specific mission (e.g. Soviet M2, GDI M2) instead of the
+  // default M1.  Creates {RA|TD}_AUTOSTART_SCENARIO.FLAG with the scenario name.
+  var scenarioName = '';
   // TIM-695: ?vqa=NAME[,NAME...] — fetch extra standalone VQA file(s) from ?src= base URL and
   // drop them into /game/.  Used by the TD WASM VQA regression test (which needs LOGO.VQA from
   // MOVIES.MIX, but loading the full 425MB MIX is too expensive for a CI run).  Each name is
@@ -355,6 +359,18 @@
       }
     }
 
+    // TIM-812: ?scenario=SCU02EA — override the autostart mission.
+    if (scenarioName) {
+      var scenarioFlagFile = isTD ? 'TD_AUTOSTART_SCENARIO.FLAG' : 'RA_AUTOSTART_SCENARIO.FLAG';
+      try {
+        var scenarioBytes = new TextEncoder().encode(scenarioName);
+        FS.createDataFile(GAME_DIR, scenarioFlagFile, scenarioBytes, true, true, false);
+        console.log('[preloader] autostart scenario flag → ' + GAME_DIR + '/' + scenarioFlagFile + ' = ' + scenarioName);
+      } catch (e) {
+        console.warn('[preloader] could not create scenario flag file:', e.message);
+      }
+    }
+
     // TIM-540: ?gameclk=1 creates RA_GAME_CLICK.FLAG in MEMFS for the same reason.
     // getenv("RA_GAME_CLICK") / getenv("TD_GAME_CLICK") returns NULL in the
     // PROXY_TO_PTHREAD worker; the flag file is the C++ fallback.
@@ -467,6 +483,13 @@
     // TIM-697: ?cheat=1 — Flag_To_Win() at game frame 200 for win-VQA verification.
     if (params.get('cheat') === '1') {
       cheat = true;
+    }
+    // TIM-812: ?scenario=SCU02EA — override autostart scenario name.
+    // Must be used with ?autostart=1.  Example: ?autostart=1&scenario=SCU02EA
+    // loads Soviet Mission 2 instead of the default Allied Mission 1.
+    var scenParam = params.get('scenario');
+    if (scenParam) {
+      scenarioName = scenParam.trim().toUpperCase();
     }
     // TIM-695: ?vqa=NAME[,NAME...] — extra standalone VQA files to fetch alongside the MIX
     // bundle.  Only applies in ?src= S3 mode.  Each entry is normalised to upper-case
