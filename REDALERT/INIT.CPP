@@ -2818,6 +2818,31 @@ static void Init_Color_Remaps(void)
 		memcpy(&ColorRemaps[PCOLOR_GREY], &temp, sizeof(RemapControlType));
 	}
 
+#ifndef _MSC_VER
+	{
+		RawFileClass diag("COLOR_DIAG.TXT");
+		if (diag.Create()) {
+			char buf[256];
+			snprintf(buf, sizeof(buf),
+				"PCOLOR_DIALOG_BLUE.Color=%d Bright=%d Shadow=%d\n"
+				"PCOLOR_TYPE.Color=%d Bright=%d\n"
+				"PCOLOR_BLUE.Color=%d Bright=%d\n"
+				"PCOLOR_GREEN.Color=%d PCOLOR_GOLD.Color=%d\n",
+				(int)ColorRemaps[PCOLOR_DIALOG_BLUE].Color,
+				(int)ColorRemaps[PCOLOR_DIALOG_BLUE].Bright,
+				(int)ColorRemaps[PCOLOR_DIALOG_BLUE].Shadow,
+				(int)ColorRemaps[PCOLOR_TYPE].Color,
+				(int)ColorRemaps[PCOLOR_TYPE].Bright,
+				(int)ColorRemaps[PCOLOR_BLUE].Color,
+				(int)ColorRemaps[PCOLOR_BLUE].Bright,
+				(int)ColorRemaps[PCOLOR_GREEN].Color,
+				(int)ColorRemaps[PCOLOR_GOLD].Color);
+			diag.Write(buf, (int)strlen(buf));
+			diag.Close();
+		}
+	}
+#endif
+
 	/*
 	** Now do the special dim grey scheme
 	*/
