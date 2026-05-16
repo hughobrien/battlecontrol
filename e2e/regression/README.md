@@ -116,7 +116,6 @@ Same shape as T1 but loads `td.html`.
   threshold — palette corruption, missing sprites, layout shifts, or terrain
   changes. Pixel-stat checks (fill %, colour diversity) run first and also
   enforce non-black content at frames 300/500.
-
 ### (shell) T5-td-native-menu — TD native main menu (with TD assets, local)
 
 Runs `build/td/td` under Xvfb :99 for 5 s, asserts non-black fill ≥10 %.
