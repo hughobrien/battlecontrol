@@ -79,8 +79,37 @@ jobs:
             fi
             size=$(stat -c%s "$path")
             echo "::notice::$bin: OK ($(numfmt --to=iec $size), ELF 64-bit)"
-            timeout 3 "./$path" 2>&1 | head -3 || true
           done
+
+      - name: Smoke-test under Xvfb
+        run: |
+          Xvfb :99 -screen 0 640x480x24 -ac &
+          XVFB_PID=$!
+          sleep 1
+          if [ ! -e /tmp/.X99-lock ]; then
+            echo "::error::Xvfb :99 did not start"
+            exit 1
+          fi
+          PASS=0; FAIL=0
+          for bin in ra td; do
+            echo "::group::smoke: $bin"
+            LOG=$(DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 5 "build/$bin" 2>&1); RC=$?
+            echo "$LOG"
+            if echo "$LOG" | grep -qE "SIGSEGV|Segmentation fault|signal 11|CRASH|Aborted"; then
+              echo "::error::$bin: crash signal in output"
+              FAIL=$((FAIL+1))
+            elif [ "$RC" -eq 124 ] || [ "$RC" -eq 143 ]; then
+              echo "::notice::$bin: alive — timed out (5 s)"
+              PASS=$((PASS+1))
+            else
+              echo "::notice::$bin: exited with code $RC (non-crash)"
+              PASS=$((PASS+1))
+            fi
+            echo "::endgroup::"
+          done
+          kill "$XVFB_PID" 2>/dev/null || true
+          echo "smoke: pass=$PASS fail=$FAIL"
+          [ "$FAIL" -eq 0 ] || exit 1
 
       - name: ccache stats
         run: |
