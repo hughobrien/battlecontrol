@@ -728,11 +728,20 @@ bool Select_Game(bool fade)
 #endif
 
 #ifndef _MSC_VER
+		/* TIM-839: run RA_AUTOSTART scenario at most once.
+		 * After one scenario completes, return false on the next
+		 * entry so the game loop exits cleanly instead of looping. */
+		static bool _ra_autostart_completed = false;
 		/* TIM-206: bypass menu entirely when RA_AUTOSTART is set.
 		 * TIM-471: also check RA_AUTOSTART.FLAG in MEMFS — getenv() returns NULL
 		 * under Emscripten PROXY_TO_PTHREAD (C environ not propagated to worker),
 		 * so preloader.js creates the flag file as a cross-thread fallback. */
 		if (getenv("RA_AUTOSTART") || RawFileClass("RA_AUTOSTART.FLAG").Is_Available()) {
+			if (_ra_autostart_completed) {
+				fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART already completed, exiting\n"); fflush(stderr);
+				return false;
+			}
+			_ra_autostart_completed = true;
 			fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI (EASY)\n"); fflush(stderr);
 			Scen.CDifficulty = DIFF_EASY;
 			Scen.Difficulty = DIFF_EASY;
