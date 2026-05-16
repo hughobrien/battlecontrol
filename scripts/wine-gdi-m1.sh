@@ -169,6 +169,25 @@ PYEOF
 # auto-selects SEL_START_NEW_GAME so the game proceeds without user input.
 printf '[Options]\r\nIsFromInstall=true\r\nPlayIntro=No\r\n' > "$STAGE/CONQUER.INI"
 
+# Stub VQP briefing files — C&C95 checks file existence in a tight retry loop
+# (~21k NtCreateFile/sec) before calling Play_Movie for each briefing video.
+# td-vqa-skip-patch patches Play_Movie to return immediately, but the existence-
+# check loop fires first.  Creating 0-byte stubs breaks the spin: File_Exists
+# returns TRUE, Play_Movie is called and returns immediately, loop exits.
+# We stub all GDI (1-15) and NOD (1-12) PRE and mission VQPs so the game
+# doesn't re-spin on subsequent briefings.
+for n in $(seq 1 15); do
+    touch "$STAGE/GDI${n}PRE.VQP" "$STAGE/GDI${n}.VQP"
+done
+for n in $(seq 1 12); do
+    touch "$STAGE/NOD${n}PRE.VQP" "$STAGE/NOD${n}.VQP"
+done
+# Also stub any transition/outro VQPs
+for f in INTRO.VQP SCORE.VQP NODEND1.VQP NODEND2.VQP GDIFINAL.VQP; do
+    touch "$STAGE/$f"
+done
+echo "  stub VQP files created (all GDI/NOD mission briefings)"
+
 # ─── Wine prefix + d:=cdrom ──────────────────────────────────────────────────
 
 if [[ ! -d "$WINEPREFIX" ]]; then
