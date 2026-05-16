@@ -281,6 +281,44 @@ jobs:
             e2e/screenshots/t9-ra-wasm-*.png
             e2e/test-results/
 
+      - name: RA post-game menu regression — map-bleed detection (T10 / TIM-802)
+        # TIM-777 / TIM-802 regression T10: loads ra.html with ?autostart=1
+        # and ?mission_test=1, runs gameplay until forced win triggers at
+        # ~frame 1250, then captures the canvas after transition back to the
+        # main menu and compares against clean-ra-menu.png golden via
+        # parity-compare.py (SSIM ≥ 0.90).
+        # Before the TIM-777 fix (clear HidPage), stale game-frame pixels
+        # bled through the menu background. This gate catches regressions.
+        # Skipped when RA_ASSETS_URL is not set (needs MIX files).
+        env:
+          RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
+        run: |
+          if [ -z "$RA_ASSETS_URL" ]; then
+            echo "::notice::T10 skipped — RA_ASSETS_URL not set"
+            exit 0
+          fi
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          COOP_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/regression/T10-ra-menu-bleed.spec.ts \
+            --grep "2 ·" --reporter=line
+          T10_EXIT=$?
+          kill "$COOP_PID" 2>/dev/null || true
+          kill "$XVFB_PID" 2>/dev/null || true
+          exit $T10_EXIT
+
+      - name: Upload T10 menu-bleed artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t10-menu-bleed-results
+          path: |
+            e2e/screenshots/t10-*.png
+            e2e/test-results/
+
       - name: TD audio pitch probe (T7 / TIM-767)
         # TIM-767 regression T7: loads td.html with autostart=1 (skips menu,
         # starts GDI L1), injects an AnalyserNode FFT tap, waits for frame 100,

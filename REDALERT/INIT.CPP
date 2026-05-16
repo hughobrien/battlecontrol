@@ -757,6 +757,13 @@ bool Select_Game(bool fade)
 				Hide_Mouse();
 
 				/*
+				**	Clear the hidden page before loading the menu background,
+				**	so stale game-frame pixels don't bleed through if the
+				**	title image doesn't overwrite every pixel (TIM-777).
+				*/
+				HidPage.Clear();
+
+				/*
 				**	Display the title page; fade it in if this is the first time
 				**	through the loop, and the 'fade' flag is true
 				*/

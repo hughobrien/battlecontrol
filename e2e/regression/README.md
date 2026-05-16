@@ -1,6 +1,6 @@
 # Regression Suite — TIM-623 / TIM-773
 
-Ten Playwright specs and two shell scripts covering the critical rendering /
+Eleven Playwright specs and two shell scripts covering the critical rendering /
 audio / gameplay path for Red Alert and Tiberian Dawn WASM builds.
 
 ## Test-point table
@@ -17,6 +17,7 @@ audio / gameplay path for Red Alert and Tiberian Dawn WASM builds.
 | T7-td-audio-pitch        | TD WASM game audio pitch probe           | TD     | WASM    | yes (TD MIX) | yes\*\* | 600 s  |
 | T8-ra-audio-pitch        | RA WASM PROLOG.VQA audio pitch probe     | RA     | WASM    | yes (RA MIX) | yes\*\* | 600 s  |
 | T9-ra-wasm-mission-start | RA WASM real-click Allied L1             | RA     | WASM    | yes (RA MIX) | yes\*\* | 600 s  |
+| T10-ra-menu-bleed        | RA WASM post-game map-bleed regression   | RA     | WASM    | yes (RA MIX) | yes\*\* | 900 s  |
 | (shell) T5-td-native-menu   | TD native main menu renders           | TD     | native  | yes          | no\*    | 30 s   |
 | (shell) T6-ra-native-smoke  | RA native short-run smoke             | RA     | native  | yes          | no\*    | 45 s   |
 
@@ -95,6 +96,14 @@ Same shape as T1 but loads `td.html`.
   frame 100 canvas fill ≥5 %.
 - **Fails on:** RA menu-click or mission-start regressions (analogous to T6 for TD).
 
+### T10-ra-menu-bleed — RA WASM post-game map-bleed regression (CI when RA_ASSETS_URL set)
+
+- **Pass:** loads `ra.html?autostart=1&mission_test=1`, runs gameplay until forced
+  win at ~frame 1250, captures canvas after transition back to the main menu,
+  parity-compare.py SSIM ≥ 0.90 vs `e2e/goldens/clean-ra-menu.png`.
+- **Fails on:** TIM-777 class regression where stale game-frame pixels (HidPage)
+  bleed through the menu background after returning from gameplay.
+
 ### (shell) T5-td-native-menu — TD native main menu (with TD assets, local)
 
 Runs `build/td/td` under Xvfb :99 for 5 s, asserts non-black fill ≥10 %.
@@ -119,6 +128,7 @@ no SIGSEGV / Aborted.  Shell: `scripts/regression/T6-ra-native-smoke.sh`.
 | T7-td-audio-pitch        | `e2e/regression/T7-td-audio-pitch.spec.ts`              | Playwright |
 | T8-ra-audio-pitch        | `e2e/regression/T8-ra-audio-pitch.spec.ts`              | Playwright |
 | T9-ra-wasm-mission-start | `e2e/regression/T9-ra-wasm-mission-start.spec.ts`       | Playwright |
+| T10-ra-menu-bleed        | `e2e/regression/T10-ra-menu-bleed.spec.ts`            | Playwright |
 | (shell) T5-td-native-menu   | `scripts/regression/T5-td-native-menu.sh`            | Shell      |
 | (shell) T6-ra-native-smoke  | `scripts/regression/T6-ra-native-smoke.sh`           | Shell      |
 
