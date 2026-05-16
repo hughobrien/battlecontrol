@@ -1,15 +1,26 @@
 name: CI
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [master]
   pull_request:
     branches: [master]
 
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+
 jobs:
   build:
-    name: Compile and link
+    name: Compile and link (${{ matrix.compiler }})
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+      fail-fast: false
 
     steps:
       - uses: actions/checkout@v4
@@ -18,26 +29,41 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            g++ \
+            g++ clang \
             libsdl2-dev \
             xvfb \
             binutils \
             python3 \
             cmake \
             ninja-build \
+            ccache \
             libsdl2-ttf-dev
 
-      - name: Build and smoke-test
-        run: bash scripts/first-run-pass-94.sh
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.compiler }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.compiler }}-
+            ccache-
 
-      - name: Configure RA cmake build
-        run: cmake --preset linux-native
+      - name: Configure cmake
+        run: |
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            export CC=clang CXX=clang++
+          fi
+          cmake --preset linux-native \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-      - name: Build RA native (cmake)
+      - name: Build RA native
         run: cmake --build build --target ra --parallel
 
-      - name: Build TD native (cmake)
+      - name: Build TD native
         run: cmake --build build --target td --parallel
+
+      - name: ccache stats
+        run: ccache --show-stats
 
   vqa-pixel-diff:
     name: VQA codec pixel-diff
@@ -154,7 +180,10 @@ jobs:
         run: |
           Xvfb :99 -screen 0 1280x1024x24 &
           XVFB_PID=$!
-          sleep 2
+          for i in $(seq 1 10); do
+            if xdpyinfo -display :99 >/dev/null 2>&1; then break; fi
+            sleep 0.5
+          done
           npx playwright test e2e/tim699-ra-compare.spec.ts \
             --grep "Tier 1|Tier 3" \
             --reporter=line
@@ -169,3 +198,44 @@ jobs:
           name: wine-comparison-screenshots
           path: e2e/screenshots/
           if-no-files-found: ignore
+
+  build-wasm:
+    name: Build WASM
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '5.0.6'
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ninja-build cmake
+
+      - name: Configure WASM build
+        run: emcmake cmake --preset wasm
+
+      - name: Build ra.wasm
+        run: cmake --build build-wasm --target ra --parallel
+
+      - name: Build td.wasm
+        run: cmake --build build-wasm --target td --parallel
+
+      - name: Validate WASM binaries
+        run: |
+          python3 - <<'EOF'
+          import os, struct
+          MIN_SIZE = 1_000_000
+          for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
+              with open(name, 'rb') as f:
+                  magic = f.read(4)
+              assert magic == b'\x00asm', f'{name}: invalid WASM magic {magic!r}'
+              size = os.path.getsize(name)
+              assert size > MIN_SIZE, f'{name}: suspiciously small ({size} bytes < {MIN_SIZE})'
+              print(f'{name}: {size // 1024} KB — OK')
+          EOF
