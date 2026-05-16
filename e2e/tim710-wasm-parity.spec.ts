@@ -133,12 +133,12 @@ async function installVqaAutoSkip(page: any): Promise<() => Promise<void>> {
 }
 
 // Run scripts/parity-compare.py and return parsed JSON result.
-// Returns { status, ssim, p99Diff, fillA, fillB, error? }
+// Returns { status, ssim, p99Diff, fillA, fillB, error?, sideBySideOut? }
 function runParityCompare(
   pathA: string,
   pathB: string,
-  opts: { label?: string; thresholdSsim?: number; diffOut?: string; cropBottom?: number } = {},
-): { status: string; ssim: number; p99Diff: number; fillA: number; fillB: number; error?: string } {
+  opts: { label?: string; thresholdSsim?: number; diffOut?: string; sideBySideOut?: string; cropBottom?: number } = {},
+): { status: string; ssim: number; p99Diff: number; fillA: number; fillB: number; error?: string; sideBySideOut?: string } {
   const argv = [
     path.join(REPO_ROOT, 'scripts', 'parity-compare.py'),
     pathA, pathB,
@@ -147,6 +147,7 @@ function runParityCompare(
     '--json',
   ];
   if (opts.diffOut) argv.push('--diff-out', opts.diffOut);
+  if (opts.sideBySideOut) argv.push('--side-by-side-out', opts.sideBySideOut);
   if (opts.cropBottom) { argv.push('--crop-bottom', String(opts.cropBottom)); }
 
   const proc = child_process.spawnSync('python3', argv, {
@@ -166,11 +167,13 @@ function runParityCompare(
       fillA:   r.fill_a  ?? 0,
       fillB:   r.fill_b  ?? 0,
       error:   r.error,
+      sideBySideOut: r.side_by_side_out,
     };
   } catch {
     return {
       status: 'SKIP', ssim: 0, p99Diff: 999, fillA: 0, fillB: 0,
       error: `parity-compare.py parse error: ${jsonLine.slice(0, 200)}`,
+      sideBySideOut: undefined,
     };
   }
 }
@@ -384,7 +387,8 @@ test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
     test.skip(!fs.existsSync(wasmShot), 'tim710-wasm-title.png missing — run Tier 1 title test first');
 
     const diffOut = path.join(SCREENSHOTS_DIR, 'tim710-diff-title.png');
-    const cmp = runParityCompare(wineShot, wasmShot, { label: 'title-screen', thresholdSsim: 0.90, diffOut });
+    const sbsOut  = path.join(SCREENSHOTS_DIR, 'tim710-sbs-title.png');
+    const cmp = runParityCompare(wineShot, wasmShot, { label: 'title-screen', thresholdSsim: 0.90, diffOut, sideBySideOut: sbsOut });
     console.log(`Title parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} fill_wine=${cmp.fillA}% fill_wasm=${cmp.fillB}%`);
     if (cmp.error) console.log(`  error: ${cmp.error}`);
 
@@ -392,6 +396,7 @@ test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
 
     if (cmp.status === 'FAIL') {
       if (fs.existsSync(diffOut))   await testInfo.attach('diff-title.png',       { path: diffOut,   contentType: 'image/png' });
+      if (fs.existsSync(sbsOut))    await testInfo.attach('sbs-title.png',        { path: sbsOut,    contentType: 'image/png' });
       if (fs.existsSync(wineShot))  await testInfo.attach('wine-ra-title.png',    { path: wineShot,  contentType: 'image/png' });
       if (fs.existsSync(wasmShot))  await testInfo.attach('wasm-title.png',       { path: wasmShot,  contentType: 'image/png' });
     }
@@ -406,7 +411,8 @@ test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
     test.skip(!fs.existsSync(wasmShot), 'tim710-wasm-menu.png missing — run Tier 1 menu test first');
 
     const diffOut = path.join(SCREENSHOTS_DIR, 'tim710-diff-menu.png');
-    const cmp = runParityCompare(wineShot, wasmShot, { label: 'main-menu', thresholdSsim: 0.90, diffOut });
+    const sbsOut  = path.join(SCREENSHOTS_DIR, 'tim710-sbs-menu.png');
+    const cmp = runParityCompare(wineShot, wasmShot, { label: 'main-menu', thresholdSsim: 0.90, diffOut, sideBySideOut: sbsOut });
     console.log(`Menu parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} fill_wine=${cmp.fillA}% fill_wasm=${cmp.fillB}%`);
     if (cmp.error) console.log(`  error: ${cmp.error}`);
 
@@ -414,6 +420,7 @@ test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
 
     if (cmp.status === 'FAIL') {
       if (fs.existsSync(diffOut))   await testInfo.attach('diff-menu.png',     { path: diffOut,  contentType: 'image/png' });
+      if (fs.existsSync(sbsOut))    await testInfo.attach('sbs-menu.png',      { path: sbsOut,   contentType: 'image/png' });
       if (fs.existsSync(wineShot))  await testInfo.attach('wine-ra-menu.png',  { path: wineShot, contentType: 'image/png' });
       if (fs.existsSync(wasmShot))  await testInfo.attach('wasm-menu.png',     { path: wasmShot, contentType: 'image/png' });
     }
@@ -428,7 +435,8 @@ test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
     test.skip(!fs.existsSync(wasmShot), 'tim710-wasm-allied-l1-t0.png missing — run Tier 1 gameplay test first');
 
     const diffOut = path.join(SCREENSHOTS_DIR, 'tim710-diff-allied-l1-t0.png');
-    const cmp = runParityCompare(wineShot, wasmShot, { label: 'allied-l1-t0', thresholdSsim: 0.90, diffOut });
+    const sbsOut  = path.join(SCREENSHOTS_DIR, 'tim710-sbs-allied-l1-t0.png');
+    const cmp = runParityCompare(wineShot, wasmShot, { label: 'allied-l1-t0', thresholdSsim: 0.90, diffOut, sideBySideOut: sbsOut });
     console.log(`L1 t=0 parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} fill_wine=${cmp.fillA}% fill_wasm=${cmp.fillB}%`);
     if (cmp.error) console.log(`  error: ${cmp.error}`);
 
@@ -436,6 +444,7 @@ test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
 
     if (cmp.status === 'FAIL') {
       if (fs.existsSync(diffOut))   await testInfo.attach('diff-allied-l1-t0.png',     { path: diffOut,  contentType: 'image/png' });
+      if (fs.existsSync(sbsOut))    await testInfo.attach('sbs-allied-l1-t0.png',      { path: sbsOut,   contentType: 'image/png' });
       if (fs.existsSync(wineShot))  await testInfo.attach('wine-allied-l1-t0.png',     { path: wineShot, contentType: 'image/png' });
       if (fs.existsSync(wasmShot))  await testInfo.attach('wasm-allied-l1-t0.png',     { path: wasmShot, contentType: 'image/png' });
     }
@@ -528,8 +537,9 @@ test.describe('Tier 2 — Soviet L1 WASM vs Wine OG parity [tag:wine]', () => {
     test.skip(!fs.existsSync(wasmShot), 'soviet-l1-wasm-f500.png missing — run Tier 1 Soviet L1 test first');
 
     const diffOut = path.join(SCREENSHOTS_DIR, 'tim780-diff-soviet-l1-f500.png');
+    const sbsOut  = path.join(SCREENSHOTS_DIR, 'tim780-sbs-soviet-l1-f500.png');
     const cmp = runParityCompare(SOVIET_L1_GOLDEN, wasmShot, {
-      label: 'soviet-l1-f500', thresholdSsim: 0.90, diffOut,
+      label: 'soviet-l1-f500', thresholdSsim: 0.90, diffOut, sideBySideOut: sbsOut,
     });
     console.log(
       `Soviet L1 f500 parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} `
@@ -541,6 +551,7 @@ test.describe('Tier 2 — Soviet L1 WASM vs Wine OG parity [tag:wine]', () => {
 
     if (cmp.status === 'FAIL') {
       if (fs.existsSync(diffOut))       await testInfo.attach('diff-soviet-l1-f500.png',   { path: diffOut,       contentType: 'image/png' });
+      if (fs.existsSync(sbsOut))        await testInfo.attach('sbs-soviet-l1-f500.png',    { path: sbsOut,        contentType: 'image/png' });
       if (fs.existsSync(SOVIET_L1_GOLDEN)) await testInfo.attach('soviet-l1-wineog.png',     { path: SOVIET_L1_GOLDEN, contentType: 'image/png' });
       if (fs.existsSync(wasmShot))      await testInfo.attach('soviet-l1-wasm-f500.png',  { path: wasmShot,      contentType: 'image/png' });
     }
