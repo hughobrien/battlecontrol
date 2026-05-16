@@ -3,43 +3,43 @@
 #
 # Rendering strategy (TIM-743 + TIM-747):
 #   The C&C95.EXE binary at /opt/tiberiandawn is the CnCNet build.
-#   Uses Wine's builtin ddraw (WINEDLLOVERRIDES=ddraw=b) — no cnc-ddraw needed.
+#   Uses cnc-ddraw (ddraw=n, renderer=gdi) as the DDraw backend inside a
+#   Wine virtual desktop (explorer /desktop=tim724,640x400).
 #
-#   The CnCNet build calls SetCooperativeLevel(DDSCL_NORMAL, hwnd=0) and then
-#   SetDisplayMode(640,400,8) during DDraw init. Without patches:
-#     - Wine's SetDisplayMode → NtUserChangeDisplaySettings → DISP_CHANGE_FAILED
-#       on Xvfb → TD shows a MessageBox warning and exits.
-#     - SetCooperativeLevel with hwnd=0 leaves Wine's ddraw with no render target.
+#   Why cnc-ddraw (not Wine builtin):
+#     Wine builtin DDraw in DDSCL_NORMAL creates the primary surface at the
+#     virtual desktop depth (24/32bpp).  TD expects an 8bpp paletted surface.
+#     When the game writes 8bpp pixels into a 32bpp surface the pitch is wrong
+#     and it crashes.  cnc-ddraw handles the 8→32bpp conversion internally.
 #
-#   Two TIM-747 binary patches make Wine builtin work headless:
-#     - td-ddmode-patch.py     — stubs SetDisplayMode call to return DD_OK
-#                                (xor eax,eax) + NOPs the 4 push args so the
-#                                stack stays balanced (callee would have ret 16).
-#     - td-setcoop-hwnd-patch.py — code-cave detour around the DDSCL_NORMAL
-#                                  preamble that loads the real HWND from the
-#                                  global at 0x567848 and re-issues
-#                                  SetCooperativeLevel with hwnd!=0.
+#   Why virtual desktop (explorer /desktop):
+#     NtUserChangeDisplaySettings on Xvfb returns DISP_CHANGE_FAILED.  The
+#     virtual desktop virtualises mode switches so TD's SetDisplayMode(640,400,8)
+#     is accepted. cnc-ddraw intercepts the call anyway and manages its own
+#     surface, so the virtual-desktop also acts as a no-op for SetDisplayMode.
 #
-#   With both patches Wine builtin ddraw accepts SetCooperativeLevel + the (now
-#   fake) SetDisplayMode, the game proceeds to create a primary surface, and
-#   renders into the actual game HWND. ffmpeg x11grab captures the window.
+#   HWND fix:
+#     The CnCNet binary calls SetCooperativeLevel(hwnd=0, DDSCL_NORMAL).
+#     cnc-ddraw with hook=1 intercepts CreateWindowExA and records the real
+#     HWND; that substitution is transparent.  td-setcoop-hwnd-patch.py adds
+#     an additional code-cave that re-issues SetCooperativeLevel with the HWND
+#     stored at [0x567848] as a belt-and-suspenders fix.
 #
-#   filesystem:
-#     - d:=cdrom registry + staged MIX/INI symlinks
-#     - .windows-label = "GDI95" so Wine's GetVolumeInformationA on D: returns
-#       "GDI95"; Get_CD_Index finds D: and Set_Search_Drives adds D:\ to the
-#       file search path. (td-cdlabel-patch.py exists but is NOT used here —
-#       zeroing GDI95[0] makes Get_CD_Index match C: first since drive_c has
-#       no .windows-label, putting C:\ on the search path and breaking MIX
-#       loading.)
+#   CD label fix:
+#     .windows-label = "GDI95" in STAGE so Wine's GetVolumeInformationA on D:
+#     returns "GDI95"; Get_CD_Index finds D: and Set_Search_Drives adds D:\ to
+#     the file search path.  td-cdlabel-patch.py is NOT used (it zeroes GDI95[0]
+#     making any empty-label drive match, including C: which Wine checks first).
+#
+#   Capture: ffmpeg x11grab reads from the virtual desktop's X11 backing store.
+#   cnc-ddraw's GDI renderer uses XPutImage to commit frames there.
 #
 #   binary patches (TIM-743 + TIM-747):
 #     - td-focus-skip-patch.py    NOP 3 GameInFocus spin-loops
 #     - td-game-in-focus-patch.py entry-detour pin 0x53dd44=1
 #     - td-vqa-skip-patch.py      Play_Movie entry -> ret
 #     - td-activateapp-patch.py   NOP WM_ACTIVATEAPP GameInFocus store
-#     - td-ddmode-patch.py        SetDisplayMode → DD_OK (TIM-747 deliverable)
-#     - td-setcoop-hwnd-patch.py  SetCooperativeLevel with real HWND (TIM-747)
+#     - td-setcoop-hwnd-patch.py  code-cave: SetCooperativeLevel with real HWND
 #
 # Outputs in $ARTIFACT_DIR (default: e2e/tim724/gdi-m1/):
 #   t05-initial.png, t10.png, t20.png, t30.png, t60.png, wine.log
@@ -51,6 +51,7 @@ WINE="${WINE:-/usr/bin/wine}"
 WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim724-gdi}"
 TD_EXE_PATH="${TD_EXE_PATH:-/opt/tiberiandawn/C&C95.EXE}"
 TD_DLL_DIR="${TD_DLL_DIR:-/opt/tiberiandawn}"
+CNC_DDRAW_DIR="${CNC_DDRAW_DIR:-/tmp/cnc-ddraw}"
 DATA_DIR="${DATA_DIR:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-e2e/tim724/gdi-m1}"
 
@@ -65,10 +66,11 @@ for tool in "$WINE" Xvfb openbox ffmpeg; do
 done
 [[ -f "$TD_EXE_PATH" ]] || { echo "FAIL: $TD_EXE_PATH missing"; exit 2; }
 [[ -d "$DATA_DIR" ]] || { echo "FAIL: $DATA_DIR missing"; exit 1; }
+[[ -f "$CNC_DDRAW_DIR/ddraw.dll" ]] || { echo "FAIL: cnc-ddraw missing at $CNC_DDRAW_DIR/ddraw.dll"; exit 1; }
 
 echo "  wine:       $($WINE --version)"
 echo "  exe:        $TD_EXE_PATH ($(sha256sum "$TD_EXE_PATH" | cut -c1-12)...)"
-echo "  ddraw:      Wine builtin (ddraw=b)"
+echo "  ddraw:      cnc-ddraw (ddraw=n, renderer=gdi)"
 echo "  prefix:     $WINEPREFIX"
 echo "  data:       $DATA_DIR"
 echo "  artifacts:  $ARTIFACT_DIR"
@@ -96,14 +98,16 @@ done
 cp "$TD_EXE_PATH" "$STAGE/C&C95.EXE"
 
 # ─── Binary patches (TIM-743 + TIM-747) ──────────────────────────────────────
-# Apply TD-specific patches analogous to the RA focus/vqa chain in TIM-708.
+# Apply TD-specific patches. td-ddmode-patch is NOT used here: cnc-ddraw
+# intercepts SetDisplayMode internally and returns DD_OK without calling
+# NtUserChangeDisplaySettings, so the ddmode stub is redundant.
+# setcoop-hwnd-patch expects the activateapp output SHA directly.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "  applying TD binary patches..."
 python3 "$SCRIPT_DIR/td-focus-skip-patch.py"      "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-game-in-focus-patch.py"   "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-vqa-skip-patch.py"        "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-activateapp-patch.py"     "$STAGE/C&C95.EXE"
-python3 "$SCRIPT_DIR/td-ddmode-patch.py"          "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-setcoop-hwnd-patch.py"    "$STAGE/C&C95.EXE"
 echo "  patch chain done: $(sha256sum "$STAGE/C&C95.EXE" | cut -c1-12)..."
 
@@ -117,6 +121,22 @@ echo "  patch chain done: $(sha256sum "$STAGE/C&C95.EXE" | cut -c1-12)..."
 printf 'GDI95' > "$STAGE/.windows-label"
 echo "  D: label set to GDI95 via .windows-label"
 [[ -f "$TD_DLL_DIR/THIPX32.DLL" ]] && cp "$TD_DLL_DIR/THIPX32.DLL" "$STAGE/THIPX32.DLL"
+
+# ─── cnc-ddraw setup ─────────────────────────────────────────────────────────
+# Copy cnc-ddraw.dll as ddraw.dll so WINEDLLOVERRIDES="ddraw=n" picks it up.
+# cnc-ddraw handles 8bpp→32bpp palette conversion internally; the GDI renderer
+# commits frames via XPutImage so ffmpeg x11grab can capture them.
+cp "$CNC_DDRAW_DIR/ddraw.dll" "$STAGE/ddraw.dll"
+cat > "$STAGE/ddraw.ini" <<'DDRAWINI'
+[ddraw]
+renderer=gdi
+windowed=true
+hook=1
+window_state=normal
+width=640
+height=400
+DDRAWINI
+echo "  cnc-ddraw installed: $CNC_DDRAW_DIR/ddraw.dll → $STAGE/ddraw.dll"
 
 # TEMPERAT.PAL — TD's Init_Game reads this directly (not via MIX) before TEMPERAT.MIX
 # is loaded, and MixFileClass::Calculate_CRC produces a different hash than what's stored
@@ -183,24 +203,21 @@ trap cleanup EXIT
 
 # ─── Launch C&C95.EXE ────────────────────────────────────────────────────────
 #
-# ddraw=b: Wine's builtin ddraw. With td-ddmode-patch the SetDisplayMode call
-# is stubbed (xor eax,eax = DD_OK) and never reaches NtUserChangeDisplaySettings,
-# so Xvfb's no-modeswitch limitation is irrelevant. td-setcoop-hwnd-patch
-# rewrites the DDSCL_NORMAL preamble so SetCooperativeLevel receives the real
-# HWND from the global at 0x567848 instead of hwnd=0.
+# ddraw=n: use the native (cnc-ddraw) ddraw.dll we copied into STAGE.
+# cnc-ddraw handles 8bpp→32bpp palette conversion internally and uses the GDI
+# renderer (XPutImage) so ffmpeg x11grab can capture real game frames.
+# td-setcoop-hwnd-patch rewrites the DDSCL_NORMAL preamble so SetCooperativeLevel
+# receives the real HWND from [0x567848] instead of hwnd=0.
+# The virtual desktop virtualises NtUserChangeDisplaySettings — cnc-ddraw also
+# intercepts SetDisplayMode and returns DD_OK, so Xvfb mode limits are irrelevant.
 
 echo
 echo "=== launching C&C95.EXE ==="
-# explorer /desktop=…,WxH gives Wine a virtual desktop at the requested size.
-# That virtualises NtUserChangeDisplaySettings so SetDisplayMode does not fail
-# fatally on Xvfb. td-ddmode-patch still applies as the defensive layer: if
-# Wine cannot honour the requested mode for any reason (8-bit indexed inside
-# a 24-bit virtual desktop), the stubbed DD_OK keeps init alive.
 (
     cd "$STAGE"
     DISPLAY="$XDISP" WAYLAND_DISPLAY= \
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
-        WINEDLLOVERRIDES="ddraw=b;mscoree=;mshtml=" \
+        WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
         timeout 180 "$WINE" explorer '/desktop=tim724,640x400' 'C&C95.EXE'
 ) > "$ARTIFACT_DIR/wine.log" 2>&1 &
@@ -223,9 +240,8 @@ done
 shoot() {
     local name="$1"
     local png="$ARTIFACT_DIR/${name}.png"
-    # Wine's builtin ddraw commits primary-surface flips to the game window
-    # (winex11 BitBlt → XPutImage). ffmpeg x11grab reads from the X11 backing
-    # store.
+    # cnc-ddraw's GDI renderer commits frames via XPutImage into the X11
+    # backing store; ffmpeg x11grab reads from that backing store directly.
     DISPLAY="$XDISP" ffmpeg -nostdin -loglevel error \
         -f x11grab -video_size 800x600 -i "$XDISP" \
         -frames:v 1 -y "$png" 2>/dev/null || true
@@ -244,6 +260,35 @@ print(len(set(img.getdata())))
     fi
 }
 
+# ─── SendInput helper ────────────────────────────────────────────────────────
+# Inject synthetic keypresses into the TD window via a Wine-side helper.
+# td-sendinput.exe uses SendInput which fires WH_KEYBOARD_LL hooks that
+# DirectInput reads — xdotool/XTest events do NOT reach DInput.
+TD_SENDINPUT="${TD_SENDINPUT:-$(dirname "$SCRIPT_DIR")/tools/wine-input/td-sendinput.exe}"
+inject_key() {
+    local vk="$1"
+    if [[ ! -f "$TD_SENDINPUT" ]]; then
+        echo "  (td-sendinput.exe missing at $TD_SENDINPUT — skipping inject)"
+        return
+    fi
+    echo "  inject key vk=$vk"
+    DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+        WINEDEBUG=-all \
+        "$WINE" "$TD_SENDINPUT" key "$vk" 2>/dev/null || true
+}
+
+inject_click() {
+    local x="$1" y="$2"
+    if [[ ! -f "$TD_SENDINPUT" ]]; then
+        echo "  (td-sendinput.exe missing — skipping click inject)"
+        return
+    fi
+    echo "  inject click ($x,$y)"
+    DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+        WINEDEBUG=-all \
+        "$WINE" "$TD_SENDINPUT" click "$x" "$y" 2>/dev/null || true
+}
+
 # Initial settle
 sleep 5
 shoot "t05-initial"
@@ -253,11 +298,29 @@ if ! kill -0 $TD_PID 2>/dev/null; then
     exit 3
 fi
 
-# Settle into menu / first-render (IsFromInstall auto-starts new game)
+# Dismiss the GDI01 mission briefing and any main-menu prompts.
+# The briefing in TD requires a click or Enter/Space to advance.
+# IsFromInstall=true causes the game to auto-select "Start New Game" and
+# land on the side select / briefing screen requiring one keypress.
+echo "  injecting keypresses to advance past briefing..."
+sleep 2
+inject_key 0x0D   # Enter — advance past any main-menu prompt
+sleep 1
+inject_key 0x0D   # Enter — advance past side-select or briefing
+sleep 1
+inject_click 320 200  # click centre of screen (fallback for click-to-advance)
+sleep 1
+inject_key 0x20   # Space — additional advance
+
+# Settle into menu / first-render
 sleep 5
 shoot "t10"
 
-sleep 10
+# Second injection in case briefing needs multiple dismisses
+inject_key 0x0D
+sleep 1
+inject_click 320 200
+sleep 8
 shoot "t20"
 
 sleep 10
