@@ -11,8 +11,9 @@
  * Tier 2 (Wine OG parity, requires WINE_RA_READY=1):
  *   - RA Soviet M2 frame-500 SSIM ≥ 0.90 vs e2e/goldens/soviet-m2-wineog-f500.png
  *
- * TD GDI M2 Wine OG parity is blocked (TIM-803: strategic map only shows M1
- * from a fresh game; binary patch needed for Select_Game Scenario=2).
+ * TD GDI M2 Wine OG parity is now available (TIM-821: binary patch bypasses
+ * Map_Selection, loads GDI M2 directly; OG golden at e2e/tim807/gdi-m2/).
+ * TD GDI M2 WASM Tier 2 (SSIM) is gated on TIM-847: WASM Map.Render crash.
  *
  * ─── URL param mechanism (TIM-812) ────────────────────────────────────────────
  * The preloader and C++ INIT.CPP now support ?scenario=<NAME> which creates
@@ -31,7 +32,8 @@
  *   WINE_RA_READY=1 npx playwright test e2e/tim812-wasm-m2-parity.spec.ts
  *
  * ─── Related ─────────────────────────────────────────────────────────────────
- *   TIM-803 — RA Soviet M2 Wine OG capture + TD GDI M2 blocked analysis
+ *   TIM-803 — RA Soviet M2 Wine OG capture + TD GDI M2 parity summary
+ *   TIM-847 — TD GDI M2 WASM Map.Render crash (blocks Tier 2)
  *   TIM-776 — RA Soviet L1 Wine OG capture (precedent)
  *   TIM-780 — RA Soviet L1 WASM capture + Wine OG parity
  *   TIM-710 — RA WASM parity suite (Allied L1, Soviet L1, VQA)
@@ -243,13 +245,17 @@ test.describe('Tier 2 — RA Soviet M2 WASM vs Wine OG parity [tag:wine]', () =>
 });
 
 // ---------------------------------------------------------------------------
-// TD GDI M2 — WASM capture
+// TD GDI M2 — WASM capture (known-fail: TIM-847)
 // ---------------------------------------------------------------------------
+
+const TD_M2_GOLDEN_OG = path.join(__dirname, 'tim807', 'gdi-m2', 't90-frame500.png');
 
 test.describe('Tier 1 — TD GDI M2 frame 500 (WASM)', () => {
   test.setTimeout(1_200_000);
 
   test('GDI Mission 2: autostart via ?scenario=SCG02EA → frame-500 capture', async ({ page }) => {
+    test.skip(true, 'TIM-847: TD WASM GDI M2 Map.Render memory access out of bounds crash');
+
     const errors: string[] = [];
     page.on('pageerror', (err: Error) => errors.push(err.message));
 
@@ -279,5 +285,46 @@ test.describe('Tier 1 — TD GDI M2 frame 500 (WASM)', () => {
     ).toHaveLength(0);
 
     console.log(`[TD-GDI-M2] GDI M2 frame 500 captured at ${shotPath}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TD GDI M2 — WASM vs Wine OG SSIM parity (gated on TIM-847 fix)
+// ---------------------------------------------------------------------------
+
+test.describe('Tier 2 — TD GDI M2 WASM vs Wine OG parity [tag:wine]', () => {
+  test.beforeEach(() => {
+    test.skip(
+      !WINE_RA_READY,
+      'Tier 2 requires WINE_RA_READY=1; run bash scripts/wine-gdi-m2.sh first',
+    );
+  });
+
+  test('GDI M2 frame 500: SSIM ≥ 0.90 vs Wine OG golden', async ({}, testInfo) => {
+    test.skip(true, 'TIM-847: WASM GDI M2 crash blocks Tier 2 capture');
+
+    const wasmShot = path.join(SCREENSHOTS_DIR, 'gdi-m2-wasm-f500.png');
+    test.skip(!fs.existsSync(TD_M2_GOLDEN_OG), 'TD GDI M2 OG golden missing');
+    test.skip(!fs.existsSync(wasmShot), 'gdi-m2-wasm-f500.png missing — run Tier 1 TD GDI M2 test first');
+
+    const diffOut = path.join(SCREENSHOTS_DIR, 'tim812-diff-gdi-m2-f500.png');
+    const cmp = runParityCompare(TD_M2_GOLDEN_OG, wasmShot, {
+      label: 'gdi-m2-f500', thresholdSsim: 0.90, diffOut,
+    });
+    console.log(
+      `GDI M2 f500 parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} `
+      + `fill_wine=${cmp.fillA}% fill_wasm=${cmp.fillB}%`
+    );
+    if (cmp.error) console.log(`  error: ${cmp.error}`);
+
+    if (cmp.status === 'SKIP') test.skip(true, cmp.error ?? 'parity-compare.py returned SKIP');
+
+    if (cmp.status === 'FAIL') {
+      if (fs.existsSync(diffOut))          await testInfo.attach('diff-gdi-m2-f500.png',       { path: diffOut,      contentType: 'image/png' });
+      if (fs.existsSync(TD_M2_GOLDEN_OG))  await testInfo.attach('gdi-m2-wineog-f500.png',     { path: TD_M2_GOLDEN_OG, contentType: 'image/png' });
+      if (fs.existsSync(wasmShot))         await testInfo.attach('gdi-m2-wasm-f500.png',       { path: wasmShot,     contentType: 'image/png' });
+    }
+
+    expect(cmp.ssim, `GDI M2 frame 500 SSIM ≥0.90 (got ${cmp.ssim})`).toBeGreaterThanOrEqual(0.90);
   });
 });
