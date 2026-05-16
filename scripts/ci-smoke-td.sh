@@ -82,9 +82,9 @@ fi
 
 # ---- run smoke test ----
 echo "::group::smoke: td"
-LOG=$(cd "$RUN_DIR" && DISPLAY="$DISPLAY_NUM" SDL_AUDIODRIVER=dummy \
-    TD_AUTOSTART=1 timeout -k 3 "$TIMEOUT_SECS" "$TD_BIN" 2>&1)
-RC=$?
+cd "$RUN_DIR" && DISPLAY="$DISPLAY_NUM" SDL_AUDIODRIVER=dummy \
+    TD_AUTOSTART=1 timeout -k 3 "$TIMEOUT_SECS" "$TD_BIN" > /tmp/smoke-td.log 2>&1; RC=$?
+LOG=$(cat /tmp/smoke-td.log)
 echo "$LOG"
 echo "::endgroup::"
 
