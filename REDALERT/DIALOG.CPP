@@ -112,6 +112,48 @@ void Dialog_Box(int x, int y, int w, int h)
 #else
 	CC_Draw_Shape(shapedata, 0, cx-156, cy-96, WINDOW_PARTIAL, SHAPE_WIN_REL);
 #endif
+#ifdef __EMSCRIPTEN__
+	/* TIM-772: visual artefact on the difficulty selector. The four-quadrant
+	** DD-BKGND.SHP grid meets at (cx, cy). Under the WASM build, shape 2/3's
+	** top edge rows (and shape 0/1's bottom edge rows) emit non-body palette
+	** indices that on Windows render as a subtle slider-track tile, but under
+	** SDL/our SHP path show as a conspicuous horizontal cyan/green/yellow
+	** band exactly at canvas y = dialog_y + cy. Sample the dominant body
+	** palette index from a clean body row (above the seam, below the wrapped
+	** title text), then overdraw the seam band (cy-2 .. cy+8) with it. Keep
+	** clear of the left/right edge ornaments so dialog corners stay intact. */
+	{
+		int counts[256];
+		for (int i = 0; i < 256; ++i) counts[i] = 0;
+		int probe_y[2] = { cy - 30, cy + 30 };
+		for (int r = 0; r < 2; ++r) {
+			int sy = y + probe_y[r];
+			if (sy < y || sy >= y + h) continue;
+			for (int xi = x + 16*RESFACTOR; xi < x + w - 16*RESFACTOR; ++xi) {
+				unsigned char p = LogicPage->Get_Pixel(xi, sy);
+				if (p != 0) counts[p]++;
+			}
+		}
+		int best = 0;
+		for (int i = 1; i < 256; ++i) {
+			if (counts[i] > counts[best]) best = i;
+		}
+		if (best > 0) {
+			/* Seam fill: SHP frames 2/3 emit non-body palette indices in
+			** their first ~6 rows. Cover cy-2..cy+5 on HidPage. Slider
+			** labels render to SeenBuff *after* Dialog_Box returns (in
+			** Fetch_Difficulty's redraw block), so they paint on top of
+			** this fill and stay visible without further bookkeeping. */
+			int seam_x0 = x + 16*RESFACTOR;
+			int seam_x1 = x + w - 16*RESFACTOR - 1;
+			int seam_y0 = y + cy - 2;
+			int seam_y1 = y + cy + 6;
+			if (seam_y0 < y) seam_y0 = y;
+			if (seam_y1 >= y + h) seam_y1 = y + h - 1;
+			LogicPage->Fill_Rect(seam_x0, seam_y0, seam_x1, seam_y1, (unsigned char)best);
+		}
+	}
+#endif
 	/*
 	**	Draw the side strips.
 	*/
