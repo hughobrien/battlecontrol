@@ -7,22 +7,18 @@ SEL_START_NEW_GAME case (INIT.CPP:83 in the CnCNet fork). The strategic map
 only shows Mission 1 nodes, preventing capture of GDI Mission 2 frame-level
 reference traces.
 
-Patch strategy: find the `mov dword [Scenario], 1` instruction and change the
-immediate value from 1 to 2.  The instruction is:
-    C7 05 <Scenario_addr> 01 00 00 00  →  C7 05 <Scenario_addr> 02 00 00 00
+Patch strategy: find the `mov byte/dword [Scenario], 1` instruction and change
+the immediate value from 1 to 2.  The compiler optimizes to a byte store
+because `1` fits in 8 bits and .bss is zero-initialized.  Instruction:
+    C6 05 <Scenario_addr> 01     →  C6 05 <Scenario_addr> 02    (byte)
+    C7 05 <Scenario_addr> 01 ... →  C7 05 <Scenario_addr> 02 ...(dword)
 
-How to find the offset (one-time):
-  The Scenario variable is an `unsigned` (4 bytes) in .bss.  Its address is
-  not yet determined.  To find it at runtime:
-    1.  Start C&C95.EXE under winedbg --gdb
-    2.  Let the game run for a few seconds, then attach gdb
-    3.  Search .bss (0x530000–0x5a3000) for the Scenario value (initially 0,
-        becomes 1 after Select_Game begins; or search for 2 if running GDI M2)
-    4.  Set watchpoint: awatch *<address>
-    5.  Restart the process and note the instruction that writes 1 to Scenario
-    6.  Update PATCH_OFFSET below with that instruction's file offset
+Found via PE binary analysis (file offset 0x6754b):
+  C6 05 2C 17 54 00 01  = mov byte ptr [0x54172C], 1
+  0x54172C is in .bss (0x530000–0x5a3000 range), confirmed as the Scenario
+  global via static analysis of the Select_Game SEL_START_NEW_GAME case.
 
-  Until then, this script will report an error when PATCH_OFFSET is unset (0).
+Patch: `C6 05 <addr> <imm8>` → change byte at PATCH_OFFSET+6 from 01→02.
 
 Chain order: focus-skip → game-in-focus → vqa-skip → activateapp → ddmode
              → setcoop-hwnd → ioport → side-preview-skip → scenario-patch
@@ -38,9 +34,11 @@ import os
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-# TODO: Set this to the file offset of the `mov dword [Scenario], 1` instruction
-# The instruction bytes at this offset should start with: C7 05 <addr> 01 00 00 00
-PATCH_OFFSET = 0  # <<<< SET ME AFTER RUNTIME ANALYSIS
+# File offset of the `mov byte [Scenario], 1` instruction in C&C95.EXE.
+# Instruction at this offset: C6 05 <addr> 01   (MOV r/m8, imm8)
+# Found by scanning .text for C6/C7 05 writes of imm=1 to Scenario's
+# .bss address (0x54172C).  At 0x6754b: c6 05 2c 17 54 00 01
+PATCH_OFFSET = 0x6754b
 
 # Value to patch from and to
 OLD_VALUE = 1
@@ -86,8 +84,8 @@ def patch(path: str) -> int:
 
     # Verify we're patching the right instruction
     expected_opcode = data[PATCH_OFFSET:PATCH_OFFSET+2]
-    if expected_opcode != b'\xc7\x05':
-        print(f"ERROR: instruction at 0x{PATCH_OFFSET:x} is not C7 05 (mov dword [mem], imm32)")
+    if expected_opcode not in (b'\xc7\x05', b'\xc6\x05'):
+        print(f"ERROR: instruction at 0x{PATCH_OFFSET:x} is not C6/C7 05 (mov byte/dword [mem], imm)")
         print(f"  Found: {expected_opcode.hex()}")
         return 1
 
