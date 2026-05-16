@@ -499,8 +499,20 @@ WWKeyboardClass::WWKeyboardClass()
 
 void  WWKeyboardClass::Clear()  { Head = Tail = 0; }
 
-// TIM-383: real ring-buffer check; called from Check_Key() hot path every frame.
-BOOL  WWKeyboardClass::Check()  { return Head != Tail; }
+// TIM-856: real ring-buffer check; called from Check_Key() hot path every frame.
+// Must pump SDL events first — otherwise the keyboard buffer stays empty in
+// code paths (e.g. Main_Menu) that don't call Wait_Vert_Blank separately.
+// Mirrors RA KEY.CPP Fill_Buffer_From_System → Wait_Vert_Blank → SDL_Process_Input_Events.
+BOOL  WWKeyboardClass::Check()
+{
+#ifndef _MSC_VER
+    // Pump SDL input events so keyboard data reaches the buffer.
+    // Wait_Vert_Blank is declared in TIBERIANDAWN/WIN32LIB/MISC.H
+    // (included transitively via KEYBOARD.H → FUNCTION.H).
+    Wait_Vert_Blank();
+#endif
+    return Head != Tail;
+}
 
 // TIM-383: ring-buffer insertion — same logic as the real KEYBOARD.CPP Put().
 BOOL  WWKeyboardClass::Put(int key)
