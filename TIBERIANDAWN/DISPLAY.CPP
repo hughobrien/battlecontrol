@@ -2131,28 +2131,28 @@ ObjectClass * DisplayClass::Cell_Object(CELL cell, int x, int y)
 		if (num) {
 			CELL cell;
 			for (cell = Coord_Cell(TacticalCoord); cell < Coord_Cell(TacticalCoord) + Lepton_To_Cell(TacLeptonWidth)+1; cell++) {
-				(*this)[cell].Redraw_Objects();
+				if ((unsigned)cell < MAP_CELL_TOTAL) (*this)[cell].Redraw_Objects();
 			}
 			for (cell = Coord_Cell(TacticalCoord) + MAP_CELL_W;
 				cell < Coord_Cell(TacticalCoord) + MAP_CELL_W + Lepton_To_Cell(TacLeptonWidth)+1; cell++) {
-				(*this)[cell].Redraw_Objects();
+				if ((unsigned)cell < MAP_CELL_TOTAL) (*this)[cell].Redraw_Objects();
 			}
 			if (num > 1) {
 				for (cell = Coord_Cell(TacticalCoord) + MAP_CELL_W*2;
 					cell < Coord_Cell(TacticalCoord) + MAP_CELL_W*2 + Lepton_To_Cell(TacLeptonWidth)+1; cell++) {
-					(*this)[cell].Redraw_Objects();
+					if ((unsigned)cell < MAP_CELL_TOTAL) (*this)[cell].Redraw_Objects();
 				}
 			}
 			if (num > 3) {
 				for (cell = Coord_Cell(TacticalCoord) + MAP_CELL_W*3;
 					cell < Coord_Cell(TacticalCoord) + MAP_CELL_W*3 + Lepton_To_Cell(TacLeptonWidth)+1; cell++) {
-					(*this)[cell].Redraw_Objects();
+					if ((unsigned)cell < MAP_CELL_TOTAL) (*this)[cell].Redraw_Objects();
 				}
 			}
 			if (num > 4) {
 				for (cell = Coord_Cell(TacticalCoord) + MAP_CELL_W*4;
 					cell < Coord_Cell(TacticalCoord) + MAP_CELL_W*4 + Lepton_To_Cell(TacLeptonWidth)+1; cell++) {
-					(*this)[cell].Redraw_Objects();
+					if ((unsigned)cell < MAP_CELL_TOTAL) (*this)[cell].Redraw_Objects();
 				}
 			}
 		}
@@ -2259,7 +2259,7 @@ ObjectClass * DisplayClass::Cell_Object(CELL cell, int x, int y)
 								CELL c = Click_Cell_Calc(Bound(x, 0, Lepton_To_Pixel(TacLeptonWidth)-1) + TacPixelX,
 											Bound(y, 0, Lepton_To_Pixel(TacLeptonHeight)-1) + TacPixelY);
 
-								if (c > 0) (*this)[c].Redraw_Objects(true);
+								if (c > 0 && (unsigned)c < MAP_CELL_TOTAL) (*this)[c].Redraw_Objects(true);
 							}
 						}
 					}
@@ -2273,7 +2273,7 @@ ObjectClass * DisplayClass::Cell_Object(CELL cell, int x, int y)
 								CELL c = Click_Cell_Calc(Bound(x, 0, Lepton_To_Pixel(TacLeptonWidth)-1) + TacPixelX,
 											Bound(y, 0, Lepton_To_Pixel(TacLeptonHeight)-1) + TacPixelY);
 
-								if (c > 0) (*this)[c].Redraw_Objects(true);
+								if (c > 0 && (unsigned)c < MAP_CELL_TOTAL) (*this)[c].Redraw_Objects(true);
 							}
 						}
 					}
@@ -2287,7 +2287,7 @@ ObjectClass * DisplayClass::Cell_Object(CELL cell, int x, int y)
 								CELL c = Click_Cell_Calc(Bound(x, 0, Lepton_To_Pixel(TacLeptonWidth)-1) + TacPixelX,
 											Bound(y, 0, Lepton_To_Pixel(TacLeptonHeight)-1) + TacPixelY);
 
-								if (c > 0) (*this)[c].Redraw_Objects(true);
+								if (c > 0 && (unsigned)c < MAP_CELL_TOTAL) (*this)[c].Redraw_Objects(true);
 							}
 						}
 					}
@@ -2301,7 +2301,7 @@ ObjectClass * DisplayClass::Cell_Object(CELL cell, int x, int y)
 								CELL c = Click_Cell_Calc(Bound(x, 0, Lepton_To_Pixel(TacLeptonWidth)-1) + TacPixelX,
 											Bound(y, 0, Lepton_To_Pixel(TacLeptonHeight)-1) + TacPixelY);
 
-								if (c > 0) (*this)[c].Redraw_Objects(true);
+								if (c > 0 && (unsigned)c < MAP_CELL_TOTAL) (*this)[c].Redraw_Objects(true);
 							}
 						}
 					}
@@ -2321,7 +2321,7 @@ ObjectClass * DisplayClass::Cell_Object(CELL cell, int x, int y)
 								CELL c = Click_Cell_Calc(Bound(x, 0, Lepton_To_Pixel(TacLeptonWidth)-1) + TacPixelX,
 											Bound(y, 0, Lepton_To_Pixel(TacLeptonHeight)-1) + TacPixelY);
 
-								if (c > 0) {
+								if (c > 0 && (unsigned)c < MAP_CELL_TOTAL) {
 									(*this)[c].Redraw_Objects(true);
 								}
 							}
