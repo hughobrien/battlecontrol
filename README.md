@@ -10,9 +10,58 @@ No installation needed. You need legally-acquired game data — click **Open Gam
 
 ---
 
-## v0.2 Release Notes
+## v0.3 Release Notes
 
 ### What's included
+
+| | Browser (WASM) — **primary deliverable** | Native Linux — CI-packaged, gdb/rr testbed |
+|---|---|---|
+| **Red Alert** | ✅ **Parity-verified** — Allied L1, Soviet L1 frame-level match against original Wine OG (per-pixel SSIM) | ✅ CI-packaged (`.tar.gz` in every release) |
+| **Tiberian Dawn** | ✅ **Parity-verified** — GDI L1 frame-level match against original Wine OG; full campaign-completion smoke | ✅ CI-packaged (`.tar.gz` in every release) |
+
+### What's new in v0.3 (since v0.2)
+
+**Parity validation (all three L1 missions frame-level matched against Wine OG):**
+- RA Allied L1 — WASM captures match original Windows binary within per-pixel SSIM tolerance ([TIM-710](/TIM/issues/TIM-710))
+- RA Soviet L1 — same frame-level comparison, Soviet faction button coordinate working ([TIM-776](/TIM/issues/TIM-776))
+- TD GDI L1 — screenshot comparison at mission start and game-loop frames ([TIM-768](/TIM/issues/TIM-768))
+- Automated via `scripts/parity-compare.py` with translation-invariant SSIM ([TIM-797](/TIM/issues/TIM-797))
+
+**CI regression gates (every push):**
+- RA WASM boot, main-menu reachable, mission-start, audio-pitch probe ([TIM-773](/TIM/issues/TIM-773))
+- TD WASM campaign-completion smoke — plays full GDI campaign to victory VQA ([TIM-774](/TIM/issues/TIM-774))
+
+**Release artifacts (four binaries per release via `release.yml`):**
+- RA-Linux, TD-Linux, RA-WASM, TD-WASM — all four packaged and attached to every GitHub release ([TIM-775](/TIM/issues/TIM-775))
+
+**TD native Linux SDL2 rendering:**
+- Keyboard/mouse input, 640×480 viewport, full gameplay (equivalent to RA's native path)
+
+**Screenshot infrastructure:**
+- `scripts/parity-compare.py` auto-registers new baseline captures with translation-invariant SSIM comparison
+
+### How to play
+
+**Browser (no install):**
+1. Visit [▶ Play RA](https://hughobrien.github.io/battlecontrol/ra.html) or [▶ Play TD](https://hughobrien.github.io/battlecontrol/td.html)
+2. Click **Open Game Folder** and select your local data directory containing the MIX files
+3. The game loads automatically — no server upload, data stays on your machine
+
+**Native Linux binaries** are now CI-packaged as `.tar.gz` downloads from the [GitHub Releases](https://github.com/hughobrien/battlecontrol/releases) page. These are development/testbed builds for debugging and CI — not performance-tuned for end users.
+
+### Known limitations
+
+- **Native Linux builds are developer testbeds, not player deliverables.** The native binaries are CI-packaged for convenience but are not performance-tuned for end users. The browser (WASM) build is the primary deliverable.
+- **Save/load not exposed in WASM** — deferred to v0.4.0 (IDBFS persistence)
+- **Multiplayer networking** — not implemented
+- **Prerequisites**: You must supply legally-acquired game data (MIX files). Game data is not included and cannot be distributed.
+- **Browser requirements**: Chrome or Edge (stable) required for SharedArrayBuffer / WASM threads. Firefox works with `dom.postMessage.sharedArrayBuffer.bypassCOOP_COEP.insecure.enabled = true`.
+
+---
+
+## v0.2 Release Notes
+
+### What's included (v0.2)
 
 | | Browser (WASM) — **primary deliverable** | Native Linux — ASAN/GDB/rr testbed |
 |---|---|---|
@@ -30,33 +79,6 @@ No installation needed. You need legally-acquired game data — click **Open Gam
 
 **Tiberian Dawn WASM** — full gameplay audit passed; all e2e specs green.
 
-### How to play
-
-**Browser (no install):**
-1. Visit [▶ Play TD](https://hughobrien.github.io/battlecontrol/td.html) or [▶ Play RA](https://hughobrien.github.io/battlecontrol/ra.html)
-2. Click **Open Game Folder** and select your local data directory containing the MIX files
-3. The game loads automatically — no server upload, data stays on your machine
-
-**Developer testbed (native Linux — ASAN/GDB/rr only, not packaged for end users):**
-
-The native Linux binary is an ASAN/GDB/rr development testbed used to catch memory bugs before they reach WASM. It is not a packaged deliverable; the browser build is the supported way to play. If you are porting or debugging:
-
-```bash
-git clone https://github.com/hughobrien/battlecontrol && cd battlecontrol
-# Debug + ASAN (recommended for development work):
-cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"
-cmake --build build-asan -j$(nproc)
-# Or run the full smoke-test script (requires RA_DATA_DIR):
-nix develop --command bash scripts/first-run-pass-94.sh
-```
-
-### Known limitations
-
-- **Native Linux builds are developer testbeds, not deliverables.** The native binaries are used for ASAN/GDB/rr debugging. They are not packaged, not performance-tuned for end users, and not on the release roadmap. The browser (WASM) build is the deliverable.
-- **Prerequisites**: You must supply legally-acquired game data (MIX files). Game data is not included and cannot be distributed.
-- **Browser requirements**: Chrome or Edge (stable) required for SharedArrayBuffer / WASM threads. Firefox works with `dom.postMessage.sharedArrayBuffer.bypassCOOP_COEP.insecure.enabled = true`.
-
 ---
 
 battlecontrol is a Linux and WebAssembly port of the EA-released game engine sources (RA + TD) from the [EA open-source release](https://github.com/electronicarts/CnC_Remastered_Collection). The upstream repo ships only an MSBuild/MSVC solution targeting Win32; this fork brings both games to a native Linux build using GCC/Clang, CMake, and SDL2.
@@ -70,7 +92,7 @@ battlecontrol is a Linux and WebAssembly port of the EA-released game engine sou
 > | [electronicarts/CnC_Red_Alert](https://github.com/electronicarts/CnC_Red_Alert) | Standalone **original 1996 Red Alert** source (Win32 game) | Separate project — not related to this fork |
 > | [electronicarts/CnC_Tiberian_Dawn](https://github.com/electronicarts/CnC_Tiberian_Dawn) | Standalone **original 1995 Tiberian Dawn** source (MS-DOS game) | Separate project — not related to this fork |
 
-> **Current status — v0.2:** Both games are fully playable in the browser (WASM) — that is the primary deliverable. Tiberian Dawn: complete game loop, audio, and full rendering pipeline. Red Alert: unit control, enemy AI, VQA cinematics (with correct palette and audio), and the full mission loop confirmed. A native Linux RA binary also exists as an ASAN/GDB/rr development testbed (not a packaged product).
+> **Current status — v0.3.0:** Both engines are parity-verified against original Windows binaries (Wine OG) for all three L1 missions (RA Allied, RA Soviet, TD GDI). CI regression gates run on every push. Release artifacts include four binaries (RA-Linux, TD-Linux, RA-WASM, TD-WASM). The browser (WASM) build is the primary deliverable; native Linux binaries are CI-packaged development testbeds.
 
 ---
 
