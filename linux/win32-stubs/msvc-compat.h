@@ -674,4 +674,18 @@ inline constexpr _WasmTargetNone _wasm_target_none;
 #define random ww_lib_random
 #endif // __EMSCRIPTEN__
 
+// Clang's bundled mm_malloc.h selects the _WIN32 codepath (using _aligned_malloc)
+// when _WIN32 is defined by wwstd.h. Provide stubs that delegate to POSIX so
+// SDL2 headers compile cleanly on Linux with clang.  Unconditional because at
+// -include time _WIN32 may not yet be defined (wwstd.h defines it later).
+#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#include <stdlib.h>
+static inline void* _aligned_malloc(size_t size, size_t alignment) {
+    void* ptr = NULL;
+    if (posix_memalign(&ptr, alignment, size) != 0) return NULL;
+    return ptr;
+}
+static inline void _aligned_free(void* ptr) { free(ptr); }
+#endif
+
 #endif // LINUX_WIN32_STUBS_MSVC_COMPAT_H
