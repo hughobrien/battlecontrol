@@ -15,7 +15,7 @@
  *   1. Assets load — preloader-overlay hides, no browser-error banner
  *   2. Game initialises — Init_Bulk_Data done logged
  *   3. Audio opens — "[RA] Audio_Init: SDL2 audio opened OK"
- *   4. Music plays — File_Stream_Sample_Vol called with .AUD filename
+ *   4. Music plays — "[RA] Music started:" logged with .AUD filename
  *   5. Canvas non-black — menu graphics render (terrain/UI tiles)
  *   6. Screenshots at T+0 / T+5s / T+15s after menu stable, attached to issue
  */
@@ -152,23 +152,23 @@ test.describe('Red Alert WASM — main menu verification (TIM-448)', () => {
     expect(output).toContain('[RA] Audio_Init: SDL2 audio opened OK');
   });
 
-  test('4 · music plays — Theme.AI fires File_Stream_Sample_Vol', async ({ page }) => {
+  test('4 · music plays — Theme.AI starts music via File_Stream_Sample_Vol', async ({ page }) => {
     await page.goto(menuUrl, { waitUntil: 'domcontentloaded' });
 
     // Init_Bulk_Data done means we are in Select_Game (menu loop).
     await waitForOutput(page, '[RA] Init_Game: Init_Bulk_Data done', 240_000);
 
     // Theme.AI fires from Select_Game's event loop. Allow up to 60s after init.
-    await waitForOutput(page, '[RA] File_Stream_Sample_Vol:', 60_000);
+    await waitForOutput(page, '[RA] Music started:', 60_000);
 
     const output = await getOutput(page);
-    const musicLines = output.split('\n').filter(l => l.includes('File_Stream_Sample_Vol'));
+    const musicLines = output.split('\n').filter(l => l.includes('Music started'));
     console.log('Music log lines:');
     musicLines.forEach(l => console.log(' ', l));
 
     expect(musicLines.length).toBeGreaterThan(0);
     // Must have a real filename (ends in .AUD case-insensitive).
-    const hasAudFile = musicLines.some(l => /filename=\S+\.aud/i.test(l));
+    const hasAudFile = musicLines.some(l => /Music started:.*\.aud/i.test(l));
     expect(hasAudFile).toBe(true);
 
     await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'ra-menu-music-playing.png'), fullPage: true });
@@ -204,7 +204,7 @@ test.describe('Red Alert WASM — main menu verification (TIM-448)', () => {
     await waitForOutput(page, '[RA] Init_Game: Init_Bulk_Data done', 240_000);
 
     // Wait for music to confirm we are in the menu loop.
-    await waitForOutput(page, '[RA] File_Stream_Sample_Vol:', 60_000);
+    await waitForOutput(page, '[RA] Music started:', 60_000);
 
     // --- Screenshot 1: menu first rendered (T+0) ---
     await page.waitForTimeout(500);
@@ -225,7 +225,7 @@ test.describe('Red Alert WASM — main menu verification (TIM-448)', () => {
     console.log(`[T+15s] canvas ${stats15.width}x${stats15.height}  fill=${stats15.fillPct}%  uniqueColors=${stats15.uniqueColors}`);
 
     const output = await getOutput(page);
-    const musicLines = output.split('\n').filter(l => l.includes('File_Stream_Sample_Vol'));
+    const musicLines = output.split('\n').filter(l => l.includes('Music started'));
 
     console.log('=== TIM-448 main menu audit ===');
     console.log(`  Canvas 640×480: confirmed`);
