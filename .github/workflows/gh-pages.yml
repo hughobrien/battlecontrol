@@ -319,6 +319,42 @@ jobs:
             e2e/screenshots/t10-*.png
             e2e/test-results/
 
+      - name: WASM gameplay SSIM gate (T11 / TIM-849)
+        # TIM-849: runs the wasm-gameplay visual audit test (test 6) which captures
+        # screenshots at frames 100/300/500 and compares against committed golden
+        # images via parity-compare.py (SSIM ≥ 0.95).  If goldens are missing from
+        # the repo the test saves candidate goldens but does NOT enforce SSIM — the
+        # golden images must be committed from a known-good build.
+        # Skipped when RA_ASSETS_URL is not set (needs MIX files for SCG01EA).
+        env:
+          RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
+        run: |
+          if [ -z "$RA_ASSETS_URL" ]; then
+            echo "::notice::T11 skipped — RA_ASSETS_URL not set"
+            exit 0
+          fi
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          COOP_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/wasm-gameplay.spec.ts \
+            --grep "6 ·" --reporter=line
+          T11_EXIT=$?
+          kill "$COOP_PID" 2>/dev/null || true
+          kill "$XVFB_PID" 2>/dev/null || true
+          exit $T11_EXIT
+
+      - name: Upload T11 gameplay SSIM artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t11-gameplay-ssim-results
+          path: |
+            e2e/screenshots/ra-visual-*.png
+            e2e/test-results/
+
       - name: TD audio pitch probe (T7 / TIM-767)
         # TIM-767 regression T7: loads td.html with autostart=1 (skips menu,
         # starts GDI L1), injects an AnalyserNode FFT tap, waits for frame 100,
