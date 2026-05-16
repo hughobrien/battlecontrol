@@ -1,0 +1,35 @@
+---
+# TIM-805: Clang-tidy configuration for C&C Remastered Linux/browser port.
+# Non-blocking initially (all findings informational). Harden over time.
+# This legacy codebase uses -fpermissive and -w, so many style/readability
+# checks would produce thousands of false positives. We focus on checks
+# that catch real bugs or portability issues.
+
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  portability-*,
+  -bugprone-assignment-in-if-condition,
+  -bugprone-branch-clone,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-macro-parentheses,
+  -bugprone-narrowing-conversions,
+  -bugprone-reserved-identifier,
+  -bugprone-signed-char-misuse,
+  -bugprone-undefined-memory-manipulation,
+  -clang-analyzer-optin.performance.Padding,
+  -clang-analyzer-optin.cplusplus.VirtualCall,
+  -performance-no-int-to-ptr,
+  -performance-inefficient-vector-operation,
+
+WarningsAsErrors: ""
+
+CheckOptions:
+  bugprone-suspicious-string-compare.WarnOnImplicitComparison: false
+  bugprone-argument-comment.StrictMode: false
+
+HeaderFilterRegex: ''
+AnalyzeTemporaryDtors: false
+FormatStyle: none

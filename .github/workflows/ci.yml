@@ -375,3 +375,85 @@ jobs:
             e2e/screenshots/
             e2e/test-results/
           if-no-files-found: ignore
+
+  clang-tidy:
+    name: clang-tidy static analysis
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            clang-tidy \
+            cmake \
+            ninja-build \
+            python3 \
+            libsdl2-dev \
+            libsdl2-ttf-dev
+
+      - name: Configure cmake (generates compile_commands.json)
+        run: cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy
+        id: clang-tidy
+        continue-on-error: true
+        run: |
+          find REDALERT TIBERIANDAWN -type f \
+            \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \
+               -o -name '*.cc' -o -name '*.cxx' -o -name '*.c++' \) \
+            | xargs -P "$(nproc)" -I{} clang-tidy \
+                -p build --quiet {} 2>&1 \
+            | tee clang-tidy-report.txt
+          echo "clang-tidy: $(grep -c 'warning:\|error:' clang-tidy-report.txt 2>/dev/null || echo 0) finding(s) reported"
+
+      - name: Upload clang-tidy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: clang-tidy-report.txt
+          if-no-files-found: ignore
+
+  cppcheck:
+    name: cppcheck static analysis
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cppcheck
+
+      - name: Run cppcheck
+        id: cppcheck
+        continue-on-error: true
+        run: |
+          cppcheck \
+            --enable=warning,performance,portability,information \
+            --suppress=missingIncludeSystem \
+            --suppress=unmatchedSuppression \
+            --inline-suppr \
+            --error-exitcode=0 \
+            -j "$(nproc)" \
+            --quiet \
+            -I REDALERT -I REDALERT/WIN32LIB \
+            -I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
+            -I linux/win32-stubs \
+            REDALERT TIBERIANDAWN \
+            2>&1 | tee cppcheck-report.txt
+          echo "cppcheck: $(grep -c 'error:\|warning:' cppcheck-report.txt 2>/dev/null || echo 0) finding(s) reported"
+
+      - name: Upload cppcheck report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: cppcheck-report.txt
+          if-no-files-found: ignore
