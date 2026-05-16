@@ -1333,11 +1333,17 @@ extern "C" void Play_Movie_Linux(const char* name)
     // TIM-619: clear scanline overlay before returning to game rendering.
     vqa_scanlines_active = 0;
 
-    // Drain remaining audio before returning
+    // Drain remaining audio before returning (native Linux only).
+    // On WASM, vqa_audio_dev=1 is a sentinel that coincides with the game's SDL
+    // audio device ID 1.  SDL_GetQueuedAudioSize(1) would query the *game* device,
+    // which is permanently fed by the game's audio thread → infinite spin.
+    // WebAudio AudioBufferSourceNodes are self-draining; no explicit drain needed.
+#ifndef __EMSCRIPTEN__
     if (audio_ok) {
         while (SDL_GetQueuedAudioSize(vqa_audio_dev) > 4096)
             SDL_Delay(10);
     }
+#endif
 
     vqa_audio_close();
     f.Close();
