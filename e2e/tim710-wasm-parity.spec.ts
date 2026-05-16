@@ -1,26 +1,29 @@
 /**
- * TIM-710 — RA WASM port vs OG Wine parity validation — gameplay scenarios.
+ * TIM-710 / TIM-780 — RA WASM port vs OG Wine parity validation.
  *
  * Validates visual parity between the WASM browser port and Wine OG Red Alert
- * across four key scenarios: title screen, main menu, Allied L1 gameplay,
- * and VQA playback.
+ * across key scenarios: title screen, main menu, Allied L1 gameplay,
+ * Soviet L1 gameplay, and VQA playback.
  *
  * ─── Tier 1 (WASM-only, always runs) ────────────────────────────────────────
  *   - Title screen: canvas fill ≥5%, 640×480, no cyan-scatter (TIM-590 gate)
  *   - Main menu: canvas fill ≥30% (TIM-250 gate), 640×480
  *   - Allied L1: map fill ≥20% at t=0, t≈10s, t≈30s (TIM-705 gate)
+ *   - Soviet L1: frame-500 screenshot for parity comparison (TIM-776/TIM-780)
  *   - VQA playback: LOGO.VQA canvas non-black at early + mid playback
  *
  * ─── Tier 2 (Wine OG parity, requires WINE_RA_READY=1) ──────────────────────
  *   - Title SSIM ≥ 0.90 vs e2e/screenshots/wine-ra-title.png
  *   - Menu SSIM ≥ 0.90 vs e2e/screenshots/wine-ra-menu.png
  *   - Allied L1 t=0 SSIM ≥ 0.90 vs e2e/screenshots/wine-allied-l1-t0.png
+ *   - Soviet L1 frame-500 SSIM ≥ 0.90 vs e2e/goldens/soviet-l1-wineog-f500.png
  *   - Diff PNGs attached as test artifacts on failure
  *
  * ─── Setup ───────────────────────────────────────────────────────────────────
  *   serve-coop.py on :8080   (WASM bundle from build-wasm/)
  *   serve-assets.py on :9090 (CD1 MIX files)
  *   [Tier 2] WINE_RA_READY=1 + bash scripts/wine-ra.sh + bash scripts/wine-gameplay.sh
+ *   [Tier 2 Soviet] also requires bash scripts/wine-soviet-l1.sh
  *
  * ─── Run ─────────────────────────────────────────────────────────────────────
  *   npm run test:e2e:wasm-parity
@@ -30,6 +33,8 @@
  *   TIM-699 — Wine setup + OG reference screenshots
  *   TIM-705 — Cinematic pixel-exact parity (8/8 VQAs SSIM=1.0)
  *   TIM-709 — Wine headless mouse input (parallel)
+ *   TIM-776 — Wine OG Soviet L1 capture (golden)
+ *   TIM-780 — WASM Soviet L1 capture + parity
  */
 
 import { test, expect }   from '@playwright/test';
@@ -42,6 +47,9 @@ const WASM_URL        = 'http://localhost:8080/ra.html';
 const ASSET_URL       = process.env['RA_ASSETS_URL'] || 'http://localhost:9090/';
 const SCREENSHOTS_DIR = path.join(__dirname, 'screenshots');
 const REPO_ROOT       = path.resolve(__dirname, '..');
+
+// Soviet L1 golden (Wine OG, captured by scripts/wine-soviet-l1.sh, PR #160)
+const SOVIET_L1_GOLDEN = path.join(__dirname, 'goldens', 'soviet-l1-wineog-f500.png');
 
 const WINE_RA_READY = process.env.WINE_RA_READY === '1';
 
@@ -432,5 +440,110 @@ test.describe('Tier 2 — Wine OG vs WASM parity [tag:wine]', () => {
     }
 
     expect(cmp.ssim, `Allied L1 t=0 SSIM ≥0.90 (got ${cmp.ssim})`).toBeGreaterThanOrEqual(0.90);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Soviet L1 — WASM capture + Wine OG parity (TIM-776 / TIM-780)
+// ---------------------------------------------------------------------------
+// The WASM build defines FIXIT_VERSION_3, so the faction dialog shows three
+// buttons: Allies / Cancel / Soviet.  The Soviet button is at (382, 268).
+//
+// Reference: scripts/wine-soviet-l1.sh captures the Wine OG reference via
+// the soviet-cdlabel-patch.py auto-start path (SCU01EA.INI).
+
+test.describe('Tier 1 — Soviet L1 frame 500 (WASM)', () => {
+  test.setTimeout(900_000);
+
+  test('Soviet Mission 1: navigates menu → faction select → frame-500 capture', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err: Error) => errors.push(err.message));
+
+    await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
+
+    // Install VQA skip to skip intro + briefing VQAs.
+    const cancelSkip = await installVqaAutoSkip(page);
+    await waitForGameReady(page);
+
+    // Wait for main menu.
+    await waitForOutput(page, '[TIM-616] menu_cs=', 120_000);
+    await cancelSkip();
+    console.log('[SOV-L1] main menu ready');
+
+    await page.waitForTimeout(500);
+    await page.locator('#canvas').click({ position: { x: 322, y: 183 } });
+    await waitForOutput(page, '[MENU] input=0x', 30_000);
+    console.log('[SOV-L1] clicked New Campaign');
+
+    // Difficulty dialog — click OK.
+    await waitForOutput(page, '[DIFF] dialog ready', 30_000);
+    await page.waitForTimeout(500);
+    await page.locator('#canvas').click({ position: { x: 470, y: 244 } });
+    console.log('[SOV-L1] difficulty accepted');
+
+    // Faction dialog — click Soviet (third button, rightmost).
+    // FIXIT_VERSION_3: Allies (258,268) / Cancel / Soviet (382,268).
+    await waitForOutput(page, '[INIT] faction dialog ready', 30_000);
+    await page.waitForTimeout(500);
+    await page.locator('#canvas').click({ position: { x: 382, y: 268 } });
+    console.log('[SOV-L1] clicked Soviet faction at (382, 268)');
+
+    // Wait for scenario to start.
+    await waitForOutput(page, '[RA] Select_Game: Start_Scenario OK', 120_000);
+    console.log('[SOV-L1] Start_Scenario OK — Soviet L1 mission started');
+
+    // Wait for frame 500.
+    await waitForOutput(page, '[RA] Main_Loop frame 500', 420_000);
+    await page.waitForTimeout(300);
+
+    const shotPath = path.join(SCREENSHOTS_DIR, 'soviet-l1-wasm-f500.png');
+    await page.screenshot({ path: shotPath });
+
+    const stats500 = await canvasStats(page);
+    console.log(`[SOV-L1] frame 500: fill=${stats500.fill}% colors=${stats500.colors} w=${stats500.w} h=${stats500.h}`);
+    expect(stats500.fill, 'Soviet L1 frame 500 fill ≥5%').toBeGreaterThanOrEqual(5);
+
+    expect(
+      errors.filter(e => !e.includes('ResizeObserver')),
+      'no uncaught JS errors during Soviet L1',
+    ).toHaveLength(0);
+
+    console.log(`[SOV-L1] Soviet L1 frame 500 captured at ${shotPath}`);
+  });
+});
+
+test.describe('Tier 2 — Soviet L1 WASM vs Wine OG parity [tag:wine]', () => {
+  test.beforeEach(() => {
+    test.skip(
+      !WINE_RA_READY,
+      'Tier 2 Soviet L1 parity requires WINE_RA_READY=1; '
+      + 'run bash scripts/wine-soviet-l1.sh first',
+    );
+  });
+
+  test('Soviet L1 frame 500: SSIM ≥ 0.90 vs Wine OG golden', async ({}, testInfo) => {
+    const wasmShot = path.join(SCREENSHOTS_DIR, 'soviet-l1-wasm-f500.png');
+    test.skip(!fs.existsSync(SOVIET_L1_GOLDEN), 'soviet-l1-wineog-f500.png missing — golden not found in e2e/goldens/');
+    test.skip(!fs.existsSync(wasmShot), 'soviet-l1-wasm-f500.png missing — run Tier 1 Soviet L1 test first');
+
+    const diffOut = path.join(SCREENSHOTS_DIR, 'tim780-diff-soviet-l1-f500.png');
+    const cmp = runParityCompare(SOVIET_L1_GOLDEN, wasmShot, {
+      label: 'soviet-l1-f500', thresholdSsim: 0.90, diffOut,
+    });
+    console.log(
+      `Soviet L1 f500 parity: ssim=${cmp.ssim} p99=${cmp.p99Diff} `
+      + `fill_wine=${cmp.fillA}% fill_wasm=${cmp.fillB}%`
+    );
+    if (cmp.error) console.log(`  error: ${cmp.error}`);
+
+    if (cmp.status === 'SKIP') test.skip(true, cmp.error ?? 'parity-compare.py returned SKIP');
+
+    if (cmp.status === 'FAIL') {
+      if (fs.existsSync(diffOut))       await testInfo.attach('diff-soviet-l1-f500.png',   { path: diffOut,       contentType: 'image/png' });
+      if (fs.existsSync(SOVIET_L1_GOLDEN)) await testInfo.attach('soviet-l1-wineog.png',     { path: SOVIET_L1_GOLDEN, contentType: 'image/png' });
+      if (fs.existsSync(wasmShot))      await testInfo.attach('soviet-l1-wasm-f500.png',  { path: wasmShot,      contentType: 'image/png' });
+    }
+
+    expect(cmp.ssim, `Soviet L1 frame 500 SSIM ≥0.90 (got ${cmp.ssim})`).toBeGreaterThanOrEqual(0.90);
   });
 });
