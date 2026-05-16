@@ -1,126 +1,72 @@
 #!/usr/bin/env python3
 """
-TIM-807 — Binary patch to unlock Scenario=2 in CnC95.EXE for GDI Mission 2.
+TIM-821 — GDI Mission 2 Scenario patch.
+Patches C&C95.EXE so that Scenario=2 loads Mission 2 directly without Map_Selection.
 
-Problem: the CnCNet TD build hardcodes Scenario=1 in Select_Game()'s
-SEL_START_NEW_GAME case (INIT.CPP:83 in the CnCNet fork). The strategic map
-only shows Mission 1 nodes, preventing capture of GDI Mission 2 frame-level
-reference traces.
+Two patches:
+  Patch A (offset 0x6754B): Change `mov byte [Scenario], 1` → `mov byte [Scenario], 2`
+    This sets Scenario=2 (GDI Mission 2) instead of Scenario=1.
 
-Patch strategy: find the `mov byte/dword [Scenario], 1` instruction and change
-the immediate value from 1 to 2.  The compiler optimizes to a byte store
-because `1` fits in 8 bits and .bss is zero-initialized.  Instruction:
-    C6 05 <Scenario_addr> 01     →  C6 05 <Scenario_addr> 02    (byte)
-    C7 05 <Scenario_addr> 01 ... →  C7 05 <Scenario_addr> 02 ...(dword)
+  Patch B (offset 0x68DAC): Change `jne +0x57` (75 57) → `jmp +0` (EB 00) at the
+    dh==5 comparison in Start_Scenario's state mapper (function at 0x478558). This
+    makes the function always fall through to the "skip map, load directly" path.
+    
+    Without Patch B, Scenario=2 triggers Map_Selection because the code's
+    selection-mode value (dh) is not 5. The `jne` redirects to the Map_Selection
+    path (dh==6 branch). Changing to `jmp +0` makes it fall through to the dh==5
+    path which sets state=2 and loads the mission directly.
 
-Found via PE binary analysis (file offset 0x6754b):
-  C6 05 2C 17 54 00 01  = mov byte ptr [0x54172C], 1
-  0x54172C is in .bss (0x530000–0x5a3000 range), confirmed as the Scenario
-  global via static analysis of the Select_Game SEL_START_NEW_GAME case.
+    Wine reference: The check is at dlls/ntdll/... — not applicable; this is a
+    binary patch on the original PE32, not a Wine component.
 
-Patch: `C6 05 <addr> <imm8>` → change byte at PATCH_OFFSET+6 from 01→02.
-
-Chain order: focus-skip → game-in-focus → vqa-skip → activateapp → ddmode
-             → setcoop-hwnd → ioport → side-preview-skip → scenario-patch
-
-Expected input SHA-256 (after side-preview-skip):
-  700e61a8fba5b23a4c8a2f666d4526e3de8303d53489e01b0b525ff3cb7c9acc
+Usage:
+    python3 scripts/td-gdi-m2-scenario-patch.py /path/to/C&C95.EXE
 """
 
 import sys
-import hashlib
-import shutil
-import os
 
-# ── Configuration ────────────────────────────────────────────────────────────
+PATCH_A_OFFSET = 0x6754B
+PATCH_A_ORIG = 0x01   # Scenario = 1
+PATCH_A_NEW = 0x02    # Scenario = 2
 
-# File offset of the `mov byte [Scenario], 1` instruction in C&C95.EXE.
-# Instruction at this offset: C6 05 <addr> 01   (MOV r/m8, imm8)
-# Found by scanning .text for C6/C7 05 writes of imm=1 to Scenario's
-# .bss address (0x54172C).  At 0x6754b: c6 05 2c 17 54 00 01
-PATCH_OFFSET = 0x6754b
+PATCH_B_OFFSET = 0x68DAC
+PATCH_B_ORIG_BYTES = bytes([0x75, 0x57])   # jne +0x57 → dh==6 (Map_Selection) check
+PATCH_B_NEW_BYTES  = bytes([0xEB, 0x00])   # jmp +0 → dh==5 (skip map) path
 
-# Value to patch from and to
-OLD_VALUE = 1
-NEW_VALUE = 2
-
-# Known-good input SHA-256 (after td-side-preview-skip-patch.py)
-ACCEPTED_INPUT_SHA256 = [
-    "700e61a8fba5b23a4c8a2f666d4526e3de8303d53489e01b0b525ff3cb7c9acc",
-]
-
-# ── Implementation ───────────────────────────────────────────────────────────
-
-def sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-def patch(path: str) -> int:
-    if PATCH_OFFSET == 0:
-        print(f"ERROR: PATCH_OFFSET is not set in {__file__}")
-        print(f"  See script header for instructions on finding the right offset.")
-        return 1
-
-    if not os.path.exists(path):
-        print(f"ERROR: {path} not found")
-        return 1
-
-    with open(path, 'rb') as f:
+def patch(exe_path: str) -> None:
+    with open(exe_path, "rb") as f:
         data = bytearray(f.read())
 
-    digest = sha256(bytes(data))
+    # Verify Patch A
+    if data[PATCH_A_OFFSET] != 0xC6 or data[PATCH_A_OFFSET+1] != 0x05:
+        print(f"ERROR: Unexpected bytes at 0x{PATCH_A_OFFSET:X}: "
+              f"{' '.join(f'{b:02x}' for b in data[PATCH_A_OFFSET:PATCH_A_OFFSET+7])}")
+        sys.exit(1)
+    if data[PATCH_A_OFFSET + 6] != PATCH_A_ORIG:
+        print(f"WARNING: Patch A already applied or unexpected value: "
+              f"expected {PATCH_A_ORIG:#04x}, got {data[PATCH_A_OFFSET + 6]:#04x}")
 
-    # Idempotency
-    guard_byte_off = PATCH_OFFSET + 6  # immediate value byte position
-    if data[guard_byte_off] == NEW_VALUE:
-        print(f"{path}: scenario patch already applied (Scenario={NEW_VALUE}) — skipping")
-        return 0
+    # Verify Patch B (2 bytes)
+    cur_b = bytes(data[PATCH_B_OFFSET:PATCH_B_OFFSET+2])
+    if cur_b != PATCH_B_ORIG_BYTES:
+        print(f"WARNING: Patch B already applied or unexpected bytes: "
+              f"expected {' '.join(f'{b:02x}' for b in PATCH_B_ORIG_BYTES)}, "
+              f"got {' '.join(f'{b:02x}' for b in cur_b)}")
 
-    # Verify input hash (warn but don't fail if testing)
-    if digest not in ACCEPTED_INPUT_SHA256:
-        print(f"WARNING: unexpected input SHA-256 {digest[:16]}…")
-        print(f"  Expected: {ACCEPTED_INPUT_SHA256[0][:16]}…")
-        print(f"  Apply prerequisite patches in order first")
-        # Continue for development testing
+    # Apply patches
+    data[PATCH_A_OFFSET + 6] = PATCH_A_NEW
+    data[PATCH_B_OFFSET:PATCH_B_OFFSET+2] = PATCH_B_NEW_BYTES
 
-    # Verify we're patching the right instruction
-    expected_opcode = data[PATCH_OFFSET:PATCH_OFFSET+2]
-    if expected_opcode not in (b'\xc7\x05', b'\xc6\x05'):
-        print(f"ERROR: instruction at 0x{PATCH_OFFSET:x} is not C6/C7 05 (mov byte/dword [mem], imm)")
-        print(f"  Found: {expected_opcode.hex()}")
-        return 1
-
-    if data[guard_byte_off] != OLD_VALUE:
-        print(f"ERROR: byte at 0x{guard_byte_off:x} is {data[guard_byte_off]:#x}, expected {OLD_VALUE:#x}")
-        print(f"  This instruction writes {data[guard_byte_off]}, not {OLD_VALUE}")
-        return 1
-
-    # Backup
-    backup = path + ".scenario_orig"
-    if not os.path.exists(backup):
-        shutil.copy2(path, backup)
-        print(f"  Backup: {backup}")
-
-    # Apply
-    data[guard_byte_off] = NEW_VALUE
-
-    with open(path, 'wb') as f:
+    with open(exe_path, "wb") as f:
         f.write(data)
 
-    out_digest = sha256(bytes(data))
-    print(f"{path}: Scenario={OLD_VALUE} → Scenario={NEW_VALUE} patch applied")
-    print(f"  Output SHA-256: {out_digest}")
-    return 0
-
+    print(f"Patch A applied: offset 0x{PATCH_A_OFFSET:X}  0x{PATCH_A_ORIG:02X} → 0x{PATCH_A_NEW:02X}  (Scenario=2)")
+    print(f"Patch B applied: offset 0x{PATCH_B_OFFSET:X}  "
+          f"{' '.join(f'{b:02x}' for b in PATCH_B_ORIG_BYTES)} → "
+          f"{' '.join(f'{b:02x}' for b in PATCH_B_NEW_BYTES)}  (skip Map_Selection)")
 
 if __name__ == "__main__":
-    paths = [a for a in sys.argv[1:] if not a.startswith("-")]
-    if not paths:
-        paths = ["/opt/tiberiandawn/C&C95.EXE"]
-    rc = 0
-    for p in paths:
-        try:
-            rc |= patch(p)
-        except FileNotFoundError:
-            print(f"SKIP: {p} not found")
-            rc = 1
-    sys.exit(rc)
+    if len(sys.argv) < 2:
+        print(f"Usage: {sys.argv[0]} /path/to/C&C95.EXE")
+        sys.exit(1)
+    patch(sys.argv[1])
