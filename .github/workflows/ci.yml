@@ -170,7 +170,7 @@ jobs:
   wine-comparison:
     name: Wine OG comparison
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -179,8 +179,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Playwright and Chromium
-        run: npm ci && npx playwright install --with-deps chromium
+      - name: Install Playwright and browsers
+        run: npm ci && npx playwright install --with-deps chromium firefox
 
       - name: Install Wine32 + system tools
         # wine32:i386 provides 32-bit Wine support needed to run RA95.EXE (16/32-bit Win).
@@ -254,10 +254,20 @@ jobs:
           path: e2e/screenshots/
           if-no-files-found: ignore
 
+      - name: Upload Playwright test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-comparison-test-results
+          path: |
+            e2e/test-results/
+            e2e/report/
+          if-no-files-found: ignore
+
   build-wasm:
     name: Build WASM
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -271,10 +281,27 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ninja-build cmake
+          sudo apt-get install -y --no-install-recommends ninja-build cmake ccache
+
+      - name: Configure ccache
+        run: |
+          ccache --zero-stats
+          ccache --max-size 500M
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-wasm-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'installer/CMakeLists.txt') }}
+          restore-keys: |
+            ccache-wasm-
+            ccache-
 
       - name: Configure WASM build
-        run: emcmake cmake --preset wasm
+        run: |
+          export CCACHE_DIR=${{ env.CCACHE_DIR }}
+          emcmake cmake --preset wasm \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build ra.wasm
         run: cmake --build build-wasm --target ra --parallel
@@ -295,3 +322,81 @@ jobs:
               assert size > MIN_SIZE, f'{name}: suspiciously small ({size} bytes < {MIN_SIZE})'
               print(f'{name}: {size // 1024} KB — OK')
           EOF
+
+      - name: Upload WASM binaries (for dependent jobs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-binaries
+          path: |
+            build-wasm/ra.html
+            build-wasm/ra.js
+            build-wasm/ra.wasm
+            build-wasm/td.html
+            build-wasm/td.js
+            build-wasm/td.wasm
+
+      - name: ccache stats
+        run: |
+          echo "### ccache hit rate (WASM)" >> "$GITHUB_STEP_SUMMARY"
+          ccache --show-stats >> "$GITHUB_STEP_SUMMARY"
+          ccache --show-stats
+
+  wasm-smoke:
+    name: WASM smoke (${{ matrix.browser }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs: build-wasm
+    strategy:
+      matrix:
+        browser: [chromium, firefox]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Playwright and browser
+        run: |
+          npm ci
+          npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xvfb python3
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-binaries
+          path: build-wasm/
+
+      - name: WASM smoke test — ${{ matrix.browser }}
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts \
+            --project=${{ matrix.browser }} \
+            --reporter=line
+          PW_EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID  2>/dev/null || true
+          exit $PW_EXIT
+
+      - name: Upload smoke test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-smoke-${{ matrix.browser }}-results
+          path: |
+            e2e/screenshots/
+            e2e/test-results/
+            e2e/report/
