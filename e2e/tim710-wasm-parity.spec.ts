@@ -137,7 +137,7 @@ async function installVqaAutoSkip(page: any): Promise<() => Promise<void>> {
 function runParityCompare(
   pathA: string,
   pathB: string,
-  opts: { label?: string; thresholdSsim?: number; diffOut?: string } = {},
+  opts: { label?: string; thresholdSsim?: number; diffOut?: string; cropBottom?: number } = {},
 ): { status: string; ssim: number; p99Diff: number; fillA: number; fillB: number; error?: string } {
   const argv = [
     path.join(REPO_ROOT, 'scripts', 'parity-compare.py'),
@@ -147,6 +147,7 @@ function runParityCompare(
     '--json',
   ];
   if (opts.diffOut) argv.push('--diff-out', opts.diffOut);
+  if (opts.cropBottom) { argv.push('--crop-bottom', String(opts.cropBottom)); }
 
   const proc = child_process.spawnSync('python3', argv, {
     encoding: 'utf-8',
