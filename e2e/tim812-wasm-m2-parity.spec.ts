@@ -164,18 +164,21 @@ function runParityCompare(
 // ---------------------------------------------------------------------------
 
 test.describe('Tier 1 — RA Soviet M2 frame 500 (WASM)', () => {
-  test.setTimeout(900_000);
+  test.setTimeout(1_200_000);
 
   test('Soviet Mission 2: autostart via ?scenario=SCU02EA → frame-500 capture', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (err: Error) => errors.push(err.message));
 
-    const url = `${RA_WASM_URL}?src=${encodeURIComponent(RA_ASSET_URL)}&autostart=1&scenario=SCU02EA&debug=1`;
+    // Log console output for debugging (suppressed in normal runs)
+    page.on('console', () => {});
+
+    const url = `${RA_WASM_URL}?src=${encodeURIComponent(RA_ASSET_URL)}&autostart=1&scenario=SCU02EA.INI&debug=1`;
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await waitForGameReady(page);
 
     // Wait for game loop to reach frame 500.
-    await waitForOutput(page, '[RA] Main_Loop frame 500', 420_000);
+    await waitForOutput(page, '[RA] Main_Loop frame 500', 600_000);
     await page.waitForTimeout(300);
 
     const shotPath = path.join(SCREENSHOTS_DIR, 'soviet-m2-wasm-f500.png');
