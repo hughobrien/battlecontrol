@@ -1,11 +1,15 @@
 name: GitHub Pages Deploy
 
+concurrency:
+  group: gh-pages-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [master]
     paths:
       - 'REDALERT/**'
-      - 'TIBDAWN/**'
+      - 'TIBERIANDAWN/**'
       - 'wasm/**'
       - 'linux/**'
       - 'CMakeLists.txt'
@@ -31,6 +35,16 @@ jobs:
           version: '5.0.6'
           actions-cache-folder: 'emsdk-cache'
 
+      - name: Cache Emscripten build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build-wasm
+            ~/.emscripten_cache
+          key: emscripten-build-${{ github.sha }}
+          restore-keys: |
+            emscripten-build-
+
       - name: Install build deps
         run: |
           sudo apt-get update -qq
@@ -46,6 +60,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Install Playwright and Chromium
         run: |
@@ -420,6 +435,17 @@ jobs:
           for f in wasm/deploy/ra.html wasm/deploy/td.html wasm/deploy/index.html; do
             sed -i 's|<head>|<head>\n  <script src="coi-serviceworker.min.js"></script>|' "$f"
           done
+
+      - name: Generate version manifest
+        run: |
+          cat > wasm/deploy/version.json <<'EOF'
+          {
+            "commit": "${{ github.sha }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "build_time": "${{ github.action_start_time }}",
+            "emsdk_version": "${{ env.EMSDK_VERSION || '5.0.6' }}"
+          }
+          EOF
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
