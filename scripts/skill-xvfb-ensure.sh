@@ -25,17 +25,17 @@ _dpy_num="${XVFB_DISPLAY#:}"
 # Kill any existing Xvfb on this display (zombie or stale)
 _old_pid=$(pgrep -f "Xvfb ${XVFB_DISPLAY}" 2>/dev/null || true)
 if [[ -n "$_old_pid" ]]; then
-    # Check if it's actually responding
-    if xdpyinfo -display "${XVFB_DISPLAY}" >/dev/null 2>&1; then
-        echo "[xvfb] Reusing existing Xvfb on ${XVFB_DISPLAY} (pid=$_old_pid)"
-        XVFB_PID="$_old_pid"
-        export XVFB_DISPLAY XVFB_PID
-        # shellcheck disable=SC2317
-        return 0 2>/dev/null || exit 0
-    fi
-    echo "[xvfb] Killing stale Xvfb on ${XVFB_DISPLAY} (pid=$_old_pid)"
-    kill -9 "$_old_pid" 2>/dev/null || true
-    sleep 0.5
+	# Check if it's actually responding
+	if xdpyinfo -display "${XVFB_DISPLAY}" >/dev/null 2>&1; then
+		echo "[xvfb] Reusing existing Xvfb on ${XVFB_DISPLAY} (pid=$_old_pid)"
+		XVFB_PID="$_old_pid"
+		export XVFB_DISPLAY XVFB_PID
+		# shellcheck disable=SC2317
+		return 0 2>/dev/null || exit 0
+	fi
+	echo "[xvfb] Killing stale Xvfb on ${XVFB_DISPLAY} (pid=$_old_pid)"
+	kill -9 "$_old_pid" 2>/dev/null || true
+	sleep 0.5
 fi
 
 # Start new Xvfb
@@ -45,25 +45,25 @@ XVFB_PID=$!
 
 # Wait for Xvfb to be ready (up to 5 seconds)
 for _ in $(seq 1 10); do
-    if xdpyinfo -display "${XVFB_DISPLAY}" >/dev/null 2>&1; then
-        echo "[xvfb] Ready (pid=$XVFB_PID)"
-        break
-    fi
-    sleep 0.5
+	if xdpyinfo -display "${XVFB_DISPLAY}" >/dev/null 2>&1; then
+		echo "[xvfb] Ready (pid=$XVFB_PID)"
+		break
+	fi
+	sleep 0.5
 done
 
 if ! xdpyinfo -display "${XVFB_DISPLAY}" >/dev/null 2>&1; then
-    echo "[xvfb] ERROR: Xvfb failed to start on ${XVFB_DISPLAY}" >&2
-    exit 1
+	echo "[xvfb] ERROR: Xvfb failed to start on ${XVFB_DISPLAY}" >&2
+	exit 1
 fi
 
 # Register cleanup trap (append, don't clobber existing traps)
 _old_trap=$(trap -p EXIT 2>/dev/null | sed "s/trap -- '//;s/' EXIT//" || true)
 if [[ -n "$_old_trap" ]]; then
-    # shellcheck disable=SC2064
-    trap "$_old_trap; kill \$XVFB_PID 2>/dev/null || true" EXIT
+	# shellcheck disable=SC2064
+	trap "$_old_trap; kill \$XVFB_PID 2>/dev/null || true" EXIT
 else
-    trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
+	trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
 fi
 
 export XVFB_DISPLAY XVFB_PID

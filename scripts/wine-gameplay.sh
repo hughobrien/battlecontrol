@@ -54,8 +54,8 @@ RA_EXE_PATH="${1:-${RA_EXE_PATH:-/opt/redalert/game/RA95.EXE}}"
 DATA_DIR="${2:-/opt/redalert/game}"
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
 WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-ra}"
-DISPLAY_NUM="${WINE_DISPLAY:-:97}"  # Use :97 to avoid collision with wine-ra.sh (:98)
-WINE_WM="${WINE_WM:-openbox}"       # Lightweight WM so Wine gets a managed window for input
+DISPLAY_NUM="${WINE_DISPLAY:-:97}" # Use :97 to avoid collision with wine-ra.sh (:98)
+WINE_WM="${WINE_WM:-openbox}"      # Lightweight WM so Wine gets a managed window for input
 
 mkdir -p "$SCREENSHOT_DIR"
 
@@ -63,18 +63,21 @@ mkdir -p "$SCREENSHOT_DIR"
 
 echo "=== Wine gameplay preflight ==="
 if ! command -v wine >/dev/null 2>&1; then
-    echo "FAIL: wine not found"; exit 1
+	echo "FAIL: wine not found"
+	exit 1
 fi
 if [[ ! -f "$RA_EXE_PATH" ]]; then
-    echo "SKIP: RA95.EXE not found at $RA_EXE_PATH"
-    echo "  Run: bash scripts/wine-ra-setup.sh"
-    exit 2
+	echo "SKIP: RA95.EXE not found at $RA_EXE_PATH"
+	echo "  Run: bash scripts/wine-ra-setup.sh"
+	exit 2
 fi
 if [[ ! -d "$DATA_DIR" ]]; then
-    echo "FAIL: data directory not found: $DATA_DIR"; exit 1
+	echo "FAIL: data directory not found: $DATA_DIR"
+	exit 1
 fi
 if ! command -v xdotool >/dev/null 2>&1; then
-    echo "FAIL: xdotool not found — install with: sudo apt-get install xdotool"; exit 1
+	echo "FAIL: xdotool not found — install with: sudo apt-get install xdotool"
+	exit 1
 fi
 
 WINE_VER=$(wine --version 2>/dev/null || echo "unknown")
@@ -92,7 +95,7 @@ trap 'rm -rf "$RA_STAGE"' EXIT
 
 # Stage from DATA_DIR first
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
-    [[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
+	[[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
 done
 
 # If a secondary REMASTERED_CD1 is set or autodiscovered, overlay its files for
@@ -100,19 +103,19 @@ done
 # install at /opt/redalert/game lacks but the remastered CD1 ships).
 REMASTERED_CD1="${REMASTERED_CD1:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
 if [[ -d "$REMASTERED_CD1" ]]; then
-    for f in "$REMASTERED_CD1"/*.MIX; do
-        [[ -e "$f" ]] || continue
-        local_name="$(basename "$f")"
-        [[ -e "$RA_STAGE/$local_name" ]] || ln -sf "$f" "$RA_STAGE/$local_name"
-    done
+	for f in "$REMASTERED_CD1"/*.MIX; do
+		[[ -e "$f" ]] || continue
+		local_name="$(basename "$f")"
+		[[ -e "$RA_STAGE/$local_name" ]] || ln -sf "$f" "$RA_STAGE/$local_name"
+	done
 fi
 
 cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
 # Look for THIPX DLLs next to the EXE first, then in DATA_DIR
 for dll in THIPX32.DLL THIPX16.DLL; do
-    for search_dir in "$(dirname "$RA_EXE_PATH")" "$DATA_DIR"; do
-        [[ -f "$search_dir/$dll" ]] && cp "$search_dir/$dll" "$RA_STAGE/$dll" && break
-    done
+	for search_dir in "$(dirname "$RA_EXE_PATH")" "$DATA_DIR"; do
+		[[ -f "$search_dir/$dll" ]] && cp "$search_dir/$dll" "$RA_STAGE/$dll" && break
+	done
 done
 
 # Apply VQA skip patch so the game bypasses the ENGLISH.VQA intro that blocks on
@@ -120,27 +123,27 @@ done
 # immediately for all VQA calls; cut-scenes are skipped.
 PATCH_SCRIPT="$(dirname "$0")/vqa-skip-patch.py"
 if [[ -f "$PATCH_SCRIPT" ]]; then
-    python3 "$PATCH_SCRIPT" "$RA_STAGE/RA95.EXE" || echo "  WARN: vqa-skip-patch returned non-zero"
+	python3 "$PATCH_SCRIPT" "$RA_STAGE/RA95.EXE" || echo "  WARN: vqa-skip-patch returned non-zero"
 else
-    echo "  WARN: $PATCH_SCRIPT not found — VQA intro may block"
+	echo "  WARN: $PATCH_SCRIPT not found — VQA intro may block"
 fi
 
 # Write the Windows volume label so RA's Get_CD_Index() matches "CD1".
 # Without this, Init_CDROM_Access() loops forever even after the nocd patch.
-printf 'CD1' > "$RA_STAGE/.windows-label"
+printf 'CD1' >"$RA_STAGE/.windows-label"
 
 if [[ ! -d "$WINE_PREFIX" ]]; then
-    echo "Creating 32-bit Wine prefix..."
-    WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
+	echo "Creating 32-bit Wine prefix..."
+	WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
 
 # Map the staging directory as drive d: (cdrom type) so Init_CDROM_Access finds it.
 # RA reads the volume label from .windows-label in the root of the mapped dir.
 mkdir -p "$WINE_PREFIX/dosdevices"
 ln -sfT "$RA_STAGE" "$WINE_PREFIX/dosdevices/d:"
-rm -f "$WINE_PREFIX/dosdevices/d::"   # device node causes ACCESS_DENIED
+rm -f "$WINE_PREFIX/dosdevices/d::" # device node causes ACCESS_DENIED
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-    'HKEY_LOCAL_MACHINE\Software\Wine\Drives' /v 'd:' /t REG_SZ /d 'cdrom' /f 2>/dev/null || true
+	'HKEY_LOCAL_MACHINE\Software\Wine\Drives' /v 'd:' /t REG_SZ /d 'cdrom' /f 2>/dev/null || true
 
 # Configure Wine for screenshot capture:
 # 1. Virtual desktop mode: game runs in a managed window (not exclusive/fullscreen)
@@ -151,11 +154,11 @@ WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
 # 3. Kill and restart wineserver so registry changes take effect before launch.
 echo "Configuring Wine virtual desktop + GDI DirectDraw renderer..."
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-    'HKCU\Software\Wine\Explorer' /v Desktop /t REG_SZ /d Default /f 2>/dev/null || true
+	'HKCU\Software\Wine\Explorer' /v Desktop /t REG_SZ /d Default /f 2>/dev/null || true
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-    'HKCU\Software\Wine\Explorer\Desktops\Default' /v Resolution /t REG_SZ /d '800x600' /f 2>/dev/null || true
+	'HKCU\Software\Wine\Explorer\Desktops\Default' /v Resolution /t REG_SZ /d '800x600' /f 2>/dev/null || true
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-    'HKCU\Software\Wine\Direct3D' /v renderer /t REG_SZ /d gdi /f 2>/dev/null || true
+	'HKCU\Software\Wine\Direct3D' /v renderer /t REG_SZ /d gdi /f 2>/dev/null || true
 WINEPREFIX="$WINE_PREFIX" wineserver -k 2>/dev/null || true
 sleep 2
 
@@ -168,8 +171,8 @@ Xvfb "$DISPLAY_NUM" -screen 0 800x600x24 -ac &
 XVFB_PID=$!
 # shellcheck disable=SC2329
 cleanup_all() {
-    kill -9 "$XVFB_PID" 2>/dev/null || true
-    rm -rf "$RA_STAGE"
+	kill -9 "$XVFB_PID" 2>/dev/null || true
+	rm -rf "$RA_STAGE"
 }
 trap "cleanup_all" EXIT
 sleep 1
@@ -182,53 +185,53 @@ echo "  Xvfb pid=$XVFB_PID"
 
 echo "=== Starting $WINE_WM WM ==="
 if command -v "$WINE_WM" >/dev/null 2>&1; then
-    DISPLAY="$DISPLAY_NUM" "$WINE_WM" &
-    WM_PID=$!
-    # shellcheck disable=SC2329
-    cleanup_all() {
-        kill -9 "$WM_PID" 2>/dev/null || true
-        kill -9 "$XVFB_PID" 2>/dev/null || true
-        rm -rf "$RA_STAGE"
-    }
-    trap "cleanup_all" EXIT
-    sleep 2
-    echo "  WM pid=$WM_PID"
+	DISPLAY="$DISPLAY_NUM" "$WINE_WM" &
+	WM_PID=$!
+	# shellcheck disable=SC2329
+	cleanup_all() {
+		kill -9 "$WM_PID" 2>/dev/null || true
+		kill -9 "$XVFB_PID" 2>/dev/null || true
+		rm -rf "$RA_STAGE"
+	}
+	trap "cleanup_all" EXIT
+	sleep 2
+	echo "  WM pid=$WM_PID"
 else
-    echo "  WARN: $WINE_WM not found — input may not reach the game"
-    WM_PID=""
+	echo "  WARN: $WINE_WM not found — input may not reach the game"
+	WM_PID=""
 fi
 
 # Screenshot helper — ffmpeg x11grab captures the full Xvfb framebuffer.
 # Requires Wine virtual desktop mode (HKCU\Software\Wine\Explorer\Desktop=Default)
 # so that RA's DirectDraw output is composited into the X11 framebuffer.
 take_shot() {
-    local name="$1"
-    local out="$SCREENSHOT_DIR/$name"
-    if command -v ffmpeg >/dev/null 2>&1; then
-        ffmpeg -nostdin -loglevel error -f x11grab -video_size 800x600 \
-            -i "$DISPLAY_NUM" -frames:v 1 -y "$out" 2>/dev/null \
-            && echo "  Screenshot: $out"
-    elif command -v import >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null \
-            && echo "  Screenshot: $out (import)"
-    else
-        echo "  WARN: no screenshot tool (ffmpeg/import) found"
-    fi
+	local name="$1"
+	local out="$SCREENSHOT_DIR/$name"
+	if command -v ffmpeg >/dev/null 2>&1; then
+		ffmpeg -nostdin -loglevel error -f x11grab -video_size 800x600 \
+			-i "$DISPLAY_NUM" -frames:v 1 -y "$out" 2>/dev/null &&
+			echo "  Screenshot: $out"
+	elif command -v import >/dev/null 2>&1; then
+		DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null &&
+			echo "  Screenshot: $out (import)"
+	else
+		echo "  WARN: no screenshot tool (ffmpeg/import) found"
+	fi
 }
 
 # Find the Wine Desktop window ID (retries for up to $1 seconds).
 find_wine_win() {
-    local deadline=$(( SECONDS + ${1:-30} ))
-    while (( SECONDS < deadline )); do
-        local wid
-        wid=$(DISPLAY="$DISPLAY_NUM" xdotool search --name "Wine Desktop" 2>/dev/null | tail -1)
-        if [[ -n "$wid" ]]; then
-            echo "$wid"
-            return 0
-        fi
-        sleep 1
-    done
-    return 1
+	local deadline=$((SECONDS + ${1:-30}))
+	while ((SECONDS < deadline)); do
+		local wid
+		wid=$(DISPLAY="$DISPLAY_NUM" xdotool search --name "Wine Desktop" 2>/dev/null | tail -1)
+		if [[ -n "$wid" ]]; then
+			echo "$wid"
+			return 0
+		fi
+		sleep 1
+	done
+	return 1
 }
 
 # Get the (x, y) origin of the Wine Desktop window's game-client area on screen.
@@ -236,41 +239,44 @@ find_wine_win() {
 # compute its height as (window_height - 480) so that click coordinates passed to
 # xdo_click land in the correct 640x480 game area, not in the title bar.
 wine_win_origin() {
-    local wid="$1"
-    local geom
-    geom=$(DISPLAY="$DISPLAY_NUM" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || { echo "0 22"; return; }
-    local wx wy wh
-    wx=$(echo "$geom" | grep '^X=' | cut -d= -f2)
-    wy=$(echo "$geom" | grep '^Y=' | cut -d= -f2)
-    wh=$(echo "$geom" | grep '^HEIGHT=' | cut -d= -f2)
-    # title bar height = total window height minus the 480-px game viewport
-    local title_h=$(( ${wh:-502} - 480 ))
-    if [[ $title_h -lt 0 || $title_h -gt 80 ]]; then title_h=22; fi
-    local client_oy=$(( ${wy:-0} + title_h ))
-    echo "${wx:-0} ${client_oy}"
+	local wid="$1"
+	local geom
+	geom=$(DISPLAY="$DISPLAY_NUM" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || {
+		echo "0 22"
+		return
+	}
+	local wx wy wh
+	wx=$(echo "$geom" | grep '^X=' | cut -d= -f2)
+	wy=$(echo "$geom" | grep '^Y=' | cut -d= -f2)
+	wh=$(echo "$geom" | grep '^HEIGHT=' | cut -d= -f2)
+	# title bar height = total window height minus the 480-px game viewport
+	local title_h=$((${wh:-502} - 480))
+	if [[ $title_h -lt 0 || $title_h -gt 80 ]]; then title_h=22; fi
+	local client_oy=$((${wy:-0} + title_h))
+	echo "${wx:-0} ${client_oy}"
 }
 
 WINE_WIN_ID=""
 WIN_OX=0
-WIN_OY=20  # fallback: 20px title bar
+WIN_OY=20 # fallback: 20px title bar
 
 # xdotool click at game-coordinates (x,y) — offset by the window's screen origin.
 xdo_click() {
-    local gx="$1" gy="$2"
-    local sx=$(( WIN_OX + gx ))
-    local sy=$(( WIN_OY + gy ))
-    echo "  click game=($gx,$gy) screen=($sx,$sy)"
-    DISPLAY="$DISPLAY_NUM" xdotool mousemove "$sx" "$sy" click 1 2>/dev/null || true
-    sleep 0.5
+	local gx="$1" gy="$2"
+	local sx=$((WIN_OX + gx))
+	local sy=$((WIN_OY + gy))
+	echo "  click game=($gx,$gy) screen=($sx,$sy)"
+	DISPLAY="$DISPLAY_NUM" xdotool mousemove "$sx" "$sy" click 1 2>/dev/null || true
+	sleep 0.5
 }
 
 xdo_key() {
-    local key="$1"
-    # Always use XTEST (no --window) so events go through the X11 device layer
-    # and are indistinguishable from real hardware — this reaches Win32 GetKeyState
-    # and DirectInput. XSendEvent (via --window) is marked synthetic and filtered.
-    DISPLAY="$DISPLAY_NUM" xdotool key "$key" 2>/dev/null || true
-    sleep 0.3
+	local key="$1"
+	# Always use XTEST (no --window) so events go through the X11 device layer
+	# and are indistinguishable from real hardware — this reaches Win32 GetKeyState
+	# and DirectInput. XSendEvent (via --window) is marked synthetic and filtered.
+	DISPLAY="$DISPLAY_NUM" xdotool key "$key" 2>/dev/null || true
+	sleep 0.3
 }
 
 # ─── Launch RA ───────────────────────────────────────────────────────────────
@@ -278,18 +284,21 @@ xdo_key() {
 echo "=== Launching RA95.EXE ==="
 LOG="$(mktemp /tmp/wine-gameplay-XXXXXX.log)"
 (
-    cd "$RA_STAGE"
-    DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
-    WINEDEBUG=-all AUDIODEV=null \
-    timeout 300 wine RA95.EXE
-) > "$LOG" 2>&1 &
+	cd "$RA_STAGE"
+	DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
+		WINEDEBUG=-all AUDIODEV=null \
+		timeout 300 wine RA95.EXE
+) >"$LOG" 2>&1 &
 RA_PID=$!
 trap 'kill "$RA_PID" 2>/dev/null || true; cleanup_all' EXIT
 
 # ─── Step 1: Find Wine Desktop window and resolve click origin ───────────────
 
 echo "  Waiting for Wine Desktop window (up to 30s)..."
-WINE_WIN_ID=$(find_wine_win 30) || { echo "FAIL: Wine Desktop window never appeared"; exit 1; }
+WINE_WIN_ID=$(find_wine_win 30) || {
+	echo "FAIL: Wine Desktop window never appeared"
+	exit 1
+}
 echo "  Wine Desktop wid=$WINE_WIN_ID"
 read -r WIN_OX WIN_OY < <(wine_win_origin "$WINE_WIN_ID")
 echo "  Window origin: ($WIN_OX, $WIN_OY)"
@@ -406,28 +415,28 @@ echo "=== Results ==="
 PASS=0
 TOTAL=0
 for name in wine-gameplay-menu wine-allied-l1-t0 wine-allied-l1-t5 wine-allied-l1-t30 wine-allied-l1-t60 wine-allied-l1-t120; do
-    shot="$SCREENSHOT_DIR/${name}.png"
-    TOTAL=$((TOTAL+1))
-    if [[ -f "$shot" ]]; then
-        sz=$(stat -c%s "$shot")
-        if [[ $sz -gt 5000 ]]; then
-            echo "  OK   ${name}.png ($sz bytes)"
-            PASS=$((PASS+1))
-        else
-            echo "  WARN ${name}.png is small ($sz bytes) — may be blank"
-        fi
-    else
-        echo "  MISS ${name}.png — not captured"
-    fi
+	shot="$SCREENSHOT_DIR/${name}.png"
+	TOTAL=$((TOTAL + 1))
+	if [[ -f "$shot" ]]; then
+		sz=$(stat -c%s "$shot")
+		if [[ $sz -gt 5000 ]]; then
+			echo "  OK   ${name}.png ($sz bytes)"
+			PASS=$((PASS + 1))
+		else
+			echo "  WARN ${name}.png is small ($sz bytes) — may be blank"
+		fi
+	else
+		echo "  MISS ${name}.png — not captured"
+	fi
 done
 
 echo ""
 echo "Captured $PASS/$TOTAL screenshots in $SCREENSHOT_DIR"
 
 if [[ $PASS -ge 4 ]]; then
-    echo "RESULT: PASS ($PASS/$TOTAL screenshots captured)"
-    exit 0
+	echo "RESULT: PASS ($PASS/$TOTAL screenshots captured)"
+	exit 0
 else
-    echo "RESULT: FAIL (only $PASS/$TOTAL screenshots captured)"
-    exit 1
+	echo "RESULT: FAIL (only $PASS/$TOTAL screenshots captured)"
+	exit 1
 fi

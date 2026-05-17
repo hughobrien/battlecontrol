@@ -28,13 +28,13 @@ SRC_BINARY="$REPO_ROOT/build/first-run-pass-72/redalert.elf"
 RUN_DIR="$REPO_ROOT/build/run-remastered"
 
 if [ ! -d "$RA_DATA" ]; then
-    echo "ERROR: RA remastered data not found at $RA_DATA" >&2
-    exit 1
+	echo "ERROR: RA remastered data not found at $RA_DATA" >&2
+	exit 1
 fi
 if [ ! -f "$SRC_BINARY" ]; then
-    echo "ERROR: RA binary not found at $SRC_BINARY" >&2
-    echo "Build the redalert target first." >&2
-    exit 1
+	echo "ERROR: RA binary not found at $SRC_BINARY" >&2
+	echo "Build the redalert target first." >&2
+	exit 1
 fi
 
 mkdir -p "$RUN_DIR"
@@ -42,24 +42,24 @@ cd "$RUN_DIR"
 
 echo "Linking core remastered assets..."
 for f in MAIN.MIX REDALERT.MIX REDALERT.INI EXPAND.MIX; do
-    if [ -f "$RA_DATA/$f" ]; then
-        ln -sf "$RA_DATA/$f" "$f"
-        echo "  linked $f"
-    else
-        echo "  WARNING: $f not found in $RA_DATA"
-    fi
+	if [ -f "$RA_DATA/$f" ]; then
+		ln -sf "$RA_DATA/$f" "$f"
+		echo "  linked $f"
+	else
+		echo "  WARNING: $f not found in $RA_DATA"
+	fi
 done
 
 # EXPAND2.MIX, HIRES1.MIX, LORES1.MIX excluded: encrypted-MIX crash (TIM-348)
 
 echo "Copying VTX palette files (Chronal Vortex effect)..."
 for f in SNOW_VTX.PAL TEMP_VTX.PAL; do
-    if [ -f "$SRC_RUN172/$f" ]; then
-        cp -f "$SRC_RUN172/$f" "$f"
-        echo "  copied $f"
-    else
-        echo "  WARNING: $f not found in $SRC_RUN172"
-    fi
+	if [ -f "$SRC_RUN172/$f" ]; then
+		cp -f "$SRC_RUN172/$f" "$f"
+		echo "  copied $f"
+	else
+		echo "  WARNING: $f not found in $SRC_RUN172"
+	fi
 done
 
 echo "Copying RA binary..."

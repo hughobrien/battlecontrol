@@ -23,12 +23,12 @@ LOG="$OUT_DIR/t5-td-native-menu.log"
 mkdir -p "$OUT_DIR"
 
 if [ ! -x "$ELF" ]; then
-    echo "T5 SKIP: $ELF not built (run \`bash scripts/build-td.sh\`)"
-    exit 77
+	echo "T5 SKIP: $ELF not built (run \`bash scripts/build-td.sh\`)"
+	exit 77
 fi
 if [ ! -d "$RUN_DIR" ]; then
-    echo "T5 SKIP: $RUN_DIR not staged (run \`bash scripts/setup-run-td.sh\`)"
-    exit 77
+	echo "T5 SKIP: $RUN_DIR not staged (run \`bash scripts/setup-run-td.sh\`)"
+	exit 77
 fi
 
 pkill -f "Xvfb :99" 2>/dev/null || true
@@ -38,25 +38,25 @@ sleep 1
 
 # shellcheck disable=SC2329
 cleanup() {
-    pkill -P "$GAME_PID" 2>/dev/null || true
-    kill -9 "$GAME_PID"  2>/dev/null || true
-    kill -9 "$XVFB_PID"  2>/dev/null || true
+	pkill -P "$GAME_PID" 2>/dev/null || true
+	kill -9 "$GAME_PID" 2>/dev/null || true
+	kill -9 "$XVFB_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
 
 # Boot TD, no autostart. Give the menu 5 s to render.
-(cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 8 "$ELF") > "$LOG" 2>&1 &
+(cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 8 "$ELF") >"$LOG" 2>&1 &
 GAME_PID=$!
 sleep 5
 
 # Capture the X display.
 if command -v import >/dev/null 2>&1; then
-    DISPLAY=:99 import -window root "$SHOT" 2>>"$LOG"
+	DISPLAY=:99 import -window root "$SHOT" 2>>"$LOG"
 elif command -v ffmpeg >/dev/null 2>&1; then
-    DISPLAY=:99 ffmpeg -loglevel error -y -f x11grab -video_size 640x480 -i :99 -frames:v 1 "$SHOT" 2>>"$LOG"
+	DISPLAY=:99 ffmpeg -loglevel error -y -f x11grab -video_size 640x480 -i :99 -frames:v 1 "$SHOT" 2>>"$LOG"
 else
-    echo "T5 SKIP: need ImageMagick (\`import\`) or ffmpeg installed"
-    exit 77
+	echo "T5 SKIP: need ImageMagick (\`import\`) or ffmpeg installed"
+	exit 77
 fi
 
 wait "$GAME_PID" 2>/dev/null
@@ -64,8 +64,8 @@ RC=$?
 echo "T5 game rc=$RC (124=timeout=alive, 0=clean exit)"
 
 if [ ! -s "$SHOT" ]; then
-    echo "T5 FAIL: no screenshot captured"
-    exit 1
+	echo "T5 FAIL: no screenshot captured"
+	exit 1
 fi
 
 # Pixel check: non-trivial colour content.
