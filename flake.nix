@@ -274,6 +274,7 @@
           echo "  nix run .#screenshot         capture WASM screenshot"
           echo "  nix run .#test -- <spec>     run an e2e test"
           echo "  nix run .#capture-wine       Wine OG baseline capture"
+          echo "  nix run .#ci-cc-setup        configure ccache (zero stats, max size)"
           echo "  nix run .#ci-run-test -- <spec>  run an e2e test under Xvfb+WASM"
           echo "  nix run .#capture-native     Native Linux gameplay capture"
           echo "  nix run .#vqa-check          VQA pixel-diff gate"
@@ -720,6 +721,10 @@
           kill $SERVER_PID 2>/dev/null || true
           kill $XVFB_PID 2>/dev/null || true
           exit $EXIT
+        '';
+
+        ci-cc-setup = mkApp "ci-cc-setup" ''
+          ccache --zero-stats && ccache --max-size 500M
         '';
 
         ci-clang-tidy = mkApp "ci-clang-tidy" ''
