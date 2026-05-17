@@ -162,6 +162,25 @@ wasm_validate(target: "both")
 Outputs: `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`,
 `build-wasm/td.html`
 
+### GitHub Pages deploy (automatic)
+
+On every merge to `master`, the `gh-pages.yml` workflow:
+1. Builds `ra.wasm` + `td.wasm`
+2. Runs smoke tests (Chromium + Firefox)
+3. Runs asset-gated regression tests (if secrets configured)
+4. Deploys to GitHub Pages
+
+The deploy directory is assembled from `build-wasm/*.wasm`, `build-wasm/*.js`,
+`build-wasm/*.html`, plus `wasm/preloader.js` and
+`wasm/coi-serviceworker.min.js`. A `version.json` manifest is generated with
+commit SHA and build timestamp.
+
+Manual deploy (legacy):
+
+```bash
+gh workflow run "GitHub Pages Deploy"
+```
+
 ---
 
 ## Canonical Test Commands
@@ -471,19 +490,19 @@ concurrently and keeps `master` clean.
 EnterWorktree(name: "<ISSUE-OR-SHORT-DESCRIPTION>")
 ```
 
-This creates a worktree on a new branch `worktree-<name>`
-and resets it to `origin/master`. The tool decides where the worktree lives.
+This creates `.claude/worktrees/<name>/` on a new branch `worktree-<name>`
+and resets it to `origin/master`.
 
-If a worktree for this name already exists, find its path with:
+If a worktree for this name already exists, re-enter it with:
+
+```
+EnterWorktree(path: "<absolute-path-from-git-worktree-list>")
+```
+
+Check what exists:
 
 ```bash
 git worktree list
-```
-
-Then re-enter it with:
-
-```
-EnterWorktree(path: "<path-from-list>")
 ```
 
 ### Working in the worktree
@@ -520,18 +539,18 @@ ExitWorktree(action: "keep")
 
 ### Cleanup after merge
 
-From the root worktree (find the path with `git worktree list`):
+From the root worktree:
 
 ```bash
 git pull origin master
-git worktree remove <path>
+git worktree remove .claude/worktrees/<name>
 git branch -d worktree-<name>
 ```
 
 ### Cancel / abandon
 
 ```bash
-git worktree remove <path> --force
+git worktree remove .claude/worktrees/<name> --force
 git branch -D worktree-<name>
 ```
 
@@ -540,7 +559,7 @@ git branch -D worktree-<name>
 | Item | Value |
 |------|-------|
 | Remote | `origin` (not `battlecontrol`) |
-| Worktree path | Tool-managed (gitignored) |
+| Worktree path | `.claude/worktrees/<name>/` (gitignored) |
 | Local branch | `worktree-<name>` |
 | Base branch | `origin/master` |
 | PR base | `master` |
