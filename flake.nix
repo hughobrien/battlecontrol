@@ -113,7 +113,7 @@
 
           src = ./.;
 
-          nativeBuildInputs = with pkgs; [ cmake ninja gcc python3 pkg-config ];
+          nativeBuildInputs = with pkgs; [ cmake ninja python3 pkg-config ];
           buildInputs       = with pkgs; [ SDL2 SDL2.dev openal libx11 ];
 
           buildPhase = ''
