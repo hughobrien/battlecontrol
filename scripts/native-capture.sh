@@ -26,12 +26,12 @@ set -euo pipefail
 MISSION="${1:?usage: $0 <allied-l1|soviet-l1>}"
 
 case "$MISSION" in
-	allied-l1) SCENARIO="SCG01EA.INI" ;;
-	soviet-l1) SCENARIO="SCU01EA.INI" ;;
-	*)
-		echo "FAIL: unknown mission '$MISSION' — expected allied-l1 or soviet-l1" >&2
-		exit 1
-		;;
+allied-l1) SCENARIO="SCG01EA.INI" ;;
+soviet-l1) SCENARIO="SCU01EA.INI" ;;
+*)
+	echo "FAIL: unknown mission '$MISSION' — expected allied-l1 or soviet-l1" >&2
+	exit 1
+	;;
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

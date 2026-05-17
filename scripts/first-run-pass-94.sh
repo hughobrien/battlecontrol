@@ -79,25 +79,25 @@ OBJECTS=()
 for src in "${SOURCES[@]}"; do
 	rel="${src#"$REPO_ROOT"/}"
 	case "$rel" in
-		REDALERT/DTABLE.CPP | REDALERT/ITABLE.CPP)
-			skipped=$((skipped + 1))
-			continue
-			;;
-		REDALERT/LZWOTRAW.CPP)
-			skipped=$((skipped + 1))
-			continue
-			;;
-		REDALERT/STUB.CPP)
-			skipped=$((skipped + 1))
-			continue
-			;;
+	REDALERT/DTABLE.CPP | REDALERT/ITABLE.CPP)
+		skipped=$((skipped + 1))
+		continue
+		;;
+	REDALERT/LZWOTRAW.CPP)
+		skipped=$((skipped + 1))
+		continue
+		;;
+	REDALERT/STUB.CPP)
+		skipped=$((skipped + 1))
+		continue
+		;;
 	esac
 
 	base="$(basename "$src" .cpp)"
 	base="${base%.CPP}"
 	case "$rel" in
-		REDALERT/WIN32LIB/*) obj="$OBJ_DIR/REDALERT/WIN32LIB/${base}.o" ;;
-		*) obj="$OBJ_DIR/REDALERT/${base}.o" ;;
+	REDALERT/WIN32LIB/*) obj="$OBJ_DIR/REDALERT/WIN32LIB/${base}.o" ;;
+	*) obj="$OBJ_DIR/REDALERT/${base}.o" ;;
 	esac
 
 	if "$CXX" "${CXXFLAGS[@]}" "$src" -o "$obj" 2>&1; then

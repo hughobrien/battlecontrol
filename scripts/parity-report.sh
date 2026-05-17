@@ -29,22 +29,22 @@ TARGETS="wine,wasm,native"
 THRESHOLD="0.90"
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-		--mode)
-			MODE="$2"
-			shift 2
-			;;
-		--targets)
-			TARGETS="$2"
-			shift 2
-			;;
-		--threshold)
-			THRESHOLD="$2"
-			shift 2
-			;;
-		*)
-			echo "unknown arg: $1" >&2
-			exit 1
-			;;
+	--mode)
+		MODE="$2"
+		shift 2
+		;;
+	--targets)
+		TARGETS="$2"
+		shift 2
+		;;
+	--threshold)
+		THRESHOLD="$2"
+		shift 2
+		;;
+	*)
+		echo "unknown arg: $1" >&2
+		exit 1
+		;;
 	esac
 done
 
@@ -112,10 +112,10 @@ if [[ "$MODE" == "gameplay" ]]; then
 	for target in "${TARGET_LIST[@]}"; do
 		target=$(echo "$target" | xargs)
 		case "$target" in
-			wine) CAPTURE_PATHS["0-$target"]="$WINE_DIR/capture.png" ;;
-			native) CAPTURE_PATHS["0-$target"]="$NATIVE_DIR/capture.png" ;;
-			wasm) CAPTURE_PATHS["0-$target"]="$WASM_DIR/capture.png" ;;
-			*) ;;
+		wine) CAPTURE_PATHS["0-$target"]="$WINE_DIR/capture.png" ;;
+		native) CAPTURE_PATHS["0-$target"]="$NATIVE_DIR/capture.png" ;;
+		wasm) CAPTURE_PATHS["0-$target"]="$WASM_DIR/capture.png" ;;
+		*) ;;
 		esac
 	done
 else
@@ -125,10 +125,10 @@ else
 		for target in "${TARGET_LIST[@]}"; do
 			target=$(echo "$target" | xargs)
 			case "$target" in
-				wine) CAPTURE_PATHS["$i-$target"]="$WINE_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
-				native) CAPTURE_PATHS["$i-$target"]="$NATIVE_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
-				wasm) CAPTURE_PATHS["$i-$target"]="$WASM_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
-				*) ;;
+			wine) CAPTURE_PATHS["$i-$target"]="$WINE_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
+			native) CAPTURE_PATHS["$i-$target"]="$NATIVE_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
+			wasm) CAPTURE_PATHS["$i-$target"]="$WASM_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
+			*) ;;
 			esac
 		done
 	done
