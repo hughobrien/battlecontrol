@@ -105,6 +105,9 @@
   // manually once both WASM and files are ready.
   Module.onRuntimeInitialized = function () {
     wasmReady = true;
+    // TIM-844: signal CI test harness that WASM JIT is complete
+    // (playbook §5 — gate on this, not waitForFunction with short timeout).
+    window.__wasmReady = true;
     if (pendingFiles !== null) {
       mountAndLaunch();
     } else {
