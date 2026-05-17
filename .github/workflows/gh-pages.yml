@@ -56,7 +56,7 @@ jobs:
       - name: Configure ccache
         env:
           CCACHE_DIR: ${{ env.CCACHE_DIR }}
-        run: nix develop --command bash -c "ccache --zero-stats && ccache --max-size 500M"
+        run: nix develop --command nix run .#ci-cc-setup
 
       - name: Build ra.wasm
         env:
