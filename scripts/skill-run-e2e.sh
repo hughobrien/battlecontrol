@@ -7,7 +7,7 @@
 #   bash scripts/skill-run-e2e.sh e2e/tim710-wasm-parity.spec.ts --grep "Tier 1"
 #   bash scripts/skill-run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
 #
-# All arguments after the spec file are forwarded to npx playwright test.
+# All arguments after the spec file are forwarded to playwright test.
 #
 # Exit code: Playwright exit code (0 = all pass).
 
