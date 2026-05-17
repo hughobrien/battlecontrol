@@ -3572,9 +3572,9 @@ void Dump_Heap_Pointers( void )
 		cptr = (char *)*(int *)(ptr + 0x24);
 		lptr = (char *)*(int *)(ptr + 0x28);
 
-		if ( ((int)cptr & 0xff000000) ||
-			((int)dptr & 0xff000000) ||
-			((int)lptr & 0xff000000) ) {
+		if ( ((intptr_t)cptr & 0xff000000) ||
+			((intptr_t)dptr & 0xff000000) ||
+			((intptr_t)lptr & 0xff000000) ) {
 			Error_In_Heap_Pointers( "local free heap ptrs too large" );
 		}
 
@@ -3588,7 +3588,7 @@ void Dump_Heap_Pointers( void )
 
 		nptr = (char *)*(int *)(ptr + 8);		// next block
 
-		if ( ((int)nptr & 0xFF000000) ) {
+		if ( ((intptr_t)nptr & 0xFF000000) ) {
 			Error_In_Heap_Pointers( "next block ptr too large" );
 		}
 
@@ -3618,7 +3618,7 @@ void Dump_Heap_Pointers( void )
 
 					aptr += ((*(int *)(aptr)) & 0xfffffffe);
 
-					if ( ((int)aptr & 0xff000000) ) {
+					if ( ((intptr_t)aptr & 0xff000000) ) {
 						Error_In_Heap_Pointers( "next alloc block ptr way too large" );
 					}
 
@@ -3686,7 +3686,7 @@ void Dump_Heap_Pointers( void )
 
 					aptr += ((*(int *)(aptr)) & 0xfffffffe);
 
-					if ( ((int)aptr & 0xff000000) ) {
+					if ( ((intptr_t)aptr & 0xff000000) ) {
 						Error_In_Heap_Pointers( "next alloc block ptr way too large" );
 					}
 
@@ -3728,7 +3728,7 @@ void Dump_Heap_Pointers( void )
 
 					aptr += ((*(int *)(aptr)) & 0xfffffffe);
 
-					if ( ((int)aptr & 0xff000000) ) {
+					if ( ((intptr_t)aptr & 0xff000000) ) {
 						Error_In_Heap_Pointers( "next alloc block ptr way too large" );
 					}
 

@@ -606,7 +606,7 @@ typedef int		WAYPOINT;
 **	and an index value of 0, the target value returned is identical with
 **	TARGET_NONE. This is by design and is necessary.
 */
-typedef long	TARGET;
+typedef intptr_t	TARGET;
 
 #define	TARGET_MANTISSA			24				// Bits of value precision.
 #define	TARGET_EXPONENT			8

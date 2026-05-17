@@ -48,6 +48,7 @@
 
 
 #include <limits.h>             /* CHAR_BIT, UINT_MAX, ULONG_MAX */
+#include <stdint.h>            /* int32_t, uint32_t, uintptr_t */
 #if !defined(CHAR_BIT) || (CHAR_BIT != 8)
 #  error invalid CHAR_BIT
 #endif
@@ -79,8 +80,8 @@
    typedef int              lzo_int;
 #  define LZO_UINT_MAX      UINT_MAX
 #elif (ULONG_MAX >= 0xffffffffL)
-   typedef unsigned long    lzo_uint;
-   typedef long             lzo_int;
+   typedef uint32_t    lzo_uint;
+   typedef int32_t             lzo_int;
 #  define LZO_UINT_MAX      ULONG_MAX
 #else
 #  error lzo_uint
@@ -113,7 +114,7 @@
 
 
 /* Unsigned type that can store all bits of a lzo_voidp */
-typedef unsigned long       lzo_ptr_t;
+typedef uintptr_t       lzo_ptr_t;
 
 /* Align a pointer on a boundary that is a multiple of 'size' */
 #define LZO_ALIGN(ptr,size) \
