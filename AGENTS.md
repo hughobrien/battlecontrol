@@ -20,37 +20,50 @@ EOF
 
 This lets you omit `--extra-experimental-features` from every Nix invocation.
 
-## ⚠️ Critical: All commands MUST run inside `nix develop`
+## ⚠️ Critical: Verify you are inside `nix develop`
 
 Every `git commit`, build command, test runner, linter, or script invocation in
 this project **must** be run inside the Nix development shell. Outside the shell,
 tools like `nixfmt`, `clang-tidy`, `shfmt`, `yamllint`, and `ruff` are not on PATH.
 The pre-commit hook will fail with cryptic errors.
 
-### Correct
+### Verify before proceeding
+
+The agent harness runs inside `nix develop`, so you inherit the shell automatically.
+Before running any command, verify you are inside the dev shell:
 
 ```bash
-nix develop --command <your-command>
+# Should print a non-empty path pointing to the Nix store, e.g.
+# /nix/store/...-battlecontrol-dev-shell/bin
+echo "$NIX_BUILD_TOP" 2>/dev/null || echo "IN_NIX_SHELL=$IN_NIX_SHELL"
 ```
 
-Or enter the shell interactively first:
+If `$IN_NIX_SHELL` is not set or `$NIX_BUILD_TOP` is empty, you are **outside**
+the dev shell. Enter it first:
 
 ```bash
 nix develop
-# now inside dev shell — all tools available
+```
+
+### Correct
+
+Once inside the dev shell, run commands directly — no `nix develop --command` wrapper needed:
+
+```bash
+git commit -m "..."
+nix run .#lint-all
+python3 scripts/lint-lp64.py
 ```
 
 ### Common mistakes
 
 | ❌ Wrong | ✅ Correct |
 |----------|-----------|
-| `git commit ...` (bare) | `nix develop --command git commit ...` |
-| `nix run .#lint-all` (bare) | `nix develop --command nix run .#lint-all` |
-| `python3 scripts/lint-lp64.py` (bare) | `nix develop --command python3 scripts/lint-lp64.py` |
+| `nix develop --command git commit ...` (unnecessary wrapper) | `git commit ...` |
+| Running outside dev shell — tools missing from PATH | Enter `nix develop` first |
 
-> The extension tools (e.g. `native_build`, `wasm_build`, `run_e2e_test`) already
-> handle this internally — you only need to worry about it for ad-hoc shell
-> commands.
+> The extension tools (e.g. `native_build`, `wasm_build`, `run_e2e_test`) also
+> expect to run inside the dev shell and do not wrap themselves.
 
 ## ⚠️ After every PR: always enable automerge
 
@@ -71,7 +84,7 @@ automerge will wait until it passes. If CI is green, the PR merges automatically
 before pushing to catch failures instantly:
 
 ```bash
-nix develop --command nix run .#ci
+nix run .#ci
 ```
 
 Or use the extension tool:
