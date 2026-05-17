@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -38,7 +38,7 @@ jobs:
           tar czf redalert-linux-x86_64.tar.gz redalert
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: redalert-linux-x86_64
           path: redalert-linux-x86_64.tar.gz
@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -75,7 +75,7 @@ jobs:
           tar czf td-linux-x86_64.tar.gz td
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: td-linux-x86_64
           path: td-linux-x86_64.tar.gz
@@ -86,13 +86,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: '5.0.6'
-          actions-cache-folder: 'emsdk-cache'
+      - uses: actions/checkout@v6
 
       - name: Install build deps
         run: |
@@ -100,7 +94,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends ninja-build cmake
 
       - name: Cache Emscripten system libraries
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.emscripten_cache
           key: emscripten-cache-ra-${{ github.sha }}
@@ -122,7 +116,7 @@ jobs:
           zip -r ra-wasm.zip ra-wasm/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ra-wasm
           path: ra-wasm.zip
@@ -133,13 +127,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: '5.0.6'
-          actions-cache-folder: 'emsdk-cache'
+      - uses: actions/checkout@v6
 
       - name: Install build deps
         run: |
@@ -147,7 +135,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends ninja-build cmake
 
       - name: Cache Emscripten system libraries
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.emscripten_cache
           key: emscripten-cache-td-${{ github.sha }}
@@ -169,7 +157,7 @@ jobs:
           zip -r td-wasm.zip td-wasm/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: td-wasm
           path: td-wasm.zip
@@ -184,7 +172,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           merge-multiple: true
 
@@ -201,7 +189,7 @@ jobs:
           MANIFEST
 
       - name: Create release and attach artifacts
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             *.tar.gz

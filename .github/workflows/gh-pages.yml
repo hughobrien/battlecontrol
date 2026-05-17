@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
@@ -43,14 +43,8 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Install Emscripten (for emcmake)
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: '5.0.6'
-          actions-cache-folder: 'emsdk-cache'
-
       - name: Cache Emscripten system libraries
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.EM_CACHE_DIR }}
           key: emcc-cache-ghpages-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
@@ -64,7 +58,7 @@ jobs:
           ccache --max-size 500M
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-ghpages-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
@@ -72,7 +66,7 @@ jobs:
             ccache-ghpages-
             ccache-
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -123,7 +117,7 @@ jobs:
 
       - name: Upload smoke artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasm-smoke-results
           path: |
@@ -147,7 +141,7 @@ jobs:
 
       - name: Upload wasm-parity screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasm-parity-screenshots
           path: e2e/screenshots/tim699-wasm-*.png
@@ -225,7 +219,7 @@ jobs:
 
       - name: Upload gameplay SSIM artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: t11-gameplay-ssim-results
           path: e2e/screenshots/ra-visual-*.png
