@@ -176,7 +176,9 @@
           pkg-config
           emscripten # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
           # CI deps
+          xvfb
           xvfb-run
+          playwright-test # Playwright CLI + browsers via Nix
           ffmpeg-headless
           ccache
           nodejs
@@ -210,6 +212,8 @@
         shellHook = ''
           export RA_ASSETS="''${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
           export TD_ASSETS="''${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
+
+
 
           # Install git pre-commit hook for linting all staged files
           REPO_ROOT="''$(git rev-parse --show-toplevel 2>/dev/null || true)"
@@ -486,7 +490,7 @@
           fi
           ASSET_PID=$!
           sleep 2
-          npx playwright test e2e/wasm-smoke.spec.ts --grep "$GAME"
+          playwright test e2e/wasm-smoke.spec.ts --grep "$GAME"
           kill "$WASM_PID" "$ASSET_PID" 2>/dev/null || true
         '';
 
@@ -651,7 +655,7 @@
           python3 wasm/serve-coop.py 8080 build-wasm &
           SERVER_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test \
+          DISPLAY=:99 playwright test \
             e2e/regression/T1-ra-wasm-boot.spec.ts \
             e2e/regression/T2-td-wasm-boot.spec.ts
           SMOKE_EXIT=$?

@@ -45,27 +45,27 @@ mkdir -p "$SCREENSHOT_DIR"
 echo "=== Wine TD preflight ==="
 
 if ! command -v wine >/dev/null 2>&1; then
-    echo "FAIL: wine not found. Install with: sudo apt-get install wine"
-    exit 1
+	echo "FAIL: wine not found. Install with: sudo apt-get install wine"
+	exit 1
 fi
 WINE_VER=$(wine --version 2>/dev/null || echo "unknown")
 echo "  wine: $WINE_VER"
 
 if wine --version 2>&1 | grep -q "wine32 is missing"; then
-    echo "FAIL: wine32 is missing."
-    echo "  Fix: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install wine32:i386"
-    exit 1
+	echo "FAIL: wine32 is missing."
+	echo "  Fix: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install wine32:i386"
+	exit 1
 fi
 
 if [[ ! -f "$CC95_EXE_PATH" ]]; then
-    echo "SKIP: C&C95.EXE not found at $CC95_EXE_PATH"
-    echo "  Run: bash scripts/wine-td-setup.sh"
-    exit 2
+	echo "SKIP: C&C95.EXE not found at $CC95_EXE_PATH"
+	echo "  Run: bash scripts/wine-td-setup.sh"
+	exit 2
 fi
 
 if [[ ! -d "$DATA_DIR" ]]; then
-    echo "FAIL: data directory not found: $DATA_DIR"
-    exit 1
+	echo "FAIL: data directory not found: $DATA_DIR"
+	exit 1
 fi
 
 EXE_SHA=$(sha256sum "$CC95_EXE_PATH" | awk '{print $1}')
@@ -77,11 +77,11 @@ echo ""
 
 echo "=== Wine staging ==="
 TD_STAGE="$(mktemp -d)"
-trap "rm -rf $TD_STAGE" EXIT
+trap 'rm -rf "$TD_STAGE"' EXIT
 
 # Link MIX data into a temporary staging directory.
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
-    [[ -e "$f" ]] && ln -sf "$f" "$TD_STAGE/$(basename "$f")"
+	[[ -e "$f" ]] && ln -sf "$f" "$TD_STAGE/$(basename "$f")"
 done
 # Symlink EXE into staging (avoids copying 1.2 MB on a space-constrained disk).
 ln -sf "$CC95_EXE_PATH" "$TD_STAGE/C&C95.EXE"
@@ -90,7 +90,7 @@ THIPX_SRC="$(dirname "$CC95_EXE_PATH")/THIPX32.DLL"
 [[ -f "$THIPX_SRC" ]] && ln -sf "$THIPX_SRC" "$TD_STAGE/THIPX32.DLL"
 
 # CONQUER.INI: disable hardware blits so game stays alive under Wine's GDI path.
-cat > "$TD_STAGE/CONQUER.INI" << 'INIEOF'
+cat >"$TD_STAGE/CONQUER.INI" <<'INIEOF'
 [Options]
 HardwareFills=0
 VideoBackBuffer=0
@@ -101,18 +101,18 @@ ScreenHeight=400
 INIEOF
 
 if [[ ! -d "$WINE_PREFIX" ]]; then
-    echo "  Creating 32-bit Wine prefix at $WINE_PREFIX..."
-    WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
+	echo "  Creating 32-bit Wine prefix at $WINE_PREFIX..."
+	WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
 
 # Configure Wine virtual desktop (640x400) and GDI renderer so the game
 # window is capturable via ffmpeg x11grab without needing DirectDraw.
 WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wine reg add \
-    'HKCU\Software\Wine\Explorer\Desktops' \
-    /v Default /t REG_SZ /d "640x400" /f >/dev/null 2>&1 || true
+	'HKCU\Software\Wine\Explorer\Desktops' \
+	/v Default /t REG_SZ /d "640x400" /f >/dev/null 2>&1 || true
 WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wine reg add \
-    'HKCU\Software\Wine\Direct3D' \
-    /v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
+	'HKCU\Software\Wine\Direct3D' \
+	/v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
 
 echo "  Staging: $TD_STAGE"
 echo ""
@@ -124,7 +124,7 @@ pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
 Xvfb "$DISPLAY_NUM" -screen 0 640x400x8 -ac &
 XVFB_PID=$!
 cleanup_xvfb() { kill -9 "$XVFB_PID" 2>/dev/null || true; }
-trap "rm -rf $TD_STAGE; cleanup_xvfb" EXIT
+trap 'rm -rf "$TD_STAGE"; cleanup_xvfb' EXIT
 sleep 1
 echo "  Xvfb pid=$XVFB_PID"
 
@@ -133,12 +133,12 @@ echo "  Xvfb pid=$XVFB_PID"
 echo "=== Launching C&C95.EXE ==="
 LOG="$(mktemp /tmp/wine-td-XXXXXX.log)"
 (
-    cd "$TD_STAGE"
-    DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
-    WINEDEBUG=-all AUDIODEV=null \
-    WINEDLLOVERRIDES="winealsa.drv=,wineoss.drv=,winemac.drv=" \
-    timeout 45 wine "C&C95.EXE"
-) > "$LOG" 2>&1 &
+	cd "$TD_STAGE"
+	DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
+		WINEDEBUG=-all AUDIODEV=null \
+		WINEDLLOVERRIDES="winealsa.drv=,wineoss.drv=,winemac.drv=" \
+		timeout 45 wine "C&C95.EXE"
+) >"$LOG" 2>&1 &
 TD_PID=$!
 
 # Capture title/menu state using ffmpeg x11grab (works under Wine+Xvfb).
@@ -148,11 +148,11 @@ TD_PID=$!
 #       through Wine's software path.  The dialog (Win32 GDI) captures at
 #       ~3-5 KB; the game screen (DirectDraw) may be blank on Xvfb.
 take_screenshot() {
-    local out="$1"
-    if command -v ffmpeg >/dev/null 2>&1; then
-        ffmpeg -f x11grab -video_size 640x400 -i "${DISPLAY_NUM}" \
-               -frames:v 1 "$out" -y 2>/dev/null && echo "  Screenshot: $out"
-    fi
+	local out="$1"
+	if command -v ffmpeg >/dev/null 2>&1; then
+		ffmpeg -f x11grab -video_size 640x400 -i "${DISPLAY_NUM}" \
+			-frames:v 1 "$out" -y 2>/dev/null && echo "  Screenshot: $out"
+	fi
 }
 
 # Wait for DirectDraw/DirectSound warning dialog (~7s).
@@ -172,20 +172,20 @@ kill "$TD_PID" 2>/dev/null || true
 
 echo ""
 echo "=== Results ==="
-echo "  wine-td-title.png: $(test -f "$SCREENSHOT_DIR/wine-td-title.png" && ls -lh "$SCREENSHOT_DIR/wine-td-title.png" | awk '{print $5, "(written)"}' || echo "MISSING")"
-echo "  wine-td-menu.png:  $(test -f "$SCREENSHOT_DIR/wine-td-menu.png"  && ls -lh "$SCREENSHOT_DIR/wine-td-menu.png"  | awk '{print $5, "(written)"}' || echo "MISSING")"
+echo "  wine-td-title.png: $(test -f "$SCREENSHOT_DIR/wine-td-title.png" && stat -c '%s (written)' "$SCREENSHOT_DIR/wine-td-title.png" || echo "MISSING")"
+echo "  wine-td-menu.png:  $(test -f "$SCREENSHOT_DIR/wine-td-menu.png" && stat -c '%s (written)' "$SCREENSHOT_DIR/wine-td-menu.png" || echo "MISSING")"
 
 for shot in "$SCREENSHOT_DIR/wine-td-title.png" "$SCREENSHOT_DIR/wine-td-menu.png"; do
-    if [[ -f "$shot" ]]; then
-        sz=$(stat -c%s "$shot")
-        if [[ $sz -lt 5000 ]]; then
-            echo "  WARN: $shot is only $sz bytes — may be blank"
-        else
-            echo "  OK: $shot ($sz bytes)"
-        fi
-    fi
+	if [[ -f "$shot" ]]; then
+		sz=$(stat -c%s "$shot")
+		if [[ $sz -lt 5000 ]]; then
+			echo "  WARN: $shot is only $sz bytes — may be blank"
+		else
+			echo "  OK: $shot ($sz bytes)"
+		fi
+	fi
 done
 
 echo ""
 echo "  To run Tier 3 Playwright comparison tests:"
-echo "    WINE_TD_READY=1 npx playwright test e2e/tim711-td-compare.spec.ts --grep 'Tier 3'"
+echo "    WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts --grep 'Tier 3'"

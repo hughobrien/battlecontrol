@@ -61,29 +61,31 @@ echo ""
 echo "--- Step 5-6: Smoke tests ---"
 
 # Start Xvfb
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/skill-xvfb-ensure.sh" :99 1280x1024x24
 
 # Start WASM server
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/skill-wasm-serve.sh" 8080
 
 # Run T1: RA boot smoke
 echo ""
 echo "  --- T1: RA WASM boot smoke ---"
-DISPLAY="$XVFB_DISPLAY" npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts
+DISPLAY="$XVFB_DISPLAY" playwright test e2e/regression/T1-ra-wasm-boot.spec.ts
 RA_EXIT=$?
 if [[ $RA_EXIT -ne 0 ]]; then
-    echo "FAIL: T1 RA boot smoke failed"
-    exit $RA_EXIT
+	echo "FAIL: T1 RA boot smoke failed"
+	exit $RA_EXIT
 fi
 
 # Run T2: TD boot smoke
 echo ""
 echo "  --- T2: TD WASM boot smoke ---"
-DISPLAY="$XVFB_DISPLAY" npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts
+DISPLAY="$XVFB_DISPLAY" playwright test e2e/regression/T2-td-wasm-boot.spec.ts
 TD_EXIT=$?
 if [[ $TD_EXIT -ne 0 ]]; then
-    echo "FAIL: T2 TD boot smoke failed"
-    exit $TD_EXIT
+	echo "FAIL: T2 TD boot smoke failed"
+	exit $TD_EXIT
 fi
 
 # Xvfb and server are killed by EXIT traps from sourced scripts
