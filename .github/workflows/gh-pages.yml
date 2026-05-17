@@ -63,13 +63,13 @@ jobs:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
         run: nix develop --command nix run .#build-wasm ra
 
-      - name: Validate and smoke test
-        run: nix develop --command bash -c "nix run .#validate-wasm && nix run .#ci-wasm-smoke"
-
       - name: Build td.wasm
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
         run: nix develop --command nix run .#build-wasm td
+
+      - name: Validate and smoke test
+        run: nix develop --command bash -c "nix run .#validate-wasm && nix run .#ci-wasm-smoke"
 
       - name: Start Xvfb and WASM server
         run: |
