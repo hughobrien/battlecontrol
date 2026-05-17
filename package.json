@@ -14,8 +14,6 @@
     "test:e2e:wasm-parity:wine": "WINE_RA_READY=1 playwright test e2e/tim710-wasm-parity.spec.ts",
     "test:e2e:td-compare": "playwright test e2e/tim711-td-compare.spec.ts",
     "test:e2e:td-compare:wine": "WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts",
-    "test:e2e:tim812": "playwright test e2e/tim812-wasm-m2-parity.spec.ts",
-    "test:e2e:tim812:wine": "WINE_RA_READY=1 playwright test e2e/tim812-wasm-m2-parity.spec.ts",
     "test:e2e:ra:ci": "RA_WASM_URL=http://localhost:8080/ra.html RA_ASSETS_URL=http://localhost:9090/ playwright test e2e/wasm-gameplay.spec.ts",
     "test:e2e:td:ci": "TD_WASM_URL=http://localhost:8080/td.html TD_ASSETS_URL=http://localhost:9091/ playwright test e2e/td-gameplay.spec.ts",
     "test:e2e:ra-gameplay-audit": "RA_WASM_URL=http://localhost:8080/ra.html RA_ASSETS_URL=http://localhost:9090/ playwright test e2e/ra-gameplay-audit.spec.ts",
