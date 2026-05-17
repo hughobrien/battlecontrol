@@ -7,6 +7,7 @@ fixed in TIM-173, TIM-206, TIM-241-243, TIM-423, TIM-453.
 
 Usage:
     python3 scripts/lint-lp64.py [--dirs DIR...] [--skip-dir DIR...]
+    python3 scripts/lint-lp64.py --files FILE...
     cmake --build build --target lint-lp64
 
 Exit codes: 0 = clean, 1 = errors found, 2 = warnings only.
@@ -323,6 +324,26 @@ def scan_dirs(
     return all_findings
 
 
+def scan_files(
+    files: List[Path],
+    rules: list,
+) -> List[Finding]:
+    """Scan a specific list of files (used by pre-commit hook)."""
+    all_findings: List[Finding] = []
+    visited: set = set()
+    for path in files:
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in C_EXTENSIONS:
+            continue
+        real = path.resolve()
+        if real in visited:
+            continue
+        visited.add(real)
+        all_findings.extend(scan_file(path, rules))
+    return all_findings
+
+
 # ---------------------------------------------------------------------------
 # Report formatter
 # ---------------------------------------------------------------------------
@@ -390,6 +411,13 @@ def main(argv=None):
         help="Source directories to scan (default: REDALERT TIBERIANDAWN)",
     )
     parser.add_argument(
+        "--files",
+        nargs="+",
+        metavar="FILE",
+        default=None,
+        help="Specific files to scan (instead of --dirs)",
+    )
+    parser.add_argument(
         "--skip-dir",
         nargs="+",
         metavar="DIR",
@@ -414,17 +442,20 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     repo_root = Path(__file__).resolve().parent.parent
-    dirs = [repo_root / d for d in args.dirs]
-    skip_dirs = [repo_root / d for d in args.skip_dir]
-
-    missing = [d for d in dirs if not d.exists()]
-    if missing:
-        print(f"lint-lp64: directories not found: {', '.join(str(m) for m in missing)}")
-        sys.exit(1)
-
     use_colour = not args.no_colour and sys.stdout.isatty()
 
-    findings = scan_dirs(dirs, skip_dirs, RULES)
+    if args.files is not None:
+        # Scan specific files (pre-commit hook mode).
+        files = [Path(f).resolve() for f in args.files]
+        findings = scan_files(files, RULES)
+    else:
+        dirs = [repo_root / d for d in args.dirs]
+        skip_dirs = [repo_root / d for d in args.skip_dir]
+        missing = [d for d in dirs if not d.exists()]
+        if missing:
+            print(f"lint-lp64: directories not found: {', '.join(str(m) for m in missing)}")
+            sys.exit(1)
+        findings = scan_dirs(dirs, skip_dirs, RULES)
 
     if args.errors_only:
         findings = [f for f in findings if f.severity == "error"]
