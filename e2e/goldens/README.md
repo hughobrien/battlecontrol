@@ -11,6 +11,8 @@ Reference screenshots used by SSIM-based regression gates in the e2e suite.
 | `ra-gameplay-f300.png` | TIM-429 visual audit (wasm-gameplay.spec.ts) | SCG01EA at frame 300 |
 | `ra-gameplay-f500.png` | TIM-429 visual audit (wasm-gameplay.spec.ts) | SCG01EA at frame 500 |
 | `soviet-l1-wineog-f500.png` | Wine OG reference | Soviet L1 Wine capture |
+| `soviet-m2-wineog-f500.png` | Wine OG reference (TIM-905) | Soviet M2 Wine capture |
+| `nod-m1-wineog-f500.png` | Wine OG reference (TIM-905) | TD Nod M1 Wine capture (Xvfb+openbox) |
 | `vqa/test.vqa` | VQA test fixture | Synthetic VQA for unit tests |
 
 ## Regenerating
