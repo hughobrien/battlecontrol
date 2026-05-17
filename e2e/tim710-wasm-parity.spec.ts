@@ -26,8 +26,8 @@
  *   [Tier 2 Soviet] also requires bash scripts/wine-soviet-l1.sh
  *
  * ─── Run ─────────────────────────────────────────────────────────────────────
- *   npm run test:e2e:wasm-parity
- *   WINE_RA_READY=1 npm run test:e2e:wasm-parity
+ *   playwright test e2e/tim710-wasm-parity.spec.ts
+ *   WINE_RA_READY=1 playwright test e2e/tim710-wasm-parity.spec.ts
  *
  * ─── Related ─────────────────────────────────────────────────────────────────
  *   TIM-699 — Wine setup + OG reference screenshots

@@ -23,7 +23,7 @@ Read `ARCH.md` and `BUILD-LINUX.md` for architectural context before starting.
 toolchain_check()
 ```
 
-One-command gate. Exits 0 if g++ (>=14), clang++ (>=19), cmake (>=3.20), ninja, python3, pkg-config, and SDL2 are all present.
+One-command gate. Exits 0 if clang++ (>=19), cmake (>=3.20), ninja, python3, pkg-config, and SDL2 are all present.
 
 
 

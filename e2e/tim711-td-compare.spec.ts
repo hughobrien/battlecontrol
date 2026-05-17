@@ -34,7 +34,7 @@
  *   C&C95.EXE at /opt/tiberiandawn/C&C95.EXE  (run scripts/wine-td-setup.sh)
  *   WINE_TD_READY=1 env var set
  *   Run: bash scripts/wine-td.sh  (creates e2e/screenshots/wine-td-*.png)
- *   Then run Tier 3: WINE_TD_READY=1 npx playwright test e2e/tim711-td-compare.spec.ts
+ *   Then run Tier 3: WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts
  *
  * Reference data:
  *   scripts/td-data-verify.py   — MIX checksum verification

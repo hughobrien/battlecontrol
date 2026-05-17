@@ -181,8 +181,6 @@
           playwright-test # Playwright CLI + browsers via Nix
           ffmpeg-headless
           ccache
-          nodejs
-          pnpm
           gh
           clang-tools
           cppcheck
