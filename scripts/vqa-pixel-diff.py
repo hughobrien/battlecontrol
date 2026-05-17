@@ -214,12 +214,21 @@ def main() -> int:
                 print(f'  {len(gframes)} frame(s) written')
                 continue
 
-            # Check for existing goldens; generate if absent
+            # Check for committed goldens (raw_*.png alongside the VQA)
+            committed_dir = os.path.join(os.path.dirname(vqa_path), vqa_stem)
             golden_frames = {}
             for fidx in frames:
-                gp = os.path.join(golden_dir, f'golden_{fidx + 1:04d}.png')
-                if os.path.exists(gp):
-                    golden_frames[fidx] = gp
+                for pattern, name in [(f'raw_{fidx + 1:04d}.png', 'committed'),
+                                      (f'golden_{fidx + 1:04d}.png', 'temp')]:
+                    gp = os.path.join(committed_dir, pattern)
+                    if os.path.exists(gp):
+                        golden_frames[fidx] = gp
+                        break
+                else:
+                    # Fallback: check temp golden dir
+                    gp = os.path.join(golden_dir, f'golden_{fidx + 1:04d}.png')
+                    if os.path.exists(gp):
+                        golden_frames[fidx] = gp
 
             if not golden_frames:
                 if not args.quiet:
