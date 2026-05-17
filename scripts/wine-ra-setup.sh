@@ -113,7 +113,7 @@ if [[ ! -f "$OUT_DIR/THIPX32.DLL" ]]; then
     START=$((58881 * 2048))
     curl -L -r "${START}-$((START + 25901))" "$ISO_URL" -o "$OUT_DIR/THIPX32.DLL" --progress-bar
 fi
-echo "  THIPX32.DLL: $(ls -lh "$OUT_DIR/THIPX32.DLL" | awk '{print $5}')"
+echo "  THIPX32.DLL: $(find "$OUT_DIR" -maxdepth 1 -name THIPX32.DLL -ls | awk '{print $7}') bytes"
 
 # THIPX16.DLL — 16-bit IPX thunk, LBA 58878, size 4192
 if [[ ! -f "$OUT_DIR/THIPX16.DLL" ]]; then
@@ -121,7 +121,7 @@ if [[ ! -f "$OUT_DIR/THIPX16.DLL" ]]; then
     START=$((58878 * 2048))
     curl -L -r "${START}-$((START + 4191))" "$ISO_URL" -o "$OUT_DIR/THIPX16.DLL" --progress-bar
 fi
-echo "  THIPX16.DLL: $(ls -lh "$OUT_DIR/THIPX16.DLL" | awk '{print $5}')"
+echo "  THIPX16.DLL: $(find "$OUT_DIR" -maxdepth 1 -name THIPX16.DLL -ls | awk '{print $7}') bytes"
 
 # ─── 4. Summary ──────────────────────────────────────────────────────────────
 
@@ -184,7 +184,7 @@ fi
 echo ""
 echo "=== Setup complete ==="
 echo "  wine: $(wine --version)"
-echo "  RA95.EXE: $OUT_DIR/RA95.EXE ($(ls -lh "$OUT_DIR/RA95.EXE" | awk '{print $5}'))"
+echo "  RA95.EXE: $OUT_DIR/RA95.EXE ($(find "$OUT_DIR" -maxdepth 1 -name RA95.EXE -ls | awk '{print $7}') bytes)"
 echo "  THIPX32.DLL: $OUT_DIR/THIPX32.DLL"
 echo "  THIPX16.DLL: $OUT_DIR/THIPX16.DLL"
 if [[ -f "$OUT_DIR/data-og/MAIN.MIX" ]]; then

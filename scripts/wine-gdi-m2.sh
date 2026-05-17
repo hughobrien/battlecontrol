@@ -120,6 +120,7 @@ DISPLAY="$XDISP" openbox > "$ARTIFACT_DIR/openbox.log" 2>&1 &
 WM_PID=$!
 sleep 1
 
+# shellcheck disable=SC2329
 cleanup() {
     [[ -n "${TD_PID:-}" ]] && kill "$TD_PID" 2>/dev/null || true
     WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
@@ -133,7 +134,7 @@ trap cleanup EXIT
 echo "=== launching C&C95.EXE ==="
 (
     cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
         WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
@@ -183,8 +184,9 @@ shoot() {
     DISPLAY="$XDISP" ffmpeg -nostdin -loglevel error \
         -f x11grab -video_size 1024x768 -i "$XDISP" -frames:v 1 -y "$png" 2>/dev/null || true
     if [[ -f "$png" ]]; then
-        local sz=$(stat -c%s "$png")
-        local nc=$(python3 -c "from PIL import Image; print(len(set(Image.open('$png').convert('RGB').getdata())))" 2>/dev/null || echo "?")
+        local sz nc
+        sz=$(stat -c%s "$png")
+        nc=$(python3 -c "from PIL import Image; print(len(set(Image.open('$png').convert('RGB').getdata())))" 2>/dev/null || echo "?")
         echo "  $1: ${sz}B ${nc}colours"
     else
         echo "  $1: FAILED"

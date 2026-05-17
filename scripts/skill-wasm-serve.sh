@@ -36,7 +36,7 @@ python3 "$REPO_ROOT/wasm/serve-coop.py" &
 WASM_SERVER_PID=$!
 
 # Wait for server to be ready
-for i in $(seq 1 10); do
+for _ in $(seq 1 10); do
     if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${WASM_SERVER_PORT}/" 2>/dev/null | grep -q '200\|304'; then
         echo "[serve] Ready (pid=$WASM_SERVER_PID)"
         break
@@ -47,9 +47,10 @@ done
 # Register cleanup trap
 _old_trap=$(trap -p EXIT 2>/dev/null | sed "s/trap -- '//;s/' EXIT//" || true)
 if [[ -n "$_old_trap" ]]; then
-    trap "$_old_trap; kill $WASM_SERVER_PID 2>/dev/null || true" EXIT
+    # shellcheck disable=SC2064
+    trap "$_old_trap; kill \$WASM_SERVER_PID 2>/dev/null || true" EXIT
 else
-    trap "kill $WASM_SERVER_PID 2>/dev/null || true" EXIT
+    trap 'kill "$WASM_SERVER_PID" 2>/dev/null || true' EXIT
 fi
 
 export WASM_SERVER_PID WASM_SERVER_PORT

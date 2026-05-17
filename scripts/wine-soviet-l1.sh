@@ -165,6 +165,7 @@ DISPLAY="$XDISP" openbox > "$ARTIFACT_DIR/openbox.log" 2>&1 &
 WM_PID=$!
 sleep 1
 
+# shellcheck disable=SC2329
 cleanup() {
     [[ -n "${RA_PID:-}" ]] && kill "$RA_PID" 2>/dev/null || true
     WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
@@ -180,7 +181,7 @@ echo
 echo "=== launching RA95.EXE ==="
 (
     cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
         WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
@@ -202,7 +203,7 @@ done
 send_key() {
     local vk="$1" label="${2:-key}"
     echo "  SendInput key[$label]: vk=$vk"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" key "$vk" \
         >> "$ARTIFACT_DIR/helper.log" 2>&1 || true
 }
@@ -210,7 +211,7 @@ send_key() {
 send_click() {
     local x="$1" y="$2" label="${3:-click}"
     echo "  SendInput click[$label]: client=($x,$y)"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" click "$x" "$y" \
         >> "$ARTIFACT_DIR/helper.log" 2>&1 || true
 }

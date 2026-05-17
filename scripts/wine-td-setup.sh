@@ -51,6 +51,7 @@ OUT_DIR="/opt/tiberiandawn"
 CC95_ZIP_DATA_OFFSET=105
 CC95_ZIP_COMP_SIZE=518994
 CC95_ZIP_END=$(( CC95_ZIP_DATA_OFFSET + CC95_ZIP_COMP_SIZE - 1 ))
+# shellcheck disable=SC2034
 CC95_UNCOMPRESSED_SIZE=1161216
 CC95_SHA256="f606bee19de599daa5ccbc9586d61ee48b8f01f42a4f943196fe30d92a124d30"
 
@@ -58,6 +59,7 @@ CC95_SHA256="f606bee19de599daa5ccbc9586d61ee48b8f01f42a4f943196fe30d92a124d30"
 THIPX_ZIP_DATA_OFFSET=674675836
 THIPX_ZIP_COMP_SIZE=22573
 THIPX_ZIP_END=$(( THIPX_ZIP_DATA_OFFSET + THIPX_ZIP_COMP_SIZE - 1 ))
+# shellcheck disable=SC2034
 THIPX_UNCOMPRESSED_SIZE=44032
 THIPX_SHA256="0e405776fb8a44c920d81d82a0d137335bf1b36749f84b56f0be4dc04408a042"
 
@@ -115,7 +117,7 @@ if [[ "${SKIP_CC95_DOWNLOAD:-0}" == "0" ]]; then
     echo "  ZIP byte range: ${CC95_ZIP_DATA_OFFSET}-${CC95_ZIP_END}"
 
     TMP_COMP=$(mktemp /tmp/cc95-compressed-XXXXXX.bin)
-    trap "rm -f $TMP_COMP" EXIT
+    trap 'rm -f "$TMP_COMP"' EXIT
 
     curl -L -r "${CC95_ZIP_DATA_OFFSET}-${CC95_ZIP_END}" "$ZIP_URL" \
         -o "$TMP_COMP" --progress-bar
@@ -175,7 +177,7 @@ if [[ "${SKIP_THIPX_DOWNLOAD:-0}" == "0" ]]; then
     echo "  ZIP byte range: ${THIPX_ZIP_DATA_OFFSET}-${THIPX_ZIP_END}"
 
     TMP_THIPX=$(mktemp /tmp/thipx-compressed-XXXXXX.bin)
-    trap "rm -f $TMP_COMP $TMP_THIPX" EXIT
+    trap 'rm -f "$TMP_COMP" "$TMP_THIPX"' EXIT
 
     curl -L -r "${THIPX_ZIP_DATA_OFFSET}-${THIPX_ZIP_END}" "$ZIP_URL" \
         -o "$TMP_THIPX" --progress-bar

@@ -122,6 +122,7 @@ if ! xdpyinfo -display "$XDISP" >/dev/null 2>&1; then
 fi
 echo "  Xvfb ready (pid=$XVFB_PID)"
 
+# shellcheck disable=SC2329
 cleanup() {
     [[ -n "${RA_PID:-}" ]] && kill "$RA_PID" 2>/dev/null || true
     [[ -n "${XVFB_PID:-}" ]] && kill "$XVFB_PID" 2>/dev/null || true
@@ -137,7 +138,7 @@ echo "=== launching native RA ==="
 RA_LOG="$STAGE/ra.log"
 (
     cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
         SDL_AUDIODRIVER=dummy \
         SDL_VIDEO_X11_FORCE_EGL=0 \
         SDL_RENDER_DRIVER=software \

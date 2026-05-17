@@ -10,7 +10,6 @@
 set -euo pipefail
 
 errors=0
-warn=0
 
 check_cmd() {
     local name="$1"

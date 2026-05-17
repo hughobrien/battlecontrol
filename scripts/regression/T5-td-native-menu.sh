@@ -36,6 +36,7 @@ Xvfb :99 -screen 0 640x480x24 -ac &
 XVFB_PID=$!
 sleep 1
 
+# shellcheck disable=SC2329
 cleanup() {
     pkill -P "$GAME_PID" 2>/dev/null || true
     kill -9 "$GAME_PID"  2>/dev/null || true

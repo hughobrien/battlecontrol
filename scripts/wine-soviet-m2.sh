@@ -98,6 +98,7 @@ DISPLAY="$XDISP" openbox > "$ARTIFACT_DIR/openbox.log" 2>&1 &
 WM_PID=$!
 sleep 1
 
+# shellcheck disable=SC2329
 cleanup() {
     [[ -n "${RA_PID:-}" ]] && kill "$RA_PID" 2>/dev/null || true
     WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
@@ -110,7 +111,7 @@ trap cleanup EXIT
 echo "=== launching RA95.EXE ==="
 (
     cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
         WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
@@ -128,13 +129,13 @@ for i in $(seq 1 30); do
 done
 
 send_key() {
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" key "$1" \
         >> "$ARTIFACT_DIR/helper.log" 2>&1 || true
 }
 
 send_click() {
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" click "$1" "$2" \
         >> "$ARTIFACT_DIR/helper.log" 2>&1 || true
 }
@@ -181,4 +182,10 @@ else
         PASS=0
     fi
 fi
-[[ "$PASS" -eq 1 ]] && echo "RESULT: PASS" && exit 0 || { echo "RESULT: FAIL"; exit 1; }
+if [[ "$PASS" -eq 1 ]]; then
+    echo "RESULT: PASS"
+    exit 0
+else
+    echo "RESULT: FAIL"
+    exit 1
+fi

@@ -113,9 +113,9 @@ else
         for target in "${TARGET_LIST[@]}"; do
             target=$(echo "$target" | xargs)
             case "$target" in
-                wine)   CAPTURE_PATHS["$i-$target"]="$WINE_DIR/vqa-${SCENE}-$(printf '%04d' $i).png" ;;
-                native) CAPTURE_PATHS["$i-$target"]="$NATIVE_DIR/vqa-${SCENE}-$(printf '%04d' $i).png" ;;
-                wasm)   CAPTURE_PATHS["$i-$target"]="$WASM_DIR/vqa-${SCENE}-$(printf '%04d' $i).png" ;;
+                wine)   CAPTURE_PATHS["$i-$target"]="$WINE_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
+                native) CAPTURE_PATHS["$i-$target"]="$NATIVE_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
+                wasm)   CAPTURE_PATHS["$i-$target"]="$WASM_DIR/vqa-${SCENE}-$(printf '%04d' "$i").png" ;;
                 *)      ;;
             esac
         done

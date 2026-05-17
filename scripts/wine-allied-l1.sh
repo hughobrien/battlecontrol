@@ -184,6 +184,7 @@ DISPLAY="$XDISP" openbox > "$ARTIFACT_DIR/openbox.log" 2>&1 &
 WM_PID=$!
 sleep 1
 
+# shellcheck disable=SC2329
 cleanup() {
     [[ -n "${RA_PID:-}" ]] && kill "$RA_PID" 2>/dev/null || true
     WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
@@ -199,7 +200,7 @@ echo
 echo "=== launching RA95.EXE ==="
 (
     cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
         WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
@@ -208,10 +209,10 @@ echo "=== launching RA95.EXE ==="
 RA_PID=$!
 
 echo "  waiting for Red Alert window..."
+# shellcheck disable=SC2034
 WIN_TIME=0
 for i in $(seq 1 30); do
     if DISPLAY="$XDISP" xdotool search --name "^Red Alert$" >/dev/null 2>&1; then
-        WIN_TIME=$i
         echo "  Red Alert window appeared after ${i}s"
         break
     fi
@@ -225,7 +226,7 @@ done
 send_key() {
     local vk="$1" label="${2:-key}"
     echo "  SendInput key[$label]: vk=$vk"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" key "$vk" \
         >> "$ARTIFACT_DIR/helper.log" 2>&1 || true
 }
@@ -233,7 +234,7 @@ send_key() {
 send_click() {
     local x="$1" y="$2" label="${3:-click}"
     echo "  SendInput click[$label]: client=($x,$y)"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" click "$x" "$y" \
         >> "$ARTIFACT_DIR/helper.log" 2>&1 || true
 }

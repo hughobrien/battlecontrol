@@ -92,7 +92,7 @@ trap cleanup EXIT
 echo "=== Launching RA95.EXE ==="
 (
     cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG="-all" AUDIODEV=null \
         timeout "$RUN_SECONDS" "$WINE" RA95.EXE
@@ -107,7 +107,7 @@ take_shot() {
 }
 
 send_input() {
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDEBUG=-all \
         "$WINE" "$STAGE/ra-sendinput.exe" "$@" >> "$ARTIFACT_DIR/helper.log" 2>&1 || true
 }

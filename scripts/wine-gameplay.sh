@@ -88,7 +88,7 @@ echo ""
 # ─── Stage ───────────────────────────────────────────────────────────────────
 
 RA_STAGE="$(mktemp -d)"
-trap "rm -rf $RA_STAGE" EXIT
+trap 'rm -rf "$RA_STAGE"' EXIT
 
 # Stage from DATA_DIR first
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
@@ -166,6 +166,7 @@ pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
 # 800x600 so the Wine Desktop window (640x480 + openbox title bar) fits.
 Xvfb "$DISPLAY_NUM" -screen 0 800x600x24 -ac &
 XVFB_PID=$!
+# shellcheck disable=SC2329
 cleanup_all() {
     kill -9 "$XVFB_PID" 2>/dev/null || true
     rm -rf "$RA_STAGE"
@@ -183,6 +184,7 @@ echo "=== Starting $WINE_WM WM ==="
 if command -v "$WINE_WM" >/dev/null 2>&1; then
     DISPLAY="$DISPLAY_NUM" "$WINE_WM" &
     WM_PID=$!
+    # shellcheck disable=SC2329
     cleanup_all() {
         kill -9 "$WM_PID" 2>/dev/null || true
         kill -9 "$XVFB_PID" 2>/dev/null || true
@@ -282,14 +284,14 @@ LOG="$(mktemp /tmp/wine-gameplay-XXXXXX.log)"
     timeout 300 wine RA95.EXE
 ) > "$LOG" 2>&1 &
 RA_PID=$!
-trap "kill $RA_PID 2>/dev/null || true; cleanup_all" EXIT
+trap 'kill "$RA_PID" 2>/dev/null || true; cleanup_all' EXIT
 
 # ─── Step 1: Find Wine Desktop window and resolve click origin ───────────────
 
 echo "  Waiting for Wine Desktop window (up to 30s)..."
 WINE_WIN_ID=$(find_wine_win 30) || { echo "FAIL: Wine Desktop window never appeared"; exit 1; }
 echo "  Wine Desktop wid=$WINE_WIN_ID"
-read WIN_OX WIN_OY < <(wine_win_origin "$WINE_WIN_ID")
+read -r WIN_OX WIN_OY < <(wine_win_origin "$WINE_WIN_ID")
 echo "  Window origin: ($WIN_OX, $WIN_OY)"
 DISPLAY="$DISPLAY_NUM" xdotool windowfocus --sync "$WINE_WIN_ID" 2>/dev/null || true
 
@@ -370,6 +372,7 @@ sleep 15
 
 # ─── Step 7: t=0 screenshot ──────────────────────────────────────────────────
 
+# shellcheck disable=SC2034
 MISSION_START_TIME="$SECONDS"
 take_shot "wine-allied-l1-t0.png"
 echo "  Mission started at t=${SECONDS}s"

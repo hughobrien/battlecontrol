@@ -30,6 +30,7 @@ if [[ -n "$_old_pid" ]]; then
         echo "[xvfb] Reusing existing Xvfb on ${XVFB_DISPLAY} (pid=$_old_pid)"
         XVFB_PID="$_old_pid"
         export XVFB_DISPLAY XVFB_PID
+        # shellcheck disable=SC2317
         return 0 2>/dev/null || exit 0
     fi
     echo "[xvfb] Killing stale Xvfb on ${XVFB_DISPLAY} (pid=$_old_pid)"
@@ -43,7 +44,7 @@ Xvfb "${XVFB_DISPLAY}" -screen 0 "${XVFB_GEOMETRY}" -ac &
 XVFB_PID=$!
 
 # Wait for Xvfb to be ready (up to 5 seconds)
-for i in $(seq 1 10); do
+for _ in $(seq 1 10); do
     if xdpyinfo -display "${XVFB_DISPLAY}" >/dev/null 2>&1; then
         echo "[xvfb] Ready (pid=$XVFB_PID)"
         break
@@ -59,9 +60,10 @@ fi
 # Register cleanup trap (append, don't clobber existing traps)
 _old_trap=$(trap -p EXIT 2>/dev/null | sed "s/trap -- '//;s/' EXIT//" || true)
 if [[ -n "$_old_trap" ]]; then
-    trap "$_old_trap; kill $XVFB_PID 2>/dev/null || true" EXIT
+    # shellcheck disable=SC2064
+    trap "$_old_trap; kill \$XVFB_PID 2>/dev/null || true" EXIT
 else
-    trap "kill $XVFB_PID 2>/dev/null || true" EXIT
+    trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
 fi
 
 export XVFB_DISPLAY XVFB_PID

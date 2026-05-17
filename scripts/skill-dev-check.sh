@@ -44,7 +44,12 @@ check "cmake"      cmake      "3.20"
 check "ninja"      ninja
 check "python3"    python3
 check "pkg-config" pkg-config
-check "SDL2"       pkg-config --modversion sdl2 >/dev/null 2>&1 && echo "OK" || { echo "MISSING"; errors=$((errors + 1)); }; true
+if pkg-config --modversion sdl2 >/dev/null 2>&1; then
+    echo "  SDL2                  OK"
+else
+    echo "  SDL2                  MISSING"
+    errors=$((errors + 1))
+fi
 
 echo ""
 if [[ $errors -eq 0 ]]; then
