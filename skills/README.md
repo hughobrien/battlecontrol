@@ -81,6 +81,7 @@ multi-step command sequences. Each script handles setup, teardown, and error rec
 | `scripts/skill-native-build.sh` | Single-cmd cmake configure + build RA + build TD | native-build, ci-cd |
 | `scripts/skill-vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff | ci-cd, vqa-codec |
 | `scripts/skill-ci-wasm-smoke.sh` | Full WASM CI: emcmake, build, validate, T1+T2 smoke | ci-cd |
+| `scripts/ci-local.sh` | Local CI: run all available gates with one command, auto-skip missing deps | all skills |
 
 ### Script design rules
 
@@ -89,3 +90,6 @@ multi-step command sequences. Each script handles setup, teardown, and error rec
 - **Self-cleaning** — registers EXIT traps so services are killed on shell exit
 - **One command per workflow** — collapses multi-step manual sequences into a single invocation
 - **Exits 0 on success** — works as a CI gate or a skill verification step
+
+Historical build-pass scripts and one-off diagnostics have been moved to
+`scripts/archive/`. Only reusable automation lives at the top level of `scripts/`.
