@@ -264,6 +264,8 @@
           echo "Workflows (from repo root):"
           echo "  nix run .#check              toolchain prerequisites"
           echo "  nix run .#build-native       native Linux build (ra/td/both)"
+          echo "  nix run .#release-build-ra    release build: RA native + package"
+          echo "  nix run .#release-build-td    release build: TD native + package"
           echo "  nix run .#lint               LP64 hazard audit"
           echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
           echo "  nix run .#build-wasm         WASM build (ra/td/both)"
@@ -272,6 +274,7 @@
           echo "  nix run .#screenshot         capture WASM screenshot"
           echo "  nix run .#test -- <spec>     run an e2e test"
           echo "  nix run .#capture-wine       Wine OG baseline capture"
+          echo "  nix run .#ci-run-test -- <spec>  run an e2e test under Xvfb+WASM"
           echo "  nix run .#capture-native     Native Linux gameplay capture"
           echo "  nix run .#vqa-check          VQA pixel-diff gate"
           echo "  nix run .#vqa-golden         Generate golden frames from VQA"
@@ -360,6 +363,25 @@
         build-native = mkApp "build-native" ''
           export CC=clang CXX=clang++
           exec bash scripts/skill-native-build.sh "$@"
+        '';
+
+        release-build-ra = mkApp "release-build-ra" ''
+          set -e
+          bash scripts/first-run-pass-94.sh
+          cp build/first-run-pass-94/redalert.elf redalert
+          strip redalert
+          tar czf redalert-linux-x86_64.tar.gz redalert
+          echo "redalert-linux-x86_64.tar.gz: $(stat -c%s redalert-linux-x86_64.tar.gz) bytes"
+        '';
+
+        release-build-td = mkApp "release-build-td" ''
+          set -e
+          cmake --preset linux-native
+          cmake --build build --target td --parallel
+          strip build/td
+          cp build/td td
+          tar czf td-linux-x86_64.tar.gz td
+          echo "td-linux-x86_64.tar.gz: $(stat -c%s td-linux-x86_64.tar.gz) bytes"
         '';
 
         lint = mkApp "lint-lp64" ''
@@ -679,6 +701,25 @@
               print(name + ': ' + str(size // 1024) + ' KB OK')
           "
                     nix run .#ci-wasm-smoke
+        '';
+
+        # Run a single Playwright e2e test under Xvfb with the WASM server.
+        # Usage: nix run .#ci-run-test -- e2e/regression/T3-td-wasm-menu.spec.ts
+        ci-run-test = mkApp "ci-run-test" ''
+          set -e
+          SPEC="''${1:?usage: nix run .#ci-run-test -- <spec-path>}"
+          shift
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py 8080 build-wasm &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 playwright test "$SPEC" "$@"
+          EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          exit $EXIT
         '';
 
         ci-clang-tidy = mkApp "ci-clang-tidy" ''

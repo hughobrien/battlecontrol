@@ -16,7 +16,7 @@ live GDI Mission 1 map.
 
 ## Run summary
 
-Single `bash scripts/wine-gdi-m1.sh` invocation from the worktree root,
+Single `bash scripts/wine-gdi-m1.sh` invocation from the repo root,
 `Wine 10.0`, `cnc-ddraw` (windowed, GDI renderer), `Xvfb :92 1024x768x24`,
 `openbox`. Eight screenshots captured progressing through:
 
