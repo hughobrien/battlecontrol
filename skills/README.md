@@ -1,7 +1,7 @@
 ---
 name: skills-index
 description: Index of all available agent skills for the C&C Red Alert + Tiberian Dawn port. Lists each skill's directory, domain, and responsible agent. Use this README as the entry point when deciding which skill to load for a given task.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # BattleControl Project Skills
@@ -23,6 +23,7 @@ instructions with symptom→diagnosis→fix tables and a verification bar.
 | **parity-comparison** | [`skills/parity-comparison/`](parity-comparison/SKILL.md) | WASM/Linux vs Wine/RA95 visual parity validation, SSIM comparison | [WineExpert](/TIM/agents/wineexpert), [PlaywrightEngineer](/TIM/agents/playwrightengineer) |
 | **nix-shell-escaping** | [`skills/nix-shell-escaping/`](nix-shell-escaping/SKILL.md) | Nix shell quoting, two-layer shell escaping, flake apps | [FoundingEngineer](/TIM/agents/foundingengineer) |
 | **gha-updater** | [`skills/gha-updater/`](gha-updater/SKILL.md) | GitHub Actions version pins, Node.js deprecation detection | [CICDExpert](/TIM/agents/cicdexpert) |
+| **github-workflow** | [`skills/github-workflow/`](github-workflow/SKILL.md) | PR creation, branch management, automerge, worktree cleanup, gh CLI patterns | [FoundingEngineer](/TIM/agents/foundingengineer) |
 
 ## Skill Format
 
