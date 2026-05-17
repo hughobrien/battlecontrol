@@ -274,6 +274,7 @@
           echo "  nix run .#screenshot         capture WASM screenshot"
           echo "  nix run .#test -- <spec>     run an e2e test"
           echo "  nix run .#capture-wine       Wine OG baseline capture"
+          echo "  nix run .#ci-run-test -- <spec>  run an e2e test under Xvfb+WASM"
           echo "  nix run .#capture-native     Native Linux gameplay capture"
           echo "  nix run .#vqa-check          VQA pixel-diff gate"
           echo "  nix run .#vqa-golden         Generate golden frames from VQA"
@@ -700,6 +701,25 @@
               print(name + ': ' + str(size // 1024) + ' KB OK')
           "
                     nix run .#ci-wasm-smoke
+        '';
+
+        # Run a single Playwright e2e test under Xvfb with the WASM server.
+        # Usage: nix run .#ci-run-test -- e2e/regression/T3-td-wasm-menu.spec.ts
+        ci-run-test = mkApp "ci-run-test" ''
+          set -e
+          SPEC="''${1:?usage: nix run .#ci-run-test -- <spec-path>}"
+          shift
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 2
+          python3 wasm/serve-coop.py 8080 build-wasm &
+          SERVER_PID=$!
+          sleep 2
+          DISPLAY=:99 playwright test "$SPEC" "$@"
+          EXIT=$?
+          kill $SERVER_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          exit $EXIT
         '';
 
         ci-clang-tidy = mkApp "ci-clang-tidy" ''
