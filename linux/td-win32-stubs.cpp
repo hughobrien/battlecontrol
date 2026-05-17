@@ -1006,6 +1006,34 @@ extern "C" void Wait_Vert_Blank(void)
         fprintf(stderr, "[TD] audit screenshot: %s\n", path);
         fflush(stderr);
     }
+
+    // TIM-1053: Frame rate limiter for software renderer fallback.
+    // The TD SDL2 renderer is always created as SOFTWARE (no PRESENTVSYNC),
+    // so SDL_RenderPresent returns immediately and the main loop runs at
+    // CPU speed.  Use wall-clock timing to throttle to ~60 FPS.
+    {
+        static struct timespec _wv_prev = {0, 0};
+        static bool _wv_initialized = false;
+        struct timespec _wv_now;
+        clock_gettime(CLOCK_MONOTONIC, &_wv_now);
+
+        if (!_wv_initialized) {
+            _wv_prev = _wv_now;
+            _wv_initialized = true;
+        } else {
+            long elapsed_ns = (_wv_now.tv_sec - _wv_prev.tv_sec) * 1000000000L
+                            + (_wv_now.tv_nsec - _wv_prev.tv_nsec);
+            const long TARGET_NS = 16666667L;  // 1/60 second in ns
+            if (elapsed_ns < TARGET_NS) {
+                long delay_ms = (TARGET_NS - elapsed_ns + 999999L) / 1000000L;
+                if (delay_ms > 0) {
+                    SDL_Delay((Uint32)delay_ms);
+                }
+            }
+            clock_gettime(CLOCK_MONOTONIC, &_wv_now);
+            _wv_prev = _wv_now;
+        }
+    }
 #endif
 }
 
