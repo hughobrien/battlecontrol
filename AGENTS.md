@@ -162,6 +162,25 @@ wasm_validate(target: "both")
 Outputs: `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`,
 `build-wasm/td.html`
 
+### GitHub Pages deploy (automatic)
+
+On every merge to `master`, the `gh-pages.yml` workflow:
+1. Builds `ra.wasm` + `td.wasm`
+2. Runs smoke tests (Chromium + Firefox)
+3. Runs asset-gated regression tests (if secrets configured)
+4. Deploys to GitHub Pages
+
+The deploy directory is assembled from `build-wasm/*.wasm`, `build-wasm/*.js`,
+`build-wasm/*.html`, plus `wasm/preloader.js` and
+`wasm/coi-serviceworker.min.js`. A `version.json` manifest is generated with
+commit SHA and build timestamp.
+
+Manual deploy (legacy):
+
+```bash
+gh workflow run "GitHub Pages Deploy"
+```
+
 ---
 
 ## Canonical Test Commands
