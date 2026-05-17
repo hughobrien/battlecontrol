@@ -68,11 +68,23 @@ ARTIFACT_DIR="$(cd "$ARTIFACT_DIR" && pwd)"
 
 echo "=== preflight ==="
 for tool in "$WINE" Xvfb openbox ffmpeg; do
-    command -v "$tool" >/dev/null 2>&1 || { echo "FAIL: $tool missing"; exit 1; }
+	command -v "$tool" >/dev/null 2>&1 || {
+		echo "FAIL: $tool missing"
+		exit 1
+	}
 done
-[[ -f "$TD_EXE_PATH" ]] || { echo "FAIL: $TD_EXE_PATH missing"; exit 2; }
-[[ -d "$DATA_DIR" ]] || { echo "FAIL: $DATA_DIR missing"; exit 1; }
-[[ -f "$CNC_DDRAW_DIR/ddraw.dll" ]] || { echo "FAIL: cnc-ddraw missing at $CNC_DDRAW_DIR/ddraw.dll"; exit 1; }
+[[ -f "$TD_EXE_PATH" ]] || {
+	echo "FAIL: $TD_EXE_PATH missing"
+	exit 2
+}
+[[ -d "$DATA_DIR" ]] || {
+	echo "FAIL: $DATA_DIR missing"
+	exit 1
+}
+[[ -f "$CNC_DDRAW_DIR/ddraw.dll" ]] || {
+	echo "FAIL: cnc-ddraw missing at $CNC_DDRAW_DIR/ddraw.dll"
+	exit 1
+}
 
 echo "  wine:       $($WINE --version)"
 echo "  exe:        $TD_EXE_PATH ($(sha256sum "$TD_EXE_PATH" | cut -c1-12)...)"
@@ -84,12 +96,14 @@ echo "  artifacts:  $ARTIFACT_DIR"
 # ─── Pick free X display ─────────────────────────────────────────────────────
 
 pick_display() {
-    for d in 91 92 93 94 95 96 97 98; do
-        if [[ ! -e "/tmp/.X${d}-lock" && ! -e "/tmp/.X11-unix/X${d}" ]]; then
-            echo ":$d"; return
-        fi
-    done
-    echo "no free display" >&2; exit 1
+	for d in 91 92 93 94 95 96 97 98; do
+		if [[ ! -e "/tmp/.X${d}-lock" && ! -e "/tmp/.X11-unix/X${d}" ]]; then
+			echo ":$d"
+			return
+		fi
+	done
+	echo "no free display" >&2
+	exit 1
 }
 XDISP="${XDISP:-$(pick_display)}"
 echo "  display:    $XDISP"
@@ -99,7 +113,7 @@ echo "  display:    $XDISP"
 STAGE=$(mktemp -d /tmp/tim724-gdi-XXXX)
 
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
-    [[ -e "$f" ]] && ln -sf "$f" "$STAGE/$(basename "$f")"
+	[[ -e "$f" ]] && ln -sf "$f" "$STAGE/$(basename "$f")"
 done
 cp "$TD_EXE_PATH" "$STAGE/C&C95.EXE"
 
@@ -112,13 +126,13 @@ cp "$TD_EXE_PATH" "$STAGE/C&C95.EXE"
 # thread with EXCEPTION_PRIV_INSTRUCTION and prevents Init_Game from running.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "  applying TD binary patches..."
-python3 "$SCRIPT_DIR/td-focus-skip-patch.py"      "$STAGE/C&C95.EXE"
-python3 "$SCRIPT_DIR/td-game-in-focus-patch.py"   "$STAGE/C&C95.EXE"
-python3 "$SCRIPT_DIR/td-vqa-skip-patch.py"        "$STAGE/C&C95.EXE"
-python3 "$SCRIPT_DIR/td-activateapp-patch.py"     "$STAGE/C&C95.EXE"
-python3 "$SCRIPT_DIR/td-ddmode-patch.py"          "$STAGE/C&C95.EXE"
-python3 "$SCRIPT_DIR/td-setcoop-hwnd-patch.py"    "$STAGE/C&C95.EXE"
-python3 "$SCRIPT_DIR/td-ioport-patch.py"          "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-focus-skip-patch.py" "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-game-in-focus-patch.py" "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-vqa-skip-patch.py" "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-activateapp-patch.py" "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-ddmode-patch.py" "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-setcoop-hwnd-patch.py" "$STAGE/C&C95.EXE"
+python3 "$SCRIPT_DIR/td-ioport-patch.py" "$STAGE/C&C95.EXE"
 python3 "$SCRIPT_DIR/td-side-preview-skip-patch.py" "$STAGE/C&C95.EXE"
 echo "  patch chain done: $(sha256sum "$STAGE/C&C95.EXE" | cut -c1-12)..."
 
@@ -129,7 +143,7 @@ echo "  patch chain done: $(sha256sum "$STAGE/C&C95.EXE" | cut -c1-12)..."
 # instead of D:, so Set_Search_Drives adds C:\ as the CD path, MIX files aren't found
 # there, and the game errors/spins before ever calling Flip.
 # .windows-label is read by Wine's DOSFS from the root of the mapped host directory.
-printf 'GDI95' > "$STAGE/.windows-label"
+printf 'GDI95' >"$STAGE/.windows-label"
 echo "  D: label set to GDI95 via .windows-label"
 [[ -f "$TD_DLL_DIR/THIPX32.DLL" ]] && cp "$TD_DLL_DIR/THIPX32.DLL" "$STAGE/THIPX32.DLL"
 
@@ -138,7 +152,7 @@ echo "  D: label set to GDI95 via .windows-label"
 # cnc-ddraw handles 8bpp→32bpp palette conversion internally; the GDI renderer
 # commits frames via XPutImage so ffmpeg x11grab can capture them.
 cp "$CNC_DDRAW_DIR/ddraw.dll" "$STAGE/ddraw.dll"
-cat > "$STAGE/ddraw.ini" <<'DDRAWINI'
+cat >"$STAGE/ddraw.ini" <<'DDRAWINI'
 [ddraw]
 renderer=gdi
 windowed=true
@@ -173,7 +187,7 @@ PYEOF
 # CRLF CONQUER.INI — TD's PROFILE.CPP uses strchr('\r') so LF-only is silently
 # ignored.  (Per TIM-695 memory note.)  IsFromInstall=true skips the intro and
 # auto-selects SEL_START_NEW_GAME so the game proceeds without user input.
-printf '[Options]\r\nIsFromInstall=true\r\nPlayIntro=No\r\n' > "$STAGE/CONQUER.INI"
+printf '[Options]\r\nIsFromInstall=true\r\nPlayIntro=No\r\n' >"$STAGE/CONQUER.INI"
 
 # Stub VQP briefing files — C&C95 checks file existence in a tight retry loop
 # (~21k NtCreateFile/sec) before calling Play_Movie for each briefing video.
@@ -183,28 +197,28 @@ printf '[Options]\r\nIsFromInstall=true\r\nPlayIntro=No\r\n' > "$STAGE/CONQUER.I
 # We stub all GDI (1-15) and NOD (1-12) PRE and mission VQPs so the game
 # doesn't re-spin on subsequent briefings.
 for n in $(seq 1 15); do
-    touch "$STAGE/GDI${n}PRE.VQP" "$STAGE/GDI${n}.VQP"
+	touch "$STAGE/GDI${n}PRE.VQP" "$STAGE/GDI${n}.VQP"
 done
 for n in $(seq 1 12); do
-    touch "$STAGE/NOD${n}PRE.VQP" "$STAGE/NOD${n}.VQP"
+	touch "$STAGE/NOD${n}PRE.VQP" "$STAGE/NOD${n}.VQP"
 done
 # Also stub any transition/outro VQPs
 for f in INTRO.VQP SCORE.VQP NODEND1.VQP NODEND2.VQP GDIFINAL.VQP; do
-    touch "$STAGE/$f"
+	touch "$STAGE/$f"
 done
 echo "  stub VQP files created (all GDI/NOD mission briefings)"
 
 # ─── Wine prefix + d:=cdrom ──────────────────────────────────────────────────
 
 if [[ ! -d "$WINEPREFIX" ]]; then
-    echo "  creating $WINEPREFIX..."
-    WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all \
-        "$WINE" wineboot --init 2>/dev/null
+	echo "  creating $WINEPREFIX..."
+	WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all \
+		"$WINE" wineboot --init 2>/dev/null
 fi
 mkdir -p "$WINEPREFIX/dosdevices"
 ln -sfT "$STAGE" "$WINEPREFIX/dosdevices/d:"
 WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all "$WINE" reg add \
-    'HKEY_LOCAL_MACHINE\Software\Wine\Drives' /v 'd:' /t REG_SZ /d 'cdrom' /f 2>/dev/null || true
+	'HKEY_LOCAL_MACHINE\Software\Wine\Drives' /v 'd:' /t REG_SZ /d 'cdrom' /f 2>/dev/null || true
 WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
 sleep 1
 
@@ -215,20 +229,20 @@ sleep 1
 # some Wine 10 + openbox combinations).
 echo
 echo "=== starting Xvfb + openbox on $XDISP ==="
-Xvfb "$XDISP" -screen 0 1024x768x24 -ac > "$ARTIFACT_DIR/xvfb.log" 2>&1 &
+Xvfb "$XDISP" -screen 0 1024x768x24 -ac >"$ARTIFACT_DIR/xvfb.log" 2>&1 &
 XVFB_PID=$!
 sleep 1
-DISPLAY="$XDISP" openbox > "$ARTIFACT_DIR/openbox.log" 2>&1 &
+DISPLAY="$XDISP" openbox >"$ARTIFACT_DIR/openbox.log" 2>&1 &
 WM_PID=$!
 sleep 1
 
 # shellcheck disable=SC2329
 cleanup() {
-    [[ -n "${TD_PID:-}" ]] && kill "$TD_PID" 2>/dev/null || true
-    WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
-    [[ -n "${WM_PID:-}" ]] && kill "$WM_PID" 2>/dev/null || true
-    [[ -n "${XVFB_PID:-}" ]] && kill "$XVFB_PID" 2>/dev/null || true
-    rm -rf "$STAGE"
+	[[ -n "${TD_PID:-}" ]] && kill "$TD_PID" 2>/dev/null || true
+	WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
+	[[ -n "${WM_PID:-}" ]] && kill "$WM_PID" 2>/dev/null || true
+	[[ -n "${XVFB_PID:-}" ]] && kill "$XVFB_PID" 2>/dev/null || true
+	rm -rf "$STAGE"
 }
 trap cleanup EXIT
 
@@ -245,82 +259,85 @@ trap cleanup EXIT
 echo
 echo "=== launching C&C95.EXE ==="
 (
-    cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
-        WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
-        WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
-        WINEDEBUG=-all AUDIODEV=null \
-        timeout 180 "$WINE" 'C&C95.EXE'
-) > "$ARTIFACT_DIR/wine.log" 2>&1 &
+	cd "$STAGE"
+	DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
+		WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
+		WINEDEBUG=-all AUDIODEV=null \
+		timeout 180 "$WINE" 'C&C95.EXE'
+) >"$ARTIFACT_DIR/wine.log" 2>&1 &
 TD_PID=$!
 
 # Wait for the C&C95 game window
 echo "  waiting for 'Command & Conquer' window..."
 WINDOW_NAME=""
 for i in $(seq 1 30); do
-    if WID=$(DISPLAY="$XDISP" xdotool search --name "Command & Conquer" 2>/dev/null | head -1); then
-        if [[ -n "$WID" ]]; then
-            WINDOW_NAME="Command & Conquer"
-            echo "  game window appeared after ${i}s (wid=$WID)"
-            break
-        fi
-    fi
-    # Also accept any visible window in case the title differs
-    if NAME=$(DISPLAY="$XDISP" xdotool search --onlyvisible --name "." 2>/dev/null | head -1); then
-        if [[ -n "$NAME" ]]; then
-            WINDOW_NAME=$(DISPLAY="$XDISP" xdotool getwindowname "$NAME" 2>/dev/null || echo "(noname)")
-            [[ "$WINDOW_NAME" != "Default IME" ]] && { echo "  window appeared after ${i}s: '$WINDOW_NAME'"; break; }
-        fi
-    fi
-    sleep 1
+	if WID=$(DISPLAY="$XDISP" xdotool search --name "Command & Conquer" 2>/dev/null | head -1); then
+		if [[ -n "$WID" ]]; then
+			WINDOW_NAME="Command & Conquer"
+			echo "  game window appeared after ${i}s (wid=$WID)"
+			break
+		fi
+	fi
+	# Also accept any visible window in case the title differs
+	if NAME=$(DISPLAY="$XDISP" xdotool search --onlyvisible --name "." 2>/dev/null | head -1); then
+		if [[ -n "$NAME" ]]; then
+			WINDOW_NAME=$(DISPLAY="$XDISP" xdotool getwindowname "$NAME" 2>/dev/null || echo "(noname)")
+			[[ "$WINDOW_NAME" != "Default IME" ]] && {
+				echo "  window appeared after ${i}s: '$WINDOW_NAME'"
+				break
+			}
+		fi
+	fi
+	sleep 1
 done
 
 TD_SCREENSHOT="${TD_SCREENSHOT:-$(dirname "$SCRIPT_DIR")/tools/wine-input/td-screenshot.exe}"
 
 shoot() {
-    local name="$1"
-    local png="$ARTIFACT_DIR/${name}.png"
+	local name="$1"
+	local png="$ARTIFACT_DIR/${name}.png"
 
-    # Primary: in-Wine BitBlt capture via td-screenshot.exe.
-    # cnc-ddraw's GDI renderer does BitBlt from its backbuffer to the game
-    # HWND's DC; capturing via another Win32 BitBlt reads that same DC.
-    # Z: = Linux root in Wine; path must use backslashes.
-    local bmp_linux="/tmp/td-shot-${name}.bmp"
-    local bmp_wine
-    bmp_wine="Z:${bmp_linux//\//\\}"
-    if [[ -f "$TD_SCREENSHOT" ]]; then
-        DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
-            WINEDEBUG=-all \
-            "$WINE" "$TD_SCREENSHOT" "$bmp_wine" 2>/dev/null || true
-        if [[ -f "$bmp_linux" ]]; then
-            python3 -c "
+	# Primary: in-Wine BitBlt capture via td-screenshot.exe.
+	# cnc-ddraw's GDI renderer does BitBlt from its backbuffer to the game
+	# HWND's DC; capturing via another Win32 BitBlt reads that same DC.
+	# Z: = Linux root in Wine; path must use backslashes.
+	local bmp_linux="/tmp/td-shot-${name}.bmp"
+	local bmp_wine
+	bmp_wine="Z:${bmp_linux//\//\\}"
+	if [[ -f "$TD_SCREENSHOT" ]]; then
+		DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+			WINEDEBUG=-all \
+			"$WINE" "$TD_SCREENSHOT" "$bmp_wine" 2>/dev/null || true
+		if [[ -f "$bmp_linux" ]]; then
+			python3 -c "
 from PIL import Image
 Image.open('$bmp_linux').convert('RGB').save('$png')
 " 2>/dev/null && rm -f "$bmp_linux" || true
-        fi
-    fi
+		fi
+	fi
 
-    # Fallback: ffmpeg x11grab from X11 backing store (captures desktop chrome).
-    if [[ ! -f "$png" ]]; then
-        DISPLAY="$XDISP" ffmpeg -nostdin -loglevel error \
-            -f x11grab -video_size 800x600 -i "$XDISP" \
-            -frames:v 1 -y "$png" 2>/dev/null || true
-    fi
+	# Fallback: ffmpeg x11grab from X11 backing store (captures desktop chrome).
+	if [[ ! -f "$png" ]]; then
+		DISPLAY="$XDISP" ffmpeg -nostdin -loglevel error \
+			-f x11grab -video_size 800x600 -i "$XDISP" \
+			-frames:v 1 -y "$png" 2>/dev/null || true
+	fi
 
-    if [[ -f "$png" ]]; then
-        local sz sha
-        sz=$(stat -c%s "$png")
-        sha=$(sha256sum "$png" | cut -c1-12)
-        local colors
-        colors=$(python3 -c "
+	if [[ -f "$png" ]]; then
+		local sz sha
+		sz=$(stat -c%s "$png")
+		sha=$(sha256sum "$png" | cut -c1-12)
+		local colors
+		colors=$(python3 -c "
 from PIL import Image
 img = Image.open('$png').convert('RGB')
 print(len(set(img.getdata())))
 " 2>/dev/null || echo "?")
-        echo "  shot $name: ${sz}B sha=${sha} colors=${colors}"
-    else
-        echo "  shot $name: FAILED"
-    fi
+		echo "  shot $name: ${sz}B sha=${sha} colors=${colors}"
+	else
+		echo "  shot $name: FAILED"
+	fi
 }
 
 # ─── Input helpers ───────────────────────────────────────────────────────────
@@ -341,69 +358,69 @@ print(len(set(img.getdata())))
 TD_SENDINPUT="${TD_SENDINPUT:-$(dirname "$SCRIPT_DIR")/tools/wine-input/td-sendinput.exe}"
 
 WIN_OX=0
-WIN_OY=22  # fallback titlebar height
+WIN_OY=22 # fallback titlebar height
 resolve_window_origin() {
-    local wid
-    wid=$(DISPLAY="$XDISP" xdotool search --name "Command & Conquer" 2>/dev/null | head -1)
-    if [[ -z "$wid" ]]; then
-        echo "  WARN: no Command & Conquer window for origin lookup"
-        return
-    fi
-    local geom
-    geom=$(DISPLAY="$XDISP" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || return
-    local wx wy wh
-    wx=$(echo "$geom" | grep '^X=' | cut -d= -f2)
-    wy=$(echo "$geom" | grep '^Y=' | cut -d= -f2)
-    wh=$(echo "$geom" | grep '^HEIGHT=' | cut -d= -f2)
-    # TD is 640x400 — anything above 400 is decoration.
-    local title_h=$(( ${wh:-422} - 400 ))
-    if [[ $title_h -lt 0 || $title_h -gt 80 ]]; then title_h=22; fi
-    WIN_OX=${wx:-0}
-    WIN_OY=$(( ${wy:-0} + title_h ))
-    echo "  window origin: client=($WIN_OX,$WIN_OY) titlebar=${title_h}px"
+	local wid
+	wid=$(DISPLAY="$XDISP" xdotool search --name "Command & Conquer" 2>/dev/null | head -1)
+	if [[ -z "$wid" ]]; then
+		echo "  WARN: no Command & Conquer window for origin lookup"
+		return
+	fi
+	local geom
+	geom=$(DISPLAY="$XDISP" xdotool getwindowgeometry --shell "$wid" 2>/dev/null) || return
+	local wx wy wh
+	wx=$(echo "$geom" | grep '^X=' | cut -d= -f2)
+	wy=$(echo "$geom" | grep '^Y=' | cut -d= -f2)
+	wh=$(echo "$geom" | grep '^HEIGHT=' | cut -d= -f2)
+	# TD is 640x400 — anything above 400 is decoration.
+	local title_h=$((${wh:-422} - 400))
+	if [[ $title_h -lt 0 || $title_h -gt 80 ]]; then title_h=22; fi
+	WIN_OX=${wx:-0}
+	WIN_OY=$((${wy:-0} + title_h))
+	echo "  window origin: client=($WIN_OX,$WIN_OY) titlebar=${title_h}px"
 }
 
 xdo_click() {
-    local gx="$1" gy="$2"
-    local sx=$(( WIN_OX + gx ))
-    local sy=$(( WIN_OY + gy ))
-    echo "  xdo_click game=($gx,$gy) screen=($sx,$sy)"
-    DISPLAY="$XDISP" xdotool mousemove "$sx" "$sy" click 1 2>/dev/null || true
-    sleep 0.5
+	local gx="$1" gy="$2"
+	local sx=$((WIN_OX + gx))
+	local sy=$((WIN_OY + gy))
+	echo "  xdo_click game=($gx,$gy) screen=($sx,$sy)"
+	DISPLAY="$XDISP" xdotool mousemove "$sx" "$sy" click 1 2>/dev/null || true
+	sleep 0.5
 }
 
 inject_key() {
-    local vk="$1"
-    if [[ ! -f "$TD_SENDINPUT" ]]; then
-        echo "  (td-sendinput.exe missing at $TD_SENDINPUT — skipping inject)"
-        return
-    fi
-    echo "  inject key vk=$vk"
-    DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
-        WINEDEBUG=-all \
-        "$WINE" "$TD_SENDINPUT" key "$vk" 2>/dev/null || true
+	local vk="$1"
+	if [[ ! -f "$TD_SENDINPUT" ]]; then
+		echo "  (td-sendinput.exe missing at $TD_SENDINPUT — skipping inject)"
+		return
+	fi
+	echo "  inject key vk=$vk"
+	DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEDEBUG=-all \
+		"$WINE" "$TD_SENDINPUT" key "$vk" 2>/dev/null || true
 }
 
 # shellcheck disable=SC2329
 inject_click() {
-    local x="$1" y="$2"
-    if [[ ! -f "$TD_SENDINPUT" ]]; then
-        echo "  (td-sendinput.exe missing — skipping click inject)"
-        return
-    fi
-    echo "  inject click ($x,$y)"
-    DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
-        WINEDEBUG=-all \
-        "$WINE" "$TD_SENDINPUT" click "$x" "$y" 2>/dev/null || true
+	local x="$1" y="$2"
+	if [[ ! -f "$TD_SENDINPUT" ]]; then
+		echo "  (td-sendinput.exe missing — skipping click inject)"
+		return
+	fi
+	echo "  inject click ($x,$y)"
+	DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEDEBUG=-all \
+		"$WINE" "$TD_SENDINPUT" click "$x" "$y" 2>/dev/null || true
 }
 
 # Initial settle
 sleep 5
 shoot "t05-initial"
 if ! kill -0 $TD_PID 2>/dev/null; then
-    echo "FAIL: TD died early — see $ARTIFACT_DIR/wine.log"
-    tail -20 "$ARTIFACT_DIR/wine.log"
-    exit 3
+	echo "FAIL: TD died early — see $ARTIFACT_DIR/wine.log"
+	tail -20 "$ARTIFACT_DIR/wine.log"
+	exit 3
 fi
 
 # Resolve the window origin now that the C&C95 window is visible.
@@ -474,8 +491,8 @@ echo
 echo "=== final ==="
 echo "  TD alive: $(kill -0 $TD_PID 2>/dev/null && echo yes || echo no)"
 DISPLAY="$XDISP" xdotool search --name . 2>/dev/null | while read -r wid; do
-    NAME=$(DISPLAY="$XDISP" xdotool getwindowname "$wid" 2>/dev/null || echo "")
-    [[ -n "$NAME" ]] && echo "  window: $NAME"
+	NAME=$(DISPLAY="$XDISP" xdotool getwindowname "$wid" 2>/dev/null || echo "")
+	[[ -n "$NAME" ]] && echo "  window: $NAME"
 done
 
 echo

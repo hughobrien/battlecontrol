@@ -20,12 +20,12 @@ LOG="$OUT_DIR/t12-td-native-m2-smoke.log"
 mkdir -p "$OUT_DIR"
 
 if [ ! -x "$ELF" ]; then
-    echo "T12 SKIP: $ELF not built (run cmake --build build --target td)"
-    exit 77
+	echo "T12 SKIP: $ELF not built (run cmake --build build --target td)"
+	exit 77
 fi
 if [ ! -d "$RUN_DIR" ]; then
-    echo "T12 SKIP: $RUN_DIR not staged (run scripts/setup-run-td.sh)"
-    exit 77
+	echo "T12 SKIP: $RUN_DIR not staged (run scripts/setup-run-td.sh)"
+	exit 77
 fi
 
 pkill -f "Xvfb :99" 2>/dev/null || true
@@ -35,8 +35,8 @@ sleep 1
 trap 'kill -9 "$XVFB_PID" 2>/dev/null || true' EXIT
 
 (cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy \
-    TD_AUTOSTART=1 TD_SCENE=2 \
-    timeout 120 "$ELF") > "$LOG" 2>&1
+	TD_AUTOSTART=1 TD_SCENE=2 \
+	timeout 120 "$ELF") >"$LOG" 2>&1
 RC=$?
 echo "T12 run rc=$RC (124=timeout=alive, 0=clean exit)"
 
@@ -47,15 +47,15 @@ MAX_FRAME=${MAX_FRAME:-0}
 echo "T12 max_frame=$MAX_FRAME crashes=$CRASHES log=$LOG"
 
 if [ "$CRASHES" -gt 0 ]; then
-    echo "T12 FAIL: $CRASHES crash signals detected"
-    grep -aE "SIGSEGV|Segmentation|CRASH signal|signal 11|Aborted" "$LOG" | head -3
-    exit 1
+	echo "T12 FAIL: $CRASHES crash signals detected"
+	grep -aE "SIGSEGV|Segmentation|CRASH signal|signal 11|Aborted" "$LOG" | head -3
+	exit 1
 fi
 
 if [ "$MAX_FRAME" -lt 200 ]; then
-    echo "T12 FAIL: only reached frame=$MAX_FRAME (need ≥ 200)"
-    tail -20 "$LOG"
-    exit 1
+	echo "T12 FAIL: only reached frame=$MAX_FRAME (need ≥ 200)"
+	tail -20 "$LOG"
+	exit 1
 fi
 
 echo "T12 PASS (M2 mission ran $MAX_FRAME frames)"

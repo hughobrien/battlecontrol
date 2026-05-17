@@ -28,20 +28,20 @@ set -euo pipefail
 MISSION="${1:?usage: $0 <allied-l1|soviet-l1>}"
 
 case "$MISSION" in
-    allied-l1)
-        CAPTURE_SCRIPT="wine-allied-l1.sh"
-        ARTIFACT_DIR="e2e/report/data/wine-ra-allied-l1"
-        SOURCE_FRAME="$ARTIFACT_DIR/frame-0.png"
-        ;;
-    soviet-l1)
-        CAPTURE_SCRIPT="wine-soviet-l1.sh"
-        ARTIFACT_DIR="e2e/report/data/wine-ra-soviet-l1"
-        SOURCE_FRAME="$ARTIFACT_DIR/frame-0.png"
-        ;;
-    *)
-        echo "FAIL: unknown mission '$MISSION' — expected allied-l1 or soviet-l1" >&2
-        exit 1
-        ;;
+	allied-l1)
+		CAPTURE_SCRIPT="wine-allied-l1.sh"
+		ARTIFACT_DIR="e2e/report/data/wine-ra-allied-l1"
+		SOURCE_FRAME="$ARTIFACT_DIR/frame-0.png"
+		;;
+	soviet-l1)
+		CAPTURE_SCRIPT="wine-soviet-l1.sh"
+		ARTIFACT_DIR="e2e/report/data/wine-ra-soviet-l1"
+		SOURCE_FRAME="$ARTIFACT_DIR/frame-0.png"
+		;;
+	*)
+		echo "FAIL: unknown mission '$MISSION' — expected allied-l1 or soviet-l1" >&2
+		exit 1
+		;;
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -59,43 +59,43 @@ echo "  golden dir:     $GOLDEN_DIR"
 # --- Run Wine capture if golden doesn't exist yet --------------------------
 
 if [[ -f "$GOLDEN_PNG" ]]; then
-    echo "  golden already exists: $GOLDEN_PNG"
-    sz=$(stat -c%s "$GOLDEN_PNG" 2>/dev/null || echo "0")
-    if [[ "$sz" -ge 5000 ]]; then
-        echo "  golden is valid ($sz bytes >= 5KB) — skipping Wine capture"
-    else
-        echo "  golden is too small ($sz bytes) — re-capturing..."
-        rm -f "$GOLDEN_PNG"
-    fi
+	echo "  golden already exists: $GOLDEN_PNG"
+	sz=$(stat -c%s "$GOLDEN_PNG" 2>/dev/null || echo "0")
+	if [[ "$sz" -ge 5000 ]]; then
+		echo "  golden is valid ($sz bytes >= 5KB) — skipping Wine capture"
+	else
+		echo "  golden is too small ($sz bytes) — re-capturing..."
+		rm -f "$GOLDEN_PNG"
+	fi
 fi
 
 if [[ ! -f "$GOLDEN_PNG" ]]; then
-    echo "  running: bash scripts/$CAPTURE_SCRIPT"
-    if ! bash "$SCRIPT_DIR/$CAPTURE_SCRIPT"; then
-        echo "FAIL: Wine capture script $CAPTURE_SCRIPT exited non-zero" >&2
-        exit 1
-    fi
+	echo "  running: bash scripts/$CAPTURE_SCRIPT"
+	if ! bash "$SCRIPT_DIR/$CAPTURE_SCRIPT"; then
+		echo "FAIL: Wine capture script $CAPTURE_SCRIPT exited non-zero" >&2
+		exit 1
+	fi
 
-    # Verify the Wine capture produced frame-0.png.
-    if [[ ! -f "$SOURCE_FRAME" ]]; then
-        echo "FAIL: $CAPTURE_SCRIPT did not produce $SOURCE_FRAME" >&2
-        exit 1
-    fi
-    sz=$(stat -c%s "$SOURCE_FRAME" 2>/dev/null || echo "0")
-    if [[ "$sz" -lt 5000 ]]; then
-        echo "FAIL: $SOURCE_FRAME too small ($sz bytes, need >=5KB)" >&2
-        exit 1
-    fi
+	# Verify the Wine capture produced frame-0.png.
+	if [[ ! -f "$SOURCE_FRAME" ]]; then
+		echo "FAIL: $CAPTURE_SCRIPT did not produce $SOURCE_FRAME" >&2
+		exit 1
+	fi
+	sz=$(stat -c%s "$SOURCE_FRAME" 2>/dev/null || echo "0")
+	if [[ "$sz" -lt 5000 ]]; then
+		echo "FAIL: $SOURCE_FRAME too small ($sz bytes, need >=5KB)" >&2
+		exit 1
+	fi
 
-    # Stage the golden.
-    mkdir -p "$GOLDEN_DIR"
-    cp "$SOURCE_FRAME" "$GOLDEN_PNG"
-    echo "  staged golden: $GOLDEN_PNG ($sz bytes)"
+	# Stage the golden.
+	mkdir -p "$GOLDEN_DIR"
+	cp "$SOURCE_FRAME" "$GOLDEN_PNG"
+	echo "  staged golden: $GOLDEN_PNG ($sz bytes)"
 fi
 
 # --- Write manifest.json (single frame) ------------------------------------
 
-cat > "$MANIFEST" <<MANIFEST_EOF
+cat >"$MANIFEST" <<MANIFEST_EOF
 {
   "scene": "$MISSION",
   "mode": "gameplay",
