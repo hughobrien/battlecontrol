@@ -202,10 +202,10 @@ playwright test e2e/regression/T1-ra-wasm-boot.spec.ts
 playwright test --grep "Tier 1"
 
 # TD gameplay only:
-npm run test:e2e:td
+playwright test e2e/td-gameplay.spec.ts
 
 # RA WASM only:
-npm run test:e2e:ra
+playwright test e2e/wasm-gameplay.spec.ts
 ```
 
 **Test timeout:** 300,000ms (5 min) for full tests, 60,000ms for expect.
