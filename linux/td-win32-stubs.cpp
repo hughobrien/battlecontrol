@@ -1411,9 +1411,9 @@ void Play_Movie_GlyphX(const char* movie_name, ThemeType) {
 }
 
 void On_Achievement_Event(const HouseClass *, const char *, const char *) {}
-void On_Sound_Effect(int, int, unsigned long)                             {}
+void On_Sound_Effect(int, int, uint32_t)                             {}
 void On_Speech(int, HouseClass *)                                         {}
-void On_Ping(HouseClass const *, unsigned long)                           {}
+void On_Ping(HouseClass const *, uint32_t)                           {}
 void On_Message(const char *, float, long long)                           {}
 void On_Defeated_Message(const char *, float)                             {}
 

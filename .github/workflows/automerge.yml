@@ -12,14 +12,11 @@ jobs:
   enable-auto-merge:
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Enable auto-merge on this PR
-        env:
+      - env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh pr merge "${{ github.event.pull_request.html_url }}" \
             --auto --merge \
-            2>&1 || echo "::notice::auto-merge already enabled or not yet eligible"
+            2>&1 || echo "::notice::auto-merge not yet eligible"

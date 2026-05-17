@@ -25,13 +25,13 @@ echo ""
 echo "--- Step 1: Synthetic VQA regeneration ---"
 python3 scripts/gen_test_vqa.py /tmp/test.vqa.new
 if diff -q e2e/goldens/vqa/test.vqa /tmp/test.vqa.new >/dev/null 2>&1; then
-    echo "PASS: committed test.vqa matches generator output"
-    rm /tmp/test.vqa.new
+	echo "PASS: committed test.vqa matches generator output"
+	rm /tmp/test.vqa.new
 else
-    echo "FAIL: committed test.vqa differs from generator output"
-    echo "Run: python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa"
-    rm /tmp/test.vqa.new
-    exit 1
+	echo "FAIL: committed test.vqa differs from generator output"
+	echo "Run: python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa"
+	rm /tmp/test.vqa.new
+	exit 1
 fi
 
 # Step 2: Pixel-diff
@@ -41,11 +41,11 @@ python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa --frames 0,1,2 --thre
 VQA_RC=$?
 
 if [[ $VQA_RC -eq 0 ]]; then
-    echo ""
-    echo "=== All VQA checks PASS ==="
+	echo ""
+	echo "=== All VQA checks PASS ==="
 else
-    echo ""
-    echo "=== VQA pixel-diff FAILED ==="
+	echo ""
+	echo "=== VQA pixel-diff FAILED ==="
 fi
 
 exit $VQA_RC

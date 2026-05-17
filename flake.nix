@@ -7,27 +7,37 @@
     cnc-ddraw.url = "path:./tools/cnc-ddraw";
   };
 
-  outputs = { self, nixpkgs, wine-input, cnc-ddraw }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      wine-input,
+      cnc-ddraw,
+    }:
     let
       system = "x86_64-linux";
-      pkgs   = nixpkgs.legacyPackages.${system};
-      mkApp  = name: script: rec {
+      pkgs = nixpkgs.legacyPackages.${system};
+      mkApp = name: script: rec {
         type = "app";
         program = toString (pkgs.writeShellScript name script);
       };
-    in {
+    in
+    {
       # -----------------------------------------------------------------------
       # packages.redalert  —  builds the redalert binary
       # -----------------------------------------------------------------------
       packages.${system} = rec {
         redalert = pkgs.stdenv.mkDerivation {
-          pname   = "cnc-redalert";
+          pname = "cnc-redalert";
           version = "unstable-2026-05-09";
 
           src = ./.;
 
           nativeBuildInputs = with pkgs; [ python3 ];
-          buildInputs       = with pkgs; [ SDL2 SDL2.dev ];
+          buildInputs = with pkgs; [
+            SDL2
+            SDL2.dev
+          ];
 
           buildPhase = ''
             runHook preBuild
@@ -95,26 +105,36 @@
           '';
 
           meta = with pkgs.lib; {
-            description  = "Command & Conquer: Red Alert — native Linux port";
+            description = "Command & Conquer: Red Alert — native Linux port";
             longDescription = ''
               Native Linux port of Command & Conquer: Red Alert built from the
               EA GPL open-source release. Requires legally-acquired game data to run.
               See README for data setup instructions.
             '';
-            license   = licenses.gpl3Plus;
+            license = licenses.gpl3Plus;
             platforms = [ "x86_64-linux" ];
             mainProgram = "redalert";
           };
         };
 
         tiberiandawn = pkgs.stdenv.mkDerivation {
-          pname   = "cnc-tiberiandawn";
+          pname = "cnc-tiberiandawn";
           version = "unstable-2026-05-09";
 
           src = ./.;
 
-          nativeBuildInputs = with pkgs; [ cmake ninja gcc python3 pkg-config ];
-          buildInputs       = with pkgs; [ SDL2 SDL2.dev openal libx11 ];
+          nativeBuildInputs = with pkgs; [
+            cmake
+            ninja
+            python3
+            pkg-config
+          ];
+          buildInputs = with pkgs; [
+            SDL2
+            SDL2.dev
+            openal
+            libx11
+          ];
 
           buildPhase = ''
             runHook preBuild
@@ -133,8 +153,8 @@
           '';
 
           meta = with pkgs.lib; {
-            description  = "Command & Conquer: Tiberian Dawn — native Linux port";
-            license   = licenses.gpl3Plus;
+            description = "Command & Conquer: Tiberian Dawn — native Linux port";
+            license = licenses.gpl3Plus;
             platforms = [ "x86_64-linux" ];
             mainProgram = "tiberiandawn";
           };
@@ -146,22 +166,33 @@
       # -----------------------------------------------------------------------
       # devShells.default  —  nix develop
       # -----------------------------------------------------------------------
-      devShells.${system}.default = pkgs.mkShell {
+      devShells.${system}.default = (pkgs.mkShell.override { stdenv = pkgs.clangStdenv; }) {
+        pure = true;
         nativeBuildInputs = with pkgs; [
           cmake
           gnumake
           ninja
-          clang
           python3
           pkg-config
-          emscripten  # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
+          emscripten # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
           # CI deps
+          xvfb
           xvfb-run
+          playwright-test # Playwright CLI + browsers via Nix
           ffmpeg-headless
           ccache
           nodejs
+          pnpm
+          gh
           clang-tools
           cppcheck
+          # Linting tools
+          ruff
+          shellcheck
+          shfmt
+          yamllint
+          nixfmt
+          uv
         ];
 
         buildInputs = with pkgs; [
@@ -181,12 +212,62 @@
         shellHook = ''
           export RA_ASSETS="''${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
           export TD_ASSETS="''${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
+
+
+
+          # Install git pre-commit hook for linting all staged files
+          REPO_ROOT="''$(git rev-parse --show-toplevel 2>/dev/null || true)"
+          if [ -n "$REPO_ROOT" ] && [ ! -f "$REPO_ROOT/.git/hooks/pre-commit" ]; then
+            HOOK="$REPO_ROOT/.git/hooks/pre-commit"
+            cat > "$HOOK" << 'PREHOOK'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          ERRORS=0
+
+          auto_fixer() { "$@" 2>/dev/null || true; }
+          checker() { if ! "$@" 2>/dev/null; then ERRORS=$((ERRORS + 1)); fi; }
+
+          # ── Phase 1: Auto-fixers (never block) ─────────────────────────
+          PY_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
+          for f in $PY_STAGED; do auto_fixer ruff check --fix "$f"; done
+          for f in $PY_STAGED; do auto_fixer ruff format "$f"; done
+
+          SH_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.sh$' || true)
+          for f in $SH_STAGED; do auto_fixer shfmt -w "$f"; done
+
+          # ── Phase 2: Checkers (block on failure) ────────────────────────
+          echo "" && echo "=== Pre-commit linting ==="
+
+          C_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|c|h|hpp)$' || true)
+          for f in $C_STAGED; do checker python3 scripts/lint-lp64.py --dirs "$(dirname "$f")"; done
+          for f in $C_STAGED; do checker clang-tidy -p build --quiet "$f"; done
+
+          for f in $PY_STAGED; do checker ruff check "$f"; done
+
+          YML_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.ya?ml$' || true)
+          for f in $YML_STAGED; do checker yamllint "$f"; done
+
+          for f in $SH_STAGED; do checker shellcheck "$f"; done
+
+          NIX_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.nix$' || true)
+          for f in $NIX_STAGED; do checker nixfmt --check "$f"; done
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "" && echo "✗ $ERRORS lint error(s) — commit blocked. Re-stage auto-fixed files and retry."
+            exit 1
+          fi
+          PREHOOK
+            chmod +x "$HOOK"
+            echo "Installed git pre-commit hook for linting"
+          fi
+
           echo "C&C Red Alert — dev shell"
           echo ""
           echo "Workflows (from repo root):"
           echo "  nix run .#check              toolchain prerequisites"
           echo "  nix run .#build-native       native Linux build (ra/td/both)"
           echo "  nix run .#lint               LP64 hazard audit"
+          echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
           echo "  nix run .#build-wasm         WASM build (ra/td/both)"
           echo "  nix run .#validate-wasm      WASM binary validation"
           echo "  nix run .#serve              both dev servers"
@@ -234,101 +315,39 @@
       # -----------------------------------------------------------------------
       apps.${system} = rec {
         redalert = {
-          type    = "app";
-          program = toString (pkgs.writeShellScript "run-redalert" ''
-            set -e
-            DATA_DIR="''${RA_ASSETS:-$PWD}"
-            if [ ! -f "$DATA_DIR/MAIN.MIX" ] && [ ! -f "$DATA_DIR/main.mix" ]; then
-              echo "ERROR: MAIN.MIX not found in $DATA_DIR"
-              echo "  cd /path/to/red-alert-data && nix run"
-              echo "  or set RA_ASSETS=/path/to/red-alert-data"
-              exit 1
-            fi
-            cd "$DATA_DIR"
-            exec ${self.packages.${system}.redalert}/bin/redalert "$@"
-          '');
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "run-redalert" ''
+              set -e
+              DATA_DIR="''${RA_ASSETS:-$PWD}"
+              if [ ! -f "$DATA_DIR/MAIN.MIX" ] && [ ! -f "$DATA_DIR/main.mix" ]; then
+                echo "ERROR: MAIN.MIX not found in $DATA_DIR"
+                echo "  cd /path/to/red-alert-data && nix run"
+                echo "  or set RA_ASSETS=/path/to/red-alert-data"
+                exit 1
+              fi
+              cd "$DATA_DIR"
+              exec ${self.packages.${system}.redalert}/bin/redalert "$@"
+            ''
+          );
         };
 
         tiberiandawn = {
-          type    = "app";
-          program = toString (pkgs.writeShellScript "run-tiberiandawn" ''
-            set -e
-            DATA_DIR="''${TD_ASSETS:-$PWD}"
-            if [ ! -f "$DATA_DIR/CONQUER.MIX" ] && [ ! -f "$DATA_DIR/conquer.mix" ]; then
-              echo "ERROR: CONQUER.MIX not found in $DATA_DIR"
-              echo "  cd /path/to/tiberian-dawn-data && nix run .#tiberiandawn"
-              echo "  or set TD_ASSETS=/path/to/tiberian-dawn-data"
-              exit 1
-            fi
-            cd "$DATA_DIR"
-            exec ${self.packages.${system}.tiberiandawn}/bin/tiberiandawn "$@"
-          '');
-        };
-
-        # -----------------------------------------------------------------------
-        # apps.wasm-server  —  nix run .#wasm-server
-        #
-        # Serves build-wasm/ over HTTP with the COOP + COEP headers required for
-        # SharedArrayBuffer (Emscripten pthreads / audio threading).
-        #
-        # Build the WASM bundle first:
-        #   emcmake cmake --preset wasm && cmake --build build-wasm --target ra
-        #
-        # Then start the server:
-        #   nix run .#wasm-server          # port 8080 (default)
-        #   PORT=9090 nix run .#wasm-server
-        #
-        # Acceptance check:
-        #   curl -I http://localhost:8080/ra.html | grep -E "opener-policy|embedder-policy"
-        # -----------------------------------------------------------------------
-        wasm-server = {
-          type    = "app";
-          program = toString (pkgs.writeShellScript "wasm-server" ''
-            set -e
-            WASM_DIR="''${WASM_DIR:-$PWD/build-wasm}"
-            PORT="''${PORT:-8080}"
-
-            if [ ! -f "$WASM_DIR/ra.html" ]; then
-              echo "ERROR: $WASM_DIR/ra.html not found."
-              echo "  Build the WASM bundle first:"
-              echo "    emcmake cmake --preset wasm && cmake --build build-wasm --target ra"
-              exit 1
-            fi
-
-            _NGINX_TMPDIR=$(mktemp -d)
-            trap 'rm -rf "$_NGINX_TMPDIR"' EXIT
-
-            # Write a self-contained nginx config into the tmpdir.
-            # Paths must be absolute; nginx rejects relative root values.
-            cat > "$_NGINX_TMPDIR/nginx.conf" <<NGINXCONF
-            events { worker_connections 64; }
-            http {
-              include ${pkgs.nginx}/conf/mime.types;
-              default_type application/octet-stream;
-              add_header Cross-Origin-Opener-Policy  "same-origin"  always;
-              add_header Cross-Origin-Embedder-Policy "require-corp" always;
-              types { application/wasm wasm; }
-              sendfile on;
-              server {
-                listen $PORT;
-                server_name localhost;
-                root $WASM_DIR;
-                index ra.html;
-                location / { try_files \$uri \$uri/ =404; }
-              }
-            }
-            NGINXCONF
-
-            echo "Serving WASM bundle at http://localhost:$PORT/ra.html"
-            echo "  COOP + COEP headers enabled — SharedArrayBuffer available"
-            echo "  Press Ctrl-C to stop."
-            echo ""
-            echo "  Verify headers:  curl -I http://localhost:$PORT/ra.html"
-
-            ${pkgs.nginx}/bin/nginx \
-              -c "$_NGINX_TMPDIR/nginx.conf" \
-              -g "pid $_NGINX_TMPDIR/nginx.pid; error_log /dev/stderr; daemon off;"
-          '');
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "run-tiberiandawn" ''
+              set -e
+              DATA_DIR="''${TD_ASSETS:-$PWD}"
+              if [ ! -f "$DATA_DIR/CONQUER.MIX" ] && [ ! -f "$DATA_DIR/conquer.mix" ]; then
+                echo "ERROR: CONQUER.MIX not found in $DATA_DIR"
+                echo "  cd /path/to/tiberian-dawn-data && nix run .#tiberiandawn"
+                echo "  or set TD_ASSETS=/path/to/tiberian-dawn-data"
+                exit 1
+              fi
+              cd "$DATA_DIR"
+              exec ${self.packages.${system}.tiberiandawn}/bin/tiberiandawn "$@"
+            ''
+          );
         };
 
         default = redalert;
@@ -349,6 +368,47 @@
           exec python3 scripts/lint-lp64.py --errors-only
         '';
 
+        lint-all = mkApp "lint-all" ''
+          set -e
+          echo "=== LP64 hazard audit ==="
+          python3 scripts/lint-lp64.py --errors-only
+          echo ""
+          echo "=== clang-tidy ==="
+          cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>/dev/null || true
+          find REDALERT TIBERIANDAWN -type f \
+            \! -path '*/WIN32LIB/*' \
+            \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
+            | xargs -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
+            | tee /tmp/clang-tidy-report.txt
+          echo "$(grep -c 'warning:\|error:' /tmp/clang-tidy-report.txt 2>/dev/null || echo 0) clang-tidy finding(s)"
+          echo ""
+          echo "=== cppcheck ==="
+          cppcheck --enable=warning,performance,portability,information \
+            --suppress=missingIncludeSystem \
+            --suppress=unmatchedSuppression \
+            --inline-suppr --error-exitcode=0 \
+            -j "$(nproc)" --quiet \
+            -I REDALERT -I REDALERT/WIN32LIB \
+            -I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
+            -I linux/win32-stubs \
+            REDALERT TIBERIANDAWN 2>&1 | tee /tmp/cppcheck-report.txt
+          echo "$(grep -c 'error:\|warning:' /tmp/cppcheck-report.txt 2>/dev/null || echo 0) cppcheck finding(s)"
+          echo ""
+          echo "=== Python (ruff check + format) ==="
+          ruff check scripts/ e2e/ wasm/ 2>&1 || true
+          ruff format --check --diff scripts/ e2e/ wasm/ 2>&1 || true
+          echo ""
+          echo "=== YAML (yamllint) ==="
+          yamllint .github/workflows/ 2>&1 || true
+          echo ""
+          echo "=== Shell (shellcheck + shfmt) ==="
+          find scripts/ -name '*.sh' -exec shellcheck {} + 2>&1 || true
+          find scripts/ -name '*.sh' -exec shfmt -d {} + 2>&1 || true
+          echo ""
+          echo "=== Nix (nixfmt) ==="
+          find . -name '*.nix' -not -path './build/*' -exec nixfmt --check {} + 2>&1 || true
+        '';
+
         shim = mkApp "generate-shim" ''
           exec python3 scripts/generate-include-shim.py \
             --repo-root . --shim-root build/include-shim --quiet
@@ -365,16 +425,16 @@
         '';
 
         validate-wasm = mkApp "validate-wasm" ''
-          python3 -c "
-import os, struct
-for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
-    if not os.path.exists(fn): continue
-    with open(fn,'rb') as f:
-        assert f.read(4) == b'\\x00asm', fn + ': bad magic'
-    sz = os.path.getsize(fn)
-    assert sz > 1_000_000, fn + ': too small (' + str(sz) + ' bytes)'
-    print('  ' + fn.split('/')[1] + ': ' + str(sz//1024) + ' KB OK')
-"
+                    python3 -c "
+          import os, struct
+          for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
+              if not os.path.exists(fn): continue
+              with open(fn,'rb') as f:
+                  assert f.read(4) == b'\\x00asm', fn + ': bad magic'
+              sz = os.path.getsize(fn)
+              assert sz > 1_000_000, fn + ': too small (' + str(sz) + ' bytes)'
+              print('  ' + fn.split('/')[1] + ': ' + str(sz//1024) + ' KB OK')
+          "
         '';
 
         serve-wasm = mkApp "serve-wasm" ''
@@ -422,14 +482,16 @@ for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
         screenshot = mkApp "screenshot" ''
           GAME="''${1:-ra}"
           python3 wasm/serve-coop.py 8080 build-wasm &
+          WASM_PID=$!
           if [ "$GAME" = "ra" ]; then
             python3 wasm/serve-assets.py "$RA_ASSETS" 9090 &
           else
             python3 wasm/serve-assets.py "$TD_ASSETS" 9090 &
           fi
+          ASSET_PID=$!
           sleep 2
-          npx playwright test e2e/wasm-smoke.spec.ts --grep "$GAME"
-          kill %1 %2 2>/dev/null || true
+          playwright test e2e/wasm-smoke.spec.ts --grep "$GAME"
+          kill "$WASM_PID" "$ASSET_PID" 2>/dev/null || true
         '';
 
         capture-wine = mkApp "capture-wine" ''
@@ -593,7 +655,7 @@ for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
           python3 wasm/serve-coop.py 8080 build-wasm &
           SERVER_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test \
+          DISPLAY=:99 playwright test \
             e2e/regression/T1-ra-wasm-boot.spec.ts \
             e2e/regression/T2-td-wasm-boot.spec.ts
           SMOKE_EXIT=$?
@@ -603,22 +665,22 @@ for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
         '';
 
         ci-build-wasm = mkApp "ci-build-wasm" ''
-          set -e
-          emcmake cmake --preset wasm
-          cmake --build build-wasm --target ra --parallel
-          cmake --build build-wasm --target td --parallel
-          python3 -c "
-import os, struct
-MIN_SIZE = 1_000_000
-for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
-    with open(name, 'rb') as f:
-        magic = f.read(4)
-    assert magic == b'\\x00asm', name + ': bad magic'
-    size = os.path.getsize(name)
-    assert size > MIN_SIZE, name + ': too small (' + str(size) + ' bytes < ' + str(MIN_SIZE) + ')'
-    print(name + ': ' + str(size // 1024) + ' KB OK')
-"
-          nix run .#ci-wasm-smoke
+                    set -e
+                    emcmake cmake --preset wasm
+                    cmake --build build-wasm --target ra --parallel
+                    cmake --build build-wasm --target td --parallel
+                    python3 -c "
+          import os, struct
+          MIN_SIZE = 1_000_000
+          for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
+              with open(name, 'rb') as f:
+                  magic = f.read(4)
+              assert magic == b'\\x00asm', name + ': bad magic'
+              size = os.path.getsize(name)
+              assert size > MIN_SIZE, name + ': too small (' + str(size) + ' bytes < ' + str(MIN_SIZE) + ')'
+              print(name + ': ' + str(size // 1024) + ' KB OK')
+          "
+                    nix run .#ci-wasm-smoke
         '';
 
         ci-clang-tidy = mkApp "ci-clang-tidy" ''

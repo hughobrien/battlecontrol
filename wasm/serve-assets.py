@@ -15,6 +15,7 @@ Red Alert example:
 Tiberian Dawn example:
     python3 wasm/serve-assets.py /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1 9090
 """
+
 import http.server
 import os
 import sys

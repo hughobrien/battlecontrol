@@ -28,16 +28,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # VQA files to extract (order matches boot sequence)
 VQA_FILES=(
-    "ENGLISH.VQA"   # Tank/Heli intro — Westwood + VIE logos
-    "PROLOG.VQA"    # Einstein time-travel prologue
-    "ALLY1.VQA"     # Allied Mission 1 briefing
-    "SOVIET1.VQA"   # Soviet Mission 1 briefing
-    "SOVIET2.VQA"   # Soviet Mission 2 CGI load
+	"ENGLISH.VQA" # Tank/Heli intro — Westwood + VIE logos
+	"PROLOG.VQA"  # Einstein time-travel prologue
+	"ALLY1.VQA"   # Allied Mission 1 briefing
+	"SOVIET1.VQA" # Soviet Mission 1 briefing
+	"SOVIET2.VQA" # Soviet Mission 2 CGI load
 )
 
 # ALLY1CGI.VQA may not exist (depends on MIX version); warn but don't fail
 VQA_OPTIONAL=(
-    "ALLY1CGI.VQA"
+	"ALLY1CGI.VQA"
 )
 
 echo "=== Generating VQA goldens ==="
@@ -50,44 +50,44 @@ errors=0
 generated=0
 
 for vqa in "${VQA_FILES[@]}"; do
-    stem="${vqa%.VQA}"
-    target_dir="$OUT_DIR/$stem"
-    vqa_path="$DATA_DIR/$vqa"
+	stem="${vqa%.VQA}"
+	target_dir="$OUT_DIR/$stem"
+	vqa_path="$DATA_DIR/$vqa"
 
-    if [[ ! -f "$vqa_path" ]]; then
-        echo "MISSING: $vqa_path — skipping $stem"
-        errors=$((errors + 1))
-        continue
-    fi
+	if [[ ! -f "$vqa_path" ]]; then
+		echo "MISSING: $vqa_path — skipping $stem"
+		errors=$((errors + 1))
+		continue
+	fi
 
-    echo "--- $stem ---"
-    if python3 "$SCRIPT_DIR/gen-vqa-golden.py" "$vqa_path" "$target_dir" "$FRAMES"; then
-        generated=$((generated + 1))
-    else
-        echo "  FAIL: $stem"
-        errors=$((errors + 1))
-    fi
-    echo ""
+	echo "--- $stem ---"
+	if python3 "$SCRIPT_DIR/gen-vqa-golden.py" "$vqa_path" "$target_dir" "$FRAMES"; then
+		generated=$((generated + 1))
+	else
+		echo "  FAIL: $stem"
+		errors=$((errors + 1))
+	fi
+	echo ""
 done
 
 # Optional VQA files
 for vqa in "${VQA_OPTIONAL[@]}"; do
-    stem="${vqa%.VQA}"
-    target_dir="$OUT_DIR/$stem"
-    vqa_path="$DATA_DIR/$vqa"
+	stem="${vqa%.VQA}"
+	target_dir="$OUT_DIR/$stem"
+	vqa_path="$DATA_DIR/$vqa"
 
-    if [[ ! -f "$vqa_path" ]]; then
-        echo "OPT: $vqa_path not found — skipping $stem"
-        continue
-    fi
+	if [[ ! -f "$vqa_path" ]]; then
+		echo "OPT: $vqa_path not found — skipping $stem"
+		continue
+	fi
 
-    echo "--- $stem ---"
-    if python3 "$SCRIPT_DIR/gen-vqa-golden.py" "$vqa_path" "$target_dir" "$FRAMES"; then
-        generated=$((generated + 1))
-    else
-        echo "  FAIL: $stem (optional)"
-    fi
-    echo ""
+	echo "--- $stem ---"
+	if python3 "$SCRIPT_DIR/gen-vqa-golden.py" "$vqa_path" "$target_dir" "$FRAMES"; then
+		generated=$((generated + 1))
+	else
+		echo "  FAIL: $stem (optional)"
+	fi
+	echo ""
 done
 
 echo "=== Done ==="
@@ -95,6 +95,6 @@ echo "  generated: $generated"
 echo "  errors:    $errors"
 
 if [[ $errors -gt 0 ]]; then
-    exit 1
+	exit 1
 fi
 exit 0

@@ -29,16 +29,16 @@ import shutil
 
 # Patch site: file offset where "CD1\0" begins in DGROUP
 PATCH_OFFSET = 0x1BFCB7
-OLD_BYTE = ord('C')   # 0x43
+OLD_BYTE = ord("C")  # 0x43
 NEW_BYTE = 0x00
 
 # Guard: the four bytes at PATCH_OFFSET should be "CD1\0"
-GUARD_BYTES = b'CD1\x00'
+GUARD_BYTES = b"CD1\x00"
 
 # Known-good input SHA-256 prefixes (first 8 hex chars)
 ACCEPTED_INPUT_PREFIXES = {
-    "4f3156f7",   # probe-skip + game-in-focus-pin
-    "b00745c2",   # probe-skip only (for direct application in diag harness)
+    "4f3156f7",  # probe-skip + game-in-focus-pin
+    "b00745c2",  # probe-skip only (for direct application in diag harness)
 }
 
 
@@ -47,7 +47,7 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
@@ -59,9 +59,11 @@ def patch(path: str) -> int:
         return 0
 
     # Verify guard bytes
-    if bytes(data[PATCH_OFFSET:PATCH_OFFSET + 4]) != GUARD_BYTES:
-        print(f"ERROR: guard bytes at 0x{PATCH_OFFSET:x} unexpected: "
-              f"{bytes(data[PATCH_OFFSET:PATCH_OFFSET+4])!r}")
+    if bytes(data[PATCH_OFFSET : PATCH_OFFSET + 4]) != GUARD_BYTES:
+        print(
+            f"ERROR: guard bytes at 0x{PATCH_OFFSET:x} unexpected: "
+            f"{bytes(data[PATCH_OFFSET : PATCH_OFFSET + 4])!r}"
+        )
         print(f"       expected: {GUARD_BYTES!r}")
         return 1
 
@@ -70,14 +72,14 @@ def patch(path: str) -> int:
 
     # Backup
     backup = path + ".cdlabel_orig"
-    if not __import__('os').path.exists(backup):
+    if not __import__("os").path.exists(backup):
         shutil.copy2(path, backup)
         print(f"  Backup: {backup}")
 
     # Apply patch
     data[PATCH_OFFSET] = NEW_BYTE
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))

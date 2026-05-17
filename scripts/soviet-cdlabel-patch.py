@@ -35,18 +35,18 @@ import hashlib
 import os
 import shutil
 
-PATCH_OFFSET = 0x1BFCBB         # First byte of "CD2"
-OLD_BYTE     = ord('C')         # 0x43
-NEW_BYTE     = 0x00
+PATCH_OFFSET = 0x1BFCBB  # First byte of "CD2"
+OLD_BYTE = ord("C")  # 0x43
+NEW_BYTE = 0x00
 
 # Guard: ensure we're at the start of "CD2\0" and "CD1\0" still precedes it
-GUARD_BYTES_AT_CD1 = b'CD1\x00'
-GUARD_BYTES_AT_CD2 = b'CD2\x00'
-CD1_OFFSET         = 0x1BFCB7
+GUARD_BYTES_AT_CD1 = b"CD1\x00"
+GUARD_BYTES_AT_CD2 = b"CD2\x00"
+CD1_OFFSET = 0x1BFCB7
 
 ACCEPTED_INPUT_PREFIXES = {
-    "4f3156f7",   # focus-skip + game-in-focus-pin
-    "b00745c2",   # focus-skip only
+    "4f3156f7",  # focus-skip + game-in-focus-pin
+    "b00745c2",  # focus-skip only
 }
 
 
@@ -55,29 +55,31 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
     digest8 = digest[:8]
 
     # Idempotency: already patched if first byte of CD2 is null
-    if data[PATCH_OFFSET] == NEW_BYTE and data[CD1_OFFSET] == ord('C'):
+    if data[PATCH_OFFSET] == NEW_BYTE and data[CD1_OFFSET] == ord("C"):
         print(f"{path}: soviet cd-label patch already applied — skipping")
         return 0
 
     # Refuse to run on a binary that already had the Allied cdlabel-patch
     # applied (CD1[0] zeroed) — that would leave both labels empty and the
     # game would still launch Allied L1 (first match wins).
-    if data[CD1_OFFSET] != ord('C'):
-        print(f"ERROR: CD1 label at 0x{CD1_OFFSET:x} already zeroed — the "
-              f"Allied cdlabel-patch was applied first.  Restore from .cdlabel_orig "
-              f"backup and apply soviet-cdlabel-patch alone.")
+    if data[CD1_OFFSET] != ord("C"):
+        print(
+            f"ERROR: CD1 label at 0x{CD1_OFFSET:x} already zeroed — the "
+            f"Allied cdlabel-patch was applied first.  Restore from .cdlabel_orig "
+            f"backup and apply soviet-cdlabel-patch alone."
+        )
         return 1
 
     # Verify guard bytes at both sites
-    cd1_bytes = bytes(data[CD1_OFFSET:CD1_OFFSET + 4])
-    cd2_bytes = bytes(data[PATCH_OFFSET:PATCH_OFFSET + 4])
+    cd1_bytes = bytes(data[CD1_OFFSET : CD1_OFFSET + 4])
+    cd2_bytes = bytes(data[PATCH_OFFSET : PATCH_OFFSET + 4])
     if cd1_bytes != GUARD_BYTES_AT_CD1:
         print(f"ERROR: CD1 guard at 0x{CD1_OFFSET:x} unexpected: {cd1_bytes!r}")
         return 1
@@ -95,7 +97,7 @@ def patch(path: str) -> int:
 
     data[PATCH_OFFSET] = NEW_BYTE
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))

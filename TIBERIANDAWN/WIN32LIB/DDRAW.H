@@ -111,7 +111,7 @@ typedef struct _DDSURFACEDESC           FAR *LPDDSURFACEDESC;
 #define DDCREATE_EMULATIONONLY          0x00000002l
 
 #ifdef WINNT
-typedef long HRESULT;
+typedef int32_t HRESULT;
 #endif
 
 //#ifndef WINNT

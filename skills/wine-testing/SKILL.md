@@ -1,7 +1,7 @@
 ---
 name: wine-testing
 description: Use when running original Win32 C&C Red Alert (RA95.EXE) or Tiberian Dawn (C&C95.EXE) under Wine for baseline comparison against native/WASM ports. Trigger on symptoms like Wine prefix failures, DirectDraw rendering blank, DirectSound dialog blocking automation, xdotool timing races, screenshot capture returning blank images, or CI Wine job skipping unexpectedly.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Wine Testing Skill
@@ -58,10 +58,21 @@ wine --version 2>&1 | grep -v "wine32 is missing"
 WINEPREFIX="$HOME/.wine-ra" WINEARCH=win32 WINEDEBUG=-all wineboot --init
 ```
 
-If prefix creation hangs, delete the corrupted prefix and retry:
+**Corrupted prefix recovery:** If the game launches but screenshots are blank,
+garbled, or the prefix creation hangs:
+
 ```bash
+# Inspect current prefix state
+WINEPREFIX="$HOME/.wine-ra" winecfg    # check DLL overrides
+WINEPREFIX="$HOME/.wine-ra" wine reg query 'HKCU\Software\Wine\Direct3D'  # check renderer
+
+# If corrupt: delete and recreate
 rm -rf "$HOME/.wine-ra"
+WINEPREFIX="$HOME/.wine-ra" WINEARCH=win32 WINEDEBUG=-all wineboot --init
 ```
+
+**CI note:** CI runners use a fresh prefix per job (ephemeral), so corruption
+is rarely an issue in CI. Local prefixes accumulate state across runs.
 
 ---
 
@@ -147,7 +158,7 @@ Xvfb :98 -screen 0 640x480x24 -ac &   # RA: 24-bit
 ## §2.5 — EXE and DLL prerequisites
 
 **RA95.EXE** (Red Alert):
-- SHA-256: `a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55`
+- SHA-256: see `scripts/wine-exe-hashes.json` (stored in a standalone config file)
 - Source: `redalert_allied.iso` from archive.org, LBA 45220, size 2,181,632 bytes
 - Required DLLs: `THIPX32.DLL`, `THIPX16.DLL` (from same ISO)
 
@@ -157,6 +168,12 @@ Xvfb :98 -screen 0 640x480x24 -ac &   # RA: 24-bit
 
 Use `scripts/wine-ra-setup.sh` and `scripts/wine-td-setup.sh` for first-time setup.
 These download, verify SHA-256, and stage everything needed.
+
+**Updating EXE hashes:** If the source ISO changes, update the hash config:
+```bash
+sha256sum /path/to/RA95.EXE
+# Edit scripts/wine-exe-hashes.json with the new hash
+```
 
 ---
 

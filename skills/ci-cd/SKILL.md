@@ -1,7 +1,7 @@
 ---
 name: ci-cd
 description: Use when working on CI/CD pipelines, GitHub Actions workflows, release automation, or artifact publishing for C&C Red Alert + Tiberian Dawn native and WASM builds. Trigger on symptoms like CI job failures, release workflow not attaching artifacts, gh-pages deploy not updating, WASM binary validation failing, ccache not hitting, or regression tiers regressing.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # CI/CD Pipeline Skill
@@ -169,7 +169,118 @@ regardless of subsequent pushes).
 
 ---
 
-## §7 — Adding a new regression tier
+## §7 — Designing new CI jobs
+
+### When to use a matrix job vs a sequential step
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Same build with different compilers (gcc, clang) | Matrix job — parallel, independent |
+| Build → test → deploy pipeline | Sequential steps in one job — cheaper than fan-out |
+| Build for multiple targets (native, WASM) | Separate jobs — different runner requirements |
+| Release with parallel builds + single aggregation | Fan-out jobs + `needs` fan-in job |
+
+### Setting timeouts
+
+Base timeouts on historical run durations (check `gh run view`):
+```yaml
+jobs:
+  build:
+    timeout-minutes: 30  # native build ~12 min on 4-core runner
+```
+| Job type | Typical duration | Recommended timeout |
+|----------|-----------------|-------------------|
+| Native build (gcc/clang) | 8–15 min | 30 min |
+| WASM build | 5–10 min | 20 min |
+| WASM smoke tests | 3–8 min | 20 min |
+| Wine comparison | 5–12 min | 20 min |
+| VQA pixel-diff | 1–3 min | 10 min |
+
+### Cancellation strategy
+
+`ci.yml` uses `cancel-in-progress: true` to save runner minutes on stacked PRs.
+`gh-pages.yml` and `release.yml` do NOT — they must complete regardless of
+subsequent pushes.
+
+---
+
+## §8 — Flaky-test triage
+
+### Identifying flaky steps
+
+```bash
+# Re-run a specific job to check consistency
+gh run rerun <run-id> --job <job-id>
+
+# Or run a failing test with --repeat-each locally
+npx playwright test --repeat-each 3 e2e/regression/T1-ra-wasm-boot.spec.ts
+```
+
+### Common flakiness patterns
+
+| Pattern | Symptom | Fix |
+|---------|---------|-----|
+| WASM JIT cold-start | T1/T2 pass 50% of time | Increase `waitForFunction` timeout to 300s |
+| Audio timing race | Audio pitch probe passes ~60% | Apply 5/5 cold-cache rule; add retry |
+| Asset server race | Game loads blank if assets not ready | Add `waitForResponse` before interaction |
+| Xvfb display collision | `xdpyinfo` fails intermittently | Use `skill-xvfb-ensure.sh` (idempotent) |
+
+### Mitigation techniques
+
+```yaml
+# In CI workflow: retry the flaky step once
+- name: WASM smoke test
+  uses: nick-fields/retry@v3
+  with:
+    timeout_minutes: 10
+    max_attempts: 2
+    command: bash scripts/skill-run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+```
+
+Before adding retries, try fixing the root cause. Retry should be a last resort.
+
+---
+
+## §9 — Artifact debugging
+
+When CI fails but you can't reproduce locally, download the job artifacts:
+
+```bash
+# List artifacts for a run
+gh run view <run-id> --json 'headBranch,status'
+
+# Download specific artifact
+gh run download <run-id> -n build-wasm -D /tmp/wasm-artifact
+
+# Download all artifacts
+gh run download <run-id>
+```
+
+### Inspecting CI screenshots
+
+Screenshots are uploaded as `e2e/screenshots/tim{N}-{description}.png` on failure.
+Download and inspect:
+```bash
+gh run download <run-id> -n t1-boot-screenshots
+ls t1-boot-screenshots/
+# Open PNG locally or upload to an image viewer
+```
+
+### CI runner debugging
+
+For runner-level issues (disk space, Docker daemon):
+```yaml
+- name: Debug runner
+  run: |
+    df -h
+    free -m
+    nproc
+    cat /proc/cpuinfo | grep 'model name' | head -1
+```
+
+---
+
+## §10 — Adding a new regression tier
 
 1. Write the test following `docs/smoke-test-design-rule.md`
 2. Add it to `gh-pages.yml` as a new step under the "Playwright tests" section.
@@ -191,7 +302,7 @@ regardless of subsequent pushes).
 
 ---
 
-## §8 — Verification bar
+## §11 — Verification bar
 
 | Gate | How | Expected |
 |------|-----|----------|

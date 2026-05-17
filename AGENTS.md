@@ -7,6 +7,117 @@ It covers the quickstart, canonical build/test commands, the change cycle, and t
 skill index. For deep architecture, see `ARCH.md`. For human-facing docs, see
 `README.md`.
 
+## ⚠️ Prerequisite: Enable Nix experimental features
+
+Before running any Nix commands, enable the required experimental features:
+
+```bash
+mkdir -p ~/.config/nix
+cat >> ~/.config/nix/nix.conf << 'EOF'
+experimental-features = nix-command flakes
+EOF
+```
+
+This lets you omit `--extra-experimental-features` from every Nix invocation.
+
+## ⚠️ Critical: Verify you are inside `nix develop`
+
+Every `git commit`, build command, test runner, linter, or script invocation in
+this project **must** be run inside the Nix development shell. Outside the shell,
+tools like `nixfmt`, `clang-tidy`, `shfmt`, `yamllint`, and `ruff` are not on PATH.
+The pre-commit hook will fail with cryptic errors.
+
+### Agent self-check block
+
+> **Agent instructions:** At startup, check `$IN_NIX_SHELL`. If it is empty or unset,
+> print the message below to the user and stop. Do not attempt to run any commands.
+
+```bash
+if [[ -z "${IN_NIX_SHELL:-}" ]]; then
+  echo ""
+  echo "============================================"
+  echo " ERROR: Not inside nix develop shell"
+  echo "============================================"
+  echo " Reinvoke the agent with:"
+  echo ""
+  echo "   nix develop --command <agent-name>"
+  echo ""
+  echo " Example:"
+  echo "   nix develop --command pi"
+  echo "   nix develop --command claude"
+  echo "   nix develop --command aider"
+  echo "============================================"
+  exit 1
+fi
+```
+
+### Verify before proceeding
+
+Once inside the dev shell, verify everything is available:
+
+```bash
+echo "IN_NIX_SHELL=$IN_NIX_SHELL"
+```
+
+Should print `IN_NIX_SHELL=1` (or another non-empty value). If it does, proceed.
+
+### Correct
+
+Once inside the dev shell, run commands directly — no `nix develop --command` wrapper needed:
+
+```bash
+git commit -m "..."
+nix run .#lint-all
+python3 scripts/lint-lp64.py
+```
+
+### Common mistakes
+
+| ❌ Wrong | ✅ Correct |
+|----------|-----------|
+| `nix develop --command git commit ...` (unnecessary wrapper) | `git commit ...` |
+| Running outside dev shell — tools missing from PATH | Enter `nix develop` first |
+
+> The extension tools (e.g. `native_build`, `wasm_build`, `run_e2e_test`) also
+> expect to run inside the dev shell and do not wrap themselves.
+
+## ⚠️ After every PR: always enable automerge
+
+Every pull request **must** have automerge enabled immediately after creation:
+
+```bash
+gh pr merge --auto --merge
+```
+
+This is step 5 in the Done workflow below. Never merge manually. If CI fails,
+automerge will wait until it passes. If CI is green, the PR merges automatically.
+
+---
+
+## ⚠️ Before every push: run `ci_local` first
+
+**GitHub CI is slow (5–15 min per job).** Always run the full CI gate locally
+before pushing to catch failures instantly:
+
+```bash
+nix run .#ci
+```
+
+Or use the extension tool:
+
+```
+ci_local()
+```
+
+This runs every available gate: native build, WASM build, LP64 audit, VQA
+pixel-diff, include shim, WASM validate. It auto-skips gates with missing
+dependencies (e.g., no emcmake = WASM skipped), so it's safe to run anywhere.
+
+> **Never push without running `ci_local` first.** A 30-second local check
+> saves 15 minutes of CI wait-and-retry.
+
+---
+
 ## How to Make Progress
 
 1. Choose a mission not already marked done (see `TODO.md`).
@@ -104,8 +215,13 @@ The standard loop for an agent working on a fix:
 3. LP64 audit  → nix run .#lint
 4. Smoke test  → run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
 5. Commit      → git commit -m "short imperative subject"
-6. Push        → git push
+6. CI check    → ci_local()  # ⚠️ run full CI locally before pushing
+7. Push        → git push
+8. Automerge   → gh pr merge --auto --merge
 ```
+
+> **Step 6 is mandatory.** Never skip local CI. GitHub CI takes 5–15 minutes;
+> `ci_local()` catches the same failures in ~30 seconds.
 
 If the change touches rendering or palette paths, add a parity check:
 
@@ -251,6 +367,8 @@ Each skill lists which extension tools apply.
 | VQA codec | `skills/vqa-codec/` | `vqa_pixel_diff` | Block corruption, palette errors, CI failure |
 | Parity comparison | `skills/parity-comparison/` | `data_verify`, `wine_capture`, `parity_compare`, `vqa_pixel_diff` | SSIM regression, parity failure |
 | CI/CD | `skills/ci-cd/` | `wasm_build`, `wasm_validate`, `native_build`, `run_e2e_test` | CI failure, release broken, deploy stuck |
+| GHA updater | `skills/gha-updater/` | — | Stale action versions, Node.js deprecation warnings |
+| Nix shell escaping | `skills/nix-shell-escaping/` | — | nix-shell quoting errors, variable expansion traps |
 
 Each skill has a symptom-classification table and diagnostic procedures.
 
@@ -285,6 +403,10 @@ Things an agent must never break:
 
 7. **Include shim regeneration.** After adding a new `#include` to any .CPP file,
    run `nix run .#shim`.
+
+8. **Never use `git add -A` (or `git add .` / `git add --all`).** Always stage
+   specific files with explicit paths. Blind `-A` picks up unrelated changes and
+   risks committing garbage (node_modules/ logs, build artifacts, generated files).
 
 ---
 
@@ -411,9 +533,12 @@ gh pr create --repo hughobrien/battlecontrol \
   --body "Closes TIM-{id}" \
   --base master
 
-# 5. Enable automerge
+# 5. Enable automerge ⚠️ **REQUIRED** — never skip this step
 gh pr merge --auto --merge
 ```
+
+> **Automerge is mandatory.** If CI is green, the PR merges automatically.
+> If CI is red, it waits until CI passes. Never merge manually.
 
 Then exit the worktree **keeping** the branch:
 
