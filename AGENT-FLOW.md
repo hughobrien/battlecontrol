@@ -157,7 +157,7 @@ A script that runs the full CI pipeline locally, respecting what's available:
 # Exit code: 0 = all available gates pass, 1 = one or more failed.
 #
 # Gates (auto-skip if deps missing):
-#   G1: Native build (ra + td)           requires: g++, cmake, ninja, SDL2
+#   G1: Native build (ra + td)           requires: cmake, ninja, SDL2
 #   G2: LP64 audit                       requires: python3
 #   G3: WASM build + smoke (ra.wasm)     requires: emsdk
 #   G4: WASM build + smoke (td.wasm)     requires: emsdk

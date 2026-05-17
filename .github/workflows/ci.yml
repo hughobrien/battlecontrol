@@ -98,18 +98,6 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Enable Corepack for pnpm
-        run: corepack enable
-
-      - uses: actions/setup-node@v6.4.0
-        with:
-          node-version: '24'
-
-      - name: Install Playwright and browsers
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm exec playwright install --with-deps chromium
-
       - name: Install Wine32 + system tools
         run: |
           sudo dpkg --add-architecture i386
@@ -155,7 +143,7 @@ jobs:
             if xdpyinfo -display :99 >/dev/null 2>&1; then break; fi
             sleep 0.5
           done
-          npx playwright test e2e/tim699-ra-compare.spec.ts \
+          nix develop --command playwright test e2e/tim699-ra-compare.spec.ts \
             --grep "Tier 1|Tier 3" --reporter=line
           PW_EXIT=$?
           kill "$XVFB_PID" 2>/dev/null || true
@@ -201,19 +189,6 @@ jobs:
           restore-keys: |
             emcc-cache-5.0.6-
 
-      - name: Enable Corepack for pnpm
-        run: corepack enable
-
-      - uses: actions/setup-node@v6.4.0
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-
-      - name: Install Playwright and browsers
-        run: |
-          pnpm install --frozen-lockfile
-          npx playwright install --with-deps chromium
-
       - name: Build WASM + validate + smoke (T1/T2)
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
@@ -235,7 +210,7 @@ jobs:
           sleep 2
           python3 wasm/serve-coop.py &
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T3-td-wasm-menu.spec.ts
+          DISPLAY=:99 nix develop --command playwright test e2e/regression/T3-td-wasm-menu.spec.ts
 
       - name: Upload T3 artifacts on failure
         if: failure()
@@ -256,7 +231,7 @@ jobs:
           sleep 2
           python3 wasm/serve-coop.py &
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T6-td-wasm-mission-start.spec.ts
+          DISPLAY=:99 nix develop --command playwright test e2e/regression/T6-td-wasm-mission-start.spec.ts
 
       - name: Upload T6 artifacts on failure
         if: failure()
@@ -277,7 +252,7 @@ jobs:
           sleep 2
           python3 wasm/serve-coop.py &
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T7-td-audio-pitch.spec.ts
+          DISPLAY=:99 nix develop --command playwright test e2e/regression/T7-td-audio-pitch.spec.ts
 
       - name: Upload T7 artifacts on failure
         if: failure()
@@ -298,7 +273,7 @@ jobs:
           sleep 2
           python3 wasm/serve-coop.py &
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T8-ra-audio-pitch.spec.ts
+          DISPLAY=:99 nix develop --command playwright test e2e/regression/T8-ra-audio-pitch.spec.ts
 
       - name: Upload T8 artifacts on failure
         if: failure()
@@ -319,7 +294,7 @@ jobs:
           sleep 2
           python3 wasm/serve-coop.py &
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T9-ra-wasm-mission-start.spec.ts
+          DISPLAY=:99 nix develop --command playwright test e2e/regression/T9-ra-wasm-mission-start.spec.ts
 
       - name: Upload T9 artifacts on failure
         if: failure()
