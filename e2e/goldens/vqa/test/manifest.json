@@ -1,0 +1,21 @@
+{
+  "file": "test.vqa",
+  "total_frames": 3,
+  "extracted": [
+    {
+      "index": 0,
+      "frame_num": 1,
+      "path": "e2e/goldens/vqa/test/frame_0001.png"
+    },
+    {
+      "index": 1,
+      "frame_num": 2,
+      "path": "e2e/goldens/vqa/test/frame_0002.png"
+    },
+    {
+      "index": 2,
+      "frame_num": 3,
+      "path": "e2e/goldens/vqa/test/frame_0003.png"
+    }
+  ]
+}
