@@ -32,10 +32,10 @@ PATCH_OFFSETS = [
     0x1C08B9,
     0x1C08D1,
 ]
-OLD_BYTE = ord('1')
-NEW_BYTE = ord('2')
+OLD_BYTE = ord("1")
+NEW_BYTE = ord("2")
 
-GUARD = b'SCU01EA.INI'
+GUARD = b"SCU01EA.INI"
 
 ACCEPTED_INPUT_PREFIXES = {
     "4f3156f7",
@@ -53,20 +53,20 @@ def guard_offsets(data: bytearray):
         start = off - 4
         if start < 0 or start + len(GUARD) > len(data):
             return False
-        if bytes(data[start:start + len(GUARD)]) != GUARD:
+        if bytes(data[start : start + len(GUARD)]) != GUARD:
             return False
     return True
 
 
 def patch(path: str) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
     digest8 = digest[:8]
 
     if not guard_offsets(data):
-        print(f"ERROR: guard bytes do not match at one or more patch sites")
+        print("ERROR: guard bytes do not match at one or more patch sites")
         return 1
 
     if data[PATCH_OFFSETS[0]] == NEW_BYTE and data[PATCH_OFFSETS[1]] == NEW_BYTE:
@@ -74,7 +74,9 @@ def patch(path: str) -> int:
         return 0
 
     if digest8 not in ACCEPTED_INPUT_PREFIXES:
-        print(f"WARN: input SHA-256 {digest8}... not in accepted list -- patching anyway")
+        print(
+            f"WARN: input SHA-256 {digest8}... not in accepted list -- patching anyway"
+        )
 
     backup = path + ".soviet_m2_orig"
     if not os.path.exists(backup):
@@ -84,7 +86,7 @@ def patch(path: str) -> int:
     for off in PATCH_OFFSETS:
         data[off] = NEW_BYTE
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))

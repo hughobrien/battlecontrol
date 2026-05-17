@@ -60,7 +60,9 @@ GAME_CONFIGS = [
 SOURCE_GLOBS = ["*.cpp", "*.CPP", "*.c", "*.C", "*.h", "*.H", "*.inl", "*.INL"]
 
 
-def collect_source_files(repo_root: Path, scan_targets: list[tuple[str, str]]) -> list[Path]:
+def collect_source_files(
+    repo_root: Path, scan_targets: list[tuple[str, str]]
+) -> list[Path]:
     files: list[Path] = []
     for scan_dir, _ in scan_targets:
         base = repo_root / scan_dir
@@ -84,7 +86,9 @@ def collect_includes(source_files: list[Path]) -> set[str]:
     return seen
 
 
-def build_resolve_index(repo_root: Path, resolve_dirs: list[str]) -> dict[str, list[Path]]:
+def build_resolve_index(
+    repo_root: Path, resolve_dirs: list[str]
+) -> dict[str, list[Path]]:
     """Map lowercased basename -> list of real paths (case-preserving)."""
     index: dict[str, list[Path]] = {}
     for rel in resolve_dirs:
@@ -99,7 +103,9 @@ def build_resolve_index(repo_root: Path, resolve_dirs: list[str]) -> dict[str, l
     return index
 
 
-def shim_dir_for(resolved: Path, shim_root: Path, shim_map: dict[str, str]) -> Path | None:
+def shim_dir_for(
+    resolved: Path, shim_root: Path, shim_map: dict[str, str]
+) -> Path | None:
     """Return the shim subdir for a resolved header path, using the game's shim_map.
 
     The map key is the resolved file's parent directory name (uppercased).
@@ -170,7 +176,11 @@ def process_game(repo_root: Path, shim_root: Path, config: dict, quiet: bool) ->
         # Play_Sample, SFX_Type, Sample_Type consumed by the only include site
         # (REDALERT/WIN32LIB/WWLIB32.H:51).
         real_path = candidates[0]
-        if game_name == "redalert" and basename.lower() == "audio.h" and len(candidates) > 1:
+        if (
+            game_name == "redalert"
+            and basename.lower() == "audio.h"
+            and len(candidates) > 1
+        ):
             for c in candidates:
                 if c.parent.name.upper() == "WIN32LIB":
                     real_path = c
@@ -203,8 +213,10 @@ def process_game(repo_root: Path, shim_root: Path, config: dict, quiet: bool) ->
     if not quiet:
         print(f"shim[{game_name}]: created {created} symlinks under {shim_root}")
         if skipped:
-            print(f"shim[{game_name}]: {len(skipped)} include(s) not resolved (likely "
-                  f"system / Win32 — handled by stubs):")
+            print(
+                f"shim[{game_name}]: {len(skipped)} include(s) not resolved (likely "
+                f"system / Win32 — handled by stubs):"
+            )
             for s in skipped[:10]:
                 print(f"  {s}")
             if len(skipped) > 10:
@@ -216,10 +228,15 @@ def process_game(repo_root: Path, shim_root: Path, config: dict, quiet: bool) ->
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", required=True, type=Path)
-    ap.add_argument("--shim-root", required=True, type=Path,
-                    help="Output dir, e.g. build/include-shim")
-    ap.add_argument("--clean", action="store_true",
-                    help="Remove the shim root before regenerating")
+    ap.add_argument(
+        "--shim-root",
+        required=True,
+        type=Path,
+        help="Output dir, e.g. build/include-shim",
+    )
+    ap.add_argument(
+        "--clean", action="store_true", help="Remove the shim root before regenerating"
+    )
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 

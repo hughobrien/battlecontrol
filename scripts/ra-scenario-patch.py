@@ -33,28 +33,30 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, new_scenario: str) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     new_scenario = new_scenario.upper().strip()
-    if not new_scenario.endswith('.INI'):
-        new_scenario += '.INI'
+    if not new_scenario.endswith(".INI"):
+        new_scenario += ".INI"
     if len(new_scenario) > 12:
         print(f"ERROR: scenario name too long: '{new_scenario}' (max 12 chars)")
         return 1
-    new_scenario = new_scenario.ljust(12, '\x00')
-    new_bytes = new_scenario.encode('ascii')[:12]
+    new_scenario = new_scenario.ljust(12, "\x00")
+    new_bytes = new_scenario.encode("ascii")[:12]
 
     # Determine source string: "SCG01EA.INI" or "SCU01EA.INI"
-    if new_bytes[:2] == b'SC':
+    if new_bytes[:2] == b"SC":
         faction = new_bytes[2:3].decode()
-        if faction in ('G', 'U'):
-            source_str = f"SC{faction}01EA.INI\x00".encode('ascii')
+        if faction in ("G", "U"):
+            source_str = f"SC{faction}01EA.INI\x00".encode("ascii")
         else:
             print(f"ERROR: unexpected faction prefix 'SC{faction}'")
             return 1
     else:
-        print(f"ERROR: scenario must start with 'SCG' or 'SCU', got '{new_scenario.strip()}'")
+        print(
+            f"ERROR: scenario must start with 'SCG' or 'SCU', got '{new_scenario.strip()}'"
+        )
         return 1
 
     # Replace all occurrences so every code path loads the target.
@@ -64,7 +66,7 @@ def patch(path: str, new_scenario: str) -> int:
         offset = data.find(source_str, offset)
         if offset < 0:
             break
-        data[offset:offset + 12] = new_bytes
+        data[offset : offset + 12] = new_bytes
         occurrence_count += 1
         offset += 1
 
@@ -78,14 +80,16 @@ def patch(path: str, new_scenario: str) -> int:
         shutil.copy2(path, backup)
         print(f"  Backup: {backup}")
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))
-    old_label = source_str.decode('ascii').rstrip('\x00')
-    new_label = new_bytes.decode('ascii').rstrip('\x00')
+    old_label = source_str.decode("ascii").rstrip("\x00")
+    new_label = new_bytes.decode("ascii").rstrip("\x00")
     print(f"{path}: scenario patch applied: {old_label} -> {new_label}")
-    print(f"  replaced {occurrence_count} occurrence(s), new SHA-256: {out_digest[:16]}...")
+    print(
+        f"  replaced {occurrence_count} occurrence(s), new SHA-256: {out_digest[:16]}..."
+    )
     return 0
 
 
@@ -100,13 +104,19 @@ def restore(path: str) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('exe_path', help='Path to RA95.EXE')
-    ap.add_argument('scenario', nargs='?', default=None,
-                    help='Target scenario name (e.g. SCG02EA, SCU02EA)')
-    ap.add_argument('--restore', action='store_true',
-                    help='Restore from .scenario_orig backup')
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument("exe_path", help="Path to RA95.EXE")
+    ap.add_argument(
+        "scenario",
+        nargs="?",
+        default=None,
+        help="Target scenario name (e.g. SCG02EA, SCU02EA)",
+    )
+    ap.add_argument(
+        "--restore", action="store_true", help="Restore from .scenario_orig backup"
+    )
     args = ap.parse_args()
 
     if args.restore:

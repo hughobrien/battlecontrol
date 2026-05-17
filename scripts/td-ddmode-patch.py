@@ -38,11 +38,12 @@ Expected input SHA-256 (C&C95.EXE after TIM-743 patch chain):
 Expected output SHA-256:
   46dc1eb4a81143610161e4f1930aec7a95a76f0b367e99454d08b01a6a3ccc9c
 """
+
 import sys
 import hashlib
 import shutil
 
-INPUT_SHA256   = "46a6d902963e4f613d550704877f4abae173b4c2e43d6a478518b2fba6fcda4a"
+INPUT_SHA256 = "46a6d902963e4f613d550704877f4abae173b4c2e43d6a478518b2fba6fcda4a"
 PATCHED_SHA256 = "46dc1eb4a81143610161e4f1930aec7a95a76f0b367e99454d08b01a6a3ccc9c"
 
 # (offset, original_byte, patched_byte, description)
@@ -51,21 +52,21 @@ SITES = [
     # Without these NOPs, the callee stack-cleanup (ret 16) is never executed
     # and the function's epilog returns to address 0x190 (= height 400 pushed
     # as arg) instead of the real caller — a guaranteed crash.
-    (0xbc6c3, 0x57, 0x90, "NOP push %edi (bpp arg to SetDisplayMode)"),
-    (0xbc6c8, 0x51, 0x90, "NOP push %ecx (height arg to SetDisplayMode)"),
-    (0xbc6ce, 0x56, 0x90, "NOP push %esi (width arg to SetDisplayMode)"),
-    (0xbc6d1, 0x50, 0x90, "NOP push %eax (this/IDirectDraw* arg)"),
+    (0xBC6C3, 0x57, 0x90, "NOP push %edi (bpp arg to SetDisplayMode)"),
+    (0xBC6C8, 0x51, 0x90, "NOP push %ecx (height arg to SetDisplayMode)"),
+    (0xBC6CE, 0x56, 0x90, "NOP push %esi (width arg to SetDisplayMode)"),
+    (0xBC6D1, 0x50, 0x90, "NOP push %eax (this/IDirectDraw* arg)"),
     # Stub SetDisplayMode call as 'xor eax,eax; nop' so Wine never invokes
     # NtUserChangeDisplaySettings (which Xvfb refuses) and init continues.
-    (0xbc6d2, 0xff, 0x31, "SetDisplayMode call -> xor eax,eax (fake DD_OK)"),
-    (0xbc6d3, 0x53, 0xc0, "SetDisplayMode call -> xor eax,eax (cont)"),
-    (0xbc6d4, 0x54, 0x90, "SetDisplayMode call -> nop"),
+    (0xBC6D2, 0xFF, 0x31, "SetDisplayMode call -> xor eax,eax (fake DD_OK)"),
+    (0xBC6D3, 0x53, 0xC0, "SetDisplayMode call -> xor eax,eax (cont)"),
+    (0xBC6D4, 0x54, 0x90, "SetDisplayMode call -> nop"),
 ]
 
 # Sanity guard: SetCooperativeLevel call immediately before SetDisplayMode.
 # If a different C&C95.EXE build shifts things, this guard catches it.
-GUARD_OFFSET = 0xbc6b9
-GUARD_BYTES  = b'\xff\x53\x50'   # call DWORD PTR [ebx+0x50] = SetCooperativeLevel
+GUARD_OFFSET = 0xBC6B9
+GUARD_BYTES = b"\xff\x53\x50"  # call DWORD PTR [ebx+0x50] = SetCooperativeLevel
 
 
 def sha256(data: bytes) -> str:
@@ -73,7 +74,7 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
@@ -84,23 +85,29 @@ def patch(path: str, dry_run: bool = False) -> int:
     if digest != INPUT_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected: {INPUT_SHA256}  (C&C95.EXE after TIM-743 patch chain)")
-        print(f"       apply td-focus-skip-patch.py, td-game-in-focus-patch.py,")
-        print(f"       td-vqa-skip-patch.py, td-activateapp-patch.py first")
+        print("       apply td-focus-skip-patch.py, td-game-in-focus-patch.py,")
+        print("       td-vqa-skip-patch.py, td-activateapp-patch.py first")
         return 1
 
-    if bytes(data[GUARD_OFFSET:GUARD_OFFSET + 3]) != GUARD_BYTES:
-        print(f"ERROR: guard bytes mismatch at 0x{GUARD_OFFSET:x}: "
-              f"{bytes(data[GUARD_OFFSET:GUARD_OFFSET + 3]).hex()} != {GUARD_BYTES.hex()}")
+    if bytes(data[GUARD_OFFSET : GUARD_OFFSET + 3]) != GUARD_BYTES:
+        print(
+            f"ERROR: guard bytes mismatch at 0x{GUARD_OFFSET:x}: "
+            f"{bytes(data[GUARD_OFFSET : GUARD_OFFSET + 3]).hex()} != {GUARD_BYTES.hex()}"
+        )
         return 1
 
     for off, orig, _, why in SITES:
         if data[off] != orig:
-            print(f"ERROR: byte at 0x{off:x} is 0x{data[off]:02x}, expected 0x{orig:02x}  [{why}]")
+            print(
+                f"ERROR: byte at 0x{off:x} is 0x{data[off]:02x}, expected 0x{orig:02x}  [{why}]"
+            )
             return 1
 
     if dry_run:
         for off, orig, new, why in SITES:
-            print(f"{path}: DRY RUN — would patch 0x{off:x}: 0x{orig:02x} -> 0x{new:02x}  [{why}]")
+            print(
+                f"{path}: DRY RUN — would patch 0x{off:x}: 0x{orig:02x} -> 0x{new:02x}  [{why}]"
+            )
         return 0
 
     backup = path + ".ddmode_orig"
@@ -110,7 +117,7 @@ def patch(path: str, dry_run: bool = False) -> int:
     for off, _, new, why in SITES:
         data[off] = new
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))
@@ -127,9 +134,13 @@ def patch(path: str, dry_run: bool = False) -> int:
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     dry = "--dry-run" in sys.argv
-    paths = args if args else [
-        "/opt/tiberiandawn/C&C95.EXE",
-    ]
+    paths = (
+        args
+        if args
+        else [
+            "/opt/tiberiandawn/C&C95.EXE",
+        ]
+    )
     rc = 0
     for p in paths:
         try:

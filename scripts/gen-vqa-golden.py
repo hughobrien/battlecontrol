@@ -31,7 +31,7 @@ import struct
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
-from vqa_decode_verify import decode_vqa
+from vqa_decode_verify import decode_vqa  # noqa: E402
 
 
 def compute_frame_indices(total_frames, num_extract):
@@ -78,22 +78,22 @@ def main():
     stem = os.path.splitext(os.path.basename(vqa_path))[0]
 
     # Read VQHD header to get total frame count
-    with open(vqa_path, 'rb') as f:
+    with open(vqa_path, "rb") as f:
         data = f.read()
 
-    if data[:4] != b'FORM' or data[8:12] != b'WVQA':
+    if data[:4] != b"FORM" or data[8:12] != b"WVQA":
         print(f"ERROR: {vqa_path} is not a WVQA file", file=sys.stderr)
         sys.exit(2)
 
     pos = 12
     total_frames = 0
     while pos + 8 <= len(data):
-        tag = data[pos:pos+4]
-        chunk_size = struct.unpack_from('>I', data, pos+4)[0]
-        body = data[pos+8:pos+8+chunk_size]
+        tag = data[pos : pos + 4]
+        chunk_size = struct.unpack_from(">I", data, pos + 4)[0]
+        body = data[pos + 8 : pos + 8 + chunk_size]
         npos = pos + 8 + chunk_size + (chunk_size & 1)
-        if tag == b'VQHD':
-            total_frames = struct.unpack_from('<H', body, 4)[0]
+        if tag == b"VQHD":
+            total_frames = struct.unpack_from("<H", body, 4)[0]
             break
         pos = npos
 
@@ -104,7 +104,9 @@ def main():
     indices = compute_frame_indices(total_frames, num_frames)
     actual_num = min(num_frames, total_frames)
 
-    print(f"{stem}.VQA: {total_frames} total frames, extracting {actual_num}: {indices}")
+    print(
+        f"{stem}.VQA: {total_frames} total frames, extracting {actual_num}: {indices}"
+    )
 
     frames_to_dump = set(indices)
     decode_vqa(vqa_path, outdir, frames_to_dump=frames_to_dump)
@@ -112,16 +114,16 @@ def main():
     # Rename frames to canonical names
     extracted = []
     for i, idx in enumerate(indices):
-        src = os.path.join(outdir, f"live_frame_{idx+1:03d}.png")
-        dst = os.path.join(outdir, f"frame_{i+1:04d}.png")
+        src = os.path.join(outdir, f"live_frame_{idx + 1:03d}.png")
+        dst = os.path.join(outdir, f"frame_{i + 1:04d}.png")
         if os.path.isfile(src):
             os.rename(src, dst)
             extracted.append({"index": i, "frame_num": idx + 1, "path": dst})
 
     # Rename raw frames too
     for i, idx in enumerate(indices):
-        src = os.path.join(outdir, f"live_raw_{idx+1:03d}.png")
-        dst = os.path.join(outdir, f"raw_{i+1:04d}.png")
+        src = os.path.join(outdir, f"live_raw_{idx + 1:03d}.png")
+        dst = os.path.join(outdir, f"raw_{i + 1:04d}.png")
         if os.path.isfile(src):
             os.rename(src, dst)
 
@@ -136,12 +138,12 @@ def main():
         "extracted": extracted,
     }
     manifest_path = os.path.join(outdir, "manifest.json")
-    with open(manifest_path, 'w') as mf:
+    with open(manifest_path, "w") as mf:
         json.dump(manifest, mf, indent=2)
     print(f"  manifest -> {manifest_path}")
 
     print(f"Done: {len(extracted)} golden frames written to {outdir}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -61,6 +61,7 @@ Expected input SHA-256 set:
 Output SHA-256:
     (recorded after first apply — see PATCHED_OUTPUT_SHA256_AFTER_IOPORT)
 """
+
 import sys
 import hashlib
 import shutil
@@ -74,17 +75,19 @@ ACCEPTED_INPUT_SHA256 = {
 }
 
 # After applying to the full chain (input = 42664f2a…, post td-ioport-patch.py)
-PATCHED_OUTPUT_SHA256_AFTER_IOPORT = "700e61a8fba5b23a4c8a2f666d4526e3de8303d53489e01b0b525ff3cb7c9acc"
+PATCHED_OUTPUT_SHA256_AFTER_IOPORT = (
+    "700e61a8fba5b23a4c8a2f666d4526e3de8303d53489e01b0b525ff3cb7c9acc"
+)
 
-PATCH_OFFSET = 0x168a        # VA 0x41128a — je after [0x5382b8] flag check
-ORIGINAL_BYTE = 0x74         # je rel8
-PATCHED_BYTE  = 0xeb         # jmp rel8 (same rel8 displacement 0x2c → target 0x4112b8)
-REL8 = 0x2c                  # displacement preserved unchanged
+PATCH_OFFSET = 0x168A  # VA 0x41128a — je after [0x5382b8] flag check
+ORIGINAL_BYTE = 0x74  # je rel8
+PATCHED_BYTE = 0xEB  # jmp rel8 (same rel8 displacement 0x2c → target 0x4112b8)
+REL8 = 0x2C  # displacement preserved unchanged
 
 # Signature bytes immediately preceding the patch site (the cmp [0x5382b8],0)
-SITE_SIG_BEFORE = b'\x83\x3d\xb8\x82\x53\x00\x00'  # cmp DWORD PTR [0x5382b8], 0
+SITE_SIG_BEFORE = b"\x83\x3d\xb8\x82\x53\x00\x00"  # cmp DWORD PTR [0x5382b8], 0
 # Signature bytes immediately following (rel8 + start of the dead-code mov)
-SITE_SIG_AFTER  = b'\x2c\xa1\xbc\x82\x53\x00'      # 0x2c + mov eax,[0x5382bc]
+SITE_SIG_AFTER = b"\x2c\xa1\xbc\x82\x53\x00"  # 0x2c + mov eax,[0x5382bc]
 
 
 def sha256(data: bytes) -> str:
@@ -92,7 +95,7 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
@@ -103,25 +106,27 @@ def patch(path: str, dry_run: bool = False) -> int:
 
     if digest not in ACCEPTED_INPUT_SHA256:
         print(f"  WARNING: unexpected input SHA-256 {digest}")
-        print(f"  Accepted inputs:")
+        print("  Accepted inputs:")
         for h in sorted(ACCEPTED_INPUT_SHA256):
             print(f"    {h}")
-        print(f"  Proceeding with byte-signature verification only.")
+        print("  Proceeding with byte-signature verification only.")
 
-    sig_before = bytes(data[PATCH_OFFSET-7:PATCH_OFFSET])
+    sig_before = bytes(data[PATCH_OFFSET - 7 : PATCH_OFFSET])
     if sig_before != SITE_SIG_BEFORE:
-        print(f"ERROR: signature-before mismatch at 0x{PATCH_OFFSET-7:x}")
+        print(f"ERROR: signature-before mismatch at 0x{PATCH_OFFSET - 7:x}")
         print(f"       got:      {sig_before.hex()}")
         print(f"       expected: {SITE_SIG_BEFORE.hex()}")
         return 1
 
     if data[PATCH_OFFSET] != ORIGINAL_BYTE:
-        print(f"ERROR: byte at 0x{PATCH_OFFSET:x} is 0x{data[PATCH_OFFSET]:02x}, expected 0x{ORIGINAL_BYTE:02x}")
+        print(
+            f"ERROR: byte at 0x{PATCH_OFFSET:x} is 0x{data[PATCH_OFFSET]:02x}, expected 0x{ORIGINAL_BYTE:02x}"
+        )
         return 1
 
-    sig_after = bytes(data[PATCH_OFFSET+1:PATCH_OFFSET+7])
+    sig_after = bytes(data[PATCH_OFFSET + 1 : PATCH_OFFSET + 7])
     if sig_after != SITE_SIG_AFTER:
-        print(f"ERROR: signature-after mismatch at 0x{PATCH_OFFSET+1:x}")
+        print(f"ERROR: signature-after mismatch at 0x{PATCH_OFFSET + 1:x}")
         print(f"       got:      {sig_after.hex()}")
         print(f"       expected: {SITE_SIG_AFTER.hex()}")
         return 1
@@ -135,9 +140,11 @@ def patch(path: str, dry_run: bool = False) -> int:
     print(f"  Backup: {backup}")
 
     data[PATCH_OFFSET] = PATCHED_BYTE
-    print(f"  Patched 0x{PATCH_OFFSET:x}: je 0x4112b8 → jmp 0x4112b8 (skip NULL preview-frame copy)")
+    print(
+        f"  Patched 0x{PATCH_OFFSET:x}: je 0x4112b8 → jmp 0x4112b8 (skip NULL preview-frame copy)"
+    )
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))

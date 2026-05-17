@@ -13,6 +13,7 @@ Usage (from repo root):
 For production or CI, prefer nginx:
     nix run .#wasm-server
 """
+
 import http.server
 import os
 import sys
