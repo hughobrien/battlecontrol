@@ -105,10 +105,8 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install Playwright and browsers
-        run: |
-          pnpm install --frozen-lockfile
-          nix develop --command playwright install chromium
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Install Wine32 + system tools
         run: |
@@ -209,10 +207,8 @@ jobs:
           node-version: '24'
           cache: 'pnpm'
 
-      - name: Install Playwright and browsers
-        run: |
-          pnpm install --frozen-lockfile
-          nix develop --command playwright install chromium
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build WASM + validate + smoke (T1/T2)
         env:
