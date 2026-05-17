@@ -251,6 +251,8 @@ Each skill lists which extension tools apply.
 | VQA codec | `skills/vqa-codec/` | `vqa_pixel_diff` | Block corruption, palette errors, CI failure |
 | Parity comparison | `skills/parity-comparison/` | `data_verify`, `wine_capture`, `parity_compare`, `vqa_pixel_diff` | SSIM regression, parity failure |
 | CI/CD | `skills/ci-cd/` | `wasm_build`, `wasm_validate`, `native_build`, `run_e2e_test` | CI failure, release broken, deploy stuck |
+| GHA updater | `skills/gha-updater/` | — | Stale action versions, Node.js deprecation warnings |
+| Nix shell escaping | `skills/nix-shell-escaping/` | — | nix-shell quoting errors, variable expansion traps |
 
 Each skill has a symptom-classification table and diagnostic procedures.
 

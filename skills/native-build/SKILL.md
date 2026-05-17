@@ -179,6 +179,34 @@ ln -sf /path/to/RED_ALERT/CD1/*.MIX build/run-172/
 
 ---
 
+## §2.7 — Debugging with sanitizers
+
+Runtime memory errors (use-after-free, buffer overflow) are the most common
+native-only failures that LP64 audit cannot catch. Build with sanitizers for
+debugging:
+
+```bash
+# Configure with AddressSanitizer + UndefinedBehaviorSanitizer
+cmake -S . -B build/ra-sanitize \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+  -DWIN32=1
+cmake --build build/ra-sanitize
+
+# Run — first crash prints a stack trace with line numbers
+./build/ra-sanitize/ra
+```
+
+**Notes:**
+- Sanitizers slow execution ~2× but catch memory errors deterministically.
+- `-DWIN32=1` and `-include msvc-compat.h` can mask some sanitizer warnings
+  due to the shim layer — add a suppression file if needed
+  (`LSAN_OPTIONS=suppressions=lsan-suppressions.txt`).
+- If `cmake --preset linux-sanitize` exists in `CMakePresets.json`, use that
+  instead of the manual configure above.
+
+---
+
 ## §3 — Standard build commands
 
 ### One-command build
@@ -194,7 +222,7 @@ native_build(target: "ra", compiler: "clang")
 nix run .#smoke-ra
 ```
 
-Expected: 307 compile units, link OK, 1000+ frames without crash, ≥1 win cycle, FPS measured.
+Expected: All RA sources compile (`grep -c '\.cpp' build/ra/CMakeFiles/ra.dir/src_files.cmake`), link OK, 1000+ frames without crash, ≥1 win cycle, FPS measured.
 
 ### Smoke test (TD)
 
@@ -211,9 +239,10 @@ Expected: 10+ frames, cheat milestones pass (credits, tech unlock, map reveal, m
 | Gate | Tool / Command | Minimum proof |
 |------|----------------|---------------|
 | **Configure** | Run `native_build` once or `cmake --preset linux-native` | exits 0 |
-| **Build RA** | `native_build(target: "ra")` | 307 compile units, link exits 0 |
+| **Build RA** | `native_build(target: "ra")` | All RA sources compile (`grep -c '\\.cpp' build/ra/CMakeFiles/ra.dir/src_files.cmake` units), link exits 0 |
 | **Build TD** | `native_build(target: "td")` | All TD sources compile, link exits 0 |
 | **LP64 audit** | `nix run .#lint` | returns 0 |
+| **Sanitizer** | `cmake --preset linux-sanitize && ./build/ra` (if preset exists) | No UAF/overflow at startup |
 | **Smoke — RA** | `nix run .#smoke-ra` | 1000+ frames stable, ≥1 win, no SIGSEGV |
 | **Smoke — TD** | `nix run .#smoke-td` | Cheat milestones pass, no crash |
 

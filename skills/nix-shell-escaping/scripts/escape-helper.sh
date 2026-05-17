@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Quick reference: prints common nix-shell escaping patterns
+set -euo pipefail
+
+echo "=== nix-shell escaping quick reference ==="
+echo ""
+echo "1. Simple:               nix-shell -p hello --run 'hello'"
+echo ""
+echo "2. Multi-pkg:            nix-shell -p go gopls --run 'go version'"
+echo ""
+echo "3. Python one-liner:     nix-shell -p python3 --run \"python3 -c 'print(42)'\""
+echo ""
+echo "4. Python both quotes:   nix-shell -p python3 --run 'python3 -c \"print(chr(39))\"'"
+echo ""
+echo "5. Env var (inner):      nix-shell -p bash --run 'echo \"\$HOME\"'"
+echo ""
+echo "6. Env var (outer):      nix-shell -p bash --run \"echo '\$HOME'\""
+echo ""
+echo "7. Command chain:        nix-shell -p bash coreutils --run 'cd /tmp; pwd; ls'"
+echo ""
+echo "8. Pipes:                nix-shell -p bash coreutils --run 'echo foo | tr a-z A-Z'"
+echo ""
+# shellcheck disable=SC2028  # informational echo, not actual execution
+echo "9. Multi-line (\$'):      nix-shell -p python3 --run \$'python3 -c \"print(1)\\\nprint(2)\"'"
+echo ""
+# shellcheck disable=SC2028  # informational echo, not actual execution
+echo "10. ANSI-C escapes:      nix-shell -p bash --run \$'echo \"new\\nline\" && echo tab:\\there'"
+echo ""
+echo "=== Pitfalls to avoid ==="
+echo ""
+echo "✗ Nested single quotes:  nix-shell -p python3 --run 'python3 -c 'print(42)''"
+echo "✓ Use double outside:    nix-shell -p python3 --run \"python3 -c 'print(42)'\""
+echo ""
+echo "✗ Flake syntax:          nix shell nixpkgs#hello -c hello"
+echo "✓ Old-style:             nix-shell -p hello --run 'hello'"
+echo ""
+echo "✗ Dotted version:        nix-shell -p python3.12 --run 'python3 --version'"
+echo "✓ Attr name:             nix-shell -p python312 --run 'python3 --version'"
+echo ""
+echo "✗ No -p outside proj:    cd /tmp && nix-shell --run 'echo hi'"
+echo "✓ Use -p:                nix-shell -p bash --run 'echo hi'"
+echo ""
+echo "=== For complex code ==="
+echo ""
+echo "Write a temp file then run it:"
+echo '  nix-shell -p python3 --run "python3 /tmp/script.py"'
+echo ""
+echo "Or use a nix-shell shebang:"
+echo '  #!/usr/bin/env nix-shell'
+echo '  #!nix-shell -i python3 -p python3 ...'

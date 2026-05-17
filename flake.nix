@@ -453,14 +453,16 @@ for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
         screenshot = mkApp "screenshot" ''
           GAME="''${1:-ra}"
           python3 wasm/serve-coop.py 8080 build-wasm &
+          WASM_PID=$!
           if [ "$GAME" = "ra" ]; then
             python3 wasm/serve-assets.py "$RA_ASSETS" 9090 &
           else
             python3 wasm/serve-assets.py "$TD_ASSETS" 9090 &
           fi
+          ASSET_PID=$!
           sleep 2
           npx playwright test e2e/wasm-smoke.spec.ts --grep "$GAME"
-          kill %1 %2 2>/dev/null || true
+          kill "$WASM_PID" "$ASSET_PID" 2>/dev/null || true
         '';
 
         capture-wine = mkApp "capture-wine" ''
