@@ -1,5 +1,5 @@
 /**
- * TIM-812 — WASM parity captures for RA Soviet M2 and TD GDI M2.
+ * TIM-812 / TIM-906 — WASM parity captures for RA Soviet M2 and TD GDI M2.
  *
  * Validates visual parity between the WASM browser port and Wine OG reference
  * for missions beyond M1 using the ?scenario= URL parameter (TIM-812).
@@ -8,12 +8,16 @@
  *   - RA Soviet M2: frame-500 capture, fill ≥5%, no cyan-scatter, 640×480
  *   - TD GDI M2:   frame-500 capture, fill ≥5%, no cyan-scatter, 640×400
  *
- * Tier 2 (Wine OG parity, requires WINE_RA_READY=1):
+ * Tier 2 (Wine OG parity):
  *   - RA Soviet M2 frame-500 SSIM ≥ 0.90 vs e2e/goldens/soviet-m2-wineog-f500.png
+ *     (requires WINE_RA_READY=1)
+ *   - TD GDI M2 frame-500 SSIM ≥ 0.90 vs e2e/tim807/gdi-m2/t90-frame500.png
+ *     (requires WINE_TD_READY=1)
  *
- * TD GDI M2 Wine OG parity is now available (TIM-821: binary patch bypasses
- * Map_Selection, loads GDI M2 directly; OG golden at e2e/tim807/gdi-m2/).
- * TD GDI M2 WASM Tier 2 (SSIM) is gated on TIM-847: WASM Map.Render crash.
+ * TIM-847 (TD GDI M2 WASM Map.Render crash) was resolved by TIM-848/TIM-850:
+ * bounds guards were added to DisplayClass::Draw_It cell accesses in
+ * TIBERIANDAWN/DISPLAY.CPP.  Both Tier 1 and Tier 2 TD GDI M2 tests are now
+ * enabled.
  *
  * ─── URL param mechanism (TIM-812) ────────────────────────────────────────────
  * The preloader and C++ INIT.CPP now support ?scenario=<NAME> which creates
@@ -30,14 +34,18 @@
  * ─── Run ─────────────────────────────────────────────────────────────────────
  *   npx playwright test e2e/tim812-wasm-m2-parity.spec.ts
  *   WINE_RA_READY=1 npx playwright test e2e/tim812-wasm-m2-parity.spec.ts
+ *   WINE_TD_READY=1 npx playwright test e2e/tim812-wasm-m2-parity.spec.ts --grep "TD GDI M2"
  *
  * ─── Related ─────────────────────────────────────────────────────────────────
  *   TIM-803 — RA Soviet M2 Wine OG capture + TD GDI M2 parity summary
- *   TIM-847 — TD GDI M2 WASM Map.Render crash (blocks Tier 2)
+ *   TIM-847 — TD GDI M2 WASM Map.Render crash (resolved by TIM-848/TIM-850)
+ *   TIM-848 — Add bounds guards to DisplayClass::Draw_It cell accesses
+ *   TIM-850 — WASM OOB fix for TD GDI M2
  *   TIM-776 — RA Soviet L1 Wine OG capture (precedent)
  *   TIM-780 — RA Soviet L1 WASM capture + Wine OG parity
  *   TIM-710 — RA WASM parity suite (Allied L1, Soviet L1, VQA)
  *   TIM-711 — TD WASM parity suite (GDI L1)
+ *   TIM-906 — TD WASM parity e2e tests + M2 mission expansion
  */
 
 import { test, expect } from '@playwright/test';
@@ -245,7 +253,7 @@ test.describe('Tier 2 — RA Soviet M2 WASM vs Wine OG parity [tag:wine]', () =>
 });
 
 // ---------------------------------------------------------------------------
-// TD GDI M2 — WASM capture (known-fail: TIM-847)
+// TD GDI M2 — WASM capture (TIM-847 fixed by TIM-848/TIM-850 bounds guards)
 // ---------------------------------------------------------------------------
 
 const TD_M2_GOLDEN_OG = path.join(__dirname, 'tim807', 'gdi-m2', 't90-frame500.png');
@@ -254,8 +262,6 @@ test.describe('Tier 1 — TD GDI M2 frame 500 (WASM)', () => {
   test.setTimeout(1_200_000);
 
   test('GDI Mission 2: autostart via ?scenario=SCG02EA → frame-500 capture', async ({ page }) => {
-    test.skip(true, 'TIM-847: TD WASM GDI M2 Map.Render memory access out of bounds crash');
-
     const errors: string[] = [];
     page.on('pageerror', (err: Error) => errors.push(err.message));
 
@@ -289,20 +295,20 @@ test.describe('Tier 1 — TD GDI M2 frame 500 (WASM)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// TD GDI M2 — WASM vs Wine OG SSIM parity (gated on TIM-847 fix)
+// TD GDI M2 — WASM vs Wine OG SSIM parity (TIM-847 fixed)
 // ---------------------------------------------------------------------------
+
+const WINE_TD_READY = process.env.WINE_TD_READY === '1';
 
 test.describe('Tier 2 — TD GDI M2 WASM vs Wine OG parity [tag:wine]', () => {
   test.beforeEach(() => {
     test.skip(
-      !WINE_RA_READY,
-      'Tier 2 requires WINE_RA_READY=1; run bash scripts/wine-gdi-m2.sh first',
+      !WINE_TD_READY,
+      'Tier 2 requires WINE_TD_READY=1; run bash scripts/wine-gdi-m2.sh first',
     );
   });
 
   test('GDI M2 frame 500: SSIM ≥ 0.90 vs Wine OG golden', async ({}, testInfo) => {
-    test.skip(true, 'TIM-847: WASM GDI M2 crash blocks Tier 2 capture');
-
     const wasmShot = path.join(SCREENSHOTS_DIR, 'gdi-m2-wasm-f500.png');
     test.skip(!fs.existsSync(TD_M2_GOLDEN_OG), 'TD GDI M2 OG golden missing');
     test.skip(!fs.existsSync(wasmShot), 'gdi-m2-wasm-f500.png missing — run Tier 1 TD GDI M2 test first');
@@ -326,5 +332,46 @@ test.describe('Tier 2 — TD GDI M2 WASM vs Wine OG parity [tag:wine]', () => {
     }
 
     expect(cmp.ssim, `GDI M2 frame 500 SSIM ≥0.90 (got ${cmp.ssim})`).toBeGreaterThanOrEqual(0.90);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TD Nod L1 — WASM capture (TIM-869 reference screenshots)
+// ---------------------------------------------------------------------------
+
+const TD_NOD_L1_GOLDEN_F500 = path.join(__dirname, 'goldens', 'td-nod-m1-f500.png');
+
+test.describe('Tier 1 — TD Nod L1 frame 500 (WASM)', () => {
+  test.setTimeout(1_200_000);
+
+  test('Nod Mission 1: autostart via ?scenario=SCB01EA → frame-500 capture', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err: Error) => errors.push(err.message));
+
+    const url = `${TD_WASM_URL}?src=${encodeURIComponent(TD_ASSET_URL)}&autostart=1&scenario=SCB01EA&debug=1`;
+    console.log(`[TD-NOD-L1] URL: ${url}`);
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await waitForTdReady(page);
+
+    await waitForOutput(page, '[TD] Main_Loop frame 500', 600_000);
+    await page.waitForTimeout(300);
+
+    const shotPath = path.join(SCREENSHOTS_DIR, 'nod-l1-wasm-f500.png');
+    await page.screenshot({ path: shotPath });
+
+    const stats500 = await canvasStats(page);
+    console.log(`[TD-NOD-L1] frame 500: fill=${stats500.fill}% colors=${stats500.colors} cyan=${stats500.cyanCount} w=${stats500.w} h=${stats500.h}`);
+
+    expect(stats500.fill, 'TD Nod L1 frame 500 fill ≥5%').toBeGreaterThanOrEqual(5);
+    expect(stats500.cyanCount, 'no cyan-scatter (TIM-590 gate)').toBeLessThan(50);
+    expect(stats500.w, 'canvas width 640').toBe(640);
+    expect(stats500.h, 'canvas height 400').toBe(400);
+
+    expect(
+      errors.filter(e => !e.includes('ResizeObserver')),
+      'no uncaught JS errors during Nod L1',
+    ).toHaveLength(0);
+
+    console.log(`[TD-NOD-L1] Nod L1 frame 500 captured at ${shotPath}`);
   });
 });
