@@ -20,7 +20,7 @@ compile_commands.json
 *.o
 a.out
 
-# Claude Code worktrees and local config
+# Claude Code local config
 .claude/
 
 # Node / Playwright

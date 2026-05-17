@@ -44,11 +44,6 @@ jobs:
             emcc-cache-ghpages-
             emcc-cache-
 
-      - name: Configure ccache
-        run: |
-          ccache --zero-stats
-          ccache --max-size 500M
-
       - name: Cache ccache
         uses: actions/cache@v5.0.5
         with:
@@ -58,27 +53,23 @@ jobs:
             ccache-ghpages-
             ccache-
 
-      - name: Build WASM + validate + smoke (ra.wasm, chromium)
+      - name: Configure ccache
+        env:
+          CCACHE_DIR: ${{ env.CCACHE_DIR }}
+        run: nix develop --command bash -c "ccache --zero-stats && ccache --max-size 500M"
+
+      - name: Build ra.wasm
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
-          CCACHE_DIR: ${{ env.CCACHE_DIR }}
-        run: |
-          nix develop --command bash -c "
-            export EM_CACHE=${{ env.EM_CACHE_DIR }}
-            export CCACHE_DIR=${{ env.CCACHE_DIR }}
-            cmake --build build-wasm --target ra --parallel
-            nix run .#validate-wasm
-            nix run .#ci-wasm-smoke
-          "
+        run: nix develop --command nix run .#build-wasm ra
+
+      - name: Validate and smoke test
+        run: nix develop --command bash -c "nix run .#validate-wasm && nix run .#ci-wasm-smoke"
 
       - name: Build td.wasm
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: |
-          nix develop --command bash -c "
-            export EM_CACHE=${{ env.EM_CACHE_DIR }}
-            cmake --build build-wasm --target td --parallel
-          "
+        run: nix develop --command nix run .#build-wasm td
 
       - name: Start Xvfb and WASM server
         run: |

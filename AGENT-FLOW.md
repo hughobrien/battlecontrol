@@ -31,9 +31,9 @@ They're well-documented with usage examples and do one thing well.
 `smoke-test-design-rule.md` each cover their domain deeply and correctly.
 The playbook in particular is a strong symptom->root-cause->fix reference.
 
-### 5. Worktree protocol (CLAUDE.md) solves concurrent-agent collisions
-Per-issue git worktrees with auto-cleanup and PR automerge prevent filesystem
-conflicts when multiple agents run concurrently. This is a solved problem.
+### 5. Branch-and-PR workflow solves concurrent-agent collisions
+Per-feature branches with automerge prevent filesystem conflicts when multiple
+agents run concurrently. This is a solved problem.
 
 ---
 
@@ -72,12 +72,10 @@ The skills README table lists companion scripts including:
 - `scripts/skill-wasm-serve.sh` — present, good
 
 ### 4. CLAUDE.md assumes Claude/Paperclip agent infrastructure
-`CLAUDE.md` describes `EnterWorktree`, `ExitWorktree`, and agent roles
-(`FoundingEngineer`, `StaffEngineer`, `WineExpert`) that are specific to the
-Claude/Paperclip agent platform. When a DeepSeek-based agent (or any
-non-Paperclip agent) reads this file, these instructions are either
-irrelevant or confusing. The worktree protocol itself is fine, but the
-tool-specific commands don't map.
+`CLAUDE.md` describes agent roles (`FoundingEngineer`, `StaffEngineer`,
+`WineExpert`) that are specific to the Claude/Paperclip agent platform. When
+a DeepSeek-based agent (or any non-Paperclip agent) reads this file, these
+instructions are either irrelevant or confusing.
 
 ### 5. No local "run full CI" command
 CI consists of 4 parallel jobs (native build, VQA pixel-diff, Wine
@@ -181,8 +179,8 @@ agents read first. It should contain:
 5. **Skill index** (table mapping domain to skill file)
 6. **Critical invariants** (things agents must never break)
 
-The `CLAUDE.md` file should remain for Paperclip-specific protocol (worktree),
-but `AGENTS.md` becomes the primary agent-facing doc.
+The `CLAUDE.md` file should remain for Paperclip-specific protocol, but
+`AGENTS.md` becomes the primary agent-facing doc.
 
 #### R4. Consolidate skill references into each skill file
 

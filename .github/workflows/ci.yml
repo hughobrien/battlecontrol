@@ -21,30 +21,8 @@ env:
   EM_CACHE_DIR: ${{ github.workspace }}/.emscripten-cache
 
 jobs:
-  # Always-run filter: determines which jobs are needed.
-  # Without this, paths-ignore causes skipped workflows that never report
-  # a status, deadlocking PRs with required CI checks.
-  filter:
-    name: CI path filter
-    runs-on: ubuntu-24.04
-    outputs:
-      run-ci: ${{ steps.filter.outputs.run-ci }}
-    steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: dorny/paths-filter@v3.0.2
-        id: filter
-        with:
-          filters: |
-            run-ci:
-              - '!**/*.md'
-              - '!**/*.txt'
-              - '!docs/**'
-              - '!skills/**'
-
   build:
     name: Compile and link (clang)
-    needs: [filter]
-    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -79,8 +57,6 @@ jobs:
 
   vqa-pixel-diff:
     name: VQA codec pixel-diff
-    needs: [filter]
-    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -98,8 +74,6 @@ jobs:
 
   wine-comparison:
     name: Wine OG comparison
-    needs: [filter]
-    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -183,8 +157,6 @@ jobs:
 
   build-wasm:
     name: Build WASM + regression
-    needs: [filter]
-    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
 
@@ -208,11 +180,7 @@ jobs:
       - name: Build WASM + validate + smoke (T1/T2)
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: |
-          nix develop --command bash -c "
-            export EM_CACHE=${{ env.EM_CACHE_DIR }}
-            nix run .#ci-build-wasm
-          "
+        run: nix develop --command nix run .#ci-build-wasm
 
       - name: WASM regression — T3 TD menu click (asset-gated)
         env:
@@ -222,11 +190,7 @@ jobs:
             echo "::notice::T3 skipped — TD_ASSETS_URL secret not set"
             exit 0
           fi
-          Xvfb :99 -screen 0 1280x1024x24 &
-          sleep 2
-          python3 wasm/serve-coop.py &
-          sleep 2
-          DISPLAY=:99 nix develop --command playwright test e2e/regression/T3-td-wasm-menu.spec.ts
+          nix develop --command nix run .#ci-run-test -- e2e/regression/T3-td-wasm-menu.spec.ts
 
       - name: Upload T3 artifacts on failure
         if: failure()
@@ -243,11 +207,7 @@ jobs:
             echo "::notice::T6 skipped — TD_ASSETS_URL secret not set"
             exit 0
           fi
-          Xvfb :99 -screen 0 1280x1024x24 &
-          sleep 2
-          python3 wasm/serve-coop.py &
-          sleep 2
-          DISPLAY=:99 nix develop --command playwright test e2e/regression/T6-td-wasm-mission-start.spec.ts
+          nix develop --command nix run .#ci-run-test -- e2e/regression/T6-td-wasm-mission-start.spec.ts
 
       - name: Upload T6 artifacts on failure
         if: failure()
@@ -264,11 +224,7 @@ jobs:
             echo "::notice::T7 skipped — TD_ASSETS_URL secret not set"
             exit 0
           fi
-          Xvfb :99 -screen 0 1280x1024x24 &
-          sleep 2
-          python3 wasm/serve-coop.py &
-          sleep 2
-          DISPLAY=:99 nix develop --command playwright test e2e/regression/T7-td-audio-pitch.spec.ts
+          nix develop --command nix run .#ci-run-test -- e2e/regression/T7-td-audio-pitch.spec.ts
 
       - name: Upload T7 artifacts on failure
         if: failure()
@@ -285,11 +241,7 @@ jobs:
             echo "::notice::T8 skipped — RA_ASSETS_URL not set"
             exit 0
           fi
-          Xvfb :99 -screen 0 1280x1024x24 &
-          sleep 2
-          python3 wasm/serve-coop.py &
-          sleep 2
-          DISPLAY=:99 nix develop --command playwright test e2e/regression/T8-ra-audio-pitch.spec.ts
+          nix develop --command nix run .#ci-run-test -- e2e/regression/T8-ra-audio-pitch.spec.ts
 
       - name: Upload T8 artifacts on failure
         if: failure()
@@ -306,11 +258,7 @@ jobs:
             echo "::notice::T9 skipped — RA_ASSETS_URL not set"
             exit 0
           fi
-          Xvfb :99 -screen 0 1280x1024x24 &
-          sleep 2
-          python3 wasm/serve-coop.py &
-          sleep 2
-          DISPLAY=:99 nix develop --command playwright test e2e/regression/T9-ra-wasm-mission-start.spec.ts
+          nix develop --command nix run .#ci-run-test -- e2e/regression/T9-ra-wasm-mission-start.spec.ts
 
       - name: Upload T9 artifacts on failure
         if: failure()
@@ -321,8 +269,6 @@ jobs:
 
   clang-tidy:
     name: clang-tidy static analysis
-    needs: [filter]
-    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     continue-on-error: true
 
@@ -350,8 +296,6 @@ jobs:
 
   cppcheck:
     name: cppcheck static analysis
-    needs: [filter]
-    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     continue-on-error: true
 
