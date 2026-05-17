@@ -19,7 +19,7 @@ int main() {
     std::cout << "  compiler          : unknown\n";
 #endif
     std::cout << "  sizeof(void*)     : " << sizeof(void*) << "\n";
-    std::cout << "  sizeof(long)      : " << sizeof(long) << "\n";
+    std::cout << "  sizeof(long)      : " << sizeof(long) << "\n";  // NOLINT: intentional LP64 demo
     std::cout << "  sizeof(long long) : " << sizeof(long long) << "\n";
     std::cout << "  sizeof(int)       : " << sizeof(int) << "\n";
 
