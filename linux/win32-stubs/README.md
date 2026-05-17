@@ -83,5 +83,5 @@ Not in `linux/win32-stubs/` but provides the same kind of Linux implementations 
 - **Total files**: 63 (45 headers, 12 .cpp, 1 README, 1 uppercase alias `WINDOWS.H`, 1 force-included `msvc-compat.h`)
 - **Total stub functions/declarations**: ~230 inline/template stubs across headers + ~150 function definitions across .cpp files
 - **Dead (zero-reference) files found**: **0** — every file is referenced by at least one `#include` or provides symbols linked by game code
-- **Build status**: both `td` and `ra` compile and link cleanly (verified in TIM-840 worktree)
+- **Build status**: both `td` and `ra` compile and link cleanly (verified in TIM-840)
 - **Conclusion**: No stubs can be removed at this time. All 63 files serve an active purpose in the Linux port.

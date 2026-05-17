@@ -32,10 +32,10 @@ the full pass-number chronology.
 
 The label is company-wide in the TIM project (colour `#7C3AED`).
 
-## Worktree protocol
+## Branch workflow
 
-All engineering work happens in a per-issue git worktree. See
-[`CLAUDE.md`](CLAUDE.md) for the full protocol.
+All work is done on feature branches. See
+[`AGENTS.md`](AGENTS.md#branch-and-pr-workflow) for the full workflow.
 
 ## Commit messages
 
