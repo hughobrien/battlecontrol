@@ -1,2 +1,341 @@
-<!doctypehtml><html lang=en><head>
-  <script src="coi-serviceworker.min.js"></script><meta charset=utf-8><meta content="width=device-width,initial-scale=1"name=viewport><title>BattleControl — RA</title><style>body{margin:0;background:#000;color:#ccc;font-family:monospace;display:flex;flex-direction:column;align-items:center;padding:8px}#browser-error{display:none;background:#3a0a0a;border:1px solid #7a2a2a;color:#e88;font-size:12px;padding:8px 16px;max-width:560px;text-align:center;margin-bottom:8px}#status-line{font-size:12px;padding:4px 0;color:#aaa;min-height:1.4em}#canvas{display:block;border:1px solid #333}#output{display:none;width:640px;height:120px;overflow-y:auto;white-space:pre-wrap;font-size:11px;background:#111;padding:4px;box-sizing:border-box;margin-top:4px}#canvas-wrapper{position:relative;width:640px}#preloader-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10}#open-btn{font-family:monospace;font-size:14px;padding:8px 20px;background:#2a2a2a;color:#ccc;border:1px solid #555;cursor:pointer}#open-btn:hover:not(:disabled){background:#3a3a3a}#open-btn:disabled{opacity:.5;cursor:default}#progress-bar-wrap{width:320px;height:6px;background:#222;border:1px solid #444;display:none}#progress-bar{height:100%;width:0%;background:#5a8a3a;transition:width .1s linear}#progress-text{font-size:12px;color:#888;min-height:1em}.overlay-hint{font-size:11px;color:#666;max-width:420px;text-align:center}#controls-hint{font-size:11px;color:#555;margin-top:4px;text-align:center;width:640px}#fullscreen-btn{font-family:monospace;font-size:11px;padding:2px 8px;background:#1a1a1a;color:#666;border:1px solid #333;cursor:pointer;margin-left:8px;vertical-align:middle}#fullscreen-btn:hover{color:#aaa;border-color:#555}:-moz-full-screen #canvas-wrapper,:-webkit-full-screen #canvas-wrapper,:fullscreen #canvas-wrapper{width:100vw!important;height:100vh!important;display:flex!important;align-items:center!important;justify-content:center!important;background:#000!important;padding:0!important}:-moz-full-screen #canvas,:-webkit-full-screen #canvas,:fullscreen #canvas{border:none!important;image-rendering:pixelated}</style></head><body><div id=browser-error>This browser does not support the File System Access API — use <strong>Chrome</strong> or <strong>Edge</strong> (stable). Firefox: enable <code>dom.fs.enabled</code> in <code>about:config</code>. Safari: not supported.</div><div id=status-line>Loading…</div><div id=canvas-wrapper><canvas height=480 id=canvas oncontextmenu=event.preventDefault() tabindex=0 width=640></canvas><div id=preloader-overlay><div>BattleControl — RA</div><button id=open-btn type=button>Open Game Folder</button><div id=progress-bar-wrap><div id=progress-bar></div></div><div id=progress-text></div><div class=overlay-hint>Point at your RA data directory containing REDALERT.MIX, LOCAL.MIX, and the other MIX files.</div></div></div><div id=controls-hint>LMB: select / move unit  |  RMB: attack / cancel  |  Scroll: zoom map  |  Esc: menu <button id=fullscreen-btn type=button title="Toggle fullscreen (F11 / Alt+Enter)">[ ]</button></div><pre id=output></pre><script>var outputEl=document.getElementById("output"),_params=new URLSearchParams(window.location.search),_debugMode="1"===_params.get("debug");_debugMode&&(outputEl.style.display="block");var _envFromUrl={};"1"===_params.get("autostart")&&(_envFromUrl.RA_AUTOSTART="1"),_debugMode&&(_envFromUrl.RA_DEBUG="1"),"1"===_params.get("gameclk")&&(_envFromUrl.RA_GAME_CLICK="1",outputEl.style.display="block");var Module={canvas:document.getElementById("canvas"),noInitialRun:!0,ENV:_envFromUrl,print:function(e){outputEl.textContent+=e+"\n",outputEl.scrollTop=outputEl.scrollHeight},printErr:function(e){outputEl.textContent+="[err] "+e+"\n",outputEl.scrollTop=outputEl.scrollHeight},setStatus:function(e){var t=document.getElementById("status-line");t&&(t.textContent=e||"Ready")},totalDependencies:0,monitorRunDependencies:function(e){this.totalDependencies=Math.max(this.totalDependencies,e),Module.setStatus(e?"Preparing… ("+(this.totalDependencies-e)+"/"+this.totalDependencies+")":"WASM loaded — waiting for game folder.")}};window.onerror=function(e){Module.setStatus("JS exception: "+e.message)},function(){var e=document.getElementById("canvas");e&&e.addEventListener("mousedown",(function(){e.focus()}))}(),function(){var e=document.getElementById("canvas-wrapper"),t=document.getElementById("fullscreen-btn");if(e&&t){t.addEventListener("click",(function(){l()})),window.addEventListener("keydown",(function(e){("F11"===e.key||"Enter"===e.key&&e.altKey)&&(e.preventDefault(),l())}));var n=document.getElementById("canvas");document.addEventListener("fullscreenchange",o),document.addEventListener("webkitfullscreenchange",o),document.addEventListener("mozfullscreenchange",o)}function l(){var t,n;document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement?(n=document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen)&&n.call(document).catch((function(){})):(t=e.requestFullscreen||e.webkitRequestFullscreen||e.mozRequestFullScreen)&&t.call(e).catch((function(){}))}function o(){var e=!!(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement);if(t.textContent=e?"[x]":"[ ]",e&&n){var l=Math.max(1,Math.floor(Math.min(screen.width/640,screen.height/480)));n.style.width=640*l+"px",n.style.height=480*l+"px"}else n&&(n.style.width="",n.style.height="")}}()</script><script src=preloader.js></script><script src=ra.js async></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <script src="coi-serviceworker.min.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BattleControl — RA</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #ccc;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px;
+    }
+    #browser-error {
+      display: none;
+      background: #3a0a0a;
+      border: 1px solid #7a2a2a;
+      color: #e88;
+      font-size: 12px;
+      padding: 8px 16px;
+      max-width: 560px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    #status-line { font-size: 12px; padding: 4px 0; color: #aaa; min-height: 1.4em; }
+    #canvas { display: block; border: 1px solid #333; }
+    #output {
+      display: none;
+      width: 640px;
+      height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 11px;
+      background: #111;
+      padding: 4px;
+      box-sizing: border-box;
+      margin-top: 4px;
+    }
+    /* Preloader overlay — shown until user picks their game folder */
+    #canvas-wrapper { position: relative; width: 640px; }
+    #preloader-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 10;
+    }
+    #open-btn {
+      font-family: monospace;
+      font-size: 14px;
+      padding: 8px 20px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #555;
+      cursor: pointer;
+    }
+    #open-btn:hover:not(:disabled) { background: #3a3a3a; }
+    #open-btn:disabled { opacity: 0.5; cursor: default; }
+    #progress-bar-wrap {
+      width: 320px;
+      height: 6px;
+      background: #222;
+      border: 1px solid #444;
+      display: none;
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #5a8a3a;
+      transition: width 0.1s linear;
+    }
+    /* Indeterminate progress animation for WASM download phase */
+    #progress-bar.indeterminate {
+      width: 30%;
+      animation: progress-indeterminate 1.5s ease-in-out infinite;
+      background: linear-gradient(90deg, #5a8a3a 30%, #7aca5a 50%, #5a8a3a 70%);
+      background-size: 200% 100%;
+    }
+    @keyframes progress-indeterminate {
+      0% { background-position: 200% 0; width: 20%; }
+      50% { width: 50%; }
+      100% { background-position: -200% 0; width: 20%; }
+    }
+    #progress-text { font-size: 12px; color: #888; min-height: 1em; }
+    .overlay-hint { font-size: 11px; color: #666; max-width: 420px; text-align: center; }
+    #preloader-error {
+      display: none;
+      font-size: 12px;
+      color: #e88;
+      background: #3a0a0a;
+      border: 1px solid #7a2a2a;
+      padding: 8px 12px;
+      max-width: 400px;
+      text-align: center;
+      border-radius: 2px;
+    }
+    #retry-btn {
+      display: none;
+      font-family: monospace;
+      font-size: 12px;
+      margin-top: 8px;
+      padding: 4px 14px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #555;
+      cursor: pointer;
+    }
+    #retry-btn:hover { background: #3a3a3a; }
+    #controls-hint {
+      font-size: 11px;
+      color: #555;
+      margin-top: 4px;
+      text-align: center;
+      width: 640px;
+    }
+    #fullscreen-btn {
+      font-family: monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      background: #1a1a1a;
+      color: #666;
+      border: 1px solid #333;
+      cursor: pointer;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    #fullscreen-btn:hover { color: #aaa; border-color: #555; }
+    /* Fullscreen: canvas-wrapper fills screen, canvas scales 4:3 */
+    :fullscreen #canvas-wrapper,
+    :-webkit-full-screen #canvas-wrapper,
+    :-moz-full-screen #canvas-wrapper {
+      width: 100vw !important;
+      height: 100vh !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: #000 !important;
+      padding: 0 !important;
+    }
+    :fullscreen #canvas,
+    :-webkit-full-screen #canvas,
+    :-moz-full-screen #canvas {
+      border: none !important;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+  <div id="browser-error">
+    This browser does not support the File System Access API —
+    use <strong>Chrome</strong> or <strong>Edge</strong> (stable).
+    Firefox: enable <code>dom.fs.enabled</code> in <code>about:config</code>.
+    Safari: not supported.
+  </div>
+  <div id="status-line">Loading…</div>
+  <div id="canvas-wrapper">
+    <canvas id="canvas" width="640" height="480" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="preloader-overlay">
+      <div>BattleControl — RA</div>
+      <button id="open-btn" type="button">Open Game Folder</button>
+      <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+      <div id="progress-text"></div>
+      <div id="preloader-error"></div>
+      <button id="retry-btn" type="button">Try Again</button>
+      <div class="overlay-hint">
+        Point at your RA data directory containing REDALERT.MIX,
+        LOCAL.MIX, and the other MIX files.
+      </div>
+    </div>
+  </div>
+  <div id="controls-hint">LMB: select / move unit &nbsp;|&nbsp; RMB: attack / cancel &nbsp;|&nbsp; Scroll: zoom map &nbsp;|&nbsp; Esc: menu
+    <button id="fullscreen-btn" type="button" title="Toggle fullscreen (F11 / Alt+Enter)">[ ]</button>
+  </div>
+  <pre id="output"></pre>
+  <script>
+    var outputEl = document.getElementById('output');
+    var _params = new URLSearchParams(window.location.search);
+    // ?debug=1 → show the stderr console below the canvas and inject RA_DEBUG env.
+    var _debugMode = _params.get('debug') === '1';
+    if (_debugMode) { outputEl.style.display = 'block'; }
+    // TIM-399: ?autostart=1 → inject RA_AUTOSTART into Emscripten ENV at module
+    // init time (before onRuntimeInitialized) so getenv("RA_AUTOSTART") works.
+    var _envFromUrl = {};
+    if (_params.get('autostart') === '1') {
+      _envFromUrl['RA_AUTOSTART'] = '1';
+    }
+    if (_debugMode) {
+      _envFromUrl['RA_DEBUG'] = '1';
+    }
+    // TIM-537: ?gameclk=1 → inject RA_GAME_CLICK so C++ fires SDL_PushEvent-based
+    // unit-select (frame 30) and move-order (frame 35) clicks; also shows #output.
+    if (_params.get('gameclk') === '1') {
+      _envFromUrl['RA_GAME_CLICK'] = '1';
+      outputEl.style.display = 'block';
+    }
+    // TIM-904: WASM download progress state.
+    var _wasmPhase = 'init'; // 'init' | 'download' | 'compile' | 'ready'
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      noInitialRun: true,   // preloader.js calls callMain() after files are mounted
+      ENV: _envFromUrl,
+      print: function(text) {
+        outputEl.textContent += text + '\n';
+        outputEl.scrollTop = outputEl.scrollHeight;
+      },
+      printErr: function(text) {
+        outputEl.textContent += '[err] ' + text + '\n';
+        outputEl.scrollTop = outputEl.scrollHeight;
+      },
+      setStatus: function(text) {
+        var el = document.getElementById('status-line');
+        if (el) el.textContent = text || 'Ready';
+        // TIM-904: drive progress bar during WASM download / compile.
+        if (_wasmPhase === 'init' || _wasmPhase === 'download') {
+          var pbar = document.getElementById('progress-bar');
+          var pwrap = document.getElementById('progress-bar-wrap');
+          var ptxt = document.getElementById('progress-text');
+          if (!pbar || !pwrap) return;
+          if (/(download|fetch|load).*data/i.test(text)) {
+            _wasmPhase = 'download';
+            pwrap.style.display = 'block';
+            pbar.className = 'indeterminate';
+            if (ptxt) ptxt.textContent = text;
+          } else if (/(compile|instantiat|run|prepar)/i.test(text)) {
+            if (_wasmPhase === 'init' || _wasmPhase === 'download') {
+              _wasmPhase = 'compile';
+              pwrap.style.display = 'block';
+              pbar.className = 'indeterminate';
+            }
+            if (ptxt) ptxt.textContent = text;
+          }
+        }
+      },
+      totalDependencies: 0,
+      monitorRunDependencies: function(left) {
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        var statusText = left
+          ? 'Preparing… (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
+          : 'WASM loaded — waiting for game folder.';
+        Module.setStatus(statusText);
+        if (left === 0 && _wasmPhase !== 'ready') {
+          _wasmPhase = 'ready';
+          // Reset progress bar for MIX loading phase (preloader will take over).
+          var pbar = document.getElementById('progress-bar');
+          if (pbar) pbar.className = '';
+        }
+      }
+    };
+    window.onerror = function(ev) {
+      Module.setStatus('JS exception: ' + ev.message);
+    };
+
+    // TIM-582: Canvas keyboard focus management.
+    // tabindex="0" (on the element) makes the canvas focusable.
+    // SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT="#canvas" (set in C++ before
+    // SDL_CreateWindow) routes SDL key events to #canvas; but the canvas
+    // must also have browser focus for those events to fire.
+    // Note: pointer lock is intentionally NOT requested here — RA is an RTS
+    // that reads absolute SDL_MOUSEMOTION x/y coordinates. Browser-level
+    // pointer lock without matching SDL_SetRelativeMouseMode in C++ would
+    // switch the browser to reporting relative deltas while SDL still reads
+    // absolute canvas-relative coordinates, breaking cursor tracking.
+    (function () {
+      var canvas = document.getElementById('canvas');
+      if (!canvas) return;
+
+      // Focus the canvas on every click so keyboard events are delivered.
+      canvas.addEventListener('mousedown', function () {
+        canvas.focus();
+      });
+    }());
+
+    // Fullscreen toggle — button click and F11/Alt+Enter keyboard shortcuts.
+    // Uses the browser Fullscreen API on canvas-wrapper so the black
+    // letterbox background is included in the fullscreen area.
+    (function () {
+      var wrapper = document.getElementById('canvas-wrapper');
+      var btn = document.getElementById('fullscreen-btn');
+      if (!wrapper || !btn) return;
+
+      function enterFullscreen() {
+        var req = wrapper.requestFullscreen || wrapper.webkitRequestFullscreen || wrapper.mozRequestFullScreen;
+        if (req) req.call(wrapper).catch(function() {});
+      }
+      function exitFullscreen() {
+        var ex = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
+        if (ex) ex.call(document).catch(function() {});
+      }
+      function toggleFullscreen() {
+        if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+          exitFullscreen();
+        } else {
+          enterFullscreen();
+        }
+      }
+
+      btn.addEventListener('click', function () { toggleFullscreen(); });
+
+      // F11 and Alt+Enter from the window level (valid user gesture).
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'F11' || (e.key === 'Enter' && e.altKey)) {
+          e.preventDefault();
+          toggleFullscreen();
+        }
+      });
+
+      // TIM-675: integer scaling on fullscreen enter/exit.
+      // Computes the largest integer multiple of the game's 640×480 canvas
+      // that fits the physical screen, then sets canvas CSS dimensions
+      // precisely so the browser doesn't apply fractional scaling.
+      var canvas = document.getElementById('canvas');
+      function onFSChange() {
+        var fs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+        btn.textContent = fs ? '[x]' : '[ ]';
+        if (fs && canvas) {
+          var factor = Math.max(1, Math.floor(Math.min(screen.width / 640, screen.height / 480)));
+          canvas.style.width  = (factor * 640) + 'px';
+          canvas.style.height = (factor * 480) + 'px';
+        } else if (canvas) {
+          canvas.style.width  = '';
+          canvas.style.height = '';
+        }
+      }
+      document.addEventListener('fullscreenchange', onFSChange);
+      document.addEventListener('webkitfullscreenchange', onFSChange);
+      document.addEventListener('mozfullscreenchange', onFSChange);
+    }());
+  </script>
+  <script src="preloader.js"></script>
+  <script async type="text/javascript" src="ra.js"></script>
+</body>
+</html>
