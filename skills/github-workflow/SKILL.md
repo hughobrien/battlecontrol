@@ -312,6 +312,57 @@ git worktree list
 git worktree prune
 ```
 
+### §3.10 — `paths-ignore` on CI causing deadlocked PRs
+
+**Problem:** A PR that only changes documentation/skills/markdown files triggers
+no CI runs at all, but the PR is blocked because the branch protection rule
+requires CI checks. The PR can never merge.
+
+**Root cause:** `paths-ignore` on the `pull_request` trigger causes the entire
+workflow to be skipped when all changed files match the ignore patterns.
+Skipped workflows report no status checks. Branch protection waits for checks
+that will never arrive.
+
+**Fix (in `.github/workflows/ci.yml`):** Replace `paths-ignore` with a
+`dorny/paths-filter` job that always runs:
+```yaml
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  filter:
+    name: CI path filter
+    runs-on: ubuntu-24.04
+    outputs:
+      run-ci: ${{ steps.filter.outputs.run-ci }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: dorny/paths-filter@v3.0.2
+        id: filter
+        with:
+          filters: |
+            run-ci:
+              - '!**/*.md'
+              - '!**/*.txt'
+              - '!docs/**'
+              - '!skills/**'
+
+  build:
+    needs: [filter]
+    if: needs.filter.outputs.run-ci == 'true'
+    ...
+```
+
+The `filter` job always runs and reports a status. When only docs/skills change,
+it outputs `run-ci=false`, the real CI jobs skip gracefully, and the filter
+job's own success satisfies the branch protection rule.
+
+**Verification:** A doc-only PR should show exactly one job ("CI path filter")
+in the CI workflow run, and the PR should be mergeable.
+
 ---
 
 ## §4 — Quick reference card
