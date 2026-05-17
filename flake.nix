@@ -264,6 +264,8 @@
           echo "Workflows (from repo root):"
           echo "  nix run .#check              toolchain prerequisites"
           echo "  nix run .#build-native       native Linux build (ra/td/both)"
+          echo "  nix run .#release-build-ra    release build: RA native + package"
+          echo "  nix run .#release-build-td    release build: TD native + package"
           echo "  nix run .#lint               LP64 hazard audit"
           echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
           echo "  nix run .#build-wasm         WASM build (ra/td/both)"
@@ -360,6 +362,25 @@
         build-native = mkApp "build-native" ''
           export CC=clang CXX=clang++
           exec bash scripts/skill-native-build.sh "$@"
+        '';
+
+        release-build-ra = mkApp "release-build-ra" ''
+          set -e
+          bash scripts/first-run-pass-94.sh
+          cp build/first-run-pass-94/redalert.elf redalert
+          strip redalert
+          tar czf redalert-linux-x86_64.tar.gz redalert
+          echo "redalert-linux-x86_64.tar.gz: $(stat -c%s redalert-linux-x86_64.tar.gz) bytes"
+        '';
+
+        release-build-td = mkApp "release-build-td" ''
+          set -e
+          cmake --preset linux-native
+          cmake --build build --target td --parallel
+          strip build/td
+          cp build/td td
+          tar czf td-linux-x86_64.tar.gz td
+          echo "td-linux-x86_64.tar.gz: $(stat -c%s td-linux-x86_64.tar.gz) bytes"
         '';
 
         lint = mkApp "lint-lp64" ''

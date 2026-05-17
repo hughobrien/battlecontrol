@@ -18,24 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            g++ \
-            libsdl2-dev \
-            xvfb \
-            binutils \
-            python3
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31.10.6
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
-      - name: Build and smoke-test
-        run: bash scripts/first-run-pass-94.sh
-
-      - name: Strip and package
-        run: |
-          cp build/first-run-pass-94/redalert.elf redalert
-          strip redalert
-          tar czf redalert-linux-x86_64.tar.gz redalert
+      - name: Build RA native + package
+        run: nix develop --command nix run .#release-build-ra
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7.0.1
@@ -51,28 +41,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            g++ \
-            cmake \
-            ninja-build \
-            libsdl2-dev \
-            libsdl2-ttf-dev \
-            binutils
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31.10.6
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
-      - name: Configure
-        run: cmake --preset linux-native
-
-      - name: Build TD
-        run: cmake --build build --target td --parallel
-
-      - name: Strip and package
-        run: |
-          strip build/td
-          cp build/td td
-          tar czf td-linux-x86_64.tar.gz td
+      - name: Build TD native + package
+        run: nix develop --command nix run .#release-build-td
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7.0.1
