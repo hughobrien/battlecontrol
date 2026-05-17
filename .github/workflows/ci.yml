@@ -50,7 +50,7 @@ jobs:
             ccache --zero-stats
             ccache --max-size 500M
             nix run .#ci-build-native
-            echo "### ccache hit rate" >> "$GITHUB_STEP_SUMMARY"
+            echo '### ccache hit rate' >> "$GITHUB_STEP_SUMMARY"
             ccache --show-stats >> "$GITHUB_STEP_SUMMARY"
             ccache --show-stats
 
