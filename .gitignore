@@ -29,6 +29,7 @@ e2e/screenshots/
 e2e/test-results/
 e2e/report/
 e2e/test-run.log
+e2e/test-results/.last-run.json
 playwright-report/
 
 # cinematic-compare.py (TIM-705) regenerates this per-run
@@ -39,3 +40,4 @@ __pycache__/
 e2e/tim772/
 result
 *.drv
+
