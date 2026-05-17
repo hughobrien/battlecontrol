@@ -162,6 +162,12 @@
           nodejs
           clang-tools
           cppcheck
+          # Linting tools
+          ruff
+          shellcheck
+          shfmt
+          yamllint
+          nixfmt
         ];
 
         buildInputs = with pkgs; [
@@ -182,25 +188,52 @@
           export RA_ASSETS="''${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
           export TD_ASSETS="''${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
 
-          # Install git pre-commit hook for linting staged C/C++ files
+          # Install git pre-commit hook for linting all staged files
           REPO_ROOT="''$(git rev-parse --show-toplevel 2>/dev/null || true)"
           if [ -n "$REPO_ROOT" ] && [ ! -f "$REPO_ROOT/.git/hooks/pre-commit" ]; then
             HOOK="$REPO_ROOT/.git/hooks/pre-commit"
             cat > "$HOOK" << 'PREHOOK'
           #!/usr/bin/env bash
           set -euo pipefail
-          STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|c|h|hpp)$' || true)
-          if [ -z "$STAGED" ]; then
-            exit 0
+          echo "=== Pre-commit linting ==="
+
+          # C/C++
+          C_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|c|h|hpp)$' || true)
+          if [ -n "$C_STAGED" ]; then
+            echo "$C_STAGED" | while IFS= read -r f; do
+              python3 scripts/lint-lp64.py --dirs "$(dirname "$f")" 2>/dev/null || true
+            done
+            echo "$C_STAGED" | xargs clang-tidy -p build --quiet 2>/dev/null || true
           fi
-          echo "=== Linting staged C/C++ files ==="
-          echo "$STAGED" | while IFS= read -r f; do
-            python3 scripts/lint-lp64.py --dirs "$(dirname "$f")" 2>/dev/null || true
-          done
-          echo "$STAGED" | xargs clang-tidy -p build --quiet 2>/dev/null || true
+
+          # Python (ruff check + format)
+          PY_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
+          if [ -n "$PY_STAGED" ]; then
+            echo "$PY_STAGED" | xargs ruff check --fix 2>/dev/null || true
+            echo "$PY_STAGED" | xargs ruff format 2>/dev/null || true
+          fi
+
+          # YAML
+          YML_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.ya?ml$' || true)
+          if [ -n "$YML_STAGED" ]; then
+            echo "$YML_STAGED" | xargs yamllint 2>/dev/null || true
+          fi
+
+          # Shell
+          SH_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.sh$' || true)
+          if [ -n "$SH_STAGED" ]; then
+            echo "$SH_STAGED" | xargs shellcheck 2>/dev/null || true
+            echo "$SH_STAGED" | xargs shfmt -w 2>/dev/null || true
+          fi
+
+          # Nix
+          NIX_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.nix$' || true)
+          if [ -n "$NIX_STAGED" ]; then
+            echo "$NIX_STAGED" | xargs nixfmt --check 2>/dev/null || true
+          fi
           PREHOOK
             chmod +x "$HOOK"
-            echo "Installed git pre-commit hook for C/C++ linting"
+            echo "Installed git pre-commit hook for linting"
           fi
 
           echo "C&C Red Alert — dev shell"
@@ -209,7 +242,7 @@
           echo "  nix run .#check              toolchain prerequisites"
           echo "  nix run .#build-native       native Linux build (ra/td/both)"
           echo "  nix run .#lint               LP64 hazard audit"
-          echo "  nix run .#lint-all           LP64 + clang-tidy + cppcheck"
+          echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
           echo "  nix run .#build-wasm         WASM build (ra/td/both)"
           echo "  nix run .#validate-wasm      WASM binary validation"
           echo "  nix run .#serve              both dev servers"
@@ -397,6 +430,20 @@
             -I linux/win32-stubs \
             REDALERT TIBERIANDAWN 2>&1 | tee /tmp/cppcheck-report.txt
           echo "$(grep -c 'error:\|warning:' /tmp/cppcheck-report.txt 2>/dev/null || echo 0) cppcheck finding(s)"
+          echo ""
+          echo "=== Python (ruff check + format) ==="
+          ruff check scripts/ e2e/ wasm/ 2>&1 || true
+          ruff format --check --diff scripts/ e2e/ wasm/ 2>&1 || true
+          echo ""
+          echo "=== YAML (yamllint) ==="
+          yamllint .github/workflows/ 2>&1 || true
+          echo ""
+          echo "=== Shell (shellcheck + shfmt) ==="
+          find scripts/ -name '*.sh' -exec shellcheck {} + 2>&1 || true
+          find scripts/ -name '*.sh' -exec shfmt -d {} + 2>&1 || true
+          echo ""
+          echo "=== Nix (nixfmt) ==="
+          find . -name '*.nix' -not -path './build/*' -exec nixfmt --check {} + 2>&1 || true
         '';
 
         shim = mkApp "generate-shim" ''
