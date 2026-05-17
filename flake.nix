@@ -197,41 +197,39 @@
             cat > "$HOOK" << 'PREHOOK'
           #!/usr/bin/env bash
           set -euo pipefail
-          echo "=== Pre-commit linting ==="
+          ERRORS=0
 
-          # C/C++
-          C_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|c|h|hpp)$' || true)
-          if [ -n "$C_STAGED" ]; then
-            echo "$C_STAGED" | while IFS= read -r f; do
-              python3 scripts/lint-lp64.py --dirs "$(dirname "$f")" 2>/dev/null || true
-            done
-            echo "$C_STAGED" | xargs clang-tidy -p build --quiet 2>/dev/null || true
-          fi
+          auto_fixer() { "$@" 2>/dev/null || true; }
+          checker() { if ! "$@" 2>/dev/null; then ERRORS=$((ERRORS + 1)); fi; }
 
-          # Python (ruff check + format)
+          # ── Phase 1: Auto-fixers (never block) ─────────────────────────
           PY_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
-          if [ -n "$PY_STAGED" ]; then
-            echo "$PY_STAGED" | xargs ruff check --fix 2>/dev/null || true
-            echo "$PY_STAGED" | xargs ruff format 2>/dev/null || true
-          fi
+          for f in $PY_STAGED; do auto_fixer ruff check --fix "$f"; done
+          for f in $PY_STAGED; do auto_fixer ruff format "$f"; done
 
-          # YAML
-          YML_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.ya?ml$' || true)
-          if [ -n "$YML_STAGED" ]; then
-            echo "$YML_STAGED" | xargs yamllint 2>/dev/null || true
-          fi
-
-          # Shell
           SH_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.sh$' || true)
-          if [ -n "$SH_STAGED" ]; then
-            echo "$SH_STAGED" | xargs shellcheck 2>/dev/null || true
-            echo "$SH_STAGED" | xargs shfmt -w 2>/dev/null || true
-          fi
+          for f in $SH_STAGED; do auto_fixer shfmt -w "$f"; done
 
-          # Nix
+          # ── Phase 2: Checkers (block on failure) ────────────────────────
+          echo "" && echo "=== Pre-commit linting ==="
+
+          C_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|c|h|hpp)$' || true)
+          for f in $C_STAGED; do checker python3 scripts/lint-lp64.py --dirs "$(dirname "$f")"; done
+          for f in $C_STAGED; do checker clang-tidy -p build --quiet "$f"; done
+
+          for f in $PY_STAGED; do checker ruff check "$f"; done
+
+          YML_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.ya?ml$' || true)
+          for f in $YML_STAGED; do checker yamllint "$f"; done
+
+          for f in $SH_STAGED; do checker shellcheck "$f"; done
+
           NIX_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.nix$' || true)
-          if [ -n "$NIX_STAGED" ]; then
-            echo "$NIX_STAGED" | xargs nixfmt --check 2>/dev/null || true
+          for f in $NIX_STAGED; do checker nixfmt --check "$f"; done
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "" && echo "✗ $ERRORS lint error(s) — commit blocked. Re-stage auto-fixed files and retry."
+            exit 1
           fi
           PREHOOK
             chmod +x "$HOOK"
