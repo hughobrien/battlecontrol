@@ -55,7 +55,7 @@ fi
 
 # ---- run ----
 echo "Running TD cheat smoke test (timeout ${TIMEOUT_SECS}s) ..."
-cd "$RUN_DIR"
+cd "$RUN_DIR" || exit 1
 TD_AUTOSTART=1 TD_CHEAT=1 DISPLAY="$DISPLAY_NUM" \
     timeout -k 5 "$TIMEOUT_SECS" "$TD_BIN" >"$LOG" 2>&1 || true
 

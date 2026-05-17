@@ -75,7 +75,7 @@ ok=0; fail=0; skipped=0
 OBJECTS=()
 
 for src in "${SOURCES[@]}"; do
-    rel="${src#$REPO_ROOT/}"
+    rel="${src#"$REPO_ROOT"/}"
     case "$rel" in
         REDALERT/DTABLE.CPP|REDALERT/ITABLE.CPP)
             skipped=$((skipped+1)); continue ;;

@@ -136,6 +136,7 @@ DISPLAY="$XDISP" openbox > "$ARTIFACT_DIR/openbox.log" 2>&1 &
 WM_PID=$!
 sleep 1
 
+# shellcheck disable=SC2329
 cleanup() {
     [[ -n "${RA_PID:-}" ]] && kill "$RA_PID" 2>/dev/null || true
     WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
@@ -151,7 +152,7 @@ shoot() {
     local delay_ms="${2:-0}"
     local bmp="$ARTIFACT_DIR/${stem}.bmp"
     local png="$ARTIFACT_DIR/${stem}.png"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= WINEPREFIX="$WINEPREFIX" \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
         WINEDEBUG=-all "$WINE" "$STAGE/ra-screenshot.exe" "$bmp" "$delay_ms" \
         >> "$ARTIFACT_DIR/helper.log" 2>&1 || true
     if [[ -f "$bmp" ]]; then
@@ -167,7 +168,7 @@ echo
 echo "=== launching RA95.EXE ==="
 (
     cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
         WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
@@ -228,7 +229,7 @@ for i in $(seq 0 $((FRAMES - 1))); do
         delta=$((offset_sec - prev))
         sleep "$delta"
     fi
-    shoot "vqa-${VQA_STEM}-$(printf '%04d' $i)" 0
+    shoot "vqa-${VQA_STEM}-$(printf '%04d' "$i")" 0
     if ! kill -0 $RA_PID 2>/dev/null; then
         echo "  RA exited early"
         break
@@ -241,7 +242,7 @@ echo "=== validation ==="
 pass=0
 fail=0
 for i in $(seq 0 $((FRAMES - 1))); do
-    png="$ARTIFACT_DIR/vqa-${VQA_STEM}-$(printf '%04d' $i).png"
+    png="$ARTIFACT_DIR/vqa-${VQA_STEM}-$(printf '%04d' "$i").png"
     if [[ -f "$png" ]]; then
         sz=$(stat -c%s "$png")
         if [[ $sz -gt 5000 ]]; then

@@ -36,7 +36,7 @@ pkill -f "Xvfb :99" 2>/dev/null || true
 Xvfb :99 -screen 0 640x480x24 -ac &
 XVFB_PID=$!
 sleep 1
-trap "kill -9 $XVFB_PID 2>/dev/null || true" EXIT
+trap 'kill -9 "$XVFB_PID" 2>/dev/null || true' EXIT
 
 (cd "$RUN_DIR" && DISPLAY=:99 SDL_AUDIODRIVER=dummy \
     RA_AUTOSTART=1 RA_SCENE=SCG02EA.INI \

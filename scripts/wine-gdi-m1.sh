@@ -222,6 +222,7 @@ DISPLAY="$XDISP" openbox > "$ARTIFACT_DIR/openbox.log" 2>&1 &
 WM_PID=$!
 sleep 1
 
+# shellcheck disable=SC2329
 cleanup() {
     [[ -n "${TD_PID:-}" ]] && kill "$TD_PID" 2>/dev/null || true
     WINEPREFIX="$WINEPREFIX" wineserver -k 2>/dev/null || true
@@ -245,7 +246,7 @@ echo
 echo "=== launching C&C95.EXE ==="
 (
     cd "$STAGE"
-    DISPLAY="$XDISP" WAYLAND_DISPLAY= \
+    DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
         WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
         WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
         WINEDEBUG=-all AUDIODEV=null \
@@ -285,7 +286,8 @@ shoot() {
     # HWND's DC; capturing via another Win32 BitBlt reads that same DC.
     # Z: = Linux root in Wine; path must use backslashes.
     local bmp_linux="/tmp/td-shot-${name}.bmp"
-    local bmp_wine="Z:$(echo "$bmp_linux" | tr '/' '\\')"
+    local bmp_wine
+    bmp_wine="Z:${bmp_linux//\//\\}"
     if [[ -f "$TD_SCREENSHOT" ]]; then
         DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
             WINEDEBUG=-all \
@@ -306,8 +308,9 @@ Image.open('$bmp_linux').convert('RGB').save('$png')
     fi
 
     if [[ -f "$png" ]]; then
-        local sz=$(stat -c%s "$png")
-        local sha=$(sha256sum "$png" | cut -c1-12)
+        local sz sha
+        sz=$(stat -c%s "$png")
+        sha=$(sha256sum "$png" | cut -c1-12)
         local colors
         colors=$(python3 -c "
 from PIL import Image
@@ -381,6 +384,7 @@ inject_key() {
         "$WINE" "$TD_SENDINPUT" key "$vk" 2>/dev/null || true
 }
 
+# shellcheck disable=SC2329
 inject_click() {
     local x="$1" y="$2"
     if [[ ! -f "$TD_SENDINPUT" ]]; then
@@ -469,7 +473,7 @@ shoot "t90-frame500"
 echo
 echo "=== final ==="
 echo "  TD alive: $(kill -0 $TD_PID 2>/dev/null && echo yes || echo no)"
-DISPLAY="$XDISP" xdotool search --name . 2>/dev/null | while read wid; do
+DISPLAY="$XDISP" xdotool search --name . 2>/dev/null | while read -r wid; do
     NAME=$(DISPLAY="$XDISP" xdotool getwindowname "$wid" 2>/dev/null || echo "")
     [[ -n "$NAME" ]] && echo "  window: $NAME"
 done
