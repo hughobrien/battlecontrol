@@ -146,12 +146,11 @@
       # -----------------------------------------------------------------------
       # devShells.default  —  nix develop
       # -----------------------------------------------------------------------
-      devShells.${system}.default = pkgs.mkShell {
+      devShells.${system}.default = (pkgs.mkShell.override { stdenv = pkgs.clangStdenv; }) {
         nativeBuildInputs = with pkgs; [
           cmake
           gnumake
           ninja
-          clang
           python3
           pkg-config
           emscripten  # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
