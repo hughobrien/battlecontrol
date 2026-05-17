@@ -24,9 +24,10 @@ audio / gameplay path for Red Alert and Tiberian Dawn WASM builds.
 \* `no` = requires licensed CnC Remastered MIX files not available in upstream
 CI.  The same test passes on a developer machine with assets symlinked.
 
-\*\* `yes` = wired in `.github/workflows/gh-pages.yml`.  Skips gracefully when
-the corresponding asset URL secret (`RA_ASSETS_URL` / `TD_ASSETS_URL`) is
-unset, so the CI job still passes on forks or branches that lack the secret.
+\*\* `yes` = wired in `.github/workflows/ci.yml` and `.github/workflows/gh-pages.yml`.
+Skips gracefully when the corresponding asset URL secret (`RA_ASSETS_URL` /
+`TD_ASSETS_URL`) is unset, so the CI job still passes on forks or branches
+that lack the secret.
 
 ## Pass / fail criteria
 
