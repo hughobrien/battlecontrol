@@ -19,7 +19,6 @@ env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   EM_CACHE_DIR: ${{ github.workspace }}/.emscripten-cache
   DISPLAY: :99
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-deploy:
