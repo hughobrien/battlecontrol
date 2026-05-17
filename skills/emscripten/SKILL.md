@@ -6,6 +6,10 @@ version: 0.1.0
 
 # Emscripten / WebAssembly Porting Skill
 
+> **Tools available via `pi-battlecontrol-dev` extension:** `wasm_build`, `wasm_validate`,
+> `wasm_screenshot`, `run_e2e_test`.
+> Ask the agent to run these instead of typing raw commands.
+
 You are guiding work on a C++ → WASM port using Emscripten. This project has an active
 playbook at `docs/emscripten-playbook.md` — read it first for symptom→root-cause→fix
 entries derived from real issues in this repo.
@@ -250,14 +254,14 @@ Target: collapse the porting work to 2–3 commits using this checklist.
 
 ## §8 — Verification bar (required before marking done)
 
-| Gate | Minimum proof |
-|---|---|
-| **Build** | `emcc` produces `.wasm` + `.js` without warnings about undefined symbols |
-| **Loads** | `onRuntimeInitialized` fires; no `Uncaught` in DevTools console |
-| **File I/O** | Required assets accessible via VFS (preload log or runtime probe) |
-| **Audio** | 5/5 cold-cache CI runs pass; pitch confirmed correct |
-| **Video** | Screenshot inspection of rendered frames — quantitative fill-% alone insufficient |
-| **Exit** | Process exits cleanly; no runaway Worker |
+| Gate | How | Minimum proof |
+|------|-----|---------------|
+| **Build** | `wasm_build(target: "ra")` then `wasm_validate(target: "ra")` | `.wasm` + `.js` produced, magic + size > 1MB valid |
+| **Loads** | `run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")` | `onRuntimeInitialized` fires; no `Uncaught` in DevTools |
+| **File I/O** | Required assets accessible via VFS (preload log or runtime probe) | Manual check |
+| **Audio** | `run_e2e_test(spec: "e2e/tim603-audio-pitch-probe.spec.ts")` | 5/5 cold-cache CI runs pass |
+| **Video** | `wasm_screenshot(target: "ra", waitMs: 2000)` — inspect visually | Fill-% alone insufficient (TIM-587) |
+| **Exit** | Process exits cleanly; no runaway Worker | Manual check |
 
 Never mark WASM audio verified on a single CI run. Screenshot inspection is required for
 any visual output — quantitative metrics can pass while frames show corruption (TIM-587).

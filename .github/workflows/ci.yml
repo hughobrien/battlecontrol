@@ -1,3 +1,9 @@
+# CI — thin wrapper around flake apps.
+# Local equivalent: nix run .#ci-build-native
+#                   nix run .#ci-vqa
+#                   nix run .#ci-build-wasm
+#                   nix run .#ci-clang-tidy
+
 name: CI
 
 concurrency:
@@ -16,30 +22,18 @@ env:
 
 jobs:
   build:
-    name: Compile and link (${{ matrix.compiler }})
+    name: Compile and link (clang)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    strategy:
-      matrix:
-        compiler: [gcc, clang]
-      fail-fast: false
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            g++ clang \
-            libsdl2-dev \
-            xvfb \
-            binutils \
-            python3 \
-            cmake \
-            ninja-build \
-            ccache \
-            libsdl2-ttf-dev
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
       - name: Configure ccache
         run: |
@@ -50,67 +44,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ matrix.compiler }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'installer/CMakeLists.txt') }}
+          key: ccache-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'installer/CMakeLists.txt') }}
           restore-keys: |
-            ccache-${{ matrix.compiler }}-
             ccache-
 
-      - name: Configure cmake
+      - name: Build native + smoke
         run: |
-          if [ "${{ matrix.compiler }}" = "clang" ]; then
-            export CC=clang CXX=clang++
-          fi
-          cmake --preset linux-native \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-
-      - name: Build RA native
-        run: cmake --build build --target ra --parallel
-
-      - name: Build TD native
-        run: cmake --build build --target td --parallel
-
-      - name: Verify native binaries
-        run: |
-          for bin in ra td; do
-            path="build/$bin"
-            if ! file "$path" 2>/dev/null | grep -q "ELF 64-bit"; then
-              echo "::error::$bin: invalid or missing at $path"
-              exit 1
-            fi
-            size=$(stat -c%s "$path")
-            echo "::notice::$bin: OK ($(numfmt --to=iec $size), ELF 64-bit)"
-          done
-
-      - name: Smoke-test under Xvfb
-        run: |
-          Xvfb :99 -screen 0 640x480x24 -ac &
-          XVFB_PID=$!
-          sleep 1
-          if [ ! -e /tmp/.X99-lock ]; then
-            echo "::error::Xvfb :99 did not start"
-            exit 1
-          fi
-          PASS=0; FAIL=0
-          for bin in ra td; do
-            echo "::group::smoke: $bin"
-            DISPLAY=:99 SDL_AUDIODRIVER=dummy timeout 5 "build/$bin" > "/tmp/smoke-${bin}.log" 2>&1 && RC=$? || RC=$?
-            LOG=$(cat "/tmp/smoke-${bin}.log")
-            echo "$LOG"
-            if echo "$LOG" | grep -qE "SIGSEGV|Segmentation fault|signal 11|CRASH|Aborted"; then
-              echo "::error::$bin: crash signal in output"
-              FAIL=$((FAIL+1))
-            elif [ "$RC" -eq 124 ] || [ "$RC" -eq 143 ]; then
-              echo "::notice::$bin: alive — timed out (5 s)"
-              PASS=$((PASS+1))
-            else
-              echo "::notice::$bin: exited with code $RC (non-crash)"
-              PASS=$((PASS+1))
-            fi
-            echo "::endgroup::"
-          done
-          kill "$XVFB_PID" 2>/dev/null || true
-          echo "smoke: pass=$PASS fail=$FAIL"
-          [ "$FAIL" -eq 0 ] || exit 1
+          nix develop --command bash -c "
+            export CCACHE_DIR=${{ env.CCACHE_DIR }}
+            nix run .#ci-build-native
+          "
 
       - name: ccache stats
         run: |
@@ -126,46 +69,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg python3
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
 
-      - name: Regenerate synthetic test VQA
-        # Ensures the committed test.vqa is bit-for-bit identical to what the
-        # generator produces on this Python version (catches generator drift).
-        run: |
-          python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa.new
-          if ! diff -q e2e/goldens/vqa/test.vqa e2e/goldens/vqa/test.vqa.new; then
-            echo "ERROR: committed test.vqa differs from generator output"
-            echo "Run: python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa"
-            exit 1
-          fi
-          rm e2e/goldens/vqa/test.vqa.new
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ffmpeg
 
-      - name: VQA pixel-diff — synthetic test VQA (always runs)
-        # Compares our Python reference decoder against ffmpeg on the committed
-        # synthetic VQA.  This gate always runs regardless of game-data presence.
-        # Catches: codebook bugs, palette scaling bugs, solid-marker regressions.
-        run: |
-          python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa \
-            --frames 0,1,2 \
-            --threshold 5
-
-      - name: VQA pixel-diff — game VQA samples (skips if data absent)
-        # Runs the same harness against real VQA files from MAIN.MIX when the
-        # game data symlink build/run-172 is present.  Always exits 0 when data
-        # is absent so the job does not block PRs from contributors without data.
-        run: |
-          if [ -f build/run-172/MAIN.MIX ]; then
-            python3 scripts/vqa-pixel-diff.py build/run-172/MAIN.MIX \
-              --frames 0,29,59 \
-              --threshold 5 \
-              --quiet
-          else
-            echo "SKIP: build/run-172/MAIN.MIX not found — game data absent"
-            exit 0
-          fi
+      - name: Run VQA pixel-diff
+        run: nix develop --command nix run .#ci-vqa
 
   wine-comparison:
     name: Wine OG comparison
@@ -175,6 +86,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -183,8 +100,6 @@ jobs:
         run: npm ci && npx playwright install --with-deps chromium firefox
 
       - name: Install Wine32 + system tools
-        # wine32:i386 provides 32-bit Wine support needed to run RA95.EXE (16/32-bit Win).
-        # imagemagick provides `import` (screenshot capture used by wine-ra.sh).
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -qq
@@ -192,15 +107,12 @@ jobs:
             wine32:i386 xvfb xdotool imagemagick
 
       - name: Cache RA95.EXE
-        # Keyed on RA95.EXE SHA-256 — immutable file, cache never expires.
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/ra95-cache
           key: ra95-exe-a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55
 
       - name: Prepare RA95.EXE
-        # Pre-populate /opt/redalert from cache so wine-ra-setup.sh skips the 2.2 MB download.
-        # wine-ra-setup.sh handles its own SHA verification, so a cache hit is safe.
         run: |
           sudo mkdir -p /opt/redalert && sudo chmod 777 /opt/redalert
           if [ -f "$RUNNER_TEMP/ra95-cache/RA95.EXE" ]; then
@@ -212,26 +124,19 @@ jobs:
             mkdir -p "$RUNNER_TEMP/ra95-cache"
             cp /opt/redalert/*.EXE /opt/redalert/*.DLL "$RUNNER_TEMP/ra95-cache/" 2>/dev/null || true
           fi
-          wine --version || true
 
       - name: Run OG Red Alert under Wine
-        # wine-ra.sh requires DATA_DIR (/CnCRemastered/...) with MIX files.
-        # On a fresh runner this directory is absent so the script exits 1 — we
-        # catch that with || and record wine_ok=false so the test tier skips.
         id: wine-run
         run: |
           bash scripts/wine-ra.sh \
             && echo "wine_ok=true"  >> "$GITHUB_OUTPUT" \
             || echo "wine_ok=false" >> "$GITHUB_OUTPUT"
 
-      - name: Set WINE_RA_READY when screenshots were captured
+      - name: Set WINE_RA_READY when screenshots captured
         if: steps.wine-run.outputs.wine_ok == 'true'
         run: echo "WINE_RA_READY=1" >> "$GITHUB_ENV"
 
       - name: Run Tier 1 + Tier 3 comparison tests
-        # Tier 1 (MIX checksums) skips when /CnCRemastered is absent.
-        # Tier 3 (Wine OG) skips when WINE_RA_READY is not set (wine-ra.sh failed).
-        # On a fresh runner both tiers skip — job exits 0 (no failures).
         run: |
           Xvfb :99 -screen 0 1280x1024x24 &
           XVFB_PID=$!
@@ -240,8 +145,7 @@ jobs:
             sleep 0.5
           done
           npx playwright test e2e/tim699-ra-compare.spec.ts \
-            --grep "Tier 1|Tier 3" \
-            --reporter=line
+            --grep "Tier 1|Tier 3" --reporter=line
           PW_EXIT=$?
           kill "$XVFB_PID" 2>/dev/null || true
           exit $PW_EXIT
@@ -272,7 +176,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Emscripten
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Install Emscripten (for emcmake outside nix)
         uses: mymindstorm/setup-emsdk@v14
         with:
           version: '5.0.6'
@@ -286,42 +196,7 @@ jobs:
           restore-keys: |
             emcc-cache-5.0.6-
 
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ninja-build cmake xvfb
-
-      - name: Configure WASM build
-        env:
-          EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: emcmake cmake --preset wasm
-
-      - name: Build ra.wasm
-        env:
-          EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: cmake --build build-wasm --target ra --parallel
-
-      - name: Build td.wasm
-        env:
-          EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: cmake --build build-wasm --target td --parallel
-
-      - name: Validate WASM binaries
-        run: |
-          python3 - <<'EOF'
-          import os, struct
-          MIN_SIZE = 1_000_000
-          for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
-              with open(name, 'rb') as f:
-                  magic = f.read(4)
-              assert magic == b'\x00asm', f'{name}: invalid WASM magic {magic!r}'
-              size = os.path.getsize(name)
-              assert size > MIN_SIZE, f'{name}: suspiciously small ({size} bytes < {MIN_SIZE})'
-              print(f'{name}: {size // 1024} KB — OK')
-          EOF
-
-      - name: Set up Node.js for smoke tests
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -331,58 +206,14 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium firefox
 
-      - name: WASM boot smoke — ra.wasm + td.wasm load without crash
-        # Asset-free regression: loads both ra.html and td.html, observes each
-        # for 30 s, asserts zero pageerror events. Catches WASM parse errors,
-        # null-function traps (TIM-593/TIM-620 class), and Emscripten init
-        # exceptions. Runs T1 and T2 from the regression suite.
-        # serve-coop.py is required for COOP+COEP headers (SharedArrayBuffer).
+      - name: Build WASM + validate + smoke (T1/T2)
+        env:
+          EM_CACHE: ${{ env.EM_CACHE_DIR }}
         run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 npx playwright test \
-            e2e/regression/T1-ra-wasm-boot.spec.ts \
-            e2e/regression/T2-td-wasm-boot.spec.ts
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $SMOKE_EXIT
-
-      - name: Upload T1 artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wasm-ci-smoke-results
-          path: |
-            e2e/screenshots/t1-ra-wasm-boot.png
-            e2e/test-results/
-
-      - name: WASM regression — T2 TD boot smoke (asset-free)
-        run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $SMOKE_EXIT
-
-      - name: Upload T2 artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t2-td-wasm-boot-results
-          path: |
-            e2e/screenshots/t2-td-wasm-boot.png
-            e2e/test-results/
+          nix develop --command bash -c "
+            export EM_CACHE=${{ env.EM_CACHE_DIR }}
+            nix run .#ci-build-wasm
+          "
 
       - name: WASM regression — T3 TD menu click (asset-gated)
         env:
@@ -393,25 +224,17 @@ jobs:
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T3-td-wasm-menu.spec.ts
-          T3_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T3_EXIT
 
       - name: Upload T3 artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: t3-td-wasm-menu-results
-          path: |
-            e2e/screenshots/t3-td-wasm-menu-*.png
-            e2e/test-results/
+          path: e2e/screenshots/t3-td-wasm-menu-*.png
 
       - name: WASM regression — T6 TD mission start (asset-gated)
         env:
@@ -422,27 +245,19 @@ jobs:
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T6-td-wasm-mission-start.spec.ts
-          T6_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T6_EXIT
 
       - name: Upload T6 artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: t6-td-wasm-mission-start-results
-          path: |
-            e2e/screenshots/t6-td-wasm-*.png
-            e2e/test-results/
+          path: e2e/screenshots/t6-td-wasm-*.png
 
-      - name: WASM regression — T7 TD audio pitch probe (asset-gated)
+      - name: WASM regression — T7 TD audio pitch (asset-gated)
         env:
           TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
         run: |
@@ -451,29 +266,19 @@ jobs:
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T7-td-audio-pitch.spec.ts
-          T7_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T7_EXIT
 
       - name: Upload T7 artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: t7-td-audio-pitch-results
-          path: |
-            e2e/screenshots/t7-td-*.png
-            e2e/screenshots/t7-td-fft-*.json
-            e2e/screenshots/t7-td-console.log
-            e2e/test-results/
+          path: e2e/screenshots/t7-td-*.png
 
-      - name: WASM regression — T8 RA audio pitch probe (asset-gated)
+      - name: WASM regression — T8 RA audio pitch (asset-gated)
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
         run: |
@@ -482,27 +287,17 @@ jobs:
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T8-ra-audio-pitch.spec.ts
-          T8_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T8_EXIT
 
       - name: Upload T8 artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: t8-ra-audio-pitch-results
-          path: |
-            e2e/screenshots/t8-ra-*.png
-            e2e/screenshots/t8-ra-fft-*.json
-            e2e/screenshots/t8-ra-console.log
-            e2e/test-results/
+          path: e2e/screenshots/t8-ra-*.png
 
       - name: WASM regression — T9 RA mission start (asset-gated)
         env:
@@ -513,26 +308,17 @@ jobs:
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T9-ra-wasm-mission-start.spec.ts
-          T9_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T9_EXIT
 
       - name: Upload T9 artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: t9-ra-wasm-mission-start-results
-          path: |
-            e2e/screenshots/t9-ra-wasm-*.png
-            e2e/test-results/
-          if-no-files-found: ignore
+          path: e2e/screenshots/t9-ra-wasm-*.png
 
   clang-tidy:
     name: clang-tidy static analysis
@@ -542,31 +328,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            clang-tidy \
-            cmake \
-            ninja-build \
-            python3 \
-            libsdl2-dev \
-            libsdl2-ttf-dev
-
-      - name: Configure cmake (generates compile_commands.json)
-        run: cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
       - name: Run clang-tidy
         id: clang-tidy
         continue-on-error: true
-        run: |
-          find REDALERT TIBERIANDAWN -type f \
-            \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \
-               -o -name '*.cc' -o -name '*.cxx' -o -name '*.c++' \) \
-            | xargs -P "$(nproc)" -I{} clang-tidy \
-                -p build --quiet {} 2>&1 \
-            | tee clang-tidy-report.txt
-          echo "clang-tidy: $(grep -c 'warning:\|error:' clang-tidy-report.txt 2>/dev/null || echo 0) finding(s) reported"
+        run: nix develop --command nix run .#ci-clang-tidy
 
       - name: Upload clang-tidy report
         if: always()
@@ -584,6 +355,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
       - name: Install cppcheck
         run: |
           sudo apt-get update -qq
@@ -592,21 +369,7 @@ jobs:
       - name: Run cppcheck
         id: cppcheck
         continue-on-error: true
-        run: |
-          cppcheck \
-            --enable=warning,performance,portability,information \
-            --suppress=missingIncludeSystem \
-            --suppress=unmatchedSuppression \
-            --inline-suppr \
-            --error-exitcode=0 \
-            -j "$(nproc)" \
-            --quiet \
-            -I REDALERT -I REDALERT/WIN32LIB \
-            -I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
-            -I linux/win32-stubs \
-            REDALERT TIBERIANDAWN \
-            2>&1 | tee cppcheck-report.txt
-          echo "cppcheck: $(grep -c 'error:\|warning:' cppcheck-report.txt 2>/dev/null || echo 0) finding(s) reported"
+        run: nix develop --command nix run .#ci-cppcheck
 
       - name: Upload cppcheck report
         if: always()

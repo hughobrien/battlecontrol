@@ -6,6 +6,9 @@ version: 0.1.0
 
 # VQA Codec Skill
 
+> **Tools available via `pi-battlecontrol-dev` extension:** `vqa_pixel_diff`.
+> Ask the agent to run this instead of typing raw commands.
+
 You are working on the VQA (Westwood Vector Quantized Animation) codec used by C&C
 Red Alert and Tiberian Dawn for cinematic cutscenes. The project has a C++ reference
 decoder (`linux/win32-stubs/vqa_player.cpp`), a Python reference decoder
@@ -18,10 +21,12 @@ Read `docs/codec-testing.md` for codec-testing context before starting.
 
 ## Phase 0 — Quick check
 
-```bash
-# Run the always-available synthetic VQA gate (no game data needed):
-python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa --frames 0,1,2 --threshold 5
+Run the synthetic VQA gate (no game data needed):
+
 ```
+vqa_pixel_diff(mode: "synthetic", threshold: 5)
+```
+
 
 Exit codes: **0** = pass, **1** = fail, **2** = skip (ffmpeg absent).
 
@@ -189,8 +194,8 @@ When `vqa_player.cpp` changes in a way that affects frame output:
 
 1. Update `vqa_decode_verify.py` to match the C++ logic
 2. Regenerate synthetic test VQA if needed
-3. Run the harness: `python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa --frames 0,1,2`
-4. On real game data (if available): `python3 scripts/vqa-pixel-diff.py build/run-172/MAIN.MIX`
+3. Run the harness: `vqa_pixel_diff(mode: "synthetic", threshold: 5)`
+4. On real game data (if available): `vqa_pixel_diff(mode: "cinematic", threshold: 5)`
 5. Confirm p99 ≤ 5 for all frames
 
 ---
@@ -212,11 +217,11 @@ blocking PRs from contributors without data.
 
 ## §7 — Verification bar
 
-| Gate | Command | Expected result |
-|------|---------|----------------|
-| Synthetic VQA | `python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa --frames 0,1,2` | Exit 0, p99 ≤ 5 |
+| Gate | Tool / Command | Expected result |
+|------|----------------|----------------|
+| Synthetic VQA | `vqa_pixel_diff(mode: "synthetic", threshold: 5)` | Exit 0, p99 ≤ 5 |
 | Generator sync | `python3 scripts/gen_test_vqa.py /tmp/test.vqa.new && diff -q e2e/goldens/vqa/test.vqa /tmp/test.vqa.new` | Identical |
-| Game VQA (optional) | `python3 scripts/vqa-pixel-diff.py build/run-172/MAIN.MIX --frames 0,29,59` | Exit 0, p99 ≤ 5 |
+| Game VQA (optional) | `vqa_pixel_diff(mode: "cinematic", threshold: 5)` or `python3 scripts/vqa-pixel-diff.py ...` | Exit 0, p99 ≤ 5 |
 
 ---
 

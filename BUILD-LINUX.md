@@ -40,7 +40,7 @@ cd /path/to/red-alert-data
 nix run github:hughobrien/battlecontrol
 
 # Or pass the data path via env:
-RA_DATA_DIR=/path/to/red-alert-data nix run github:hughobrien/battlecontrol
+RA_ASSETS=/path/to/red-alert-data nix run github:hughobrien/battlecontrol
 ```
 
 ### Build only

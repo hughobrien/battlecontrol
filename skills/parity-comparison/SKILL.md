@@ -6,6 +6,10 @@ version: 0.1.0
 
 # Parity Comparison Skill
 
+> **Tools available via `pi-battlecontrol-dev` extension:** `data_verify`, `wine_capture`,
+> `parity_compare`, `wasm_screenshot`, `vqa_pixel_diff`, `run_e2e_test`.
+> Ask the agent to run these instead of typing raw commands.
+
 You are comparing output from the WASM or native Linux C&C build against the original
 Windows Red Alert (RA95.EXE) or Tiberian Dawn (C&C95.EXE) running under Wine. The goal
 is pixel-level visual parity: every frame, menu, and gameplay scene should be
@@ -21,13 +25,14 @@ triage failures.
 
 Before visual comparison, verify the game data matches the reference:
 
-```bash
-# Tier 1 — MIX checksum verification (no Wine needed):
-python3 scripts/ra-data-verify.py [DATA_DIR]
+```
+data_verify(dir: "/path/to/game/data")
 ```
 
 If this fails, the game data is corrupt or from a different release — visual parity
 comparison will be invalid regardless of code correctness.
+
+
 
 ---
 
@@ -48,21 +53,22 @@ comparison will be invalid regardless of code correctness.
 
 ### §2.1 — Step 1: Capture Wine OG reference screenshots
 
-**Red Alert:**
-```bash
-# Capture title + menu (takes ~30s):
-bash scripts/wine-ra.sh
-# Output: e2e/screenshots/wine-ra-title.png, e2e/screenshots/wine-ra-menu.png
+Use the `wine_capture` tool:
 
-# Campaign-specific captures:
-bash scripts/wine-allied-l1.sh    # Allied L1
-bash scripts/wine-soviet-l1.sh    # Soviet L1 (golden stored in e2e/goldens/)
+```
+# Red Alert title + menu (takes ~30s):
+wine_capture(game: "ra")
+
+# Tiberian Dawn title + menu:
+wine_capture(game: "td")
 ```
 
-**Tiberian Dawn:**
+**Output:** `e2e/screenshots/wine-{game}-title.png` and `wine-{game}-menu.png`
+
+**Campaign-specific captures** (manual scripts only):
 ```bash
-bash scripts/wine-td.sh
-# Output: e2e/screenshots/wine-td-title.png, e2e/screenshots/wine-td-menu.png
+bash scripts/wine-allied-l1.sh    # Allied L1
+bash scripts/wine-soviet-l1.sh    # Soviet L1 (golden stored in e2e/goldens/)
 ```
 
 Set env vars to enable downstream comparison:
@@ -74,21 +80,22 @@ export WINE_TD_READY=1    # Enables TD parity tests
 ### §2.2 — Step 2: Capture WASM/Linux test screenshots
 
 **WASM (via Playwright):**
-```bash
-# Tier 1: captures WASM screenshots, always runs
-npm run test:e2e:wasm-parity
-# Output screenshots: e2e/screenshots/tim710-wasm-*.png
 
-# With Wine OG comparison enabled:
-WINE_RA_READY=1 npm run test:e2e:wasm-parity
+Use the `wasm_screenshot` tool for a quick capture:
+```
+wasm_screenshot(target: "ra", waitMs: 1000, buildFirst: true)
 ```
 
-**Native Linux:**
-```bash
-# Start Xvfb (idempotent, auto-cleanup on exit):
-source scripts/skill-xvfb-ensure.sh :99 640x480x24
+Or run the full parity E2E test suite:
+```
+run_e2e_test(spec: "e2e/tim710-wasm-parity.spec.ts")
+# With Wine OG comparison:
+# (run wine_capture first, then set WINE_RA_READY=1)
+```
 
-# Run game under Xvfb, capture via ffmpeg x11grab:
+**Native Linux:** (manual only)
+```bash
+source scripts/skill-xvfb-ensure.sh :99 640x480x24
 DISPLAY=:99 ./build/ra &
 sleep 10
 ffmpeg -f x11grab -video_size 640x480 -i :99 -frames:v 1 native-menu.png -y
@@ -96,17 +103,19 @@ ffmpeg -f x11grab -video_size 640x480 -i :99 -frames:v 1 native-menu.png -y
 
 ### §2.3 — Step 3: Run parity comparison
 
-```bash
-# SSIM + fill% + p99 pixel diff (Wine OG vs WASM/Linux):
-python3 scripts/parity-compare.py \
-    e2e/screenshots/wine-ra-menu.png \
-    e2e/screenshots/tim710-wasm-menu.png \
-    --label "RA-menu" \
-    --threshold-ssim 0.90 \
-    --diff-out e2e/screenshots/diff-menu.png
+Use the `parity_compare` tool:
 
-# Exit codes: 0=PASS, 1=FAIL, 2=SKIP
 ```
+parity_compare(
+  imageA: "e2e/screenshots/wine-ra-menu.png",
+  imageB: "e2e/screenshots/tim710-wasm-menu.png",
+  label: "RA-menu",
+  thresholdSsim: 0.90,
+  diffOut: "e2e/screenshots/diff-menu.png"
+)
+```
+
+
 
 Output includes:
 - **SSIM** — structural similarity (0–1). ≥0.90 = pass.
@@ -160,34 +169,25 @@ to run on any machine.
 
 ## §4 — Cinematic/VQA parity
 
-For frame-level cinematic comparison, use the cinematic pixel-diff harness which
-compares our Python VQA decoder against ffmpeg (as a proxy for Wine OG output):
+For frame-level cinematic comparison, use the `vqa_pixel_diff` tool:
 
-```bash
-# RA cinematics:
-python3 scripts/cinematic-compare.py \
-    /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1/MAIN.MIX \
-    --threshold 8
+```
+# RA cinematics (full game VQA scan):
+vqa_pixel_diff(mode: "cinematic", mixPath: "/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1/MAIN.MIX", threshold: 8)
 
 # TD cinematics:
-python3 scripts/td-cinematic-compare.py \
-    /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1/CONQUER.MIX
-
-# For specific VQA files:
-python3 scripts/cinematic-compare.py \
-    build/run-172/MAIN.MIX \
-    --threshold 5 \
-    --max-vqas 8
+vqa_pixel_diff(mode: "cinematic", mixPath: "/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1/CONQUER.MIX", threshold: 8)
 ```
+
+
 
 **Why ffmpeg ≈ Wine OG:** ffmpeg's VQA decoder is a clean-room reverse-engineering
 of the Westwood codec. Frame-for-frame output is effectively identical to RA95.EXE's
 output (±1 per channel on 6→8 bit palette expansion).
 
 **For WASM cinematic parity specifically:**
-```bash
-# WASM VQA verification (E2E test):
-npx playwright test e2e/tim600-english-vqa-verify.spec.ts
+```
+run_e2e_test(spec: "e2e/tim600-english-vqa-verify.spec.ts")
 ```
 
 ---
@@ -196,10 +196,10 @@ npx playwright test e2e/tim600-english-vqa-verify.spec.ts
 
 When a previously-passing parity check starts failing:
 
-1. **Check if the Wine OG reference changed.** Re-run `wine-ra.sh` and compare the
+1. **Check if the Wine OG reference changed.** Re-run `wine_capture(game: "ra")` and compare the
    new screenshot against the old one:
-   ```bash
-   python3 scripts/parity-compare.py old-wine-menu.png new-wine-menu.png --threshold-ssim 0.95
+   ```
+   parity_compare(imageA: "old-wine-menu.png", imageB: "e2e/screenshots/wine-ra-menu.png", thresholdSsim: 0.95)
    ```
    If SSIM < 0.95 between two Wine captures, the capture environment changed
    (Wine version, Xvfb depth, display settings).
@@ -222,6 +222,7 @@ When a previously-passing parity check starts failing:
    ```bash
    python3 scripts/parity-compare.py wine.png wasm.png --print-bbox
    ```
+   (The `parity_compare` tool doesn't expose `--print-bbox` yet — use the Python script directly for this.)
    If the content bboxes differ significantly, the captures are from different
    game states.
 
@@ -260,44 +261,41 @@ When a previously-passing parity check starts failing:
 
 ## §7 — Tools reference
 
-| Tool | Purpose | Input | Output |
-|------|---------|-------|--------|
-| `parity-compare.py` | SSIM + fill% + p99 diff | Two PNGs | JSON result + optional diff PNG |
-| `cinematic-compare.py` | VQA frame-by-frame pixel diff | MAIN.MIX | Per-VQA PASS/FAIL + JSON report |
-| `td-cinematic-compare.py` | TD VQA frame comparison | CONQUER.MIX | Same as cinematic-compare for TD |
-| `ra-data-verify.py` | MIX checksum + INI verification | CD1 data dir | PASS/FAIL per file |
-| `wine-ra.sh` | Wine OG RA capture | — | title + menu PNGs |
-| `wine-td.sh` | Wine OG TD capture | — | title + menu PNGs |
-| `wine-allied-l1.sh` | Wine OG Allied L1 | — | gameplay PNGs |
-| `wine-soviet-l1.sh` | Wine OG Soviet L1 | — | gameplay PNGs |
-| `tim710-wasm-parity.spec.ts` | WASM self-validation + Wine parity | — | Screenshots + PASS/FAIL |
-| `tim699-ra-compare.spec.ts` | RA Wine OG comparison (Tier 1+3) | — | MIX checksums + screenshot parity |
-| `tim711-td-compare.spec.ts` | TD Wine OG comparison | — | Screenshot parity |
+### Extension tools (preferred — ask the agent)
+
+| Tool | Purpose |
+|------|---------|
+| `data_verify` | MIX checksum + INI verification |
+| `wine_capture` | Wine OG title + menu screenshots |
+| `wasm_screenshot` | Capture a WASM game screenshot |
+| `parity_compare` | SSIM + fill% + p99 diff between two PNGs |
+| `vqa_pixel_diff` | VQA frame-by-frame pixel diff (synthetic or cinematic) |
+| `run_e2e_test` | Run a Playwright e2e test spec |
+
+### Underlying scripts (use directly for advanced options)
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/parity-compare.py` | SSIM + fill% + p99 diff (supports `--no-align`, `--print-bbox`, `--crop-bottom`) |
+| `scripts/cinematic-compare.py` | VQA frame-by-frame pixel diff (RA) |
+| `scripts/td-cinematic-compare.py` | VQA frame-by-frame pixel diff (TD) |
+| `scripts/ra-data-verify.py` | MIX checksum + INI verification |
+| `scripts/wine-ra.sh` / `wine-td.sh` | Wine OG launcher + screenshot capture |
+| `scripts/wine-allied-l1.sh` / `wine-soviet-l1.sh` | Campaign-specific captures |
+| `e2e/tim710-wasm-parity.spec.ts` | WASM self-validation + Wine parity |
+| `e2e/tim699-ra-compare.spec.ts` | RA Wine OG comparison (Tier 1+3) |
+| `e2e/tim711-td-compare.spec.ts` | TD Wine OG comparison |
 
 ---
 
 ## §8 — Verification bar (smoke test)
 
-```bash
-# 1. Data integrity (no Wine needed):
-python3 scripts/ra-data-verify.py [DATA_DIR]
-# Expected: exit 0 (or SKIP if data absent)
-
-# 2. Parity compare tool works (on any two PNGs):
-python3 scripts/parity-compare.py \
-    e2e/screenshots/wine-ra-menu.png \
-    e2e/screenshots/wine-ra-menu.png \
-    --label "self-test" --threshold-ssim 0.99
-# Expected: PASS with SSIM ≈ 1.0 (comparing image against itself)
-
-# 3. Cinematic compare (requires MAIN.MIX + ffmpeg):
-python3 scripts/cinematic-compare.py --threshold 8
-# Expected: all VQAs PASS, p99 ≤ 8 per frame
-
-# 4. WASM parity (requires wasm build + server):
-npx playwright test e2e/tim710-wasm-parity.spec.ts --grep "Tier 1"
-# Expected: all Tier 1 self-validation tests pass
-```
+| # | Check | Tool / Command | Expected |
+|---|-------|----------------|----------|
+| 1 | Data integrity | `data_verify(dir: ...)` or `python3 scripts/ra-data-verify.py [DATA_DIR]` | exit 0 (or SKIP) |
+| 2 | Parity compare works | `parity_compare(imageA: "...", imageB: "...", thresholdSsim: 0.99)` | SSIM ≈ 1.0 (same image vs itself) |
+| 3 | Cinematic compare | `vqa_pixel_diff(mode: "cinematic", threshold: 8)` | all VQAs PASS, p99 ≤ 8 |
+| 4 | WASM parity | `run_e2e_test(spec: "e2e/tim710-wasm-parity.spec.ts", args: ["--grep", "Tier 1"])` | all Tier 1 pass |
 
 ---
 
