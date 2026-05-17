@@ -114,7 +114,7 @@
           src = ./.;
 
           nativeBuildInputs = with pkgs; [ cmake ninja gcc python3 pkg-config ];
-          buildInputs       = with pkgs; [ SDL2 SDL2.dev openal xorg.libX11 ];
+          buildInputs       = with pkgs; [ SDL2 SDL2.dev openal libx11 ];
 
           buildPhase = ''
             runHook preBuild
@@ -169,7 +169,7 @@
           SDL2.dev
           SDL2_ttf
           openal
-          xorg.libX11
+          libx11
           # Script deps (campaign captures, screenshots, etc.)
           openbox
           xdotool
