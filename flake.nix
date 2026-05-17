@@ -181,12 +181,35 @@
         shellHook = ''
           export RA_ASSETS="''${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
           export TD_ASSETS="''${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
+
+          # Install git pre-commit hook for linting staged C/C++ files
+          REPO_ROOT="''$(git rev-parse --show-toplevel 2>/dev/null || true)"
+          if [ -n "$REPO_ROOT" ] && [ ! -f "$REPO_ROOT/.git/hooks/pre-commit" ]; then
+            HOOK="$REPO_ROOT/.git/hooks/pre-commit"
+            cat > "$HOOK" << 'PREHOOK'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|c|h|hpp)$' || true)
+          if [ -z "$STAGED" ]; then
+            exit 0
+          fi
+          echo "=== Linting staged C/C++ files ==="
+          echo "$STAGED" | while IFS= read -r f; do
+            python3 scripts/lint-lp64.py --dirs "$(dirname "$f")" 2>/dev/null || true
+          done
+          echo "$STAGED" | xargs clang-tidy -p build --quiet 2>/dev/null || true
+          PREHOOK
+            chmod +x "$HOOK"
+            echo "Installed git pre-commit hook for C/C++ linting"
+          fi
+
           echo "C&C Red Alert — dev shell"
           echo ""
           echo "Workflows (from repo root):"
           echo "  nix run .#check              toolchain prerequisites"
           echo "  nix run .#build-native       native Linux build (ra/td/both)"
           echo "  nix run .#lint               LP64 hazard audit"
+          echo "  nix run .#lint-all           LP64 + clang-tidy + cppcheck"
           echo "  nix run .#build-wasm         WASM build (ra/td/both)"
           echo "  nix run .#validate-wasm      WASM binary validation"
           echo "  nix run .#serve              both dev servers"
@@ -347,6 +370,33 @@
 
         lint = mkApp "lint-lp64" ''
           exec python3 scripts/lint-lp64.py --errors-only
+        '';
+
+        lint-all = mkApp "lint-all" ''
+          set -e
+          echo "=== LP64 hazard audit ==="
+          python3 scripts/lint-lp64.py --errors-only
+          echo ""
+          echo "=== clang-tidy ==="
+          cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>/dev/null || true
+          find REDALERT TIBERIANDAWN -type f \
+            \! -path '*/WIN32LIB/*' \
+            \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
+            | xargs -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
+            | tee /tmp/clang-tidy-report.txt
+          echo "$(grep -c 'warning:\|error:' /tmp/clang-tidy-report.txt 2>/dev/null || echo 0) clang-tidy finding(s)"
+          echo ""
+          echo "=== cppcheck ==="
+          cppcheck --enable=warning,performance,portability,information \
+            --suppress=missingIncludeSystem \
+            --suppress=unmatchedSuppression \
+            --inline-suppr --error-exitcode=0 \
+            -j "$(nproc)" --quiet \
+            -I REDALERT -I REDALERT/WIN32LIB \
+            -I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
+            -I linux/win32-stubs \
+            REDALERT TIBERIANDAWN 2>&1 | tee /tmp/cppcheck-report.txt
+          echo "$(grep -c 'error:\|warning:' /tmp/cppcheck-report.txt 2>/dev/null || echo 0) cppcheck finding(s)"
         '';
 
         shim = mkApp "generate-shim" ''
