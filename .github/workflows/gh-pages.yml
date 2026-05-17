@@ -377,15 +377,13 @@ jobs:
             e2e/screenshots/t9-ra-wasm-*.png
             e2e/test-results/
 
-      - name: RA post-game menu regression — map-bleed detection (T10 / TIM-802)
-        # TIM-777 / TIM-802 regression T10: loads ra.html with ?autostart=1
-        # and ?mission_test=1, runs gameplay until forced win triggers at
-        # ~frame 1250, then captures the canvas after transition back to the
-        # main menu and compares against clean-ra-menu.png golden via
-        # parity-compare.py (SSIM ≥ 0.90).
-        # Before the TIM-777 fix (clear HidPage), stale game-frame pixels
-        # bled through the menu background. This gate catches regressions.
-        # Skipped when RA_ASSETS_URL is not set (needs MIX files).
+      - name: RA post-game menu parity test — map-bleed regression gate (T10 / TIM-810)
+        # TIM-810 regression T10: loads ra.html with autostart=1, waits for
+        # frame 100, then presses Escape → ArrowUp → Enter → Enter to quit back
+        # to the main menu. Compares post-game menu canvas with a clean menu
+        # golden via parity-compare.py; asserts SSIM ≥ 0.90.
+        # Catches TIM-777 class bug (map bleeds into menu after game exit).
+        # Skipped when RA_ASSETS_URL is not set.
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
         run: |
@@ -393,24 +391,23 @@ jobs:
             echo "::notice::T10 skipped — RA_ASSETS_URL not set"
             exit 0
           fi
-          Xvfb :99 -screen 0 1280x1024x24 &
+          Xvfb :99 -screen 0 1280x1024x24 -ac &
           XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
           COOP_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T10-ra-menu-bleed.spec.ts \
-            --grep "2 ·" --reporter=line
+          DISPLAY=:99 npx playwright test e2e/regression/T10-ra-wasm-post-game-menu.spec.ts
           T10_EXIT=$?
-          kill "$COOP_PID" 2>/dev/null || true
-          kill "$XVFB_PID" 2>/dev/null || true
+          kill $COOP_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
           exit $T10_EXIT
 
-      - name: Upload T10 menu-bleed artifacts on failure
+      - name: Upload T10 post-game menu parity artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: t10-menu-bleed-results
+          name: t10-ra-wasm-post-game-menu-results
           path: |
             e2e/screenshots/t10-*.png
             e2e/test-results/
