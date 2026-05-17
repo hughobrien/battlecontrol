@@ -88,10 +88,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ninja-build cmake
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31.10.6
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
       - name: Cache Emscripten system libraries
         uses: actions/cache@v5.0.5
@@ -102,11 +103,14 @@ jobs:
             emscripten-cache-ra-
             emscripten-cache-
 
-      - name: Configure WASM build
-        run: emcmake cmake --preset wasm
-
       - name: Build ra.wasm
-        run: cmake --build build-wasm --target ra --parallel
+        env:
+          EM_CACHE: ~/.emscripten_cache
+        run: |
+          nix develop --command bash -c '
+            emcmake cmake --preset wasm
+            cmake --build build-wasm --target ra --parallel
+          '
 
       - name: Package ra-wasm.zip
         run: |
@@ -129,10 +133,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ninja-build cmake
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31.10.6
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
       - name: Cache Emscripten system libraries
         uses: actions/cache@v5.0.5
@@ -143,11 +148,14 @@ jobs:
             emscripten-cache-td-
             emscripten-cache-
 
-      - name: Configure WASM build
-        run: emcmake cmake --preset wasm
-
       - name: Build td.wasm
-        run: cmake --build build-wasm --target td --parallel
+        env:
+          EM_CACHE: ~/.emscripten_cache
+        run: |
+          nix develop --command bash -c '
+            emcmake cmake --preset wasm
+            cmake --build build-wasm --target td --parallel
+          '
 
       - name: Package td-wasm.zip
         run: |
