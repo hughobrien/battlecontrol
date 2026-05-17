@@ -85,29 +85,29 @@ mkdir -p "$SCREENSHOT_DIR"
 echo "=== Wine RA preflight ==="
 
 if ! command -v wine >/dev/null 2>&1; then
-    echo "FAIL: wine not found. Install with: sudo apt-get install wine"
-    exit 1
+	echo "FAIL: wine not found. Install with: sudo apt-get install wine"
+	exit 1
 fi
 WINE_VER=$(wine --version 2>/dev/null || echo "unknown")
 echo "  wine: $WINE_VER"
 
 # wine32 check: fail gracefully if 32-bit support is missing
 if wine --version 2>&1 | grep -q "wine32 is missing"; then
-    echo "FAIL: wine32 is missing."
-    echo "  Fix: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install wine32:i386"
-    exit 1
+	echo "FAIL: wine32 is missing."
+	echo "  Fix: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install wine32:i386"
+	exit 1
 fi
 
 if [[ ! -f "$RA_EXE_PATH" ]]; then
-    echo "SKIP: RA95.EXE not found at $RA_EXE_PATH"
-    echo "  Run: bash scripts/wine-ra-setup.sh"
-    echo "  Or download manually — see header of this script for instructions."
-    exit 2
+	echo "SKIP: RA95.EXE not found at $RA_EXE_PATH"
+	echo "  Run: bash scripts/wine-ra-setup.sh"
+	echo "  Or download manually — see header of this script for instructions."
+	exit 2
 fi
 
 if [[ ! -d "$DATA_DIR" ]]; then
-    echo "FAIL: data directory not found: $DATA_DIR"
-    exit 1
+	echo "FAIL: data directory not found: $DATA_DIR"
+	exit 1
 fi
 
 EXE_SHA=$(sha256sum "$RA_EXE_PATH" | awk '{print $1}')
@@ -119,23 +119,23 @@ echo ""
 
 echo "=== Wine staging ==="
 RA_STAGE="$(mktemp -d)"
-trap "rm -rf $RA_STAGE" EXIT
+trap 'rm -rf "$RA_STAGE"' EXIT
 
 # Link MIX data + DLLs into a temporary staging directory.
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
-    [[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
+	[[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
 done
 # Copy EXE and IPX DLLs to staging.
 cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
 # Copy THIPX DLLs if present (required at startup).
 THIPX_DIR="$(dirname "$RA_EXE_PATH")"
 for dll in THIPX32.DLL THIPX16.DLL; do
-    [[ -f "$THIPX_DIR/$dll" ]] && cp "$THIPX_DIR/$dll" "$RA_STAGE/$dll"
+	[[ -f "$THIPX_DIR/$dll" ]] && cp "$THIPX_DIR/$dll" "$RA_STAGE/$dll"
 done
 
 if [[ ! -d "$WINE_PREFIX" ]]; then
-    echo "  Creating 32-bit Wine prefix at $WINE_PREFIX..."
-    WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
+	echo "  Creating 32-bit Wine prefix at $WINE_PREFIX..."
+	WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
 echo "  Staging: $RA_STAGE"
 echo ""
@@ -147,7 +147,7 @@ pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
 Xvfb "$DISPLAY_NUM" -screen 0 640x480x24 -ac &
 XVFB_PID=$!
 cleanup_xvfb() { kill -9 "$XVFB_PID" 2>/dev/null || true; }
-trap "rm -rf $RA_STAGE; cleanup_xvfb" EXIT
+trap 'rm -rf "$RA_STAGE"; cleanup_xvfb' EXIT
 sleep 1
 echo "  Xvfb pid=$XVFB_PID"
 
@@ -156,11 +156,11 @@ echo "  Xvfb pid=$XVFB_PID"
 echo "=== Launching RA95.EXE ==="
 LOG="$(mktemp /tmp/wine-ra-XXXXXX.log)"
 (
-    cd "$RA_STAGE"
-    DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
-    WINEDEBUG=-all AUDIODEV=null \
-    timeout 45 wine RA95.EXE
-) > "$LOG" 2>&1 &
+	cd "$RA_STAGE"
+	DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
+		WINEDEBUG=-all AUDIODEV=null \
+		timeout 45 wine RA95.EXE
+) >"$LOG" 2>&1 &
 RA_PID=$!
 
 # Wait for the DirectSound warning dialog to appear (~6s), then dismiss it.
@@ -173,10 +173,10 @@ DISPLAY="$DISPLAY_NUM" xdotool key Return 2>/dev/null || true
 # Capture title/menu state
 sleep 3
 take_screenshot() {
-    local out="$1"
-    if command -v import >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null && echo "  Screenshot: $out"
-    fi
+	local out="$1"
+	if command -v import >/dev/null 2>&1; then
+		DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null && echo "  Screenshot: $out"
+	fi
 }
 
 take_screenshot "$SCREENSHOT_DIR/wine-ra-title.png"
@@ -188,21 +188,21 @@ kill "$RA_PID" 2>/dev/null || true
 
 echo ""
 echo "=== Results ==="
-echo "  wine-ra-title.png: $(test -f "$SCREENSHOT_DIR/wine-ra-title.png" && ls -lh "$SCREENSHOT_DIR/wine-ra-title.png" | awk '{print $5, "(written)"}' || echo "MISSING")"
-echo "  wine-ra-menu.png:  $(test -f "$SCREENSHOT_DIR/wine-ra-menu.png"  && ls -lh "$SCREENSHOT_DIR/wine-ra-menu.png"  | awk '{print $5, "(written)"}' || echo "MISSING")"
+echo "  wine-ra-title.png: $(test -f "$SCREENSHOT_DIR/wine-ra-title.png" && stat -c '%s (written)' "$SCREENSHOT_DIR/wine-ra-title.png" || echo "MISSING")"
+echo "  wine-ra-menu.png:  $(test -f "$SCREENSHOT_DIR/wine-ra-menu.png" && stat -c '%s (written)' "$SCREENSHOT_DIR/wine-ra-menu.png" || echo "MISSING")"
 
 # Verify screenshots are non-trivially sized.
 for shot in "$SCREENSHOT_DIR/wine-ra-title.png" "$SCREENSHOT_DIR/wine-ra-menu.png"; do
-    if [[ -f "$shot" ]]; then
-        sz=$(stat -c%s "$shot")
-        if [[ $sz -lt 5000 ]]; then
-            echo "  WARN: $shot is only $sz bytes — may be blank"
-        else
-            echo "  OK: $shot ($sz bytes)"
-        fi
-    fi
+	if [[ -f "$shot" ]]; then
+		sz=$(stat -c%s "$shot")
+		if [[ $sz -lt 5000 ]]; then
+			echo "  WARN: $shot is only $sz bytes — may be blank"
+		else
+			echo "  OK: $shot ($sz bytes)"
+		fi
+	fi
 done
 
 echo ""
 echo "  To run Tier 3 Playwright comparison tests:"
-echo "    WINE_RA_READY=1 npx playwright test e2e/tim699-ra-compare.spec.ts --grep 'Tier 3'"
+echo "    WINE_RA_READY=1 playwright test e2e/tim699-ra-compare.spec.ts --grep 'Tier 3'"

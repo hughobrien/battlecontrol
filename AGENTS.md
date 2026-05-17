@@ -7,6 +7,19 @@ It covers the quickstart, canonical build/test commands, the change cycle, and t
 skill index. For deep architecture, see `ARCH.md`. For human-facing docs, see
 `README.md`.
 
+## ⚠️ Prerequisite: Enable Nix experimental features
+
+Before running any Nix commands, enable the required experimental features:
+
+```bash
+mkdir -p ~/.config/nix
+cat >> ~/.config/nix/nix.conf << 'EOF'
+experimental-features = nix-command flakes
+EOF
+```
+
+This lets you omit `--extra-experimental-features` from every Nix invocation.
+
 ## ⚠️ Critical: All commands MUST run inside `nix develop`
 
 Every `git commit`, build command, test runner, linter, or script invocation in
@@ -17,13 +30,13 @@ The pre-commit hook will fail with cryptic errors.
 ### Correct
 
 ```bash
-nix develop --extra-experimental-features 'nix-command flakes' --command <your-command>
+nix develop --command <your-command>
 ```
 
 Or enter the shell interactively first:
 
 ```bash
-nix develop --extra-experimental-features 'nix-command flakes'
+nix develop
 # now inside dev shell — all tools available
 ```
 
@@ -58,7 +71,7 @@ automerge will wait until it passes. If CI is green, the PR merges automatically
 before pushing to catch failures instantly:
 
 ```bash
-nix develop --extra-experimental-features 'nix-command flakes' --command nix run .#ci
+nix develop --command nix run .#ci
 ```
 
 Or use the extension tool:
