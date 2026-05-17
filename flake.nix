@@ -7,27 +7,37 @@
     cnc-ddraw.url = "path:./tools/cnc-ddraw";
   };
 
-  outputs = { self, nixpkgs, wine-input, cnc-ddraw }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      wine-input,
+      cnc-ddraw,
+    }:
     let
       system = "x86_64-linux";
-      pkgs   = nixpkgs.legacyPackages.${system};
-      mkApp  = name: script: rec {
+      pkgs = nixpkgs.legacyPackages.${system};
+      mkApp = name: script: rec {
         type = "app";
         program = toString (pkgs.writeShellScript name script);
       };
-    in {
+    in
+    {
       # -----------------------------------------------------------------------
       # packages.redalert  —  builds the redalert binary
       # -----------------------------------------------------------------------
       packages.${system} = rec {
         redalert = pkgs.stdenv.mkDerivation {
-          pname   = "cnc-redalert";
+          pname = "cnc-redalert";
           version = "unstable-2026-05-09";
 
           src = ./.;
 
           nativeBuildInputs = with pkgs; [ python3 ];
-          buildInputs       = with pkgs; [ SDL2 SDL2.dev ];
+          buildInputs = with pkgs; [
+            SDL2
+            SDL2.dev
+          ];
 
           buildPhase = ''
             runHook preBuild
@@ -95,26 +105,36 @@
           '';
 
           meta = with pkgs.lib; {
-            description  = "Command & Conquer: Red Alert — native Linux port";
+            description = "Command & Conquer: Red Alert — native Linux port";
             longDescription = ''
               Native Linux port of Command & Conquer: Red Alert built from the
               EA GPL open-source release. Requires legally-acquired game data to run.
               See README for data setup instructions.
             '';
-            license   = licenses.gpl3Plus;
+            license = licenses.gpl3Plus;
             platforms = [ "x86_64-linux" ];
             mainProgram = "redalert";
           };
         };
 
         tiberiandawn = pkgs.stdenv.mkDerivation {
-          pname   = "cnc-tiberiandawn";
+          pname = "cnc-tiberiandawn";
           version = "unstable-2026-05-09";
 
           src = ./.;
 
-          nativeBuildInputs = with pkgs; [ cmake ninja python3 pkg-config ];
-          buildInputs       = with pkgs; [ SDL2 SDL2.dev openal libx11 ];
+          nativeBuildInputs = with pkgs; [
+            cmake
+            ninja
+            python3
+            pkg-config
+          ];
+          buildInputs = with pkgs; [
+            SDL2
+            SDL2.dev
+            openal
+            libx11
+          ];
 
           buildPhase = ''
             runHook preBuild
@@ -133,8 +153,8 @@
           '';
 
           meta = with pkgs.lib; {
-            description  = "Command & Conquer: Tiberian Dawn — native Linux port";
-            license   = licenses.gpl3Plus;
+            description = "Command & Conquer: Tiberian Dawn — native Linux port";
+            license = licenses.gpl3Plus;
             platforms = [ "x86_64-linux" ];
             mainProgram = "tiberiandawn";
           };
@@ -154,13 +174,14 @@
           ninja
           python3
           pkg-config
-          emscripten  # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
+          emscripten # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
           # CI deps
           xvfb-run
           ffmpeg-headless
           ccache
           nodejs
           pnpm
+          gh
           clang-tools
           cppcheck
           # Linting tools
@@ -290,35 +311,39 @@
       # -----------------------------------------------------------------------
       apps.${system} = rec {
         redalert = {
-          type    = "app";
-          program = toString (pkgs.writeShellScript "run-redalert" ''
-            set -e
-            DATA_DIR="''${RA_ASSETS:-$PWD}"
-            if [ ! -f "$DATA_DIR/MAIN.MIX" ] && [ ! -f "$DATA_DIR/main.mix" ]; then
-              echo "ERROR: MAIN.MIX not found in $DATA_DIR"
-              echo "  cd /path/to/red-alert-data && nix run"
-              echo "  or set RA_ASSETS=/path/to/red-alert-data"
-              exit 1
-            fi
-            cd "$DATA_DIR"
-            exec ${self.packages.${system}.redalert}/bin/redalert "$@"
-          '');
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "run-redalert" ''
+              set -e
+              DATA_DIR="''${RA_ASSETS:-$PWD}"
+              if [ ! -f "$DATA_DIR/MAIN.MIX" ] && [ ! -f "$DATA_DIR/main.mix" ]; then
+                echo "ERROR: MAIN.MIX not found in $DATA_DIR"
+                echo "  cd /path/to/red-alert-data && nix run"
+                echo "  or set RA_ASSETS=/path/to/red-alert-data"
+                exit 1
+              fi
+              cd "$DATA_DIR"
+              exec ${self.packages.${system}.redalert}/bin/redalert "$@"
+            ''
+          );
         };
 
         tiberiandawn = {
-          type    = "app";
-          program = toString (pkgs.writeShellScript "run-tiberiandawn" ''
-            set -e
-            DATA_DIR="''${TD_ASSETS:-$PWD}"
-            if [ ! -f "$DATA_DIR/CONQUER.MIX" ] && [ ! -f "$DATA_DIR/conquer.mix" ]; then
-              echo "ERROR: CONQUER.MIX not found in $DATA_DIR"
-              echo "  cd /path/to/tiberian-dawn-data && nix run .#tiberiandawn"
-              echo "  or set TD_ASSETS=/path/to/tiberian-dawn-data"
-              exit 1
-            fi
-            cd "$DATA_DIR"
-            exec ${self.packages.${system}.tiberiandawn}/bin/tiberiandawn "$@"
-          '');
+          type = "app";
+          program = toString (
+            pkgs.writeShellScript "run-tiberiandawn" ''
+              set -e
+              DATA_DIR="''${TD_ASSETS:-$PWD}"
+              if [ ! -f "$DATA_DIR/CONQUER.MIX" ] && [ ! -f "$DATA_DIR/conquer.mix" ]; then
+                echo "ERROR: CONQUER.MIX not found in $DATA_DIR"
+                echo "  cd /path/to/tiberian-dawn-data && nix run .#tiberiandawn"
+                echo "  or set TD_ASSETS=/path/to/tiberian-dawn-data"
+                exit 1
+              fi
+              cd "$DATA_DIR"
+              exec ${self.packages.${system}.tiberiandawn}/bin/tiberiandawn "$@"
+            ''
+          );
         };
 
         default = redalert;
@@ -396,16 +421,16 @@
         '';
 
         validate-wasm = mkApp "validate-wasm" ''
-          python3 -c "
-import os, struct
-for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
-    if not os.path.exists(fn): continue
-    with open(fn,'rb') as f:
-        assert f.read(4) == b'\\x00asm', fn + ': bad magic'
-    sz = os.path.getsize(fn)
-    assert sz > 1_000_000, fn + ': too small (' + str(sz) + ' bytes)'
-    print('  ' + fn.split('/')[1] + ': ' + str(sz//1024) + ' KB OK')
-"
+                    python3 -c "
+          import os, struct
+          for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
+              if not os.path.exists(fn): continue
+              with open(fn,'rb') as f:
+                  assert f.read(4) == b'\\x00asm', fn + ': bad magic'
+              sz = os.path.getsize(fn)
+              assert sz > 1_000_000, fn + ': too small (' + str(sz) + ' bytes)'
+              print('  ' + fn.split('/')[1] + ': ' + str(sz//1024) + ' KB OK')
+          "
         '';
 
         serve-wasm = mkApp "serve-wasm" ''
@@ -636,22 +661,22 @@ for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
         '';
 
         ci-build-wasm = mkApp "ci-build-wasm" ''
-          set -e
-          emcmake cmake --preset wasm
-          cmake --build build-wasm --target ra --parallel
-          cmake --build build-wasm --target td --parallel
-          python3 -c "
-import os, struct
-MIN_SIZE = 1_000_000
-for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
-    with open(name, 'rb') as f:
-        magic = f.read(4)
-    assert magic == b'\\x00asm', name + ': bad magic'
-    size = os.path.getsize(name)
-    assert size > MIN_SIZE, name + ': too small (' + str(size) + ' bytes < ' + str(MIN_SIZE) + ')'
-    print(name + ': ' + str(size // 1024) + ' KB OK')
-"
-          nix run .#ci-wasm-smoke
+                    set -e
+                    emcmake cmake --preset wasm
+                    cmake --build build-wasm --target ra --parallel
+                    cmake --build build-wasm --target td --parallel
+                    python3 -c "
+          import os, struct
+          MIN_SIZE = 1_000_000
+          for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
+              with open(name, 'rb') as f:
+                  magic = f.read(4)
+              assert magic == b'\\x00asm', name + ': bad magic'
+              size = os.path.getsize(name)
+              assert size > MIN_SIZE, name + ': too small (' + str(size) + ' bytes < ' + str(MIN_SIZE) + ')'
+              print(name + ': ' + str(size // 1024) + ' KB OK')
+          "
+                    nix run .#ci-wasm-smoke
         '';
 
         ci-clang-tidy = mkApp "ci-clang-tidy" ''
