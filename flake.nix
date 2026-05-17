@@ -237,7 +237,9 @@
           echo "" && echo "=== Pre-commit linting ==="
 
           C_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|c|h|hpp)$' || true)
-          for f in $C_STAGED; do checker python3 scripts/lint-lp64.py --dirs "$(dirname "$f")"; done
+          if [ -n "$C_STAGED" ]; then
+            checker python3 scripts/lint-lp64.py --files $C_STAGED
+          fi
           for f in $C_STAGED; do checker clang-tidy -p build --quiet "$f"; done
 
           for f in $PY_STAGED; do checker ruff check "$f"; done
