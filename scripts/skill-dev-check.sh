@@ -38,7 +38,6 @@ check() {
 echo "=== Toolchain prerequisite check ==="
 echo ""
 
-check "g++" g++ "14.0"
 check "clang++" clang++ "19.0"
 check "cmake" cmake "3.20"
 check "ninja" ninja

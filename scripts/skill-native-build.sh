@@ -6,7 +6,7 @@
 #   bash scripts/skill-native-build.sh              # both targets
 #   bash scripts/skill-native-build.sh ra           # RA only
 #   bash scripts/skill-native-build.sh td           # TD only
-#   CXX=clang++ bash scripts/skill-native-build.sh  # use clang
+#   bash scripts/skill-native-build.sh              # default: clang++
 #
 # Exit code: 0 if all builds pass, 1 if any fails.
 
