@@ -25,7 +25,7 @@
  *
  * Release-gate spec — NOT wired into PR CI (90s budget, too slow for every-push).
  * Run before tagging v0.3.0:
- *   npx playwright test e2e/tim774-td-campaign-complete.spec.ts --headed
+ *   playwright test e2e/tim774-td-campaign-complete.spec.ts --headed
  *
  * Servers required:
  *   serve-coop.py   on :8082 (TD WASM bundle from build-wasm/)

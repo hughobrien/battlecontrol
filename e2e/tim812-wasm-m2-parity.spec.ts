@@ -32,9 +32,9 @@
  *   serve-assets.py on :9091  (TD CD1 MIX files) or TD_ASSETS_URL
  *
  * ─── Run ─────────────────────────────────────────────────────────────────────
- *   npx playwright test e2e/tim812-wasm-m2-parity.spec.ts
- *   WINE_RA_READY=1 npx playwright test e2e/tim812-wasm-m2-parity.spec.ts
- *   WINE_TD_READY=1 npx playwright test e2e/tim812-wasm-m2-parity.spec.ts --grep "TD GDI M2"
+ *   playwright test e2e/tim812-wasm-m2-parity.spec.ts
+ *   WINE_RA_READY=1 playwright test e2e/tim812-wasm-m2-parity.spec.ts
+ *   WINE_TD_READY=1 playwright test e2e/tim812-wasm-m2-parity.spec.ts --grep "TD GDI M2"
  *
  * ─── Related ─────────────────────────────────────────────────────────────────
  *   TIM-803 — RA Soviet M2 Wine OG capture + TD GDI M2 parity summary
