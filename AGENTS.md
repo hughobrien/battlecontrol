@@ -7,6 +7,40 @@ It covers the quickstart, canonical build/test commands, the change cycle, and t
 skill index. For deep architecture, see `ARCH.md`. For human-facing docs, see
 `README.md`.
 
+## ⚠️ Critical: All commands MUST run inside `nix develop`
+
+Every `git commit`, build command, test runner, linter, or script invocation in
+this project **must** be run inside the Nix development shell. Outside the shell,
+tools like `nixfmt`, `clang-tidy`, `shfmt`, `yamllint`, and `ruff` are not on PATH.
+The pre-commit hook will fail with cryptic errors.
+
+### Correct
+
+```bash
+nix develop --extra-experimental-features 'nix-command flakes' --command <your-command>
+```
+
+Or enter the shell interactively first:
+
+```bash
+nix develop --extra-experimental-features 'nix-command flakes'
+# now inside dev shell — all tools available
+```
+
+### Common mistakes
+
+| ❌ Wrong | ✅ Correct |
+|----------|-----------|
+| `git commit ...` (bare) | `nix develop --command git commit ...` |
+| `nix run .#lint-all` (bare) | `nix develop --command nix run .#lint-all` |
+| `python3 scripts/lint-lp64.py` (bare) | `nix develop --command python3 scripts/lint-lp64.py` |
+
+> The extension tools (e.g. `native_build`, `wasm_build`, `run_e2e_test`) already
+> handle this internally — you only need to worry about it for ad-hoc shell
+> commands.
+
+---
+
 ## How to Make Progress
 
 1. Choose a mission not already marked done (see `TODO.md`).
