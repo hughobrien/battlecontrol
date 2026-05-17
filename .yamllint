@@ -1,0 +1,15 @@
+extends: default
+
+rules:
+  # GitHub Actions YAML uses `on: push` etc. — these are intentionally truthy
+  truthy:
+    check-keys: false
+    allowed-values: ['true', 'false', 'on']
+
+  # GHA workflow action refs (v6.0.2, hashes, URLs) are unavoidably long
+  line-length:
+    max: 120
+    level: warning
+
+  # Document-start marker (---) is optional for GHA — GitHub parses fine without
+  document-start: disable
