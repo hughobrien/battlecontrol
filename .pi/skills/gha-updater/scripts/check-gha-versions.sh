@@ -16,26 +16,46 @@ if [ ! -d "$WORKFLOW_DIR" ]; then
   exit 1
 fi
 
+# Cache resolved tags: owner_repo -> latest_tag
+declare -A TAG_CACHE
+
 get_latest_tag() {
-  local owner_repo="$1"  # e.g. "actions/checkout"
-  local api_url="https://api.github.com/repos/$owner_repo/releases/latest"
+  local owner_repo="$1"
   local tag
 
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    tag=$(curl -sL -H "Authorization: Bearer $GITHUB_TOKEN" "$api_url" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null || echo "")
-  else
-    tag=$(curl -sL "$api_url" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null || echo "")
+  # Return cached value if available
+  if [ -n "${TAG_CACHE[$owner_repo]:-}" ]; then
+    echo "${TAG_CACHE[$owner_repo]}"
+    return
   fi
 
+  # Query GitHub API
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    tag=$(curl -sL --connect-timeout 5 -H "Authorization: Bearer $GITHUB_TOKEN" \
+      "https://api.github.com/repos/$owner_repo/releases/latest" 2>/dev/null | \
+      python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null || echo "")
+  else
+    tag=$(curl -sL --connect-timeout 5 \
+      "https://api.github.com/repos/$owner_repo/releases/latest" 2>/dev/null | \
+      python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null || echo "")
+  fi
+
+  # Fallback to releases list
   if [ -z "$tag" ]; then
-    # Fallback: try list endpoint
     if [ -n "${GITHUB_TOKEN:-}" ]; then
-      tag=$(curl -sL -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/$owner_repo/releases?per_page=1" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['tag_name'])" 2>/dev/null || echo "")
+      tag=$(curl -sL --connect-timeout 5 -H "Authorization: Bearer $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$owner_repo/releases?per_page=1" 2>/dev/null | \
+        python3 -c "import sys,json; print(json.load(sys.stdin)[0]['tag_name'])" 2>/dev/null || echo "")
     else
-      tag=$(curl -sL "https://api.github.com/repos/$owner_repo/releases?per_page=1" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['tag_name'])" 2>/dev/null || echo "")
+      tag=$(curl -sL --connect-timeout 5 \
+        "https://api.github.com/repos/$owner_repo/releases?per_page=1" 2>/dev/null | \
+        python3 -c "import sys,json; print(json.load(sys.stdin)[0]['tag_name'])" 2>/dev/null || echo "")
     fi
   fi
 
+  if [ -n "$tag" ]; then
+    TAG_CACHE[$owner_repo]="$tag"
+  fi
   echo "$tag"
 }
 
@@ -45,43 +65,37 @@ for workflow in "$WORKFLOW_DIR"/*.yml; do
   name=$(basename "$workflow")
   echo "=== $name ==="
 
-  # Extract all uses: lines with @version
+  # Collect unique owner/repo from this file
+  declare -A FILE_ACTIONS
   while IFS= read -r line; do
-    # Parse: owner/repo@version or path
     uses=$(echo "$line" | sed -n 's/.*uses: *//p' | xargs)
     [ -z "$uses" ] && continue
-
-    # Skip local path actions (they don't have @)
-    case "$uses" in
-      *@*) ;;
-      *) continue ;;
-    esac
+    case "$uses" in *@*) ;; *) continue ;; esac
 
     owner_repo="${uses%@*}"
     current_ver="${uses#*@}"
 
-    # Skip non-GitHub actions (./path or docker://)
-    case "$owner_repo" in
-      */*) ;;
-      *) continue ;;
-    esac
-    case "$owner_repo" in
-      ./*|docker://*) continue ;;
-    esac
+    case "$owner_repo" in */*) ;; *) continue ;; esac
+    case "$owner_repo" in ./*|docker://*) continue ;; esac
 
+    # Track current version in this file
+    FILE_ACTIONS["$owner_repo"]="${FILE_ACTIONS[$owner_repo]:-$current_ver}"
+  done < <(grep -rn "uses:" "$workflow" || true)
+
+  for owner_repo in "${!FILE_ACTIONS[@]}"; do
+    current_ver="${FILE_ACTIONS[$owner_repo]}"
     latest_tag=$(get_latest_tag "$owner_repo")
 
     if [ -z "$latest_tag" ]; then
-      echo "  ? $owner_repo@$current_ver (could not fetch latest)"
+      echo "  ? $owner_repo (could not fetch latest)"
       continue
     fi
 
     if [ "$latest_tag" != "$current_ver" ]; then
-      echo "  outdated: $owner_repo@$current_ver → $latest_tag"
+      echo "  $owner_repo: $current_ver → $latest_tag"
       HAD_STALE=true
 
       if $UPDATE; then
-        # Replace in file
         if [[ "$(uname)" == "darwin" ]]; then
           sed -i "" "s|uses: $owner_repo@$current_ver|uses: $owner_repo@$latest_tag|g" "$workflow"
         else
@@ -90,10 +104,11 @@ for workflow in "$WORKFLOW_DIR"/*.yml; do
         echo "    ✓ updated"
       fi
     else
-      echo "  up to date: $owner_repo@$current_ver"
+      echo "  $owner_repo: $current_ver (up to date)"
     fi
-  done < <(grep -rn "uses:" "$workflow" || true)
+  done
 
+  unset FILE_ACTIONS
   echo ""
 done
 
