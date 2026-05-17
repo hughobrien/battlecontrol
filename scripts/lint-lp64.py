@@ -16,7 +16,7 @@ import re
 import sys
 import argparse
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
 
@@ -24,19 +24,21 @@ from typing import Callable, List, Optional, Tuple
 # Finding
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Finding:
     path: Path
     line_no: int
-    severity: str    # 'error' | 'warning'
+    severity: str  # 'error' | 'warning'
     rule: str
     detail: str
-    text: str        # stripped source line
+    text: str  # stripped source line
 
 
 # ---------------------------------------------------------------------------
 # Rule helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_rule(
     rule: str,
@@ -60,9 +62,7 @@ def _literal_detail(msg: str) -> Callable:
 # suppression based on capture groups).
 
 RULES: List[Tuple] = [
-
     # ---- ERRORs --------------------------------------------------------
-
     # E1: typedef (unsigned) long NAME  →  uint32_t / int32_t
     # The canonical LP64 trap: Win32 assumed sizeof(long)==4; on LP64 it is 8.
     # Seen in: COORDINATE (TIM-241), timer fields (TIM-242), MCEFLAGS, etc.
@@ -76,7 +76,6 @@ RULES: List[Tuple] = [
         ),
         flags=0,
     ),
-
     # E2: _lrotl / _lrotr  →  explicit uint32_t rotate
     # _lrotl operates on unsigned long (8 bytes LP64); produces wrong CRC/hash.
     # Fixed in CRC.CPP (TIM-173) and TD CRC (TIM-453).
@@ -90,7 +89,6 @@ RULES: List[Tuple] = [
         ),
         flags=0,
     ),
-
     # E3: (int) cast on obvious pointer expression
     # Truncates a 64-bit pointer to 32 bits silently.
     # Matches: (int)somePtr  (int)(void*)x  (int)&x
@@ -106,14 +104,11 @@ RULES: List[Tuple] = [
         ),
         flags=0,
     ),
-
     # E4: __attribute__((packed)) struct with a 'long' field inside it
     # Packed struct layout depends on sizeof(long); fields after the long
     # shift by 4 bytes on LP64 vs Win32.  Seen in CompHeaderType (TIM-202).
     # This is a file-level check applied via context tracking (see scan()).
-
     # ---- WARNINGs -------------------------------------------------------
-
     # W1: struct/class field declared as (unsigned) long
     # Each such field grows by 4 bytes on LP64, misaligning later fields.
     # Fixed: TotalValue (TIM-243), COORDINATE (TIM-241), timer fields (TIM-242).
@@ -127,7 +122,6 @@ RULES: List[Tuple] = [
         ),
         flags=0,
     ),
-
     # W2: sizeof(long) used as a size constant
     # Almost always assumes sizeof(long)==4; breaks buffer/array sizing on LP64.
     _make_rule(
@@ -140,7 +134,6 @@ RULES: List[Tuple] = [
         ),
         flags=0,
     ),
-
     # W3: unsigned long array used for binary file offsets
     # Seen in Build_Frame offset[] (TIM-206) and MixFile bsearch table (TIM-453).
     # Pattern: array declaration with (unsigned) long element type.
@@ -155,7 +148,6 @@ RULES: List[Tuple] = [
         ),
         flags=0,
     ),
-
     # W4: LONG / ULONG used in struct fields (windows.h typedef long LONG)
     # LONG is typedef'd to `long` in our windows.h stub, so it is 8 bytes on
     # LP64.  Flags uses inside game-code structs that were intended as 32-bit.
@@ -170,7 +162,6 @@ RULES: List[Tuple] = [
         ),
         flags=0,
     ),
-
     # W5: HRESULT used in packed/serialised structs
     # HRESULT is typedef long HRESULT in our stub — 8 bytes on LP64.
     # OK for return values; problematic inside packed structs or binary I/O.
@@ -185,7 +176,6 @@ RULES: List[Tuple] = [
         ),
         flags=0,
     ),
-
     # W6: pointer stored via (long) or (unsigned long) cast
     # Equivalent to E3 but using long instead of int.
     _make_rule(
@@ -206,22 +196,23 @@ RULES: List[Tuple] = [
 # Packed-struct context tracker (E4)
 # ---------------------------------------------------------------------------
 
+
 class PackedStructTracker:
     """Tracks when we are inside a #pragma pack or __attribute__((packed))
     struct and flags 'long' fields inside them as errors."""
 
-    _PACK_PUSH   = re.compile(r"#\s*pragma\s+pack\s*\(\s*push\b", re.IGNORECASE)
-    _PACK_POP    = re.compile(r"#\s*pragma\s+pack\s*\(\s*pop\b",  re.IGNORECASE)
-    _PACK_N      = re.compile(r"#\s*pragma\s+pack\s*\(\s*\d+",    re.IGNORECASE)
+    _PACK_PUSH = re.compile(r"#\s*pragma\s+pack\s*\(\s*push\b", re.IGNORECASE)
+    _PACK_POP = re.compile(r"#\s*pragma\s+pack\s*\(\s*pop\b", re.IGNORECASE)
+    _PACK_N = re.compile(r"#\s*pragma\s+pack\s*\(\s*\d+", re.IGNORECASE)
     _ATTR_PACKED = re.compile(r"__attribute__\s*\(\s*\(\s*packed\s*\)", re.IGNORECASE)
     _STRUCT_OPEN = re.compile(r"\bstruct\b|\bclass\b")
-    _BRACE_OPEN  = re.compile(r"\{")
+    _BRACE_OPEN = re.compile(r"\{")
     _BRACE_CLOSE = re.compile(r"\}")
-    _LONG_FIELD  = re.compile(r"^\s+(?:unsigned\s+)?long\s+\w+", re.MULTILINE)
+    _LONG_FIELD = re.compile(r"^\s+(?:unsigned\s+)?long\s+\w+", re.MULTILINE)
 
     def __init__(self):
-        self.pack_depth: int = 0     # nesting level of #pragma pack(push)
-        self.brace_depth: int = 0    # overall { } depth while packing
+        self.pack_depth: int = 0  # nesting level of #pragma pack(push)
+        self.brace_depth: int = 0  # overall { } depth while packing
         self.pack_brace_start: int = 0  # brace_depth when packing began
 
     def feed(self, line: str, line_no: int, path: Path, findings: list):
@@ -237,18 +228,20 @@ class PackedStructTracker:
         if self.pack_depth > 0 and self._LONG_FIELD.match(line):
             m = re.search(r"(?:unsigned\s+)?long\s+(\w+)", line)
             name = m.group(1) if m else "?"
-            findings.append(Finding(
-                path=path,
-                line_no=line_no,
-                severity="error",
-                rule="E4:packed-long-field",
-                detail=(
-                    f"Field '{name}' typed as (unsigned) long inside a packed struct: "
-                    f"sizeof(long) is 8 on LP64; use int32_t/uint32_t to guarantee "
-                    f"4-byte slot and preserve binary layout"
-                ),
-                text=line.rstrip(),
-            ))
+            findings.append(
+                Finding(
+                    path=path,
+                    line_no=line_no,
+                    severity="error",
+                    rule="E4:packed-long-field",
+                    detail=(
+                        f"Field '{name}' typed as (unsigned) long inside a packed struct: "
+                        f"sizeof(long) is 8 on LP64; use int32_t/uint32_t to guarantee "
+                        f"4-byte slot and preserve binary layout"
+                    ),
+                    text=line.rstrip(),
+                )
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +266,11 @@ def scan_file(path: Path, rules: list) -> List[Finding]:
         # Skip pure comment lines (C++ //, block comment open /*,
         # and block comment continuation lines starting with *)
         stripped = line.lstrip()
-        if stripped.startswith("//") or stripped.startswith("*") or stripped.startswith("/*"):
+        if (
+            stripped.startswith("//")
+            or stripped.startswith("*")
+            or stripped.startswith("/*")
+        ):
             continue
 
         # Feed packed-struct tracker first (E4)
@@ -286,14 +283,16 @@ def scan_file(path: Path, rules: list) -> List[Finding]:
                 detail = detail_fn(m)
                 if detail is None:
                     continue
-                findings.append(Finding(
-                    path=path,
-                    line_no=line_no,
-                    severity=severity,
-                    rule=rule_id,
-                    detail=detail,
-                    text=line.rstrip(),
-                ))
+                findings.append(
+                    Finding(
+                        path=path,
+                        line_no=line_no,
+                        severity=severity,
+                        rule=rule_id,
+                        detail=detail,
+                        text=line.rstrip(),
+                    )
+                )
 
     return findings
 
@@ -328,11 +327,11 @@ def scan_dirs(
 # Report formatter
 # ---------------------------------------------------------------------------
 
-RESET  = "\033[0m"
-RED    = "\033[31m"
+RESET = "\033[0m"
+RED = "\033[31m"
 YELLOW = "\033[33m"
-BOLD   = "\033[1m"
-DIM    = "\033[2m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
 
 
 def _colour(text: str, code: str, use_colour: bool) -> str:
@@ -340,7 +339,7 @@ def _colour(text: str, code: str, use_colour: bool) -> str:
 
 
 def print_report(findings: List[Finding], use_colour: bool, repo_root: Path):
-    errors   = [f for f in findings if f.severity == "error"]
+    errors = [f for f in findings if f.severity == "error"]
     warnings = [f for f in findings if f.severity == "warning"]
 
     if not findings:
@@ -354,20 +353,20 @@ def print_report(findings: List[Finding], use_colour: bool, repo_root: Path):
             return str(p)
 
     for group, colour, label in [
-        (errors,   RED,    "ERROR"),
+        (errors, RED, "ERROR"),
         (warnings, YELLOW, "WARNING"),
     ]:
         for f in group:
-            loc    = _colour(f"{_rel(f.path)}:{f.line_no}", BOLD, use_colour)
-            sev    = _colour(f"[{label}]",  colour, use_colour)
-            rule   = _colour(f"({f.rule})", DIM,    use_colour)
+            loc = _colour(f"{_rel(f.path)}:{f.line_no}", BOLD, use_colour)
+            sev = _colour(f"[{label}]", colour, use_colour)
+            rule = _colour(f"({f.rule})", DIM, use_colour)
             print(f"{loc}: {sev} {rule}")
             print(f"  {f.detail}")
             print(f"  {_colour(f.text.strip(), DIM, use_colour)}")
             print()
 
     total = len(findings)
-    e_str = _colour(f"{len(errors)} error(s)",   RED,    use_colour)
+    e_str = _colour(f"{len(errors)} error(s)", RED, use_colour)
     w_str = _colour(f"{len(warnings)} warning(s)", YELLOW, use_colour)
     print(f"LP64 audit: {total} finding(s) — {e_str}, {w_str}")
 
@@ -375,6 +374,7 @@ def print_report(findings: List[Finding], use_colour: bool, repo_root: Path):
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
@@ -414,7 +414,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     repo_root = Path(__file__).resolve().parent.parent
-    dirs      = [repo_root / d for d in args.dirs]
+    dirs = [repo_root / d for d in args.dirs]
     skip_dirs = [repo_root / d for d in args.skip_dir]
 
     missing = [d for d in dirs if not d.exists()]

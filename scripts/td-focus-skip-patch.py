@@ -22,6 +22,7 @@ Expected input SHA-256 (original unpatched C&C95.EXE):
 Output SHA-256:
     53d1670fc4122dacc31343e0f00529037badaaa8166ebf4d48b154c5d13cf74d
 """
+
 import sys
 import hashlib
 import shutil
@@ -32,11 +33,11 @@ OUTPUT_SHA256 = "53d1670fc4122dacc31343e0f00529037badaaa8166ebf4d48b154c5d13cf74
 # (je_file_offset, expected_9_bytes, description)
 # 9 bytes = 7-byte CMP + 2-byte JE
 PATCH_SITES = [
-    (0x1e3b4, bytes.fromhex('833d44dd53000074ed'), "GameInFocus spin loop #1"),
-    (0x448f7, bytes.fromhex('833d44dd53000074eb'), "GameInFocus spin loop #2"),
-    (0x6c5fb, bytes.fromhex('833d44dd530000749a'), "GameInFocus spin loop #3"),
+    (0x1E3B4, bytes.fromhex("833d44dd53000074ed"), "GameInFocus spin loop #1"),
+    (0x448F7, bytes.fromhex("833d44dd53000074eb"), "GameInFocus spin loop #2"),
+    (0x6C5FB, bytes.fromhex("833d44dd530000749a"), "GameInFocus spin loop #3"),
 ]
-NOP2 = b'\x90\x90'
+NOP2 = b"\x90\x90"
 
 
 def sha256(data: bytes) -> str:
@@ -44,13 +45,13 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
 
     # Check if already patched
-    already = all(bytes(data[off:off+2]) == NOP2 for off, _, _ in PATCH_SITES)
+    already = all(bytes(data[off : off + 2]) == NOP2 for off, _, _ in PATCH_SITES)
     if already:
         print(f"{path}: already patched (td-focus-skip)")
         return 0
@@ -63,7 +64,7 @@ def patch(path: str, dry_run: bool = False) -> int:
     # Verify each patch site (check CMP+JE 9 bytes)
     for off, expected, desc in PATCH_SITES:
         cmp_off = off - 7
-        actual = bytes(data[cmp_off:cmp_off+9])
+        actual = bytes(data[cmp_off : cmp_off + 9])
         if actual != expected:
             print(f"ERROR: unexpected bytes at 0x{cmp_off:x} ({desc}): {actual.hex()}")
             print(f"       expected: {expected.hex()}")
@@ -79,10 +80,10 @@ def patch(path: str, dry_run: bool = False) -> int:
     print(f"  Backup: {backup}")
 
     for off, _, desc in PATCH_SITES:
-        data[off:off+2] = NOP2
+        data[off : off + 2] = NOP2
         print(f"  Patched 0x{off:x}: {desc}")
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))

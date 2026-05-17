@@ -26,7 +26,7 @@ import shutil
 import sys
 
 
-FMT_OFFSET = 0xdb375
+FMT_OFFSET = 0xDB375
 FMT_ORIGINAL = b"SC%c%02d%c%c.INI"
 MAX_FIXED_LEN = 16
 
@@ -43,35 +43,37 @@ def patch(path: str, target: str) -> int:
         print(f"ERROR: scenario name too long: '{target}' (max 12 chars)")
         return 1
 
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
-    actual = bytes(data[FMT_OFFSET:FMT_OFFSET + len(FMT_ORIGINAL)])
+    actual = bytes(data[FMT_OFFSET : FMT_OFFSET + len(FMT_ORIGINAL)])
     if actual != FMT_ORIGINAL:
         print(f"ERROR: unexpected bytes at 0x{FMT_OFFSET:x}: {actual.hex()}")
         print(f"       expected: {FMT_ORIGINAL.hex()}")
         try:
-            current = actual.rstrip(b'\x00').decode('ascii')
+            current = actual.rstrip(b"\x00").decode("ascii")
             print(f"       current value: '{current}' (already patched)")
         except UnicodeDecodeError:
             pass
         return 1
 
-    fixed = target.encode('ascii')[:12]
-    fixed_padded = fixed.ljust(MAX_FIXED_LEN, b'\x00')
+    fixed = target.encode("ascii")[:12]
+    fixed_padded = fixed.ljust(MAX_FIXED_LEN, b"\x00")
 
     backup = path + ".scenario_orig"
     if not os.path.exists(backup):
         shutil.copy2(path, backup)
         print(f"  Backup: {backup}")
 
-    data[FMT_OFFSET:FMT_OFFSET + MAX_FIXED_LEN] = fixed_padded
+    data[FMT_OFFSET : FMT_OFFSET + MAX_FIXED_LEN] = fixed_padded
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))
-    print(f"{path}: scenario patch applied: {FMT_ORIGINAL.decode()} -> {fixed.decode()}")
+    print(
+        f"{path}: scenario patch applied: {FMT_ORIGINAL.decode()} -> {fixed.decode()}"
+    )
     print(f"  new SHA-256: {out_digest[:16]}...")
     return 0
 
@@ -87,13 +89,19 @@ def restore(path: str) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('exe_path', help='Path to C&C95.EXE')
-    ap.add_argument('scenario', nargs='?', default=None,
-                    help='Target scenario name (e.g. SCG02EA, SCB01EA)')
-    ap.add_argument('--restore', action='store_true',
-                    help='Restore from .scenario_orig backup')
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument("exe_path", help="Path to C&C95.EXE")
+    ap.add_argument(
+        "scenario",
+        nargs="?",
+        default=None,
+        help="Target scenario name (e.g. SCG02EA, SCB01EA)",
+    )
+    ap.add_argument(
+        "--restore", action="store_true", help="Restore from .scenario_orig backup"
+    )
     args = ap.parse_args()
 
     if args.restore:

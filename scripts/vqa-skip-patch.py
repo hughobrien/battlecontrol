@@ -24,18 +24,19 @@ Patch site:
 Expected input SHA-256 (all prior patches already applied):
   08f89ab8c85d38650f981a6e1f998e2dacd164142bde5aa22146e5d57382d03c
 """
+
 import sys
 import hashlib
 import shutil
 
 ORIGINAL_SHA256 = "08f89ab8c85d38650f981a6e1f998e2dacd164142bde5aa22146e5d57382d03c"
 
-PATCH_OFFSET = 0x0a53c4    # Play_Movie entry
-ORIGINAL_BYTE = 0x55       # push %ebp
-PATCHED_BYTE  = 0xC3       # ret
+PATCH_OFFSET = 0x0A53C4  # Play_Movie entry
+ORIGINAL_BYTE = 0x55  # push %ebp
+PATCHED_BYTE = 0xC3  # ret
 
 # Signature to verify we're at the right site (bytes 1-4 after the patched byte)
-SITE_SIGNATURE = b'\x89\xe5\x56\x3c\xff'   # mov %esp,%ebp; push %esi; cmp $0xff,%al
+SITE_SIGNATURE = b"\x89\xe5\x56\x3c\xff"  # mov %esp,%ebp; push %esi; cmp $0xff,%al
 
 
 def sha256(data: bytes) -> str:
@@ -43,14 +44,14 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
 
     # Check if already patched
     if data[PATCH_OFFSET] == PATCHED_BYTE:
-        sig = bytes(data[PATCH_OFFSET + 1:PATCH_OFFSET + 6])
+        sig = bytes(data[PATCH_OFFSET + 1 : PATCH_OFFSET + 6])
         if sig == SITE_SIGNATURE:
             print(f"{path}: already patched")
             return 0
@@ -59,22 +60,28 @@ def patch(path: str, dry_run: bool = False) -> int:
     if digest != ORIGINAL_SHA256:
         print(f"WARNING: unexpected input SHA-256 {digest}")
         print(f"         expected: {ORIGINAL_SHA256}")
-        print(f"         Proceeding anyway — verifying site signature instead.")
+        print("         Proceeding anyway — verifying site signature instead.")
 
     # Verify site signature
     if data[PATCH_OFFSET] != ORIGINAL_BYTE:
-        print(f"ERROR: byte at 0x{PATCH_OFFSET:x} is 0x{data[PATCH_OFFSET]:02x}, "
-              f"expected 0x{ORIGINAL_BYTE:02x}")
+        print(
+            f"ERROR: byte at 0x{PATCH_OFFSET:x} is 0x{data[PATCH_OFFSET]:02x}, "
+            f"expected 0x{ORIGINAL_BYTE:02x}"
+        )
         return 1
-    sig = bytes(data[PATCH_OFFSET + 1:PATCH_OFFSET + 6])
+    sig = bytes(data[PATCH_OFFSET + 1 : PATCH_OFFSET + 6])
     if sig != SITE_SIGNATURE:
-        print(f"ERROR: site signature mismatch at 0x{PATCH_OFFSET+1:x}: "
-              f"{sig.hex()} != {SITE_SIGNATURE.hex()}")
+        print(
+            f"ERROR: site signature mismatch at 0x{PATCH_OFFSET + 1:x}: "
+            f"{sig.hex()} != {SITE_SIGNATURE.hex()}"
+        )
         return 1
 
     if dry_run:
-        print(f"{path}: DRY RUN — would patch 0x{PATCH_OFFSET:x}: "
-              f"0x{ORIGINAL_BYTE:02x} -> 0x{PATCHED_BYTE:02x}")
+        print(
+            f"{path}: DRY RUN — would patch 0x{PATCH_OFFSET:x}: "
+            f"0x{ORIGINAL_BYTE:02x} -> 0x{PATCHED_BYTE:02x}"
+        )
         return 0
 
     # Backup
@@ -85,7 +92,7 @@ def patch(path: str, dry_run: bool = False) -> int:
     # Apply patch
     data[PATCH_OFFSET] = PATCHED_BYTE
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))
@@ -95,9 +102,13 @@ def patch(path: str, dry_run: bool = False) -> int:
 
 
 if __name__ == "__main__":
-    paths = sys.argv[1:] if len(sys.argv) > 1 else [
-        "/opt/redalert/game/RA95.EXE",
-    ]
+    paths = (
+        sys.argv[1:]
+        if len(sys.argv) > 1
+        else [
+            "/opt/redalert/game/RA95.EXE",
+        ]
+    )
     rc = 0
     for p in paths:
         try:

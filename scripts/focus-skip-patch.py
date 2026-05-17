@@ -21,6 +21,7 @@ Patch sites (JZ_near offsets = CMP_offset + 7):
 Expected input SHA-256  (nocd + sdm-skip + probe-skip patched):
   b00745c200f07551cea018c749cafd62c4ac58d7753f9710964ddbdab809ed90
 """
+
 import sys
 import hashlib
 import shutil
@@ -29,11 +30,11 @@ PROBE_SKIP_SHA256 = "b00745c200f07551cea018c749cafd62c4ac58d7753f9710964ddbdab80
 
 # (jz_file_offset, expected_6_bytes, description)
 PATCH_SITES = [
-    (0x154005, bytes.fromhex('0f8455ffffff'), "GameInFocus spin loop #1"),
-    (0x15f2f1, bytes.fromhex('0f847bffffff'), "GameInFocus spin loop #2"),
-    (0x15f583, bytes.fromhex('0f847affffff'), "GameInFocus spin loop #3"),
+    (0x154005, bytes.fromhex("0f8455ffffff"), "GameInFocus spin loop #1"),
+    (0x15F2F1, bytes.fromhex("0f847bffffff"), "GameInFocus spin loop #2"),
+    (0x15F583, bytes.fromhex("0f847affffff"), "GameInFocus spin loop #3"),
 ]
-NOP6 = b'\x90' * 6
+NOP6 = b"\x90" * 6
 
 
 def sha256(data: bytes) -> str:
@@ -41,13 +42,13 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
 
     # Check if already patched
-    already = all(bytes(data[off:off+6]) == NOP6 for off, _, _ in PATCH_SITES)
+    already = all(bytes(data[off : off + 6]) == NOP6 for off, _, _ in PATCH_SITES)
     if already:
         print(f"{path}: already patched (focus-skip)")
         return 0
@@ -55,12 +56,12 @@ def patch(path: str, dry_run: bool = False) -> int:
     if digest != PROBE_SKIP_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected probe-skip binary: {PROBE_SKIP_SHA256}")
-        print(f"       Run nocd-patch.py, sdm-skip-patch.py, probe-skip-patch.py first.")
+        print("       Run nocd-patch.py, sdm-skip-patch.py, probe-skip-patch.py first.")
         return 1
 
     # Verify each patch site
     for off, expected, desc in PATCH_SITES:
-        actual = bytes(data[off:off+6])
+        actual = bytes(data[off : off + 6])
         if actual != expected:
             print(f"ERROR: unexpected bytes at 0x{off:x} ({desc}): {actual.hex()}")
             print(f"       expected: {expected.hex()}")
@@ -76,10 +77,10 @@ def patch(path: str, dry_run: bool = False) -> int:
     print(f"  Backup: {backup}")
 
     for off, _, desc in PATCH_SITES:
-        data[off:off+6] = NOP6
+        data[off : off + 6] = NOP6
         print(f"  Patched 0x{off:x}: {desc}")
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))

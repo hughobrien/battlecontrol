@@ -46,14 +46,16 @@ def _load_deps():
     try:
         import numpy as np
         from PIL import Image
+
         return np, Image
-    except ImportError as e:
+    except ImportError:
         return None, None
 
 
 def _compute_ssim(luma_a, luma_b):
     """Global SSIM between two float64 luminance arrays (Wang et al. 2004)."""
     import numpy as np
+
     C1 = (0.01 * 255) ** 2
     C2 = (0.03 * 255) ** 2
     mu_a = luma_a.mean()
@@ -62,19 +64,21 @@ def _compute_ssim(luma_a, luma_b):
     sigma_b2 = ((luma_b - mu_b) ** 2).mean()
     sigma_ab = float(np.mean((luma_a - mu_a) * (luma_b - mu_b)))
     num = (2.0 * mu_a * mu_b + C1) * (2.0 * sigma_ab + C2)
-    den = (mu_a ** 2 + mu_b ** 2 + C1) * (sigma_a2 + sigma_b2 + C2)
+    den = (mu_a**2 + mu_b**2 + C1) * (sigma_a2 + sigma_b2 + C2)
     return float(num / den) if den != 0.0 else 0.0
 
 
 def _fill_pct(arr):
     """Percentage of pixels where any RGB channel > 15 (non-black)."""
     import numpy as np
+
     return round(float(np.any(arr > 15, axis=2).mean() * 100), 1)
 
 
 def _p99_diff(arr_a, arr_b):
     """99th percentile absolute per-channel pixel difference."""
     import numpy as np
+
     d = np.abs(arr_a.astype(np.int32) - arr_b.astype(np.int32)).flatten()
     return int(np.percentile(d, 99))
 
@@ -93,6 +97,7 @@ def _content_bbox(arr, threshold=15):
     Returns (x1, y1, x2, y2) or None if entirely black.
     """
     import numpy as np
+
     mask = np.any(arr > threshold, axis=2)
     if not mask.any():
         return None
@@ -136,8 +141,8 @@ def _register_images(arr_a, arr_b, threshold=15):
     # Crop both to content bounding box
     x1a, y1a, x2a, y2a = bbox_a
     x1b, y1b, x2b, y2b = bbox_b
-    crop_a = arr_a[y1a:y2a+1, x1a:x2a+1]
-    crop_b = arr_b[y1b:y2b+1, x1b:x2b+1]
+    crop_a = arr_a[y1a : y2a + 1, x1a : x2a + 1]
+    crop_b = arr_b[y1b : y2b + 1, x1b : x2b + 1]
 
     # Compute luminance for cross-correlation
     luma_a = to_luma(crop_a)
@@ -194,8 +199,8 @@ def _register_images(arr_a, arr_b, threshold=15):
         ow = min(wa, wb)
         return crop_a[:oh, :ow], crop_b[:oh, :ow], 0, 0
 
-    aligned_a = crop_a[y_start_a:y_start_a + oh, x_start_a:x_start_a + ow]
-    aligned_b = crop_b[y_start_b:y_start_b + oh, x_start_b:x_start_b + ow]
+    aligned_a = crop_a[y_start_a : y_start_a + oh, x_start_a : x_start_a + ow]
+    aligned_b = crop_b[y_start_b : y_start_b + oh, x_start_b : x_start_b + ow]
     return aligned_a, aligned_b, dy, dx
 
 
@@ -203,30 +208,38 @@ def _write_diff(arr_a, arr_b, out_path):
     """Write an amplified absolute-difference PNG (x8) to out_path."""
     import numpy as np
     from PIL import Image
+
     diff = np.abs(arr_a.astype(np.int32) - arr_b.astype(np.int32)).astype(np.uint8)
     amplified = np.clip(diff * 8, 0, 255).astype(np.uint8)
     Image.fromarray(amplified).save(out_path)
 
 
-def _write_side_by_side(arr_a, arr_b, out_path, label_a='Reference', label_b='Test',
-                         ssim=None, p99=None, fill_a=None, fill_b=None):
+def _write_side_by_side(
+    arr_a,
+    arr_b,
+    out_path,
+    label_a="Reference",
+    label_b="Test",
+    ssim=None,
+    p99=None,
+    fill_a=None,
+    fill_b=None,
+):
     """Write a side-by-side composite PNG comparing img_a (left) and img_b (right).
 
     A thin gap separates the two images, and a top banner shows labels + stats.
     """
     from PIL import Image, ImageDraw, ImageFont
-    import numpy as np
 
     ha, wa = arr_a.shape[:2]
     hb, wb = arr_b.shape[:2]
     gap = 4
     banner_h = 36 if (ssim is not None or label_a or label_b) else 0
-    inter_img_gap = 2
 
     out_w = wa + gap + wb
     out_h = banner_h + max(ha, hb)
 
-    composite = Image.new('RGB', (out_w, out_h), (32, 32, 32))
+    composite = Image.new("RGB", (out_w, out_h), (32, 32, 32))
     draw = ImageDraw.Draw(composite)
 
     # Draw banner background
@@ -243,14 +256,14 @@ def _write_side_by_side(arr_a, arr_b, out_path, label_a='Reference', label_b='Te
     info_a = label_a
     info_b = label_b
     if ssim is not None:
-        info_a += f'  SSIM={ssim:.4f}'
-        info_b += f'  SSIM={ssim:.4f}'
+        info_a += f"  SSIM={ssim:.4f}"
+        info_b += f"  SSIM={ssim:.4f}"
     if fill_a is not None:
-        info_a += f'  fill={fill_a}%'
+        info_a += f"  fill={fill_a}%"
     if fill_b is not None:
-        info_b += f'  fill={fill_b}%'
+        info_b += f"  fill={fill_b}%"
     if p99 is not None:
-        suffix = f'  p99={p99}'
+        suffix = f"  p99={p99}"
         info_a += suffix
         info_b += suffix
 
@@ -272,64 +285,100 @@ def _write_side_by_side(arr_a, arr_b, out_path, label_a='Reference', label_b='Te
         draw.line([(wa, banner_h), (wa, out_h - 1)], fill=(80, 80, 80))
         if gap > 2:
             draw.line([(wa + 1, banner_h), (wa + 1, out_h - 1)], fill=(48, 48, 48))
-            draw.line([(wa + gap - 1, banner_h), (wa + gap - 1, out_h - 1)], fill=(48, 48, 48))
+            draw.line(
+                [(wa + gap - 1, banner_h), (wa + gap - 1, out_h - 1)], fill=(48, 48, 48)
+            )
 
     composite.save(out_path)
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('path_a', help='Reference PNG (Wine OG)')
-    ap.add_argument('path_b', help='Test PNG (WASM)')
-    ap.add_argument('--label',            default='comparison')
-    ap.add_argument('--threshold-ssim',   type=float, default=0.90)
-    ap.add_argument('--diff-out',         default=None)
-    ap.add_argument('--side-by-side-out', default=None,
-                    help='write side-by-side comparison PNG to this path')
-    ap.add_argument('--json',             action='store_true')
-    ap.add_argument('--crop-bottom',      type=int, default=0,
-                    help='remove N rows from bottom of both images before comparing')
-    ap.add_argument('--no-align',         action='store_true',
-                    help='disable content-based alignment (old center-crop behavior)')
-    ap.add_argument('--print-bbox',       action='store_true',
-                    help='print detected content bounding boxes and exit (no SSIM)')
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument("path_a", help="Reference PNG (Wine OG)")
+    ap.add_argument("path_b", help="Test PNG (WASM)")
+    ap.add_argument("--label", default="comparison")
+    ap.add_argument("--threshold-ssim", type=float, default=0.90)
+    ap.add_argument("--diff-out", default=None)
+    ap.add_argument(
+        "--side-by-side-out",
+        default=None,
+        help="write side-by-side comparison PNG to this path",
+    )
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument(
+        "--crop-bottom",
+        type=int,
+        default=0,
+        help="remove N rows from bottom of both images before comparing",
+    )
+    ap.add_argument(
+        "--no-align",
+        action="store_true",
+        help="disable content-based alignment (old center-crop behavior)",
+    )
+    ap.add_argument(
+        "--print-bbox",
+        action="store_true",
+        help="print detected content bounding boxes and exit (no SSIM)",
+    )
     args = ap.parse_args()
 
     def emit(result):
         if not args.json:
-            st = result.get('status', '?')
-            ss = result.get('ssim', 0)
-            p  = result.get('p99_diff', '?')
-            fa = result.get('fill_a', '?')
-            fb = result.get('fill_b', '?')
-            err = result.get('error', '')
-            sa = result.get('size_a', '?')
-            sb = result.get('size_b', '?')
-            of = result.get('offset', '?')
-            print(f'[{st}] {args.label}: ssim={ss:.4f} threshold={args.threshold_ssim} '
-                  f'p99={p} fill_a={fa}% fill_b={fb}% size_a={sa} size_b={sb}'
-                  + (f' offset=({of})' if of != '?' else ''))
+            st = result.get("status", "?")
+            ss = result.get("ssim", 0)
+            p = result.get("p99_diff", "?")
+            fa = result.get("fill_a", "?")
+            fb = result.get("fill_b", "?")
+            err = result.get("error", "")
+            sa = result.get("size_a", "?")
+            sb = result.get("size_b", "?")
+            of = result.get("offset", "?")
+            print(
+                f"[{st}] {args.label}: ssim={ss:.4f} threshold={args.threshold_ssim} "
+                f"p99={p} fill_a={fa}% fill_b={fb}% size_a={sa} size_b={sb}"
+                + (f" offset=({of})" if of != "?" else "")
+            )
             if err:
-                print(f'  error: {err}')
+                print(f"  error: {err}")
         print(json.dumps(result))
 
     for p in [args.path_a, args.path_b]:
         if not os.path.exists(p):
-            emit({'status': 'SKIP', 'error': f'file not found: {p}',
-                  'ssim': 0, 'p99_diff': None, 'fill_a': None, 'fill_b': None,
-                  'label': args.label, 'threshold_ssim': args.threshold_ssim})
+            emit(
+                {
+                    "status": "SKIP",
+                    "error": f"file not found: {p}",
+                    "ssim": 0,
+                    "p99_diff": None,
+                    "fill_a": None,
+                    "fill_b": None,
+                    "label": args.label,
+                    "threshold_ssim": args.threshold_ssim,
+                }
+            )
             return 2
 
     np, Image = _load_deps()
     if np is None:
-        emit({'status': 'SKIP', 'error': 'numpy or Pillow not available',
-              'ssim': 0, 'p99_diff': None, 'fill_a': None, 'fill_b': None,
-              'label': args.label, 'threshold_ssim': args.threshold_ssim})
+        emit(
+            {
+                "status": "SKIP",
+                "error": "numpy or Pillow not available",
+                "ssim": 0,
+                "p99_diff": None,
+                "fill_a": None,
+                "fill_b": None,
+                "label": args.label,
+                "threshold_ssim": args.threshold_ssim,
+            }
+        )
         return 2
 
-    img_a = Image.open(args.path_a).convert('RGB')
-    img_b = Image.open(args.path_b).convert('RGB')
+    img_a = Image.open(args.path_a).convert("RGB")
+    img_b = Image.open(args.path_b).convert("RGB")
     wa, ha = img_a.size
     wb, hb = img_b.size
 
@@ -341,11 +390,25 @@ def main():
         bbox_a = _content_bbox(arr_a)
         bbox_b = _content_bbox(arr_b)
         result = {
-            'label':  args.label,
-            'bbox_a': {'x1': bbox_a[0], 'y1': bbox_a[1], 'x2': bbox_a[2], 'y2': bbox_a[3]} if bbox_a else None,
-            'bbox_b': {'x1': bbox_b[0], 'y1': bbox_b[1], 'x2': bbox_b[2], 'y2': bbox_b[3]} if bbox_b else None,
-            'size_a': f'{wa}x{ha}',
-            'size_b': f'{wb}x{hb}',
+            "label": args.label,
+            "bbox_a": {
+                "x1": bbox_a[0],
+                "y1": bbox_a[1],
+                "x2": bbox_a[2],
+                "y2": bbox_a[3],
+            }
+            if bbox_a
+            else None,
+            "bbox_b": {
+                "x1": bbox_b[0],
+                "y1": bbox_b[1],
+                "x2": bbox_b[2],
+                "y2": bbox_b[3],
+            }
+            if bbox_b
+            else None,
+            "size_a": f"{wa}x{ha}",
+            "size_b": f"{wb}x{hb}",
         }
         print(json.dumps(result))
         return 0
@@ -368,48 +431,58 @@ def main():
 
     # Optionally crop bottom N rows from both (mask known-different regions)
     if args.crop_bottom > 0 and args.crop_bottom < min(arr_a.shape[0], arr_b.shape[0]):
-        arr_a = arr_a[:arr_a.shape[0] - args.crop_bottom, :, :]
-        arr_b = arr_b[:arr_b.shape[0] - args.crop_bottom, :, :]
+        arr_a = arr_a[: arr_a.shape[0] - args.crop_bottom, :, :]
+        arr_b = arr_b[: arr_b.shape[0] - args.crop_bottom, :, :]
 
     # Grayscale luminance (BT.601)
     def to_luma(a):
-        r, g, b = a[:, :, 0].astype(np.float64), a[:, :, 1].astype(np.float64), a[:, :, 2].astype(np.float64)
+        r, g, b = (
+            a[:, :, 0].astype(np.float64),
+            a[:, :, 1].astype(np.float64),
+            a[:, :, 2].astype(np.float64),
+        )
         return 0.299 * r + 0.587 * g + 0.114 * b
 
-    ssim   = _compute_ssim(to_luma(arr_a), to_luma(arr_b))
-    p99    = _p99_diff(arr_a, arr_b)
+    ssim = _compute_ssim(to_luma(arr_a), to_luma(arr_b))
+    p99 = _p99_diff(arr_a, arr_b)
     fill_a = _fill_pct(arr_a)
     fill_b = _fill_pct(arr_b)
     passed = ssim >= args.threshold_ssim
 
     result = {
-        'label':          args.label,
-        'status':         'PASS' if passed else 'FAIL',
-        'ssim':           round(ssim, 4),
-        'threshold_ssim': args.threshold_ssim,
-        'p99_diff':       p99,
-        'fill_a':         fill_a,
-        'fill_b':         fill_b,
-        'size_a':         f'{arr_a.shape[1]}x{arr_a.shape[0]}',
-        'size_b':         f'{arr_b.shape[1]}x{arr_b.shape[0]}',
-        'offset':         f'{offset_y},{offset_x}',
+        "label": args.label,
+        "status": "PASS" if passed else "FAIL",
+        "ssim": round(ssim, 4),
+        "threshold_ssim": args.threshold_ssim,
+        "p99_diff": p99,
+        "fill_a": fill_a,
+        "fill_b": fill_b,
+        "size_a": f"{arr_a.shape[1]}x{arr_a.shape[0]}",
+        "size_b": f"{arr_b.shape[1]}x{arr_b.shape[0]}",
+        "offset": f"{offset_y},{offset_x}",
     }
 
     if args.diff_out:
         _write_diff(arr_a, arr_b, args.diff_out)
-        result['diff_out'] = args.diff_out
+        result["diff_out"] = args.diff_out
 
     if args.side_by_side_out:
         _write_side_by_side(
-            arr_a, arr_b, args.side_by_side_out,
-            label_a=args.label + ' (ref)', label_b=args.label + ' (test)',
-            ssim=ssim, p99=p99, fill_a=fill_a, fill_b=fill_b,
+            arr_a,
+            arr_b,
+            args.side_by_side_out,
+            label_a=args.label + " (ref)",
+            label_b=args.label + " (test)",
+            ssim=ssim,
+            p99=p99,
+            fill_a=fill_a,
+            fill_b=fill_b,
         )
-        result['side_by_side_out'] = args.side_by_side_out
+        result["side_by_side_out"] = args.side_by_side_out
 
     emit(result)
     return 0 if passed else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
