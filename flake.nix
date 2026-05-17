@@ -147,6 +147,7 @@
       # devShells.default  —  nix develop
       # -----------------------------------------------------------------------
       devShells.${system}.default = (pkgs.mkShell.override { stdenv = pkgs.clangStdenv; }) {
+        pure = true;
         nativeBuildInputs = with pkgs; [
           cmake
           gnumake
