@@ -72,19 +72,20 @@ All three L1 missions were frame-level parity-verified against original Windows 
 
 ## Current Status
 
-**v0.3.0+** (20 commits on `master` as of May 2026)
+**v0.3.0+** (98 commits on `master` as of May 2026)
 
-Post-v0.3.0 work has focused on hardening and bug fixes discovered through parity testing and CI:
+Post-v0.3.0 work expanded beyond hardening into TD WASM completion, M2+ mission parity expansion, and CI matrix growth:
 
-- **VQA palette fix** — top-level CPL0 handler for inter-frame VQA palettes, fixing colour drift across cinematic scenes ([TIM-845](/TIM/issues/TIM-845))
-- **Map-bleed fix** — cleared `HidPage` before menu renders in `Select_Game`, preventing canvas bleed from gameplay to post-game menu ([TIM-777](/TIM/issues/TIM-777))
-- **WASM difficulty-selector seam artifact** fixed ([TIM-772](/TIM/issues/TIM-772))
-- **Clang build restored** on Linux — `_aligned_malloc`/`_aligned_free` stubs, `-Wno-register` for C++17 ([TIM-820](/TIM/issues/TIM-820))
-- **CI hardening** — ccache key fix, binary smoke test, ccache size cap, job timeouts ([TIM-829](/TIM/issues/TIM-829), [TIM-792](/TIM/issues/TIM-792))
-- **Playwright e2e regression** — gameplay-to-menu canvas bleed detection ([TIM-802](/TIM/issues/TIM-802))
-- **Auto-merge workflow** for PRs against master ([TIM-831](/TIM/issues/TIM-831))
+- **TD WASM playable in browser** — TD WASM port completed with SDL keyboard input, wait-strategy fix, DisplayClass bounds guards preventing crash on specific cells, and audio null-function guard. Playwright e2e smoke gates and CI regression pipeline verify every push ([TIM-858](/TIM/issues/TIM-858), [TIM-856](/TIM/issues/TIM-856), [TIM-844](/TIM/issues/TIM-844), [TIM-843](/TIM/issues/TIM-843), [TIM-846](/TIM/issues/TIM-846), [TIM-848](/TIM/issues/TIM-848))
+- **M2+ mission parity expansion** — RA Allied M2, RA Soviet M2, TD GDI M2, and TD Nod M1 all have Wine OG reference captures and translation-invariant SSIM parity gates. Scenario-patching scripts and golden frame databases committed ([TIM-869](/TIM/issues/TIM-869), [TIM-857](/TIM/issues/TIM-857), [TIM-859](/TIM/issues/TIM-859), [TIM-803](/TIM/issues/TIM-803), [TIM-861](/TIM/issues/TIM-861))
+- **CI matrix expansion** — Firefox added to Playwright browser matrix alongside Chromium; nightly build pipeline with expanded smoke-test coverage ([TIM-873](/TIM/issues/TIM-873), [TIM-861](/TIM/issues/TIM-861))
+- **WASM build hardening** — Emscripten cache fix, binary size reduction, WASM-specific CI job ([TIM-826](/TIM/issues/TIM-826), [TIM-792](/TIM/issues/TIM-792))
+- **SSIM golden comparison** integrated into WASM gameplay CI; side-by-side screenshot output ([TIM-849](/TIM/issues/TIM-849), [TIM-831](/TIM/issues/TIM-831))
+- **Bug fixes** — VQA CPL0 palette handler for inter-frame colour drift ([TIM-845](/TIM/issues/TIM-845)); post-game menu map-bleed fix ([TIM-777](/TIM/issues/TIM-777)); WASM difficulty-selector seam artifact ([TIM-772](/TIM/issues/TIM-772)); audio log-spam removal, clean-exit after autostart ([TIM-838](/TIM/issues/TIM-838), [TIM-834](/TIM/issues/TIM-834), [TIM-839](/TIM/issues/TIM-839)); clang build restored on Linux ([TIM-820](/TIM/issues/TIM-820))
+- **CI hardening** — ccache key fix, binary smoke test, ccache size cap, job timeouts, auto-merge workflow ([TIM-829](/TIM/issues/TIM-829), [TIM-792](/TIM/issues/TIM-792), [TIM-831](/TIM/issues/TIM-831))
+- **Windows stubs audit** — all 63 `linux/win32-stubs` files inventoried, zero dead stubs confirmed ([TIM-840](/TIM/issues/TIM-840))
 
-All CI checks green. Both WASM bundles deploy to GitHub Pages on every push to `master`.
+All CI checks green. WASM bundles for both RA and TD deploy to GitHub Pages on every push to `master`.
 
 ---
 
