@@ -452,92 +452,138 @@ but returns real queue size when another consumer (the game) happens to have dev
 
 ---
 
-## 11. SDL_BlitSurface palette conversion under PROXY_TO_PTHREAD (2026-05-16)
+## 11. WASM Build Caching
 
-**Symptom:** Game rendering produces wrong colours in WASM build; native build is correct.
-Colours are shifted or completely wrong for palette-indexed source surfaces.
+### Symptom
 
-**Root cause:** Emscripten's `USE_SDL=2` port does not reliably use the SDL surface palette
-when `SDL_BlitSurface` performs an INDEX8→ARGB8888 blit from a Worker thread (created by
-`PROXY_TO_PTHREAD`). The SDL surface-palette state (set via `SDL_SetPaletteColors`) can be
-stale or uninitialised when accessed from the Worker's SDL context.
+First CI WASM build takes longer than expected (system library compilation time dominates);
+subsequent builds don't seem to reuse compiled system libraries.
 
-**Fix:** Replace `SDL_BlitSurface` with manual indexed→ARGB expansion using the
-authoritative palette array (populated by `Set_DD_Palette` / `Set_DD_Palette_8bit`):
+### Root cause
 
-```cpp
-// Instead of:
-//   SDL_Surface* src = SDL_CreateRGBSurfaceWithFormatFrom(buf, w, h, 8, pitch,
-//                                                           SDL_PIXELFORMAT_INDEX8);
-//   SDL_SetPaletteColors(src->format->palette, my_palette, 0, 256);
-//   SDL_BlitSurface(src, nullptr, argb_surf, nullptr);
-//   SDL_FreeSurface(src);
+Emscripten builds system libraries (libc, libc++, SDL2 port, pthreads) from source on first
+use and caches them at the default `EM_CACHE` location. When `EM_CACHE` points to a
+non-persistent directory (e.g. `/tmp/_cache` in Nix, or unset which defaults to
+`~/.emscripten_cache` on a clean CI runner), the cache is empty on every run.
 
-// Do manual expansion:
-const uint8_t* src = (const uint8_t*)indexed_pixels;
-uint32_t*      dst = (uint32_t*)argb_surf->pixels;
-int srcPitch = indexed_pitch;
-int dstPitch32 = argb_surf->pitch / 4;
-for (int y = 0; y < h; ++y) {
-    for (int x = 0; x < w; ++x) {
-        uint8_t idx = src[y * srcPitch + x];
-        const SDL_Color& c = my_palette[idx];
-        dst[y * dstPitch32 + x] =
-            ((uint32_t)0xFF << 24) |
-            ((uint32_t)c.r  << 16) |
-            ((uint32_t)c.g  <<  8) |
-            ((uint32_t)c.b);
-    }
-}
+The `mymindstorm/setup-emsdk` action caches the emsdk **installation** but the system
+library cache may be stored outside the emsdk tree, depending on the Emscripten version
+and installation method.
+
+### Fix
+
+Set `EM_CACHE` explicitly to a directory that is cached by `actions/cache`:
+
+```yaml
+env:
+  EM_CACHE_DIR: ${{ github.workspace }}/.emscripten-cache
+
+steps:
+  - name: Cache Emscripten system libraries
+    uses: actions/cache@v4
+    with:
+      path: ${{ env.EM_CACHE_DIR }}
+      key: emcc-cache-5.0.6-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
+      restore-keys: |
+        emcc-cache-5.0.6-
+
+  - name: Configure WASM build
+    env:
+      EM_CACHE: ${{ env.EM_CACHE_DIR }}
+    run: emcmake cmake --preset wasm
+
+  - name: Build
+    env:
+      EM_CACHE: ${{ env.EM_CACHE_DIR }}
+    run: cmake --build build-wasm --parallel
 ```
 
-This is a CPU-bounded inner loop (640×480 = 307,200 pixels per frame); the manual
-expansion has comparable performance to SDL_BlitSurface on modern WASM VMs and is
-not a bottleneck.
+The cache key includes a hash of `CMakeLists.txt` and `CMakePresets.json` so that changes
+to link flags (which may change which system libraries are required) cause a cache miss.
 
-*(Landed in TIM-858 for TD; originally established as TIM-573 for RA in DDRAW.CPP.)*
-
-**Reference:** RA `DDRAW.CPP:Wait_Vert_Blank` (lines 1052–1087), TD `td-win32-stubs.cpp:Wait_Vert_Blank`.
+**Reference:** [Emscripten compiler cache](https://emscripten.org/docs/tools_reference/emcc.html#emcc-cache)
 
 ---
 
-## 12. EMULATE_FUNCTION_POINTER_CASTS for residual audio null-function traps (2026-05-16)
+## 12. Binary Size / Load Time
 
-**Symptom:** RA WASM audio produces an intermittent null-function trap at ~50% rate even
-after applying the TIM-593 (-O2 link) and TIM-604 (remove `SDL_AUDIO_ALLOW_FREQUENCY_CHANGE`)
-fixes. A single CI run may pass; cold-cache runs fail non-deterministically.
+### Current baseline (TIM-812 build, Emscripten 5.0.6, -O2 link)
 
-**Root cause:** RA compiles at `-O3` per-TU with `-O2` link-time Binaryen optimisation.
-At `-O3`, LLVM can inline or transform `Sound_Mixer_Callback` (and other function pointers)
-in ways that make the function's table entry appear unused to Binaryen's liveness analysis,
-even at `-O2`. On newer emsdk versions (post Binaryen 129), the pruner is more aggressive
-and removes `HandleAudioProcess` and similar SDL2 internal function-table entries that are
-only reached from JavaScript via `dynCall('vp', ptr, [dev])`.
+| Binary | WASM size | Functions | JS size |
+|--------|-----------|-----------|---------|
+| ra.wasm | 1,775 KB | 2,896 | 213 KB |
+| td.wasm | 1,442 KB | 2,616 | 210 KB |
 
-**Fix:** Add `-sEMULATE_FUNCTION_POINTER_CASTS=1` to the WASM link flags. This routes all
-indirect function calls through a JavaScript dispatcher that maps function indices to real
-WASM function references, making Binaryen's function-table pruning harmless. The performance
-overhead is 2–5% and is acceptable for this use case.
+WASM section breakdown (ra.wasm):
+- Code: 1,614 KB (88.8%)
+- Data: 185 KB (10.2%)
+- Everything else: ~18 KB (1.0%)
+
+### Key size wins already applied
+
+The build already uses the two most impactful size optimisations:
+- No Asyncify (lens #11) — Asyncify adds ~2× code-size overhead for stack scanning
+- `-O2` link optimisation — Binaryen prunes dead code and unused functions
+
+### Safe optimisations to consider
+
+#### `-sDISABLE_EXCEPTION_CATCHING=1`
+
+Removes C++ exception handling support. Saves ~10-15% code size (~160-240 KB for ra.wasm).
+The codebase uses one try/catch in `vqa_player.cpp` (returns 0 on exception) — verify this
+path is not exercised under WASM before enabling. This is a compile+link flag.
 
 ```cmake
-target_link_options(my_game PRIVATE
-    -sEMULATE_FUNCTION_POINTER_CASTS=1
-)
+target_compile_options(ra PRIVATE -sDISABLE_EXCEPTION_CATCHING=1)
 ```
 
-This flag should be used on any target that:
-- Compiles at `-O3` or higher per-TU, AND
-- Links at `-O2` or higher, AND
-- Uses `SDL_OpenAudioDevice` (or any library that registers WASM function pointers via `dynCall`)
+#### `--closure 1`
 
-TD (which compiles at `-O2`) does not need this flag; removing `SDL_AUDIO_ALLOW_FREQUENCY_CHANGE`
-is sufficient to prevent its audio null-function trap.
+Runs Google Closure Compiler on the JS output. Reduces JS by ~60-80% (uncompressed).
+However, under PROXY_TO_PTHREAD the JS structure is complex (Module, worker proxy,
+`FS`, `callMain`). Closure may rename `Module` properties, breaking the preloader.
+To use safely:
 
-*(Landed in TIM-858.)*
+1. Add `-sMODULARIZE=1` to the link flags
+2. Create a `closure-externs.js` file listing properties that must not be renamed:
+   ```js
+   var Module = {};
+   Module.FS = {};
+   Module.callMain = function(){};
+   Module.onRuntimeInitialized = function(){};
+   Module.ENV = {};
+   ```
+3. Pass `--closure-args=--externs=closure-externs.js` to emcc
 
-**Reference:** [Emscripten EMULATE_FUNCTION_POINTER_CASTS doc](https://emscripten.org/docs/porting/guidelines/function_pointer_issues.html#emulate-function-pointer-casts)
+**Risk: medium.** The gzip-compressed JS is already small (~60-70 KB); closure's network
+savings are modest.
+
+#### `-Os` (size-optimised link)
+
+Binaryen's `-Os` at link time aggressively optimises for size. This can save
+5-10% on the code section. However, it may impact runtime performance and, like `-O3`,
+may prune function table entries that SDL2 audio routing depends on (lens #7).
+**Risk: low-medium.** Test with 5/5 audio verification before committing.
+
+### Load time
+
+At 1.8 MB, the WASM module streams and compiles in < 5 seconds on modern hardware.
+The real load-time bottleneck is JIT cold-start in CI (lens #8) — up to 240 s for
+optimised WASM in headless Chrome. Solutions:
+
+- Gate on `onRuntimeInitialized`, NOT `waitForFunction` (playbook §5)
+- Use ≥ 300 s timeouts for WASM-ready gates in CI
+- Consider `-sWASM_BIGINT=1` to reduce JS <-> WASM marshalling overhead
+
+### What NOT to do
+
+- Do NOT add Asyncify (`-sASYNCIFY`) unless absolutely needed. It adds ~2× code size.
+- Do NOT switch to `-O0` for "faster startup" — it makes the WASM module larger and
+  JIT compilation takes just as long.
+- Do NOT strip `-sALLOW_MEMORY_GROWTH=1` — the game's memory footprint varies with
+  mission complexity; fixed `INITIAL_MEMORY` risks OOM crashes.
 
 ---
 
 *Last updated: 2026-05-16. Maintainer: EmscriptenExpert agent.*
-*Source issues: TIM-399, TIM-489, TIM-555, TIM-573, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712, TIM-757, TIM-858.*
+*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712, TIM-757, TIM-826.*
