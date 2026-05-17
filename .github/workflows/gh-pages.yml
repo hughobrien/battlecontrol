@@ -58,14 +58,6 @@ jobs:
             ccache-ghpages-
             ccache-
 
-      - uses: actions/setup-node@v6.4.0
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-
-      - name: Install pnpm dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Build WASM + validate + smoke (ra.wasm, chromium)
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
