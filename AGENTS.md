@@ -27,23 +27,39 @@ this project **must** be run inside the Nix development shell. Outside the shell
 tools like `nixfmt`, `clang-tidy`, `shfmt`, `yamllint`, and `ruff` are not on PATH.
 The pre-commit hook will fail with cryptic errors.
 
+### Agent self-check block
+
+> **Agent instructions:** At startup, check `$IN_NIX_SHELL`. If it is empty or unset,
+> print the message below to the user and stop. Do not attempt to run any commands.
+
+```bash
+if [[ -z "${IN_NIX_SHELL:-}" ]]; then
+  echo ""
+  echo "============================================"
+  echo " ERROR: Not inside nix develop shell"
+  echo "============================================"
+  echo " Reinvoke the agent with:"
+  echo ""
+  echo "   nix develop --command <agent-name>"
+  echo ""
+  echo " Example:"
+  echo "   nix develop --command pi"
+  echo "   nix develop --command claude"
+  echo "   nix develop --command aider"
+  echo "============================================"
+  exit 1
+fi
+```
+
 ### Verify before proceeding
 
-The agent harness runs inside `nix develop`, so you inherit the shell automatically.
-Before running any command, verify you are inside the dev shell:
+Once inside the dev shell, verify everything is available:
 
 ```bash
-# Should print a non-empty path pointing to the Nix store, e.g.
-# /nix/store/...-battlecontrol-dev-shell/bin
-echo "$NIX_BUILD_TOP" 2>/dev/null || echo "IN_NIX_SHELL=$IN_NIX_SHELL"
+echo "IN_NIX_SHELL=$IN_NIX_SHELL"
 ```
 
-If `$IN_NIX_SHELL` is not set or `$NIX_BUILD_TOP` is empty, you are **outside**
-the dev shell. Enter it first:
-
-```bash
-nix develop
-```
+Should print `IN_NIX_SHELL=1` (or another non-empty value). If it does, proceed.
 
 ### Correct
 
