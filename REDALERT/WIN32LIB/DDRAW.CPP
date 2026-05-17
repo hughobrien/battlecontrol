@@ -1214,6 +1214,43 @@ void Wait_Vert_Blank(void)
 		}
 		fprintf(stderr, "[RA] first SDL frame presented — window now visible\n");
 	}
+
+	// TIM-1053: Frame rate limiter for software renderer fallback.
+	// When the hardware-accelerated renderer with PRESENTVSYNC is active,
+	// SDL_RenderPresent already blocks for ~16.6ms at 60Hz.  On the
+	// software fallback (Xvfb, headless CI, no GPU), RenderPresent returns
+	// immediately and the main loop runs at CPU speed, making the game
+	// play far too fast.  This limiter uses wall-clock timing to throttle
+	// to ~60 FPS regardless of renderer type.
+	{
+		static struct timespec _wv_prev = {0, 0};
+		static bool _wv_initialized = false;
+		struct timespec _wv_now;
+		clock_gettime(CLOCK_MONOTONIC, &_wv_now);
+
+		if (!_wv_initialized) {
+			_wv_prev = _wv_now;
+			_wv_initialized = true;
+		} else {
+			// Compute elapsed ns since last frame.
+			long elapsed_ns = (_wv_now.tv_sec - _wv_prev.tv_sec) * 1000000000L
+			                + (_wv_now.tv_nsec - _wv_prev.tv_nsec);
+			// Target: 16.666 ms per frame (~60 FPS).  If we're running
+			// faster than that (e.g. software renderer with no vsync),
+			// delay for the remaining time.
+			const long TARGET_NS = 16666667L;  // 1/60 second in ns
+			if (elapsed_ns < TARGET_NS) {
+				long delay_ms = (TARGET_NS - elapsed_ns + 999999L) / 1000000L;
+				if (delay_ms > 0) {
+					SDL_Delay((Uint32)delay_ms);
+				}
+			}
+			// After any delay, update reference for next frame.
+			clock_gettime(CLOCK_MONOTONIC, &_wv_now);
+			_wv_prev = _wv_now;
+		}
+	}
+
 	return;
 #else
 	if (DirectDrawObject == NULL) {
