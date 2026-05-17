@@ -541,6 +541,9 @@ int Fetch_Difficulty(void)
 	**	Main Processing Loop.
 	*/
 	Set_Logic_Page(SeenBuff);
+#ifndef _MSC_VER
+	GadgetClass::Set_Color_Scheme(&ColorRemaps[PCOLOR_BLUE]);
+#endif
 	bool redraw = true;
 	bool process = true;
 	while (process) {
