@@ -52,6 +52,30 @@ automerge will wait until it passes. If CI is green, the PR merges automatically
 
 ---
 
+## ⚠️ Before every push: run `ci_local` first
+
+**GitHub CI is slow (5–15 min per job).** Always run the full CI gate locally
+before pushing to catch failures instantly:
+
+```bash
+nix develop --extra-experimental-features 'nix-command flakes' --command nix run .#ci
+```
+
+Or use the extension tool:
+
+```
+ci_local()
+```
+
+This runs every available gate: native build, WASM build, LP64 audit, VQA
+pixel-diff, include shim, WASM validate. It auto-skips gates with missing
+dependencies (e.g., no emcmake = WASM skipped), so it's safe to run anywhere.
+
+> **Never push without running `ci_local` first.** A 30-second local check
+> saves 15 minutes of CI wait-and-retry.
+
+---
+
 ## How to Make Progress
 
 1. Choose a mission not already marked done (see `TODO.md`).
@@ -149,8 +173,13 @@ The standard loop for an agent working on a fix:
 3. LP64 audit  → nix run .#lint
 4. Smoke test  → run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
 5. Commit      → git commit -m "short imperative subject"
-6. Push        → git push
+6. CI check    → ci_local()  # ⚠️ run full CI locally before pushing
+7. Push        → git push
+8. Automerge   → gh pr merge --auto --merge
 ```
+
+> **Step 6 is mandatory.** Never skip local CI. GitHub CI takes 5–15 minutes;
+> `ci_local()` catches the same failures in ~30 seconds.
 
 If the change touches rendering or palette paths, add a parity check:
 
