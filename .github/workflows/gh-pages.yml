@@ -35,16 +35,16 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v30
+        uses: cachix/install-nix-action@v31.10.6
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
       - name: Cache Emscripten system libraries
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ${{ env.EM_CACHE_DIR }}
           key: emcc-cache-ghpages-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
@@ -58,7 +58,7 @@ jobs:
           ccache --max-size 500M
 
       - name: Cache ccache
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.5
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-ghpages-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
@@ -66,7 +66,7 @@ jobs:
             ccache-ghpages-
             ccache-
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6.4.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -117,7 +117,7 @@ jobs:
 
       - name: Upload smoke artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wasm-smoke-results
           path: |
@@ -141,7 +141,7 @@ jobs:
 
       - name: Upload wasm-parity screenshots
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wasm-parity-screenshots
           path: e2e/screenshots/tim699-wasm-*.png
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload gameplay SSIM artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: t11-gameplay-ssim-results
           path: e2e/screenshots/ra-visual-*.png
@@ -320,7 +320,7 @@ jobs:
           EOF
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: wasm/deploy
