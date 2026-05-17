@@ -172,12 +172,15 @@ if(EMSCRIPTEN)
         -pthread
         -sUSE_SDL=2
         -sUSE_PTHREADS=1
+        -Os     # TIM-904: optimize for size at compile time.
+        -sDISABLE_EXCEPTION_CATCHING=1
     )
     set_target_properties(td PROPERTIES SUFFIX ".html")
     target_link_options(td PRIVATE
         # TIM-593: match ra's -O2 link opt — keeps SDL2 audio function table entries
         # intact on all Binaryen versions (see ra block comment above).
-        -O2
+        # TIM-904: -Oz for maximum code-size savings at link time.
+        -Oz
         -sUSE_SDL=2
         -sALLOW_MEMORY_GROWTH=1
         -sUSE_PTHREADS=1
@@ -188,6 +191,8 @@ if(EMSCRIPTEN)
         # Without this flag, IDBFS is absent from td.js and the preloader throws a
         # TypeError on FS.mount, silently aborting the Promise chain before callMain.
         -sFORCE_FILESYSTEM=1
+        # TIM-904: no C++ try/catch in the codebase; strip EH support for size.
+        -sDISABLE_EXCEPTION_CATCHING=1
         "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/td-shell.html"
     )
     add_custom_command(TARGET td POST_BUILD
@@ -282,7 +287,8 @@ if(EMSCRIPTEN)
         -pthread
         -sUSE_SDL=2
         -sUSE_PTHREADS=1
-        -O3     # TIM-489: override Release-mode -O2 (per-TU; compile stays at -O3)
+        -Os     # TIM-904: optimize for size at compile time (was -O3 for speed per TIM-489).
+        -sDISABLE_EXCEPTION_CATCHING=1
     )
     # TIM-381: Output ra.html so --shell-file is honoured (Emscripten only
     # processes the shell template when the output suffix is .html).
@@ -295,7 +301,9 @@ if(EMSCRIPTEN)
         # so Binaryen at -O3 removes it from the table → ptr==0 → null-function trap.
         # Binaryen 129 (Nix) happens not to prune it at -O3; newer emsdk Binaryen does.
         # -O2 keeps the table entry intact on all Binaryen versions.
-        -O2
+        # TIM-904: -Oz for maximum code-size savings at link time.
+        # Still safe with EMULATE_FUNCTION_POINTER_CASTS protecting the fn table.
+        -Oz
         -sUSE_SDL=2
         -sALLOW_MEMORY_GROWTH=1
         -sUSE_PTHREADS=1
@@ -315,6 +323,8 @@ if(EMSCRIPTEN)
         # Without this flag, IDBFS is absent from ra.js and the preloader throws a
         # TypeError on FS.mount, silently aborting the Promise chain before callMain.
         -sFORCE_FILESYSTEM=1
+        # TIM-904: no C++ try/catch in the codebase; strip EH support for size.
+        -sDISABLE_EXCEPTION_CATCHING=1
         "--shell-file" "${CMAKE_SOURCE_DIR}/wasm/shell.html"
     )
     # TIM-378: copy preloader.js alongside ra.html so <script src="preloader.js"> resolves.
