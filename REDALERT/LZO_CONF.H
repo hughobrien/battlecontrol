@@ -93,7 +93,7 @@
 #if (UINT_MAX >= 0xffffffffL)
    typedef ptrdiff_t        lzo_ptrdiff_t;
 #else
-   typedef long             lzo_ptrdiff_t;
+   typedef int32_t             lzo_ptrdiff_t;
 #endif
 
 

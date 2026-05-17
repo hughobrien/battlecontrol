@@ -153,7 +153,7 @@ extern void             RA_Save_Gameplay_BMP(int game_frame); // TIM-490 audit
 #define DDCREATE_EMULATIONONLY          0x00000002l
 
 #ifdef WINNT
-typedef long HRESULT;
+typedef int32_t HRESULT;
 #endif
 
 //#ifndef WINNT

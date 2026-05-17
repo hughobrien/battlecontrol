@@ -109,7 +109,7 @@ typedef struct {
 	** locked.
 	*/
 	void const *Original;
-	long OriginalSize;
+	int32_t OriginalSize;
 
 	/*
 	**	These are pointers to the double buffers.
@@ -234,7 +234,7 @@ typedef struct {
 	LONG	QueueSize;		// Size of queue buffer attached.
 	short int	Odd;				// Block number tracker (0..StreamBufferCount-1).
 	int	FilePending;	// Number of buffers already filled ahead.
-	long	FilePendingSize;	// Number of bytes in last filled buffer.
+	int32_t	FilePendingSize;	// Number of bytes in last filled buffer.
 
 	/*
 	**	The file variables are used when streaming directly off of the
@@ -256,9 +256,9 @@ typedef struct {
 typedef struct LockedData {
 	unsigned int 		DigiHandle; 			// = -1;
 	BOOL 					ServiceSomething;		// = FALSE;
-	long 					MagicNumber; 			// = 0xDEAF;
+	int32_t 				MagicNumber; 			// = 0xDEAF;
 	VOID 					*UncompBuffer;			// = NULL;
-	long 					StreamBufferSize; 	// = (2*SECONDARY_BUFFER_SIZE)+128;
+	int32_t 				StreamBufferSize; 	// = (2*SECONDARY_BUFFER_SIZE)+128;
 	short 				StreamBufferCount; 	// = 32;
 	SampleTrackerType SampleTracker[MAX_SFX];
 	unsigned int		SoundVolume;
@@ -280,7 +280,7 @@ void	DPMI_Unlock(VOID const *ptr, long const size);
 extern "C" {
 	void __cdecl Audio_Mem_Set(void const *ptr, unsigned char value, long size);
 //	void	Mem_Copy(void *source, void *dest, unsigned long bytes_to_copy);
-	long  __cdecl Decompress_Frame(void * source, void * dest, long size);
+	int32_t  __cdecl Decompress_Frame(void * source, void * dest, int32_t size);
 	int	__cdecl Decompress_Frame_Lock(void);
 	int	__cdecl Decompress_Frame_Unlock(void);
 	int	__cdecl sosCODEC_Lock(void);
