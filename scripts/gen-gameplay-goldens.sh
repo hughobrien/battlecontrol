@@ -28,20 +28,20 @@ set -euo pipefail
 MISSION="${1:?usage: $0 <allied-l1|soviet-l1>}"
 
 case "$MISSION" in
-	allied-l1)
-		CAPTURE_SCRIPT="wine-allied-l1.sh"
-		ARTIFACT_DIR="e2e/report/data/wine-ra-allied-l1"
-		SOURCE_FRAME="$ARTIFACT_DIR/frame-0.png"
-		;;
-	soviet-l1)
-		CAPTURE_SCRIPT="wine-soviet-l1.sh"
-		ARTIFACT_DIR="e2e/report/data/wine-ra-soviet-l1"
-		SOURCE_FRAME="$ARTIFACT_DIR/frame-0.png"
-		;;
-	*)
-		echo "FAIL: unknown mission '$MISSION' — expected allied-l1 or soviet-l1" >&2
-		exit 1
-		;;
+allied-l1)
+	CAPTURE_SCRIPT="wine-allied-l1.sh"
+	ARTIFACT_DIR="e2e/report/data/wine-ra-allied-l1"
+	SOURCE_FRAME="$ARTIFACT_DIR/frame-0.png"
+	;;
+soviet-l1)
+	CAPTURE_SCRIPT="wine-soviet-l1.sh"
+	ARTIFACT_DIR="e2e/report/data/wine-ra-soviet-l1"
+	SOURCE_FRAME="$ARTIFACT_DIR/frame-0.png"
+	;;
+*)
+	echo "FAIL: unknown mission '$MISSION' — expected allied-l1 or soviet-l1" >&2
+	exit 1
+	;;
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
