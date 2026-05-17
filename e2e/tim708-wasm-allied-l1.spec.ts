@@ -12,10 +12,14 @@ import * as path from 'path';
  * snapshots at three timed checkpoints.
  *
  * Companion to scripts/wine-allied-l1.sh — see e2e/tim708/allied-l1/notes.md.
+ *
+ * Also saves a canonical capture at e2e/screenshots/wasm-gameplay/allied-l1/
+ * for the three-way parity pipeline (parity-report.sh --mode gameplay).
  */
 
 const WASM_URL = 'http://localhost:8080/ra.html?src=http://localhost:9090&autostart=1';
 const SHOTS_DIR = path.join(__dirname, 'tim708', 'allied-l1');
+const PARITY_DIR = path.join(__dirname, 'screenshots', 'wasm-gameplay', 'allied-l1');
 
 async function canvasStats(page: any) {
   return await page.evaluate(() => {
@@ -43,6 +47,7 @@ test.describe('TIM-708 — WASM Allied L1 capture', () => {
 
   test('WASM reaches Allied L1 via ?src= HTTP source', async ({ page }) => {
     if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });
+    if (!fs.existsSync(PARITY_DIR)) fs.mkdirSync(PARITY_DIR, { recursive: true });
 
     const errors: string[] = [];
     page.on('pageerror', err => errors.push(err.message));
@@ -84,6 +89,18 @@ test.describe('TIM-708 — WASM Allied L1 capture', () => {
       results[`t${t}`] = { fill: s.fill, colors: s.colors, bytes };
     }
 
+    // --- Canonical parity capture for parity-report.sh --mode gameplay ---
+    // Use the t=5 frame (best representation of settled mission terrain)
+    // and save at the canonical path expected by the parity pipeline.
+    const parityCapture = path.join(PARITY_DIR, 'capture.png');
+    await page.screenshot({
+      path: parityCapture,
+      clip: { x: 0, y: 0, width: 640, height: 480 },
+    });
+    const parityBytes = fs.statSync(parityCapture).size;
+    console.log(`  parity capture: ${parityCapture} (${parityBytes} bytes)`);
+    expect(parityBytes, 'parity capture ≥ 5KB').toBeGreaterThanOrEqual(5000);
+
     expect(errors.filter(e => !e.includes('ResizeObserver')),
       'no uncaught JS errors during gameplay').toHaveLength(0);
 
@@ -95,5 +112,6 @@ test.describe('TIM-708 — WASM Allied L1 capture', () => {
     for (const [t, r] of Object.entries(results)) {
       console.log(`  ${t}: fill=${r.fill}% colors=${r.colors} bytes=${r.bytes}`);
     }
+    console.log(`  parity: ${parityCapture} (${parityBytes} bytes)`);
   });
 });

@@ -35,6 +35,11 @@
  *   TIM-709 — Wine headless mouse input (parallel)
  *   TIM-776 — Wine OG Soviet L1 capture (golden)
  *   TIM-780 — WASM Soviet L1 capture + parity
+ *
+ * ─── Canonical parity captures ───────────────────────────────────────────────
+ *   Soviet L1 also saves a canonical capture at
+ *   e2e/screenshots/wasm-gameplay/soviet-l1/capture.png for the three-way
+ *   parity pipeline (parity-report.sh --mode gameplay).
  */
 
 import { test, expect }   from '@playwright/test';
@@ -50,6 +55,9 @@ const REPO_ROOT       = path.resolve(__dirname, '..');
 
 // Soviet L1 golden (Wine OG, captured by scripts/wine-soviet-l1.sh, PR #160)
 const SOVIET_L1_GOLDEN = path.join(__dirname, 'goldens', 'soviet-l1-wineog-f500.png');
+
+// Canonical parity capture path for parity-report.sh --mode gameplay.
+const SOVIET_L1_PARITY_DIR = path.join(__dirname, 'screenshots', 'wasm-gameplay', 'soviet-l1');
 
 const WINE_RA_READY = process.env.WINE_RA_READY === '1';
 
@@ -179,7 +187,7 @@ function runParityCompare(
 }
 
 // ---------------------------------------------------------------------------
-// Tier 1 — WASM visual reference
+// Tier 1 — title screen (WASM)
 // ---------------------------------------------------------------------------
 
 test.describe('Tier 1 — title screen (WASM)', () => {
@@ -469,6 +477,9 @@ test.describe('Tier 1 — Soviet L1 frame 500 (WASM)', () => {
     const errors: string[] = [];
     page.on('pageerror', (err: Error) => errors.push(err.message));
 
+    // Ensure parity dir exists.
+    if (!fs.existsSync(SOVIET_L1_PARITY_DIR)) fs.mkdirSync(SOVIET_L1_PARITY_DIR, { recursive: true });
+
     await page.goto(`${WASM_URL}?src=${encodeURIComponent(ASSET_URL)}&debug=1`, { waitUntil: 'domcontentloaded' });
 
     // Install VQA skip to skip intro + briefing VQAs.
@@ -508,6 +519,13 @@ test.describe('Tier 1 — Soviet L1 frame 500 (WASM)', () => {
 
     const shotPath = path.join(SCREENSHOTS_DIR, 'soviet-l1-wasm-f500.png');
     await page.screenshot({ path: shotPath });
+
+    // --- Canonical parity capture for parity-report.sh --mode gameplay ---
+    const parityCapture = path.join(SOVIET_L1_PARITY_DIR, 'capture.png');
+    await page.screenshot({ path: parityCapture });
+    const parityBytes = fs.statSync(parityCapture).size;
+    console.log(`[SOV-L1] parity capture: ${parityCapture} (${parityBytes} bytes)`);
+    expect(parityBytes, 'parity capture ≥ 5KB').toBeGreaterThanOrEqual(5000);
 
     const stats500 = await canvasStats(page);
     console.log(`[SOV-L1] frame 500: fill=${stats500.fill}% colors=${stats500.colors} w=${stats500.w} h=${stats500.h}`);
