@@ -160,6 +160,7 @@
           ffmpeg-headless
           ccache
           nodejs
+          pnpm
           clang-tools
           cppcheck
           # Linting tools
@@ -168,6 +169,7 @@
           shfmt
           yamllint
           nixfmt
+          uv
         ];
 
         buildInputs = with pkgs; [
