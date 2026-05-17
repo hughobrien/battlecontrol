@@ -1,8 +1,7 @@
 # WASM deployment
 
-Two deployment paths are wired up in CI. GitHub Pages is the primary active path
-(no external secrets needed). Cloudflare Pages is the preferred long-term target
-(better headers) but requires a one-time credential setup.
+Deployed to GitHub Pages on every push to `master`.
+COOP/COEP headers are injected via `coi-serviceworker.min.js`.
 
 ## Local development (nginx)
 
@@ -79,56 +78,16 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-GitHub Pages cannot set these headers directly — hence `coi-serviceworker`. Cloudflare
-Pages / Netlify can set them via the `_headers` file in this directory.
+GitHub Pages cannot set these headers directly — hence `coi-serviceworker`.
 
 ## Provider comparison
 
-| | GitHub Pages | Cloudflare Pages | Netlify |
-|---|---|---|---|
-| HTTPS | ✓ | ✓ | ✓ |
-| Native COOP/COEP headers | ✗ (need SW shim) | ✓ | ✓ |
-| Free tier bandwidth | 100 GB/mo soft | Unlimited | 100 GB/mo |
-| Max file size | 100 MB | 25 MB | 100 MB |
-| Credentials required | GitHub token (built-in) | API token + account ID | Site ID + token |
+| | GitHub Pages |
+|---|---|
+| HTTPS | ✓ |
+| Native COOP/COEP headers | ✗ (need SW shim) |
+| Free tier bandwidth | 100 GB/mo soft |
+| Max file size | 100 MB |
+| Credentials required | GitHub token (built-in) |
 
-## Upgrading to Cloudflare Pages
 
-If you want native COOP/COEP headers (no SW shim, works in all security environments):
-
-1. Create a Cloudflare account (free tier).
-2. Create an API token: Dashboard → My Profile → API Tokens →
-   "Edit Cloudflare Workers" template, scoped to Pages.
-3. Find your Account ID in the dashboard right sidebar.
-4. Add to GitHub repo secrets:
-   - `CLOUDFLARE_API_TOKEN`
-   - `CLOUDFLARE_ACCOUNT_ID`
-5. Create the Pages project (one-time, from any authenticated machine):
-   ```
-   npx wrangler pages project create cnc-remastered-linux
-   ```
-6. Enable `.github/workflows/wasm-deploy.yml` (currently present but requires secrets).
-
-Cloudflare reads `_headers` automatically from the published directory root — no
-code change needed beyond adding the secrets.
-
-## Manual deployment (Cloudflare Pages)
-
-```bash
-# Build
-emcmake cmake --preset wasm
-cmake --build build-wasm --target ra --parallel
-cmake --build build-wasm --target td --parallel
-
-# Collect artifacts
-cp build-wasm/ra.{html,js,wasm} build-wasm/td.{html,js,wasm} wasm/deploy/
-cp wasm/preloader.js wasm/deploy/
-
-# Deploy (requires wrangler login or CLOUDFLARE_API_TOKEN set)
-npx wrangler pages deploy wasm/deploy --project-name cnc-remastered-linux
-```
-
-Verify headers after deploy:
-```bash
-curl -sI https://cnc-remastered-linux.pages.dev/ra.html | grep -i cross-origin
-```
