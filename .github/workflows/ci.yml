@@ -13,8 +13,20 @@ concurrency:
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'docs/**'
+      - 'skills/**'
+      - '**.md'
   pull_request:
     branches: [master]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'docs/**'
+      - 'skills/**'
+      - '**.md'
 
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -96,7 +108,7 @@ jobs:
       - name: Install Playwright and browsers
         run: |
           pnpm install --frozen-lockfile
-          pnpx playwright install --with-deps chromium firefox
+          pnpm exec playwright install --with-deps chromium
 
       - name: Install Wine32 + system tools
         run: |
@@ -200,7 +212,7 @@ jobs:
       - name: Install Playwright and browsers
         run: |
           pnpm install --frozen-lockfile
-          npx playwright install --with-deps chromium firefox
+          npx playwright install --with-deps chromium
 
       - name: Build WASM + validate + smoke (T1/T2)
         env:
