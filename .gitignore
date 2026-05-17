@@ -37,3 +37,5 @@ e2e/cinematic-compare/
 # Python caches
 __pycache__/
 e2e/tim772/
+result
+*.drv
