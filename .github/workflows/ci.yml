@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
@@ -36,7 +36,7 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ccache-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'installer/CMakeLists.txt') }}
@@ -61,7 +61,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
@@ -78,7 +78,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
@@ -86,7 +86,7 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -101,7 +101,7 @@ jobs:
             wine32:i386 xvfb xdotool imagemagick
 
       - name: Cache RA95.EXE
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/ra95-cache
           key: ra95-exe-a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55
@@ -146,7 +146,7 @@ jobs:
 
       - name: Upload comparison screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wine-comparison-screenshots
           path: e2e/screenshots/
@@ -154,7 +154,7 @@ jobs:
 
       - name: Upload Playwright test results on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wine-comparison-test-results
           path: |
@@ -168,7 +168,7 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
@@ -177,20 +177,20 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: Install Emscripten (for emcmake outside nix)
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: '5.0.6'
           actions-cache-folder: 'emsdk-cache'
 
       - name: Cache Emscripten system libraries
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.EM_CACHE_DIR }}
           key: emcc-cache-5.0.6-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
           restore-keys: |
             emcc-cache-5.0.6-
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -225,7 +225,7 @@ jobs:
 
       - name: Upload T3 artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: t3-td-wasm-menu-results
           path: e2e/screenshots/t3-td-wasm-menu-*.png
@@ -246,7 +246,7 @@ jobs:
 
       - name: Upload T6 artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: t6-td-wasm-mission-start-results
           path: e2e/screenshots/t6-td-wasm-*.png
@@ -267,7 +267,7 @@ jobs:
 
       - name: Upload T7 artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: t7-td-audio-pitch-results
           path: e2e/screenshots/t7-td-*.png
@@ -288,7 +288,7 @@ jobs:
 
       - name: Upload T8 artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: t8-ra-audio-pitch-results
           path: e2e/screenshots/t8-ra-*.png
@@ -309,7 +309,7 @@ jobs:
 
       - name: Upload T9 artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: t9-ra-wasm-mission-start-results
           path: e2e/screenshots/t9-ra-wasm-*.png
@@ -320,7 +320,7 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
@@ -335,7 +335,7 @@ jobs:
 
       - name: Upload clang-tidy report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: clang-tidy-report
           path: clang-tidy-report.txt
@@ -347,7 +347,7 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
@@ -367,7 +367,7 @@ jobs:
 
       - name: Upload cppcheck report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cppcheck-report
           path: cppcheck-report.txt
