@@ -10,7 +10,7 @@
 # Exit code: 0 = all available gates pass, 1 = one or more failed.
 #
 # Gates (auto-skip if deps missing):
-#   G1: Native build (ra + td)           requires: g++, cmake, ninja, SDL2
+#   G1: Native build (ra + td)           requires: clang++, cmake, ninja, SDL2
 #   G2: LP64 audit                       requires: python3
 #   G3: WASM build + validate            requires: emcmake
 #   G4: WASM smoke (T1+T2)              requires: emcmake, node, chromium, Xvfb
@@ -52,7 +52,7 @@ gate_fail() {
 have() { command -v "$1" &>/dev/null; }
 
 # — check what's available —
-check_native() { (have g++ || have clang++) && have cmake && have ninja && have pkg-config && pkg-config --exists sdl2 2>/dev/null; }
+check_native() { have clang++ && have cmake && have ninja && have pkg-config && pkg-config --exists sdl2 2>/dev/null; }
 check_wasm() { have emcmake; }
 
 check_ffmpeg() { have ffmpeg; }
@@ -74,7 +74,7 @@ if [[ "$MODE" != "--wasm-only" ]] && check_native; then
 elif [[ "$MODE" == "--wasm-only" ]]; then
 	gate_skip "G1: native build" "wasm-only mode"
 else
-	gate_skip "G1: native build" "missing toolchain (g++/clang++/cmake/ninja/SDL2)"
+	gate_skip "G1: native build" "missing toolchain (clang++/cmake/ninja/SDL2)"
 fi
 
 # ======================================================================
