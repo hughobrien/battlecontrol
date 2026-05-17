@@ -404,6 +404,10 @@ Things an agent must never break:
 7. **Include shim regeneration.** After adding a new `#include` to any .CPP file,
    run `nix run .#shim`.
 
+8. **Never use `git add -A` (or `git add .` / `git add --all`).** Always stage
+   specific files with explicit paths. Blind `-A` picks up unrelated changes and
+   risks committing garbage (node_modules/ logs, build artifacts, generated files).
+
 ---
 
 ## Key Scripts Reference
