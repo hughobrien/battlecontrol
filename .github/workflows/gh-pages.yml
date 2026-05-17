@@ -63,8 +63,8 @@ jobs:
           node-version: '24'
           cache: 'pnpm'
 
-      - name: Install Playwright and browsers
-        run: pnpm install --frozen-lockfile && nix develop --command playwright install chromium firefox
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build WASM + validate + smoke (ra.wasm, chromium)
         env:
