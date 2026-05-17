@@ -1,3 +1,9 @@
+---
+name: skills-index
+description: Index of all available agent skills for the C&C Red Alert + Tiberian Dawn port. Lists each skill's directory, domain, and responsible agent. Use this README as the entry point when deciding which skill to load for a given task.
+version: 0.1.0
+---
+
 # BattleControl Project Skills
 
 Reusable agent skills for the C&C Red Alert + Tiberian Dawn port to modern Linux
@@ -15,6 +21,8 @@ instructions with symptom→diagnosis→fix tables and a verification bar.
 | **e2e-testing** | [`skills/e2e-testing/`](e2e-testing/SKILL.md) | Playwright e2e tests, WASM readiness gates, audio pitch probes | [PlaywrightEngineer](/TIM/agents/playwrightengineer) |
 | **ci-cd** | [`skills/ci-cd/`](ci-cd/SKILL.md) | CI/CD pipeline, release automation, regression tiers | [CICDExpert](/TIM/agents/cicdexpert) |
 | **parity-comparison** | [`skills/parity-comparison/`](parity-comparison/SKILL.md) | WASM/Linux vs Wine/RA95 visual parity validation, SSIM comparison | [WineExpert](/TIM/agents/wineexpert), [PlaywrightEngineer](/TIM/agents/playwrightengineer) |
+| **nix-shell-escaping** | [`skills/nix-shell-escaping/`](nix-shell-escaping/SKILL.md) | Nix shell quoting, two-layer shell escaping, flake apps | [FoundingEngineer](/TIM/agents/foundingengineer) |
+| **gha-updater** | [`skills/gha-updater/`](gha-updater/SKILL.md) | GitHub Actions version pins, Node.js deprecation detection | [CICDExpert](/TIM/agents/cicdexpert) |
 
 ## Skill Format
 
@@ -82,6 +90,8 @@ multi-step command sequences. Each script handles setup, teardown, and error rec
 | `scripts/skill-vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff | ci-cd, vqa-codec |
 | `scripts/skill-ci-wasm-smoke.sh` | Full WASM CI: emcmake, build, validate, T1+T2 smoke | ci-cd |
 | `scripts/ci-local.sh` | Local CI: run all available gates with one command, auto-skip missing deps | all skills |
+| `scripts/check-gha-versions.sh` | Scan workflow files for stale action versions | gha-updater |
+| `scripts/generate-include-shim.py` | Case-folding include symlink generator | native-build |
 
 ### Script design rules
 

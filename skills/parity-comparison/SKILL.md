@@ -226,6 +226,37 @@ When a previously-passing parity check starts failing:
    If the content bboxes differ significantly, the captures are from different
    game states.
 
+### Automated bisection for parity regressions
+
+When a previously-passing parity check fails, bisect to find the offending commit:
+
+1. **Identify the commit range:**
+   ```bash
+   git log --oneline win-pass..new-fail  # commits between known-good and known-bad
+   ```
+
+2. **Write a bisect script** that builds WASM, captures a screenshot, and compares:
+   ```bash
+   #!/bin/bash
+   # bisect-parity.sh — exits 0 (good) if parity passes, 125 (skip) if build fails
+   set -e
+   wasm_build target=ra || exit 125
+   wasm_screenshot target=ra waitMs=2000 buildFirst=false || exit 125
+   parity_compare imageA=e2e/screenshots/wine-ra-menu.png \
+                  imageB=e2e/screenshots/tim710-wasm-menu.png \
+                  thresholdSsim=0.90 || exit 1
+   ```
+
+3. **Run bisect:**
+   ```bash
+   git bisect start win-pass..new-fail
+   git bisect run bash bisect-parity.sh
+   ```
+
+   > **Caveat:** Bisect runs from a detached HEAD. The WASM server + asset server
+   > must be started outside the bisect loop and stay running across all steps.
+   > Alternatively, include server start/stop in the bisect script with PID tracking.
+
 ---
 
 ## §6 — Adding a new parity scene
@@ -262,6 +293,9 @@ When a previously-passing parity check starts failing:
 ## §7 — Tools reference
 
 ### Extension tools (preferred — ask the agent)
+
+See the [skills index](../README.md#companion-scripts) for the full list of
+`pi-battlecontrol-dev` extension tools. Parity-relevant tools:
 
 | Tool | Purpose |
 |------|---------|
