@@ -76,8 +76,42 @@
       background: #3a6a3a;
       transition: width 0.1s linear;
     }
+    #progress-bar.indeterminate {
+      width: 30%;
+      animation: progress-indeterminate 1.5s ease-in-out infinite;
+      background: linear-gradient(90deg, #3a6a3a 30%, #6aaa5a 50%, #3a6a3a 70%);
+      background-size: 200% 100%;
+    }
+    @keyframes progress-indeterminate {
+      0% { background-position: 200% 0; width: 20%; }
+      50% { width: 50%; }
+      100% { background-position: -200% 0; width: 20%; }
+    }
     #progress-text { font-size: 12px; color: #888; min-height: 1em; }
     .overlay-hint { font-size: 11px; color: #666; max-width: 420px; text-align: center; }
+    #preloader-error {
+      display: none;
+      font-size: 12px;
+      color: #e88;
+      background: #3a0a0a;
+      border: 1px solid #7a2a2a;
+      padding: 8px 12px;
+      max-width: 400px;
+      text-align: center;
+      border-radius: 2px;
+    }
+    #retry-btn {
+      display: none;
+      font-family: monospace;
+      font-size: 12px;
+      margin-top: 8px;
+      padding: 4px 14px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #555;
+      cursor: pointer;
+    }
+    #retry-btn:hover { background: #3a3a3a; }
     #controls-hint {
       font-size: 11px;
       color: #555;
@@ -132,6 +166,8 @@
       <button id="open-btn" type="button">Open Game Folder</button>
       <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
       <div id="progress-text"></div>
+      <div id="preloader-error"></div>
+      <button id="retry-btn" type="button">Try Again</button>
       <div class="overlay-hint">
         Point at your TD data directory containing CONQUER.MIX,
         GENERAL.MIX, and the other MIX files.
@@ -162,6 +198,7 @@
       _envFromUrl['TD_GAME_CLICK'] = '1';
       outputEl.style.display = 'block';
     }
+    var _wasmPhase = 'init';
     var Module = {
       canvas: document.getElementById('canvas'),
       noInitialRun: true,   // preloader.js calls callMain() after files are mounted
@@ -177,13 +214,38 @@
       setStatus: function(text) {
         var el = document.getElementById('status-line');
         if (el) el.textContent = text || 'Ready';
+        if (_wasmPhase === 'init' || _wasmPhase === 'download') {
+          var pbar = document.getElementById('progress-bar');
+          var pwrap = document.getElementById('progress-bar-wrap');
+          var ptxt = document.getElementById('progress-text');
+          if (!pbar || !pwrap) return;
+          if (/(download|fetch|load).*data/i.test(text)) {
+            _wasmPhase = 'download';
+            pwrap.style.display = 'block';
+            pbar.className = 'indeterminate';
+            if (ptxt) ptxt.textContent = text;
+          } else if (/(compile|instantiat|run|prepar)/i.test(text)) {
+            if (_wasmPhase === 'init' || _wasmPhase === 'download') {
+              _wasmPhase = 'compile';
+              pwrap.style.display = 'block';
+              pbar.className = 'indeterminate';
+            }
+            if (ptxt) ptxt.textContent = text;
+          }
+        }
       },
       totalDependencies: 0,
       monitorRunDependencies: function(left) {
         this.totalDependencies = Math.max(this.totalDependencies, left);
-        Module.setStatus(left
+        var statusText = left
           ? 'Preparing… (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
-          : 'WASM loaded — waiting for game folder.');
+          : 'WASM loaded — waiting for game folder.';
+        Module.setStatus(statusText);
+        if (left === 0 && _wasmPhase !== 'ready') {
+          _wasmPhase = 'ready';
+          var pbar = document.getElementById('progress-bar');
+          if (pbar) pbar.className = '';
+        }
       }
     };
     window.onerror = function(ev) {
