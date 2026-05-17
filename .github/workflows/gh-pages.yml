@@ -64,7 +64,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install Playwright and browsers
-        run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium firefox
+        run: pnpm install --frozen-lockfile && nix develop --command playwright install chromium firefox
 
       - name: Build WASM + validate + smoke (ra.wasm, chromium)
         env:
@@ -98,12 +98,12 @@ jobs:
           python3 wasm/serve-coop.py &
 
       - name: WASM smoke — ra.wasm (firefox)
-        run: npx playwright test e2e/wasm-smoke.spec.ts --project=firefox
+        run: nix develop --command playwright test e2e/wasm-smoke.spec.ts --project=firefox
 
       - name: WASM smoke — td.wasm (chromium + firefox)
         run: |
-          npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts --project=chromium && \
-          npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts --project=firefox
+          nix develop --command playwright test e2e/regression/T2-td-wasm-boot.spec.ts --project=chromium && \
+          nix develop --command playwright test e2e/regression/T2-td-wasm-boot.spec.ts --project=firefox
 
       - name: Upload smoke artifacts on failure
         if: failure()
@@ -122,7 +122,7 @@ jobs:
             echo "::notice::parity skipped — RA_ASSETS_URL not set"
             exit 0
           fi
-          npx playwright test e2e/tim699-ra-compare.spec.ts --grep "Tier 2" --reporter=line
+          nix develop --command playwright test e2e/tim699-ra-compare.spec.ts --grep "Tier 2" --reporter=line
 
       - name: Upload wasm-parity screenshots
         if: always()
@@ -140,7 +140,7 @@ jobs:
             echo "::notice::T3 skipped"
             exit 0
           fi
-          npx playwright test e2e/regression/T3-td-wasm-menu.spec.ts
+          nix develop --command playwright test e2e/regression/T3-td-wasm-menu.spec.ts
 
       - name: WASM regression — T6 TD mission start (asset-gated)
         env:
@@ -150,7 +150,7 @@ jobs:
             echo "::notice::T6 skipped"
             exit 0
           fi
-          npx playwright test e2e/regression/T6-td-wasm-mission-start.spec.ts
+          nix develop --command playwright test e2e/regression/T6-td-wasm-mission-start.spec.ts
 
       - name: WASM regression — T9 RA mission start (asset-gated)
         env:
@@ -160,7 +160,7 @@ jobs:
             echo "::notice::T9 skipped"
             exit 0
           fi
-          npx playwright test e2e/regression/T9-ra-wasm-mission-start.spec.ts
+          nix develop --command playwright test e2e/regression/T9-ra-wasm-mission-start.spec.ts
 
       - name: WASM regression — T10 RA menu-bleed parity (asset-gated)
         env:
@@ -170,7 +170,7 @@ jobs:
             echo "::notice::T10 skipped"
             exit 0
           fi
-          npx playwright test e2e/regression/T10-ra-wasm-post-game-menu.spec.ts
+          nix develop --command playwright test e2e/regression/T10-ra-wasm-post-game-menu.spec.ts
 
       - name: WASM gameplay SSIM gate — T11 (asset-gated)
         env:
@@ -180,7 +180,7 @@ jobs:
             echo "::notice::T11 skipped"
             exit 0
           fi
-          npx playwright test e2e/wasm-gameplay.spec.ts --grep "6 ·" --reporter=line
+          nix develop --command playwright test e2e/wasm-gameplay.spec.ts --grep "6 ·" --reporter=line
 
       - name: Upload gameplay SSIM artifacts on failure
         if: failure()
@@ -197,7 +197,7 @@ jobs:
             echo "::notice::T7 skipped"
             exit 0
           fi
-          npx playwright test e2e/regression/T7-td-audio-pitch.spec.ts
+          nix develop --command playwright test e2e/regression/T7-td-audio-pitch.spec.ts
 
       - name: RA audio pitch — T8 (asset-gated)
         env:
@@ -207,13 +207,13 @@ jobs:
             echo "::notice::T8 skipped"
             exit 0
           fi
-          npx playwright test e2e/regression/T8-ra-audio-pitch.spec.ts
+          nix develop --command playwright test e2e/regression/T8-ra-audio-pitch.spec.ts
 
       - name: TIM-695 TD WASM VQA
         env:
           TIM695_WASM_URL: http://localhost:8080/td.html
           TIM695_ASSET_URL: ${{ vars.TIM695_ASSET_URL || 'http://localhost:9090/' }}
-        run: npx playwright test e2e/tim695-td-wasm-vqa.spec.ts --reporter=line
+        run: nix develop --command playwright test e2e/tim695-td-wasm-vqa.spec.ts --reporter=line
 
       - name: RA gameplay full e2e (asset-gated)
         env:
@@ -223,7 +223,7 @@ jobs:
             echo "::notice::RA gameplay skipped"
             exit 0
           fi
-          npx playwright test e2e/wasm-gameplay.spec.ts --reporter=line
+          nix develop --command playwright test e2e/wasm-gameplay.spec.ts --reporter=line
 
       - name: TD gameplay full e2e (asset-gated)
         env:
@@ -233,7 +233,7 @@ jobs:
             echo "::notice::TD gameplay skipped"
             exit 0
           fi
-          npx playwright test e2e/td-gameplay.spec.ts --reporter=line
+          nix develop --command playwright test e2e/td-gameplay.spec.ts --reporter=line
 
       - name: Cleanup Xvfb and WASM server
         if: always()
