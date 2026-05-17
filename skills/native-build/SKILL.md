@@ -6,6 +6,9 @@ version: 0.1.0
 
 # Native Linux Build Skill
 
+> **Tools available via `pi-battlecontrol-dev` extension:** `native_build`, `toolchain_check`.
+> Ask the agent to run these instead of typing raw commands.
+
 You are working on the native Linux port of C&C Red Alert or Tiberian Dawn. The build
 system uses CMake with Ninja, targets GCC or Clang, and links against SDL2 for graphics,
 audio, and input.
@@ -16,11 +19,13 @@ Read `ARCH.md` and `BUILD-LINUX.md` for architectural context before starting.
 
 ## Phase 0 — Verify toolchain
 
-```bash
-bash scripts/skill-dev-check.sh
+```
+toolchain_check()
 ```
 
-One-command gate. Exits 0 if g++ (>=14), clang++ (>=19), cmake (>=3.20), ninja, python3, pkg-config, and SDL2 are all present. Exits 1 with a list of what's missing.
+One-command gate. Exits 0 if g++ (>=14), clang++ (>=19), cmake (>=3.20), ninja, python3, pkg-config, and SDL2 are all present.
+
+
 
 ---
 
@@ -178,37 +183,23 @@ ln -sf /path/to/RED_ALERT/CD1/*.MIX build/run-172/
 
 ### One-command build
 
-```bash
-bash scripts/skill-native-build.sh             # both targets
-bash scripts/skill-native-build.sh ra          # RA only
-bash scripts/skill-native-build.sh td          # TD only
-CXX=clang++ bash scripts/skill-native-build.sh # use clang
 ```
-
-### Manual configure + build
-
-```bash
-# Configure (preset: RelWithDebInfo, Ninja)
-cmake --preset linux-native
-
-# Build
-cmake --build build --target ra --parallel     # Red Alert
-cmake --build build --target td --parallel     # Tiberian Dawn
-cmake --build build --target lint-lp64         # LP64 audit
+native_build(target: "both", compiler: "gcc")
+native_build(target: "ra", compiler: "clang")
 ```
 
 ### Smoke test (RA)
 
-```bash
-bash scripts/first-run-pass-94.sh
+```
+nix run .#smoke-ra
 ```
 
 Expected: 307 compile units, link OK, 1000+ frames without crash, ≥1 win cycle, FPS measured.
 
 ### Smoke test (TD)
 
-```bash
-bash scripts/run-td-cheat.sh
+```
+nix run .#smoke-td
 ```
 
 Expected: 10+ frames, cheat milestones pass (credits, tech unlock, map reveal, mission win at frame 200).
@@ -217,14 +208,14 @@ Expected: 10+ frames, cheat milestones pass (credits, tech unlock, map reveal, m
 
 ## §4 — Verification bar
 
-| Gate | Minimum proof |
-|---|---|
-| **Configure** | `cmake --preset linux-native` exits 0 |
-| **Build RA** | 307 compile units, link exits 0 |
-| **Build TD** | All TD sources compile, link exits 0 |
-| **LP64 audit** | `lint-lp64.py --errors-only` returns 0 |
-| **Smoke — RA** | 1000+ frames stable, ≥1 win, no SIGSEGV |
-| **Smoke — TD** | Cheat milestones pass, no crash |
+| Gate | Tool / Command | Minimum proof |
+|------|----------------|---------------|
+| **Configure** | Run `native_build` once or `cmake --preset linux-native` | exits 0 |
+| **Build RA** | `native_build(target: "ra")` | 307 compile units, link exits 0 |
+| **Build TD** | `native_build(target: "td")` | All TD sources compile, link exits 0 |
+| **LP64 audit** | `nix run .#lint` | returns 0 |
+| **Smoke — RA** | `nix run .#smoke-ra` | 1000+ frames stable, ≥1 win, no SIGSEGV |
+| **Smoke — TD** | `nix run .#smoke-td` | Cheat milestones pass, no crash |
 
 ---
 

@@ -6,6 +6,10 @@ version: 0.1.0
 
 # CI/CD Pipeline Skill
 
+> **Tools available via `pi-battlecontrol-dev` extension:** `wasm_build`, `wasm_validate`,
+> `native_build`, `toolchain_check`, `wine_capture`, `vqa_pixel_diff`, `run_e2e_test`.
+> Ask the agent to run these instead of typing raw commands.
+
 You are working on the CI/CD pipeline for the C&C native Linux and WASM builds. The
 pipeline has three GitHub Actions workflows: `ci.yml` (push/PR), `gh-pages.yml`
 (continuous deploy), and `release.yml` (semver tag trigger).
@@ -119,34 +123,19 @@ gh-pages URL and the downloaded artifacts.
 
 ## §4 — Running CI jobs locally
 
-### Native build
+Use the `pi-battlecontrol-dev` extension tools instead of typing raw commands:
 
-```bash
-bash scripts/skill-native-build.sh
-```
+| CI Job | Tool | Notes |
+|--------|------|-------|
+| Native build | `native_build(target: "both")` | Builds RA + TD native Linux |
+| WASM build | `wasm_build(target: "both")` | Builds ra.wasm + td.wasm |
+| WASM validate | `wasm_validate(target: "both")` | Checks magic + size > 1 MB |
+| VQA pixel-diff | `vqa_pixel_diff(mode: "synthetic")` | Synthetic VQA gate, no data needed |
+| Cinematic VQA | `vqa_pixel_diff(mode: "cinematic")` | Full game VQA scan against ffmpeg |
+| Wine OG capture | `wine_capture(game: "ra")` | Title + menu baseline screenshots |
+| Wine + parity | `wine_capture` then `run_e2e_test` with `tim699` spec | Requires EXE + data |
+| WASM smoke test | `run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")` | T1 boot smoke |
 
-### VQA pixel-diff
-
-```bash
-bash scripts/skill-vqa-check.sh
-```
-
-### Wine comparison (requires RA95.EXE + game data)
-
-```bash
-bash scripts/wine-ra.sh
-WINE_RA_READY=1 npx playwright test e2e/tim699-ra-compare.spec.ts --grep "Tier 1|Tier 3"
-```
-
-### WASM build + smoke
-
-```bash
-bash scripts/skill-ci-wasm-smoke.sh
-```
-
-This single command: configures via emcmake, builds both ra.wasm and td.wasm,
-validates WASM magic + size (>1MB), starts the dev server + Xvfb, runs T1+T2
-boot smoke tests, and cleans up. Equivalent to the full CI `build-wasm` job locally.
 
 ---
 
@@ -204,12 +193,12 @@ regardless of subsequent pushes).
 
 ## §8 — Verification bar
 
-| Gate | Command | Expected |
-|------|---------|----------|
+| Gate | How | Expected |
+|------|-----|----------|
 | CI lint | `act -j build --matrix compiler:gcc` (if `act` installed) | All steps pass |
-| Release dry-run | Check `release.yml` syntax: `yamllint .github/workflows/release.yml` | No errors |
-| WASM binary | Magic bytes `\x00asm`, size > 1MB | Both ra.wasm and td.wasm |
-| T1 smoke | `npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts` | Pass |
+| Release dry-run | Check `release.yml` syntax | No errors |
+| WASM binary | Run `wasm_validate` or `wasm_validate_both` | Both ra.wasm and td.wasm |
+| T1 smoke | Run `run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")` | Pass |
 
 ---
 

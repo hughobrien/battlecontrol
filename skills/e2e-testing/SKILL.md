@@ -28,19 +28,6 @@ source scripts/skill-wasm-serve.sh
 # Server is auto-killed on shell exit via EXIT trap.
 ```
 
-### Manual serve options
-
-### Nginx (for CI or production-like)
-
-```bash
-# Or use nix:
-nix run .#wasm-server
-
-# Manual nginx:
-cp wasm/nginx.conf /etc/nginx/sites-enabled/wasm.conf
-nginx -s reload
-```
-
 **Critical:** Without COOP/COEP headers, SharedArrayBuffer is unavailable and
 Emscripten pthreads initialization fails silently.
 
@@ -98,18 +85,16 @@ The WASM build uses PROXY_TO_PTHREAD with OffscreenCanvas. Chromium's headless
 shell mode (`--headless=new` or `headless: true` in Playwright config) does not
 support OffscreenCanvas → black screen.
 
-**One-command E2E runner (Xvfb + server + test):**
+**One-command E2E runner (using extension tool):**
 
-```bash
-bash scripts/skill-run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
-bash scripts/skill-run-e2e.sh e2e/tim710-wasm-parity.spec.ts --grep "Tier 1"
+```
+run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
+run_e2e_test(spec: "e2e/tim710-wasm-parity.spec.ts", args: ["--grep", "Tier 1"])
 ```
 
 This starts Xvfb :99, starts the WASM dev server on :8080, runs the Playwright
-test with `DISPLAY=:99`, and cleans up both on exit. All arguments after the spec
-file are forwarded to `npx playwright test`.
+test with `DISPLAY=:99`, and cleans up both on exit.
 
-**Manual Xvfb setup:**
 ```ts
 // playwright.config.ts
 use: {

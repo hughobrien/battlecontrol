@@ -6,6 +6,8 @@ version: 0.1.0
 
 # Wine Testing Skill
 
+> **Extension tools:** `wine_check`, `wine_capture`.  **Nix app:** `nix run .#capture-wine`.
+
 You are running the original Win32 C&C Red Alert or Tiberian Dawn executable under Wine
 for baseline comparison against the native Linux and WASM ports. The workflow captures
 screenshots in a headless Xvfb environment for automated pixel-level parity validation.
@@ -20,8 +22,6 @@ bash scripts/skill-wine-check.sh
 
 One-command gate. Exits 0 if wine, wine32, xvfb-run, xdotool, ffmpeg, and
 imagemagick are all present. Exits 1 with a list of what's missing.
-
-### Manual checks (if the script is unavailable):
 
 ---
 
@@ -233,7 +233,7 @@ WINE_TD_READY=1 npx playwright test e2e/tim711-td-compare.spec.ts --grep "Tier 3
 - `scripts/wine-ra-setup.sh` — First-time RA setup
 - `scripts/wine-td-setup.sh` — First-time TD setup
 - `tools/wine-input/` — Synthetic input injectors
-- `scripts/build-cnc-ddraw.sh` — cnc-ddraw wrapper builder
+- `nix build path:./tools/cnc-ddraw#cnc-ddraw  # produces result/bin/ddraw.dll` — cnc-ddraw wrapper builder
 - `scripts/wine-soviet-l1.sh`, `scripts/wine-allied-l1.sh` — Campaign-specific captures
 - `e2e/tim699-ra-compare.spec.ts` — RA comparison test (Tier 3 = Wine OG)
 - `e2e/tim711-td-compare.spec.ts` — TD comparison test (Tier 3 = Wine OG)

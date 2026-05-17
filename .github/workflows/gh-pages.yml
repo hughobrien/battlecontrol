@@ -1,8 +1,7 @@
-name: GitHub Pages Deploy
+# GitHub Pages Deploy — thin wrapper around flake apps.
+# Local equivalent: nix run .#ci-build-wasm && nix run .#ci-wasm-smoke
 
-env:
-  CCACHE_DIR: ${{ github.workspace }}/.ccache
-  CCACHE_MAXSIZE: 500M
+name: GitHub Pages Deploy
 
 concurrency:
   group: gh-pages-${{ github.ref }}
@@ -25,6 +24,10 @@ on:
 permissions:
   contents: write
 
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  EM_CACHE_DIR: ${{ github.workspace }}/.emscripten-cache
+
 jobs:
   build-and-deploy:
     name: Build WASM + deploy to GitHub Pages
@@ -34,7 +37,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Emscripten
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Install Emscripten (for emcmake)
         uses: mymindstorm/setup-emsdk@v14
         with:
           version: '5.0.6'
@@ -43,15 +52,11 @@ jobs:
       - name: Cache Emscripten system libraries
         uses: actions/cache@v4
         with:
-          path: ~/.emscripten_cache
-          key: emscripten-cache-${{ github.sha }}
+          path: ${{ env.EM_CACHE_DIR }}
+          key: emcc-cache-ghpages-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
           restore-keys: |
-            emscripten-cache-
-
-      - name: Install build deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ninja-build cmake xvfb ccache
+            emcc-cache-ghpages-
+            emcc-cache-
 
       - name: Configure ccache
         run: |
@@ -62,102 +67,83 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-ghpages-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'installer/CMakeLists.txt') }}
+          key: ccache-ghpages-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json') }}
           restore-keys: |
             ccache-ghpages-
             ccache-
 
-      - name: Configure WASM build
-        run: |
-          export CCACHE_DIR=${{ env.CCACHE_DIR }}
-          emcmake cmake --preset wasm \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-
-      - name: Build ra.wasm
-        run: cmake --build build-wasm --target ra --parallel
-
-      - name: Set up Node.js for smoke tests
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install Playwright and browsers
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium firefox
+        run: npm ci && npx playwright install --with-deps chromium firefox
 
-      - name: WASM smoke test — ra.wasm (chromium)
-        # Serves the freshly-built ra.wasm via serve-coop.py (COOP+COEP headers
-        # required for SharedArrayBuffer / pthreads). Fails the build if the
-        # binary crashes during Emscripten runtime init, blocking the deploy.
+      - name: Build WASM + validate + smoke (ra.wasm, chromium)
+        env:
+          EM_CACHE: ${{ env.EM_CACHE_DIR }}
+          CCACHE_DIR: ${{ env.CCACHE_DIR }}
+        run: |
+          nix develop --command bash -c "
+            export EM_CACHE=${{ env.EM_CACHE_DIR }}
+            export CCACHE_DIR=${{ env.CCACHE_DIR }}
+            cmake --build build-wasm --target ra --parallel
+            nix run .#validate-wasm
+            nix run .#ci-wasm-smoke
+          "
+
+      - name: WASM smoke — ra.wasm (firefox)
         run: |
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          SERVER_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts \
-            --project=chromium
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $SMOKE_EXIT
+          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts --project=firefox
 
-      - name: Upload smoke test artifacts on failure
+      - name: Build td.wasm
+        env:
+          EM_CACHE: ${{ env.EM_CACHE_DIR }}
+        run: |
+          nix develop --command bash -c "
+            export EM_CACHE=${{ env.EM_CACHE_DIR }}
+            cmake --build build-wasm --target td --parallel
+          "
+
+      - name: WASM smoke — td.wasm (chromium + firefox)
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          sleep 2
+          python3 wasm/serve-coop.py &
+          sleep 2
+          DISPLAY=:99 npx playwright test \
+            e2e/regression/T2-td-wasm-boot.spec.ts --project=chromium && \
+          DISPLAY=:99 npx playwright test \
+            e2e/regression/T2-td-wasm-boot.spec.ts --project=firefox
+
+      - name: Upload smoke artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: wasm-smoke-results
           path: |
-            e2e/screenshots/tim595-smoke-after-init.png
-            e2e/test-results/
-
-      - name: WASM smoke test — ra.wasm (firefox)
-        run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 npx playwright test e2e/wasm-smoke.spec.ts \
-            --project=firefox
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $SMOKE_EXIT
-
-      - name: Upload Firefox smoke test artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wasm-smoke-firefox-results
-          path: |
             e2e/screenshots/
             e2e/test-results/
 
-      - name: WASM parity tests — TIM-699 Tier 2 visual reference
-        # Runs Tier 2 tests from e2e/tim699-ra-compare.spec.ts against the freshly
-        # built ra.wasm.  Requires game assets reachable via RA_ASSETS_URL (set as
-        # a repository variable or secret; CDN base URL with CORS headers).
-        # When RA_ASSETS_URL is unset the Tier 2 tests skip gracefully — job passes.
+      - name: WASM parity — Tier 2 visual reference (asset-gated)
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
         run: |
+          if [ -z "$RA_ASSETS_URL" ]; then
+            echo "::notice::parity skipped — RA_ASSETS_URL not set"
+            exit 0
+          fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          SERVER_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/tim699-ra-compare.spec.ts \
             --grep "Tier 2" --reporter=line
-          PW_EXIT=$?
-          kill "$SERVER_PID" 2>/dev/null || true
-          kill "$XVFB_PID"  2>/dev/null || true
-          exit $PW_EXIT
 
       - name: Upload wasm-parity screenshots
         if: always()
@@ -167,495 +153,153 @@ jobs:
           path: e2e/screenshots/tim699-wasm-*.png
           if-no-files-found: ignore
 
-      - name: Build td.wasm
-        run: cmake --build build-wasm --target td --parallel
-
-      - name: WASM smoke test — td.wasm loads without crash (T2 / TIM-623)
-        # TIM-623 regression T2: same shape as the ra.wasm smoke test above,
-        # asserts td.wasm initializes without a pageerror in 30 s.
-        run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts \
-            --project=chromium
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $SMOKE_EXIT
-
-      - name: Upload T2 smoke artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t2-td-wasm-boot-results
-          path: |
-            e2e/screenshots/t2-td-wasm-boot.png
-            e2e/test-results/
-
-      - name: WASM smoke test — td.wasm loads without crash (T2 / firefox)
-        run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts \
-            --project=firefox
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $SMOKE_EXIT
-
-      - name: Upload T2 firefox smoke artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t2-td-wasm-boot-firefox-results
-          path: |
-            e2e/screenshots/
-            e2e/test-results/
-
-      - name: WASM smoke test — ra.wasm loads without crash (T1 / TIM-623)
-        # TIM-623 regression T1: asset-free RA boot gate. Mirrors T2 exactly.
-        # Asserts ra.wasm initializes without a pageerror in 30 s, catching WASM
-        # parse errors, null-function traps (TIM-593/TIM-620 class), and
-        # Emscripten init-time JS exceptions.
-        run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts \
-            --project=chromium
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $SMOKE_EXIT
-
-      - name: Upload T1 smoke artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t1-ra-wasm-boot-results
-          path: |
-            e2e/screenshots/t1-ra-wasm-boot.png
-            e2e/test-results/
-
-      - name: WASM smoke test — ra.wasm loads without crash (T1 / firefox)
-        run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts \
-            --project=firefox
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $SMOKE_EXIT
-
-      - name: Upload T1 firefox smoke artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t1-ra-wasm-boot-firefox-results
-          path: |
-            e2e/screenshots/
-            e2e/test-results/
-
-      - name: WASM menu navigation test — TD menu click (T3 / TIM-696)
-        # TIM-696 regression T3: loads td.html with TD game assets from TD_ASSETS_URL,
-        # waits for "[TD] Main_Menu: gadgets up", clicks "Start New Game" at (321,59),
-        # and asserts the canvas changes (proves real mouse input reaches GadgetClass).
-        # Skipped when TD_ASSETS_URL secret is not set (asset-dependent test).
-        # TD_ASSETS_URL is passed directly as the ?src= CDN base URL — no local asset
-        # server required; the preloader fetches MIX files from the CDN directly.
-        # NOTE: secrets context must not appear in step if: conditions (causes "0 jobs
-        # created" validation failure). Skip is handled via bash guard in run: instead.
+      - name: WASM regression — T3 TD menu click (asset-gated)
         env:
           TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
         run: |
           if [ -z "$TD_ASSETS_URL" ]; then
-            echo "::notice::T3 skipped — TD_ASSETS_URL secret not set"
+            echo "::notice::T3 skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T3-td-wasm-menu.spec.ts
-          T3_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T3_EXIT
 
-      - name: Upload T3 menu test artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t3-td-wasm-menu-results
-          path: |
-            e2e/screenshots/t3-td-wasm-menu-*.png
-            e2e/test-results/
-
-      - name: TD mission start test — real-click GDI L1 (T6 / TIM-755)
-        # TIM-755 regression T6: loads td.html (no ?autostart=1), clicks "Start New
-        # Game" at (321, 59), waits for Choose_Side GDI auto-select, asserts
-        # Start_Scenario(SCG01EA) fires and frame 200 has ≥20% canvas fill.
-        # Skipped when TD_ASSETS_URL secret is not set.
+      - name: WASM regression — T6 TD mission start (asset-gated)
         env:
           TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
         run: |
           if [ -z "$TD_ASSETS_URL" ]; then
-            echo "::notice::T6 skipped — TD_ASSETS_URL secret not set"
+            echo "::notice::T6 skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T6-td-wasm-mission-start.spec.ts
-          T6_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T6_EXIT
 
-      - name: Upload T6 mission start artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t6-td-wasm-mission-start-results
-          path: |
-            e2e/screenshots/t6-td-wasm-*.png
-            e2e/test-results/
-
-      - name: RA mission start test — real-click Allied L1 (T9 / TIM-773)
-        # TIM-773 regression T9: loads ra.html (no ?autostart=1), skips VQAs via
-        # window._vqa_aborted interval, waits for "[TIM-616] menu_cs=", clicks
-        # "New Campaign" at (322, 183), auto-accepts difficulty+faction via
-        # KN_RETURN injections, asserts Start_Scenario(SCG01EA) fires and
-        # frame 100 has ≥5% canvas fill.
-        # Skipped when RA_ASSETS_URL is not set.
+      - name: WASM regression — T9 RA mission start (asset-gated)
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
         run: |
           if [ -z "$RA_ASSETS_URL" ]; then
-            echo "::notice::T9 skipped — RA_ASSETS_URL not set"
+            echo "::notice::T9 skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T9-ra-wasm-mission-start.spec.ts
-          T9_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T9_EXIT
 
-      - name: Upload T9 mission start artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t9-ra-wasm-mission-start-results
-          path: |
-            e2e/screenshots/t9-ra-wasm-*.png
-            e2e/test-results/
-
-      - name: RA post-game menu parity test — map-bleed regression gate (T10 / TIM-810)
-        # TIM-810 regression T10: loads ra.html with autostart=1, waits for
-        # frame 100, then presses Escape → ArrowUp → Enter → Enter to quit back
-        # to the main menu. Compares post-game menu canvas with a clean menu
-        # golden via parity-compare.py; asserts SSIM ≥ 0.90.
-        # Catches TIM-777 class bug (map bleeds into menu after game exit).
-        # Skipped when RA_ASSETS_URL is not set.
+      - name: WASM regression — T10 RA menu-bleed parity (asset-gated)
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
         run: |
           if [ -z "$RA_ASSETS_URL" ]; then
-            echo "::notice::T10 skipped — RA_ASSETS_URL not set"
+            echo "::notice::T10 skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 -ac &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T10-ra-wasm-post-game-menu.spec.ts
-          T10_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T10_EXIT
 
-      - name: Upload T10 post-game menu parity artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t10-ra-wasm-post-game-menu-results
-          path: |
-            e2e/screenshots/t10-*.png
-            e2e/test-results/
-
-      - name: WASM gameplay SSIM gate (T11 / TIM-849)
-        # TIM-849: runs the wasm-gameplay visual audit test (test 6) which captures
-        # screenshots at frames 100/300/500 and compares against committed golden
-        # images via parity-compare.py (SSIM ≥ 0.95).  If goldens are missing from
-        # the repo the test saves candidate goldens but does NOT enforce SSIM — the
-        # golden images must be committed from a known-good build.
-        # Skipped when RA_ASSETS_URL is not set (needs MIX files for SCG01EA).
+      - name: WASM gameplay SSIM gate — T11 (asset-gated)
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
         run: |
           if [ -z "$RA_ASSETS_URL" ]; then
-            echo "::notice::T11 skipped — RA_ASSETS_URL not set"
+            echo "::notice::T11 skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
-          DISPLAY=:99 npx playwright test e2e/wasm-gameplay.spec.ts \
-            --grep "6 ·" --reporter=line
-          T11_EXIT=$?
-          kill "$COOP_PID" 2>/dev/null || true
-          kill "$XVFB_PID" 2>/dev/null || true
-          exit $T11_EXIT
+          DISPLAY=:99 npx playwright test e2e/wasm-gameplay.spec.ts --grep "6 ·" --reporter=line
 
-      - name: Upload T11 gameplay SSIM artifacts on failure
+      - name: Upload gameplay SSIM artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: t11-gameplay-ssim-results
-          path: |
-            e2e/screenshots/ra-visual-*.png
-            e2e/test-results/
-      - name: TD audio pitch probe (T7 / TIM-767)
-        # TIM-767 regression T7: loads td.html with autostart=1 (skips menu,
-        # starts GDI L1), injects an AnalyserNode FFT tap, waits for frame 100,
-        # then samples the spectral centroid at t=5s and t=20s.  Asserts mean
-        # centroid < 700 Hz — detects the TIM-555 class of 2× pitch regression
-        # where 22050 Hz PCM is fed raw to a 44100/48000 Hz AudioContext.
-        # Skipped when TD_ASSETS_URL secret is not set.
+          path: e2e/screenshots/ra-visual-*.png
+
+      - name: TD audio pitch — T7 (asset-gated)
         env:
           TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
         run: |
           if [ -z "$TD_ASSETS_URL" ]; then
-            echo "::notice::T7 skipped — TD_ASSETS_URL secret not set"
+            echo "::notice::T7 skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T7-td-audio-pitch.spec.ts
-          T7_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T7_EXIT
 
-      - name: Upload T7 audio pitch artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t7-td-audio-pitch-results
-          path: |
-            e2e/screenshots/t7-td-*.png
-            e2e/screenshots/t7-td-fft-*.json
-            e2e/screenshots/t7-td-console.log
-            e2e/test-results/
-
-      - name: RA WASM audio pitch probe (T8 / TIM-773)
-        # TIM-773 regression T8: loads ra.html, waits for ENGLISH.VQA to finish
-        # (~10 s), then PROLOG.VQA starts (Hell March).  Injects AnalyserNode FFT
-        # tap and samples dominant peak at t=5 s and t=20 s after PROLOG starts.
-        # Asserts min(dominantHz_t5s, dominantHz_t20s) < 90 Hz — detects the
-        # TIM-602 class of 2× pitch regression where 22050 Hz VQA PCM is fed raw
-        # to a 44100/48000 Hz AudioContext.  Using min (not max) per TIM-766 to
-        # resist false positives from single-window percussion transients.
-        # Skipped when RA_ASSETS_URL is not set (needs MIX files for VQAs).
+      - name: RA audio pitch — T8 (asset-gated)
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
         run: |
           if [ -z "$RA_ASSETS_URL" ]; then
-            echo "::notice::T8 skipped — RA_ASSETS_URL not set"
+            echo "::notice::T8 skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/regression/T8-ra-audio-pitch.spec.ts
-          T8_EXIT=$?
-          kill $COOP_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $T8_EXIT
 
-      - name: Upload T8 audio pitch artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t8-ra-audio-pitch-results
-          path: |
-            e2e/screenshots/t8-ra-*.png
-            e2e/screenshots/t8-ra-fft-*.json
-            e2e/screenshots/t8-ra-console.log
-            e2e/test-results/
-
-      - name: TIM-695 TD WASM VQA — intro VQA verification (LOGO.VQA)
-        # Runs the full TD VQA verification spec.  It auto-skips when LOGO.VQA
-        # is not reachable at TIM695_ASSET_URL — copyrighted TD MOVIES.MIX
-        # (~425MB) cannot live in the repo, so the default CI run skips with
-        # an informational message.  To exercise the full path:
-        #   1. Extract LOGO.VQA from TD MOVIES.MIX: scripts/extract_mix.py
-        #   2. Stand up an asset server with TD MIX files + standalone LOGO.VQA.
-        #   3. Trigger workflow_dispatch with TIM695_ASSET_URL pointing at it.
-        #
-        # Asset-free regressions (preloader CRLF synthesis, Play_Intro gating
-        # on IsFromInstall) are caught by T2 above + the boot-path logging in
-        # STARTUP.CPP::[TD] CONQUER.INI Intro/PlayIntro=[...] IsFromInstall=N.
+      - name: TIM-695 TD WASM VQA
         env:
-          TIM695_WASM_URL:  http://localhost:8080/td.html
+          TIM695_WASM_URL: http://localhost:8080/td.html
           TIM695_ASSET_URL: ${{ vars.TIM695_ASSET_URL || 'http://localhost:9090/' }}
         run: |
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          SERVER_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/tim695-td-wasm-vqa.spec.ts --reporter=line
-          TIM695_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID  2>/dev/null || true
-          exit $TIM695_EXIT
 
-      - name: Upload TIM-695 VQA artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tim695-td-wasm-vqa-results
-          path: |
-            e2e/screenshots/tim695-td-logo-*.png
-            e2e/screenshots/tim695-td-logo-vqa-console.log
-            e2e/test-results/
-
-      - name: RA WASM gameplay — full e2e (TIM-399 / TIM-429)
-        # Runs the full RA gameplay suite: assets load, Start_Scenario fires,
-        # game loop reaches frame 100, canvas renders non-black, audio opens,
-        # visual audit at frames 100/300/500.
-        # Skipped when RA_ASSETS_URL is not set (asset-dependent test).
+      - name: RA gameplay full e2e (asset-gated)
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
         run: |
           if [ -z "$RA_ASSETS_URL" ]; then
-            echo "::notice::RA gameplay skipped — RA_ASSETS_URL not set"
+            echo "::notice::RA gameplay skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/wasm-gameplay.spec.ts --reporter=line
-          RA_GAMEPLAY_EXIT=$?
-          kill "$COOP_PID" 2>/dev/null || true
-          kill "$XVFB_PID"  2>/dev/null || true
-          exit $RA_GAMEPLAY_EXIT
 
-      - name: Upload RA gameplay artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ra-gameplay-results
-          path: |
-            e2e/screenshots/ra-*.png
-            e2e/screenshots/game-started.png
-            e2e/screenshots/scenario-start.png
-            e2e/screenshots/frame-100.png
-            e2e/screenshots/canvas-frame-100.png
-            e2e/screenshots/*.png
-            e2e/test-results/
-          if-no-files-found: ignore
-
-      - name: TD WASM gameplay — full e2e (TIM-404 / TIM-435)
-        # Runs the full TD gameplay suite: assets load, TD_AUTOSTART active,
-        # SCG01EA fires, game loop reaches frame 100, canvas renders non-black,
-        # audio opens, visual audit at frames 100/300/500.
-        # Skipped when TD_ASSETS_URL is not set (asset-dependent test).
+      - name: TD gameplay full e2e (asset-gated)
         env:
           TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
         run: |
           if [ -z "$TD_ASSETS_URL" ]; then
-            echo "::notice::TD gameplay skipped — TD_ASSETS_URL not set"
+            echo "::notice::TD gameplay skipped"
             exit 0
           fi
           Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
           sleep 2
           python3 wasm/serve-coop.py &
-          COOP_PID=$!
           sleep 2
           DISPLAY=:99 npx playwright test e2e/td-gameplay.spec.ts --reporter=line
-          TD_GAMEPLAY_EXIT=$?
-          kill "$COOP_PID" 2>/dev/null || true
-          kill "$XVFB_PID"  2>/dev/null || true
-          exit $TD_GAMEPLAY_EXIT
-
-      - name: Upload TD gameplay artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: td-gameplay-results
-          path: |
-            e2e/screenshots/td-*.png
-            e2e/screenshots/*.png
-            e2e/test-results/
-          if-no-files-found: ignore
-
-      - name: Validate WASM binaries
-        # TIM-593: Sanity-check that both binaries are valid WASM and non-trivially
-        # large.  This catches silent build failures and the class of Binaryen
-        # over-optimisation bugs where the output file is near-empty or malformed.
-        # A full audio-path smoke test requires game assets (not in this repo) and
-        # a browser; that is tracked separately.
-        run: |
-          python3 - <<'EOF'
-          import os, struct, sys
-          MIN_SIZE = 1_000_000  # TIM-597: Emscripten 5.0.6 -O2 produces ~1.8 MB; 1 MB guards against empty stubs
-          for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
-              with open(name, 'rb') as f:
-                  magic = f.read(4)
-              assert magic == b'\x00asm', f'{name}: invalid WASM magic {magic!r}'
-              size = os.path.getsize(name)
-              assert size > MIN_SIZE, f'{name}: suspiciously small ({size} bytes < {MIN_SIZE})'
-              print(f'{name}: {size // 1024} KB — OK')
-          EOF
 
       - name: Assemble deploy directory
         run: |
+          mkdir -p wasm/deploy
           cp build-wasm/ra.html  wasm/deploy/ra.html
           cp build-wasm/ra.js    wasm/deploy/ra.js
           cp build-wasm/ra.wasm  wasm/deploy/ra.wasm
@@ -664,19 +308,12 @@ jobs:
           cp build-wasm/td.wasm  wasm/deploy/td.wasm
           cp wasm/preloader.js          wasm/deploy/preloader.js
           cp wasm/coi-serviceworker.min.js wasm/deploy/coi-serviceworker.min.js
-          ls -lh wasm/deploy/
 
-      - name: Inject coi-serviceworker into game HTML
-        # GitHub Pages cannot set COOP/COEP response headers, so we use
-        # coi-serviceworker to inject them via a service worker instead.
-        # The script must load before Emscripten's Module initializes.
+      - name: Inject COI service worker
         run: |
           for f in wasm/deploy/ra.html wasm/deploy/td.html wasm/deploy/index.html; do
             sed -i 's|<head>|<head>\n  <script src="coi-serviceworker.min.js"></script>|' "$f"
           done
-
-      - name: Capture Emscripten version
-        run: echo "EMSDK_VERSION=$(emcc --version | head -1 | sed 's/.*emcc.*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/')" >> "$GITHUB_ENV"
 
       - name: Generate version manifest
         run: |
@@ -684,8 +321,7 @@ jobs:
           {
             "commit": "${{ github.sha }}",
             "workflow_run_id": "${{ github.run_id }}",
-            "build_time": "${{ github.action_start_time }}",
-            "emsdk_version": "${{ env.EMSDK_VERSION }}"
+            "build_time": "${{ github.action_start_time }}"
           }
           EOF
 

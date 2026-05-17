@@ -20,13 +20,13 @@ skill index. For deep architecture, see `ARCH.md`. For human-facing docs, see
 
 ## Quickstart (verify readiness)
 
-Run these three commands. If all exit 0, the toolchain is ready:
+The `pi-battlecontrol-dev` extension (`.pi/extensions/battlecontrol.ts`) registers
+13 tools for build, test, screenshot, and parity workflows. Run:
 
-```bash
-bash scripts/skill-dev-check.sh                    # g++, clang++, cmake, ninja, SDL2
-emcmake cmake --preset wasm 2>&1 | head -5         # Emscripten available (optional)
-npx playwright --version                            # Playwright available (optional)
 ```
+toolchain_check()
+```
+
 
 ---
 
@@ -34,26 +34,22 @@ npx playwright --version                            # Playwright available (opti
 
 ### Native Linux (GCC or Clang)
 
-```bash
-bash scripts/skill-native-build.sh                 # both targets (ra + td)
-bash scripts/skill-native-build.sh ra              # RA only
-bash scripts/skill-native-build.sh td              # TD only
-CXX=clang++ bash scripts/skill-native-build.sh     # use clang
+```
+native_build(target: "both", compiler: "gcc")
+native_build(target: "ra", compiler: "clang")
 ```
 
-Binaries land in `build/ra` and `build/td`.
+Binaries land in `build/ra` and `build/td`
 
 ### WASM (Emscripten)
 
-```bash
-bash scripts/skill-ci-wasm-smoke.sh                # full cycle: configure + build + validate + smoke
+```
+wasm_build(target: "both")
+wasm_validate(target: "both")
 ```
 
-This configures via `emcmake cmake --preset wasm`, builds `ra.wasm` and `td.wasm`,
-validates WASM magic and size, then runs T1+T2 boot smoke tests.
-
 Outputs: `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`,
-`build-wasm/td.html`.
+`build-wasm/td.html`
 
 ---
 
@@ -61,50 +57,39 @@ Outputs: `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`,
 
 ### Smoke tests (fast, always run)
 
-```bash
-# WASM boot smoke (requires build-wasm/ artifacts and Xvfb)
-source scripts/skill-xvfb-ensure.sh :99 1280x1024x24
-source scripts/skill-wasm-serve.sh 8080
-DISPLAY=:99 npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts
-DISPLAY=:99 npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts
+```
+run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
+run_e2e_test(spec: "e2e/regression/T2-td-wasm-boot.spec.ts")
 ```
 
-### Full E2E (one command)
-
-```bash
-bash scripts/skill-run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
-bash scripts/skill-run-e2e.sh e2e/tim710-wasm-parity.spec.ts --grep "Tier 1"
-```
-
-Starts Xvfb, starts the WASM server, runs the test, and cleans up both.
 
 ### LP64 audit
 
 ```bash
-python3 scripts/lint-lp64.py --errors-only           # gate: must exit 0
-cmake --build build --target lint-lp64               # CMake target version
+nix run .#lint                                      # gate: must exit 0
 ```
 
 ### VQA pixel-diff
 
-```bash
-python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa --frames 0,1,2 --threshold 5
+```
+vqa_pixel_diff(mode: "synthetic", threshold: 5)
 ```
 
 ### Parity comparison (Wine OG vs WASM/Linux)
 
-```bash
-python3 scripts/parity-compare.py \
-    e2e/screenshots/wine-ra-menu.png \
-    e2e/screenshots/tim710-wasm-menu.png \
-    --label "RA-menu" --threshold-ssim 0.90
+```
+parity_compare(
+  imageA: "e2e/screenshots/wine-ra-menu.png",
+  imageB: "e2e/screenshots/tim710-wasm-menu.png",
+  label: "RA-menu",
+  thresholdSsim: 0.90
+)
 ```
 
 ### Data integrity
 
-```bash
-python3 scripts/ra-data-verify.py /path/to/data      # RA MIX checksums
-python3 scripts/td-data-verify.py /path/to/data      # TD MIX checksums
+```
+data_verify(dir: "/path/to/data")
 ```
 
 ---
@@ -115,17 +100,17 @@ The standard loop for an agent working on a fix:
 
 ```
 1. Edit source
-2. Build       → bash scripts/skill-native-build.sh ra
-3. LP64 audit  → python3 scripts/lint-lp64.py --errors-only
-4. Smoke test  → bash scripts/skill-run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+2. Build       → native_build(target: "ra")
+3. LP64 audit  → nix run .#lint
+4. Smoke test  → run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
 5. Commit      → git commit -m "short imperative subject"
 6. Push        → git push
 ```
 
 If the change touches rendering or palette paths, add a parity check:
 
-```bash
-python3 scripts/parity-compare.py <wine-ref> <wasm-screenshot> --threshold-ssim 0.90
+```
+parity_compare(imageA: "<wine-ref>", imageB: "<wasm-screenshot>", thresholdSsim: 0.90)
 ```
 
 ---
@@ -143,22 +128,22 @@ native Linux and WASM, and runs a three-way SSIM comparison.
 
 **Full workflow:**
 
-```bash
+```
 # Build prerequisites
-bash scripts/skill-native-build.sh ra
-bash scripts/build-cnc-ddraw.sh
+native_build(target: "ra")
+# (build-cnc-ddraw.sh still manual)
 
 # Generate gameplay goldens from Wine (the reference)
 bash scripts/gen-gameplay-goldens.sh allied-l1
 bash scripts/gen-gameplay-goldens.sh soviet-l1
 
-# Capture same state from native Linux
+# Capture same state from native Linux (manual)
 bash scripts/native-capture.sh allied-l1
 bash scripts/native-capture.sh soviet-l1
 
 # Capture same state from WASM
-npx playwright test e2e/tim708-wasm-allied-l1.spec.ts
-npx playwright test e2e/tim710-wasm-parity.spec.ts --grep "Soviet L1"
+run_e2e_test(spec: "e2e/tim708-wasm-allied-l1.spec.ts")
+run_e2e_test(spec: "e2e/tim710-wasm-parity.spec.ts", args: ["--grep", "Soviet L1"])
 
 # Compare three-way
 bash scripts/parity-report.sh allied-l1 --mode gameplay --targets wine,wasm,native
@@ -254,20 +239,20 @@ The `seq` subcommand of `ra-sendinput.exe` can chain a full navigation:
 
 ## Skill Index
 
-When an agent hits a symptom, it should read the corresponding skill file.
-Skills are at `skills/<name>/SKILL.md`.
+When an agent hits a symptom, read the corresponding skill for diagnostic guidance.
+Each skill lists which extension tools apply.
 
-| Domain | Skill | Trigger symptoms |
-|--------|-------|-----------------|
-| Native build | `skills/native-build/SKILL.md` | CMake failure, missing SDL2, case-sensitivity include errors, LP64 struct crashes |
-| WASM/Emscripten | `skills/emscripten/SKILL.md` | EM_ASM silent no-op, black screen, garbled audio, `onRuntimeInitialized` timeout |
-| E2E testing | `skills/e2e-testing/SKILL.md` | Playwright pageerror, `__wasmReady` never set, blank Xvfb screenshots |
-| Wine testing | `skills/wine-testing/SKILL.md` | Wine prefix failure, DirectDraw blank, DirectSound dialog blocking automation |
-| VQA codec | `skills/vqa-codec/SKILL.md` | Block-aligned corruption, palette errors, CBFZ/CBPZ decode bugs, pixel-diff CI failure |
-| Parity comparison | `skills/parity-comparison/SKILL.md` | SSIM below threshold, parity regression, Wine OG capture failure |
-| CI/CD | `skills/ci-cd/SKILL.md` | CI job failure, release workflow broken, gh-pages deploy not updating |
+| Domain | Skill | Extension tools | Trigger symptoms |
+|--------|-------|----------------|-----------------|
+| Native build | `skills/native-build/` | `toolchain_check`, `native_build` | CMake failure, missing SDL2, LP64 crashes |
+| WASM/Emscripten | `skills/emscripten/` | `wasm_build`, `wasm_validate`, `wasm_screenshot`, `run_e2e_test` | EM_ASM silent, black screen, garbled audio |
+| E2E testing | `skills/e2e-testing/` | `serve_wasm`, `serve_assets`, `run_e2e_test` | pageerror, `__wasmReady` timeout, blank Xvfb |
+| Wine testing | `skills/wine-testing/` | `wine_check`, `wine_capture` | Wine prefix failure, DirectDraw blank |
+| VQA codec | `skills/vqa-codec/` | `vqa_pixel_diff` | Block corruption, palette errors, CI failure |
+| Parity comparison | `skills/parity-comparison/` | `data_verify`, `wine_capture`, `parity_compare`, `vqa_pixel_diff` | SSIM regression, parity failure |
+| CI/CD | `skills/ci-cd/` | `wasm_build`, `wasm_validate`, `native_build`, `run_e2e_test` | CI failure, release broken, deploy stuck |
 
-Each skill has a Phase 0 smoke check and a Phase 1 symptom-classification table.
+Each skill has a symptom-classification table and diagnostic procedures.
 
 ---
 
@@ -283,7 +268,8 @@ Things an agent must never break:
    on success. If you modify one, verify with that script's own smoke test.
 
 3. **WASM binary validation.** `ra.wasm` and `td.wasm` must be >1MB and have
-   valid WASM magic (`\x00asm`). Build with `skill-ci-wasm-smoke.sh` to verify.
+   valid WASM magic (`\x00asm`). Run `wasm_validate(target: "both")` or
+   `nix run .#ci-wasm` to verify.
 
 4. **COOP/COEP headers.** WASM requires `Cross-Origin-Opener-Policy: same-origin`
    and `Cross-Origin-Embedder-Policy: require-corp` for SharedArrayBuffer. The
@@ -298,7 +284,7 @@ Things an agent must never break:
    `docs/smoke-test-design-rule.md`.
 
 7. **Include shim regeneration.** After adding a new `#include` to any .CPP file,
-   run `python3 scripts/generate-include-shim.py --repo-root . --shim-root build/include-shim --quiet`.
+   run `nix run .#shim`.
 
 ---
 
@@ -307,36 +293,33 @@ Things an agent must never break:
 All reusable scripts live in `scripts/`. Historical build-pass scripts have been
 moved to `scripts/archive/`.
 
-| Script | Purpose |
-|--------|---------|
-| `skill-native-build.sh` | One-command native Linux build (ra + td) |
-| `skill-ci-wasm-smoke.sh` | Full WASM CI cycle: configure + build + validate + smoke |
-| `skill-run-e2e.sh` | Xvfb + WASM server + Playwright test + cleanup |
+| Script / Tool | Purpose |
+|---------------|---------|
+| `native_build` tool / `skill-native-build.sh` | One-command native Linux build (ra + td) |
+| `wasm_build` + `wasm_validate` / `skill-ci-wasm-smoke.sh` | Full WASM CI cycle |
+| `run_e2e_test` tool / `skill-run-e2e.sh` | Xvfb + WASM server + Playwright test |
+| `serve_wasm` tool / `skill-wasm-serve.sh` | WASM dev server with COOP/COEP |
+| `toolchain_check` tool / `skill-dev-check.sh` | Toolchain prerequisite check |
+| `vqa_pixel_diff` tool / `vqa-pixel-diff.py` | VQA pixel diff against ffmpeg |
+| `parity_compare` tool / `parity-compare.py` | SSIM + fill% + p99 pixel diff |
+| `data_verify` tool / `*-data-verify.py` | MIX checksum verification |
+| `wine_check` tool / `skill-wine-check.sh` | Wine prerequisite check |
+| `wine_capture` tool / `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
 | `skill-xvfb-ensure.sh` | Idempotent Xvfb launcher (source it) |
-| `skill-wasm-serve.sh` | Start WASM dev server with COOP/COEP (source it) |
-| `skill-dev-check.sh` | Toolchain prerequisite check |
 | `skill-vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff |
-| `skill-wine-check.sh` | Wine prerequisite check |
-| `parity-compare.py` | SSIM + fill% + p99 pixel diff comparison |
-| `parity-report.sh` | Three-way parity report: goldens vs captures (vqa + gameplay modes) |
+| `parity-report.sh` | Three-way parity report (vqa + gameplay modes) |
 | `lint-lp64.py` | LP64 static hazard audit |
-| `vqa-pixel-diff.py` | Frame-level VQA pixel diff against ffmpeg |
 | `cinematic-compare.py` | Cinematic/VQA batch comparison |
 | `generate-include-shim.py` | Case-folding include shim generator |
-| `*-data-verify.py` | MIX checksum verification |
-| `gen-vqa-golden.py` | Decode VQA → N evenly-spaced golden PNG frames |
-| `gen-all-vqa-goldens.sh` | Batch golden generation for all 6 intro VQAs |
-| `gen-gameplay-goldens.sh` | Generate gameplay golden from Wine capture + manifest |
+| `gen-vqa-golden.py` / `gen-all-vqa-goldens.sh` | VQA golden frame generation |
+| `gen-gameplay-goldens.sh` | Gameplay golden from Wine capture + manifest |
 | `native-capture.sh` | Native Linux gameplay capture under Xvfb |
-| `ci-local.sh` | Local CI: run all available gates, auto-skip missing deps |
-| `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
+| `ci-local.sh` | Local CI: run all available gates |
 | `wine-ra-setup.sh` / `wine-td-setup.sh` | First-time Wine prefix setup |
-| `wine-allied-l1.sh` | Wine → Allied Mission 1 gameplay capture |
-| `wine-soviet-l1.sh` | Wine → Soviet Mission 1 gameplay capture |
-| `wine-vqa-capture.sh` | Wine → VQA playback frame capture via ra-screenshot.exe |
-| `tools/wine-input/ra-sendinput.exe` | SendInput keyboard/mouse injector (reaches DInput) |
-| `tools/wine-input/ra-screenshot.exe` | BitBlt frame capture from inside Wine |
-| `build-cnc-ddraw.sh` | Build cnc-ddraw with scanline_double patch |
+| `wine-allied-l1.sh` / `wine-soviet-l1.sh` | Campaign-specific Wine captures |
+| `wine-vqa-capture.sh` | Wine VQA playback frame capture |
+| `tools/wine-input/*` | SendInput injectors + BitBlt capture inside Wine |
+| `tools/cnc-ddraw/` flake | Build cnc-ddraw with scanline_double patch — `nix build path:./tools/cnc-ddraw#cnc-ddraw` |
 
 ---
 
@@ -350,4 +333,113 @@ moved to `scripts/archive/`.
 | `docs/lp64-audit.md` | LP64 porting hazards and fixes |
 | `docs/smoke-test-design-rule.md` | Assertion design rules for smoke tests |
 | `docs/codec-testing.md` | VQA codec testing methodology |
-| `CLAUDE.md` | Claude/Paperclip-specific worktree protocol |
+| *(below)* | Worktree protocol for concurrent multi-agent development |
+
+---
+
+## Worktree Protocol
+
+All engineering agents **MUST** work in a per-issue git worktree. This prevents
+filesystem collisions when multiple agents run concurrently on the same repository.
+
+### Entering a worktree
+
+At the start of every heartbeat that touches source files or runs builds, before doing
+anything else:
+
+**1 — Check whether a worktree already exists for this issue:**
+
+```bash
+git worktree list
+```
+
+Look for a path containing the issue identifier (e.g. `TIM-272`).
+
+**2 — Enter or create:**
+
+- Worktree already listed → enter it:
+  ```
+  EnterWorktree(path: "<absolute-path-shown-in-git-worktree-list>")
+  ```
+
+- No worktree yet → create one:
+  ```
+  EnterWorktree(name: "<ISSUE-IDENTIFIER>")
+  ```
+
+  This creates `.claude/worktrees/TIM-272/` on a new branch `worktree-TIM-272`.
+  After creation, immediately reset to `battlecontrol/master` so the worktree
+  starts from the team's working master, not the upstream EA base:
+
+  ```bash
+  git fetch battlecontrol
+  git reset --hard battlecontrol/master
+  ```
+
+**3 — Confirm you are on the right branch:**
+
+```bash
+git branch --show-current
+```
+
+### Working in the worktree
+
+- Commit normally to the issue branch as you go.
+- **Never** commit directly to `master` in the root `_default` worktree while an issue
+  worktree is active.
+- Run builds and tests from inside the worktree — build artifacts are local to the
+  worktree directory, so concurrent agents don't collide.
+
+### Done workflow (merging back to master via Pull Request)
+
+When the issue is complete, from inside the worktree:
+
+```bash
+# 1. Make sure everything is committed
+git status
+
+# 2. Sync with upstream changes
+git fetch battlecontrol
+git rebase battlecontrol/master --autostash
+
+# 3. Push your branch
+git push battlecontrol HEAD
+
+# 4. Open a PR
+gh pr create --repo hughobrien/battlecontrol \
+  --title "TIM-{id}: <short description>" \
+  --body "Closes TIM-{id}" \
+  --base master
+
+# 5. Enable automerge
+gh pr merge --auto --merge
+```
+
+Then exit the worktree **keeping** the branch:
+
+```
+ExitWorktree(action: "keep")
+```
+
+After GitHub merges the PR, clean up from `_default`:
+
+```bash
+git pull battlecontrol master
+git worktree remove .claude/worktrees/TIM-{id}
+git branch -d worktree-TIM-{id}
+```
+
+### Cancellation / abandonment
+
+```bash
+git worktree remove .claude/worktrees/TIM-{id} --force
+git branch -D worktree-TIM-{id}
+```
+
+### Notes
+
+- Worktrees branch from `battlecontrol/master`.
+- Path: `.claude/worktrees/TIM-{id}/` (gitignored).
+- Local branch: `worktree-TIM-{id}`.
+- If `EnterWorktree` is called for a name that already exists, use the `path:` form.
+
