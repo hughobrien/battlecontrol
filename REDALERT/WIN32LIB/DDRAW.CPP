@@ -52,12 +52,30 @@
 #ifndef _MSC_VER
 #include <SDL2/SDL.h>
 #include <climits>      // TIM-141 commit 2: Get_Free_Video_Memory uses INT_MAX
+#include <cstdint>      // TIM-908: uint32_t for palette LUT
+#include <cstring>       // TIM-908: memcmp/memcpy for palette dirty-check
+#include <ctime>         // TIM-908: clock_gettime for frame profiling
 #include "sdl_input.h"  // TIM-145 pass-43A: SDL_Process_Input_Events()
 #include "sdl_window.h" // TIM-152 pass-46B: SDL_Set_Main_Window registration
 static SDL_Window*   SDL_VideoWindow    = nullptr;
 static SDL_Renderer* SDL_VideoRenderer  = nullptr;
 static SDL_Surface*  SDL_PrimarySurface = nullptr;
 static SDL_Color     SDL_PaletteEntries[256] = {};
+// TIM-908: precomputed 32-bit ARGB LUT to avoid per-pixel shift/OR in
+// the Wait_Vert_Blank indexed→ARGB conversion loop. Rebuilt whenever
+// Set_DD_Palette or Set_DD_Palette_8bit updates SDL_PaletteEntries.
+static uint32_t       SDL_PaletteLUT[256] = {};
+
+static void Rebuild_Palette_LUT(void)
+{
+	for (int i = 0; i < 256; ++i) {
+		const SDL_Color& c = SDL_PaletteEntries[i];
+		SDL_PaletteLUT[i] = ((uint32_t)0xFF << 24) |
+		                    ((uint32_t)c.r  << 16) |
+		                    ((uint32_t)c.g  <<  8) |
+		                    ((uint32_t)c.b);
+	}
+}
 // TIM-141 commit 5: present-pump caches. Texture is the GPU streaming
 // destination; PrimaryARGB is the CPU-side 32-bit blit target that holds
 // SDL_BlitSurface's indexed->ARGB conversion using the palette set by
@@ -687,18 +705,29 @@ BOOL Set_Video_Mode(HWND hwnd, int w, int h, int bits_per_pixel)
 			SDL_VideoRenderer = SDL_CreateRenderer(SDL_VideoWindow, -1, 0);
 		}
 #else
-		// TIM-250: always use the software renderer under Linux — the X11
-		// accelerated path (SDL_RENDERER_ACCELERATED) crashes in
-		// SDL_RenderPresent when run under Xvfb at 640×480. Software
-		// rendering is correct and sufficient; vsync is not critical here.
-		SDL_VideoRenderer = SDL_CreateRenderer(
-			SDL_VideoWindow, -1,
-			SDL_RENDERER_SOFTWARE);
-		// If software also fails try accelerated as last resort
-		if (SDL_VideoRenderer == nullptr) {
-			SDL_VideoRenderer = SDL_CreateRenderer(
-				SDL_VideoWindow, -1,
-				SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+		// TIM-908: prefer hardware-accelerated rendering when available.
+		// TIM-250 originally forced SOFTWARE because SDL_RENDERER_ACCELERATED
+		// crashed under Xvfb at 640×480. The new strategy tries accelerated
+		// first and falls back to software when the driver isn't available
+		// (Xvfb, headless CI, missing GPU drivers). Set RA_SOFTWARE_RENDERER=1
+		// to force the software path regardless.
+		{
+			const char* forceSw = getenv("RA_SOFTWARE_RENDERER");
+			if (forceSw && forceSw[0] == '1') {
+				SDL_VideoRenderer = SDL_CreateRenderer(
+					SDL_VideoWindow, -1, SDL_RENDERER_SOFTWARE);
+			} else {
+				SDL_VideoRenderer = SDL_CreateRenderer(
+					SDL_VideoWindow, -1,
+					SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+				if (SDL_VideoRenderer == nullptr) {
+					fprintf(stderr, "[RA] accelerated renderer unavailable, trying software\n");
+					SDL_VideoRenderer = SDL_CreateRenderer(
+						SDL_VideoWindow, -1, SDL_RENDERER_SOFTWARE);
+				} else {
+					fprintf(stderr, "[RA] using hardware-accelerated renderer\n");
+				}
+			}
 		}
 #endif
 		fprintf(stderr, "[RA] SDL window %dx%d renderer=%p\n",
@@ -1068,21 +1097,35 @@ void Wait_Vert_Blank(void)
 		return;
 	}
 	int blit_rc = 0;
+	// TIM-908: indexed→ARGB conversion using precomputed LUT.
+	// Replaces the per-pixel SDL_Color dereference + three-shift
+	// pattern with a single 256-entry uint32_t table lookup.
 	{
 		const uint8_t* src     = (const uint8_t*)SDL_PrimarySurface->pixels;
 		uint32_t*      dst     = (uint32_t*)SDL_PrimaryARGB->pixels;
 		int            srcPitch = SDL_PrimarySurface->pitch;
 		int            dstPitch32 = SDL_PrimaryARGB->pitch / 4;
+		const uint32_t* lut     = SDL_PaletteLUT;
+
+		// TIM-908: profile conversion cost every 60 presents (~1s at 60fps)
+		struct timespec t0, t1;
+		if (SDL_PresentCount % 60 == 0)
+			clock_gettime(CLOCK_MONOTONIC, &t0);
+
 		for (int y = 0; y < h; ++y) {
+			const uint8_t* srcRow = src + y * srcPitch;
+			uint32_t*      dstRow = dst + y * dstPitch32;
 			for (int x = 0; x < w; ++x) {
-				uint8_t idx = src[y * srcPitch + x];
-				const SDL_Color& c = SDL_PaletteEntries[idx];
-				dst[y * dstPitch32 + x] =
-					((uint32_t)0xFF << 24) |
-					((uint32_t)c.r  << 16) |
-					((uint32_t)c.g  <<  8) |
-					((uint32_t)c.b);
+				dstRow[x] = lut[srcRow[x]];
 			}
+		}
+
+		if (SDL_PresentCount % 60 == 0) {
+			clock_gettime(CLOCK_MONOTONIC, &t1);
+			long ns = (t1.tv_sec - t0.tv_sec) * 1000000000L +
+			          (t1.tv_nsec - t0.tv_nsec);
+			fprintf(stderr, "[RA] frame%4d indexed→ARGB conv: %7ld µs (%dx%d)\n",
+			        SDL_PresentCount, ns / 1000, w, h);
 		}
 	}
 	SDL_UpdateTexture(SDL_PrimaryTexture, nullptr,
@@ -1213,6 +1256,21 @@ void Set_DD_Palette ( void *palette )
 	*/
 	if (!palette) return;
 
+#ifndef _MSC_VER
+	// TIM-908: skip redundant palette updates. Color_Cycle calls
+	// Set_DD_Palette every busy-wait tick during Sync_Delay even when
+	// the palette hasn't changed. memcmp against the last-set raw 6-bit
+	// bytes and early-return avoids useless SDL_PaletteEntries copies,
+	// LUT rebuilds, and SDL_SetPaletteColors calls.
+	static uint8_t lastPaletteRaw[768] = {};
+	static bool    lastPaletteValid = false;
+	if (lastPaletteValid && memcmp(lastPaletteRaw, palette, 768) == 0) {
+		return;
+	}
+	memcpy(lastPaletteRaw, palette, 768);
+	lastPaletteValid = true;
+#endif
+
 	int	j;
 	int	k;
 	char	*palette_get;
@@ -1242,6 +1300,7 @@ void Set_DD_Palette ( void *palette )
 		SDL_PaletteEntries[i].b = PaletteEntries[i].peBlue;
 		SDL_PaletteEntries[i].a = 255;
 	}
+	Rebuild_Palette_LUT();
 	if (SDL_PrimarySurface && SDL_PrimarySurface->format && SDL_PrimarySurface->format->palette) {
 		SDL_SetPaletteColors(SDL_PrimarySurface->format->palette,
 		                     SDL_PaletteEntries, 0, 256);
@@ -1288,6 +1347,7 @@ extern "C" void Set_DD_Palette_8bit(const uint8_t* cpl0, int ncolors)
 		SDL_PaletteEntries[i].b = (uint8_t)(b | ((b >> 6) & 0x3));
 		SDL_PaletteEntries[i].a = 255;
 	}
+	Rebuild_Palette_LUT();
 	if (SDL_PrimarySurface && SDL_PrimarySurface->format &&
 	    SDL_PrimarySurface->format->palette)
 		SDL_SetPaletteColors(SDL_PrimarySurface->format->palette,
