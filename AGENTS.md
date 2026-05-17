@@ -39,6 +39,17 @@ nix develop --extra-experimental-features 'nix-command flakes'
 > handle this internally — you only need to worry about it for ad-hoc shell
 > commands.
 
+## ⚠️ After every PR: always enable automerge
+
+Every pull request **must** have automerge enabled immediately after creation:
+
+```bash
+gh pr merge --auto --merge
+```
+
+This is step 5 in the Done workflow below. Never merge manually. If CI fails,
+automerge will wait until it passes. If CI is green, the PR merges automatically.
+
 ---
 
 ## How to Make Progress
@@ -447,9 +458,12 @@ gh pr create --repo hughobrien/battlecontrol \
   --body "Closes TIM-{id}" \
   --base master
 
-# 5. Enable automerge
+# 5. Enable automerge ⚠️ **REQUIRED** — never skip this step
 gh pr merge --auto --merge
 ```
+
+> **Automerge is mandatory.** If CI is green, the PR merges automatically.
+> If CI is red, it waits until CI passes. Never merge manually.
 
 Then exit the worktree **keeping** the branch:
 
