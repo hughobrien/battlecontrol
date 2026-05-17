@@ -49,30 +49,31 @@ Expected input SHA-256 (NoCD-patched RA95.EXE, see scripts/nocd-patch.py):
 Expected output SHA-256 (NoCD + windowed-DDraw patched):
   c9e9be012953c2cd0db68f30861dbe29f9709332c832bf8483998200315a1af7
 """
+
 import sys
 import hashlib
 import shutil
 
-INPUT_SHA256   = "292f858724dc215ea1db7ad36c9617fdd1acd808b4fb01593e0719ff87ee8edf"
+INPUT_SHA256 = "292f858724dc215ea1db7ad36c9617fdd1acd808b4fb01593e0719ff87ee8edf"
 PATCHED_SHA256 = "c9e9be012953c2cd0db68f30861dbe29f9709332c832bf8483998200315a1af7"
 
 # (offset, original_byte, patched_byte, description)
 SITES = [
-    (0x1a4a34, 0x51, 0x08, "DDSCL_EXCLUSIVE|FULLSCREEN|ALLOWMODEX -> DDSCL_NORMAL"),
-    (0x1a4a3f, 0x11, 0x08, "DDSCL_EXCLUSIVE|FULLSCREEN -> DDSCL_NORMAL"),
+    (0x1A4A34, 0x51, 0x08, "DDSCL_EXCLUSIVE|FULLSCREEN|ALLOWMODEX -> DDSCL_NORMAL"),
+    (0x1A4A3F, 0x11, 0x08, "DDSCL_EXCLUSIVE|FULLSCREEN -> DDSCL_NORMAL"),
     # Stub SetDisplayMode call as 'xor eax, eax; nop' so Wine never invokes
     # NtUserChangeDisplaySettings (which Xvfb refuses) and Set_Video_Mode
     # continues with the window-bound primary surface.
-    (0x1a4a69, 0xff, 0x31, "SetDisplayMode call -> xor eax,eax (fake DD_OK)"),
-    (0x1a4a6a, 0x53, 0xc0, "SetDisplayMode call -> xor eax,eax (cont)"),
-    (0x1a4a6b, 0x54, 0x90, "SetDisplayMode call -> nop (cont)"),
+    (0x1A4A69, 0xFF, 0x31, "SetDisplayMode call -> xor eax,eax (fake DD_OK)"),
+    (0x1A4A6A, 0x53, 0xC0, "SetDisplayMode call -> xor eax,eax (cont)"),
+    (0x1A4A6B, 0x54, 0x90, "SetDisplayMode call -> nop (cont)"),
 ]
 
 # Sanity-guard: the SetCooperativeLevel call (right before SetDisplayMode)
 # is left intact and at this offset. If a different RA95.EXE build shifts
 # things, this guard catches it before we patch the wrong bytes.
-CALL_OFFSET = 0x1a4a45
-CALL_BYTES  = b'\xff\x52\x50'   # call DWORD PTR [edx+0x50] = SetCooperativeLevel
+CALL_OFFSET = 0x1A4A45
+CALL_BYTES = b"\xff\x52\x50"  # call DWORD PTR [edx+0x50] = SetCooperativeLevel
 
 
 def sha256(data: bytes) -> str:
@@ -80,7 +81,7 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
@@ -91,22 +92,28 @@ def patch(path: str, dry_run: bool = False) -> int:
     if digest != INPUT_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected: {INPUT_SHA256}  (NoCD-patched RA95.EXE)")
-        print(f"       run scripts/nocd-patch.py first")
+        print("       run scripts/nocd-patch.py first")
         return 1
 
-    if bytes(data[CALL_OFFSET:CALL_OFFSET+3]) != CALL_BYTES:
-        print(f"ERROR: call bytes mismatch at 0x{CALL_OFFSET:x}: "
-              f"{bytes(data[CALL_OFFSET:CALL_OFFSET+3]).hex()} != {CALL_BYTES.hex()}")
+    if bytes(data[CALL_OFFSET : CALL_OFFSET + 3]) != CALL_BYTES:
+        print(
+            f"ERROR: call bytes mismatch at 0x{CALL_OFFSET:x}: "
+            f"{bytes(data[CALL_OFFSET : CALL_OFFSET + 3]).hex()} != {CALL_BYTES.hex()}"
+        )
         return 1
 
     for off, orig, _, why in SITES:
         if data[off] != orig:
-            print(f"ERROR: byte at 0x{off:x} is 0x{data[off]:02x}, expected 0x{orig:02x}  [{why}]")
+            print(
+                f"ERROR: byte at 0x{off:x} is 0x{data[off]:02x}, expected 0x{orig:02x}  [{why}]"
+            )
             return 1
 
     if dry_run:
         for off, orig, new, why in SITES:
-            print(f"{path}: DRY RUN — would patch 0x{off:x}: 0x{orig:02x} -> 0x{new:02x}  [{why}]")
+            print(
+                f"{path}: DRY RUN — would patch 0x{off:x}: 0x{orig:02x} -> 0x{new:02x}  [{why}]"
+            )
         return 0
 
     backup = path + ".ddscl_orig"
@@ -116,7 +123,7 @@ def patch(path: str, dry_run: bool = False) -> int:
     for off, _, new, why in SITES:
         data[off] = new
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))
@@ -133,10 +140,14 @@ def patch(path: str, dry_run: bool = False) -> int:
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     dry = "--dry-run" in sys.argv
-    paths = args if args else [
-        "/opt/redalert/RA95.EXE",
-        "/opt/redalert/game/RA95.EXE",
-    ]
+    paths = (
+        args
+        if args
+        else [
+            "/opt/redalert/RA95.EXE",
+            "/opt/redalert/game/RA95.EXE",
+        ]
+    )
     rc = 0
     for p in paths:
         try:

@@ -29,19 +29,20 @@ Expected input SHA-256 (C&C95.EXE after TIM-743+TIM-747 setcoop-hwnd chain):
 Expected output SHA-256:
   c88e74cfcee017bc7abb9fc5657f08665570162a3df13e621b6e296ee2f579ed
 """
+
 import sys
 import hashlib
 import shutil
 
-INPUT_SHA256   = "935b32578dfc39d3e4bd928fe87d7703e39a974f7eb2e827a2249e119d925429"
+INPUT_SHA256 = "935b32578dfc39d3e4bd928fe87d7703e39a974f7eb2e827a2249e119d925429"
 PATCHED_SHA256 = "c88e74cfcee017bc7abb9fc5657f08665570162a3df13e621b6e296ee2f579ed"
 
-PATCH_OFFSET = 0xda71c   # 'G' of "GDI95"
-PATCH_ORIG   = 0x47      # 'G'
-PATCH_NEW    = 0x00      # NUL → makes stricmp("", "") match empty drive label
+PATCH_OFFSET = 0xDA71C  # 'G' of "GDI95"
+PATCH_ORIG = 0x47  # 'G'
+PATCH_NEW = 0x00  # NUL → makes stricmp("", "") match empty drive label
 
 GUARD_OFFSET = PATCH_OFFSET
-GUARD_BYTE   = PATCH_ORIG
+GUARD_BYTE = PATCH_ORIG
 
 
 def sha256(data: bytes) -> str:
@@ -49,7 +50,7 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
@@ -60,18 +61,22 @@ def patch(path: str, dry_run: bool = False) -> int:
     if digest != INPUT_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected: {INPUT_SHA256}")
-        print(f"       apply td-focus-skip, td-game-in-focus, td-vqa-skip,")
-        print(f"       td-activateapp, td-setcoop-hwnd patches first")
+        print("       apply td-focus-skip, td-game-in-focus, td-vqa-skip,")
+        print("       td-activateapp, td-setcoop-hwnd patches first")
         return 1
 
     if data[GUARD_OFFSET] != GUARD_BYTE:
-        print(f"ERROR: guard byte at 0x{GUARD_OFFSET:x}: "
-              f"0x{data[GUARD_OFFSET]:02x} != 0x{GUARD_BYTE:02x}")
+        print(
+            f"ERROR: guard byte at 0x{GUARD_OFFSET:x}: "
+            f"0x{data[GUARD_OFFSET]:02x} != 0x{GUARD_BYTE:02x}"
+        )
         return 1
 
     if dry_run:
-        print(f"{path}: DRY RUN — would zero 0x{PATCH_OFFSET:x} "
-              f"(GDI95[0] = 0x{PATCH_ORIG:02x} → 0x{PATCH_NEW:02x})")
+        print(
+            f"{path}: DRY RUN — would zero 0x{PATCH_OFFSET:x} "
+            f"(GDI95[0] = 0x{PATCH_ORIG:02x} → 0x{PATCH_NEW:02x})"
+        )
         return 0
 
     backup = path + ".cdlabel_orig"
@@ -80,7 +85,7 @@ def patch(path: str, dry_run: bool = False) -> int:
 
     data[PATCH_OFFSET] = PATCH_NEW
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))
@@ -88,7 +93,9 @@ def patch(path: str, dry_run: bool = False) -> int:
         print(f"ERROR: post-patch SHA-256 mismatch: {out_digest}")
         return 1
 
-    print(f"  Patched 0x{PATCH_OFFSET:x}: GDI95[0] -> NUL (Get_CD_Index accepts empty label)")
+    print(
+        f"  Patched 0x{PATCH_OFFSET:x}: GDI95[0] -> NUL (Get_CD_Index accepts empty label)"
+    )
     print(f"{path}: td-cdlabel patch applied ({out_digest[:16]}…)")
     return 0
 

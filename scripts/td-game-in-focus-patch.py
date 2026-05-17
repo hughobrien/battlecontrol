@@ -45,10 +45,10 @@ Accepted input SHA-256:
 Output SHA-256:
     460bf72d18447a935f9269f85bef0c27ba56953e12aed3b52bdcb28e75822ee6
 """
+
 import sys
 import hashlib
 import shutil
-import struct
 
 ACCEPTED_INPUT_SHA256 = {
     "3ead491cf25eed9865a2d088afb00941900e6f6719b550199ee35e9b4ca01627",  # original
@@ -57,18 +57,18 @@ ACCEPTED_INPUT_SHA256 = {
 OUTPUT_SHA256 = "460bf72d18447a935f9269f85bef0c27ba56953e12aed3b52bdcb28e75822ee6"
 
 # (1) Entry detour
-ENTRY_FILE_OFFSET = 0xca094
-ENTRY_ORIG_BYTES = bytes.fromhex('c705682e5a0020974a00')   # 10 bytes (first entry insn)
-ENTRY_PATCHED_BYTES = bytes.fromhex('e9bfbf00009090909090')  # jmp 0x4e5c58 + 5 NOPs
+ENTRY_FILE_OFFSET = 0xCA094
+ENTRY_ORIG_BYTES = bytes.fromhex("c705682e5a0020974a00")  # 10 bytes (first entry insn)
+ENTRY_PATCHED_BYTES = bytes.fromhex("e9bfbf00009090909090")  # jmp 0x4e5c58 + 5 NOPs
 assert len(ENTRY_PATCHED_BYTES) == len(ENTRY_ORIG_BYTES) == 10
 
 # (2) Code cave
-CAVE_FILE_OFFSET = 0xd6058
-CAVE_ORIG_BYTES = b'\x00' * 22
+CAVE_FILE_OFFSET = 0xD6058
+CAVE_ORIG_BYTES = b"\x00" * 22
 CAVE_PATCHED_BYTES = bytes.fromhex(
-    'c60544dd530001'              # mov byte [0x53dd44], 1
-    'c705682e5a0020974a00'        # movl $0x4a9720, 0x5a2e68  (replay entry insn 1)
-    'e93040ffff'                  # jmp 0x4d9c9e  (entry+10)
+    "c60544dd530001"  # mov byte [0x53dd44], 1
+    "c705682e5a0020974a00"  # movl $0x4a9720, 0x5a2e68  (replay entry insn 1)
+    "e93040ffff"  # jmp 0x4d9c9e  (entry+10)
 )
 assert len(CAVE_PATCHED_BYTES) == 22
 
@@ -76,17 +76,21 @@ assert len(CAVE_PATCHED_BYTES) == 22
 # Each site: file offset of the CMP instruction (7 bytes CMP + 2 bytes NOP after focus-skip)
 # Pre-focus-skip: 7-byte CMP + 2-byte JE (short); post-focus-skip: 7-byte CMP + 2-byte NOP
 SPIN_CMP_OFFSETS = [
-    0x1e3b4 - 7,  # 0x1e3ad — spin loop 1 CMP offset
-    0x448f7 - 7,  # 0x448f0 — spin loop 2 CMP offset
-    0x6c5fb - 7,  # 0x6c5f4 — spin loop 3 CMP offset
+    0x1E3B4 - 7,  # 0x1e3ad — spin loop 1 CMP offset
+    0x448F7 - 7,  # 0x448f0 — spin loop 2 CMP offset
+    0x6C5FB - 7,  # 0x6c5f4 — spin loop 3 CMP offset
 ]
-SPIN_ORIG_AFTER_FOCUS_SKIP = bytes.fromhex('833d44dd530000' + '9090')  # CMP + 2 NOPs (9 bytes)
+SPIN_ORIG_AFTER_FOCUS_SKIP = bytes.fromhex(
+    "833d44dd530000" + "9090"
+)  # CMP + 2 NOPs (9 bytes)
 SPIN_ORIG_PRE_FOCUS_SKIP = {
-    0x1e3ad: bytes.fromhex('833d44dd53000074ed'),
-    0x448f0: bytes.fromhex('833d44dd53000074eb'),
-    0x6c5f4: bytes.fromhex('833d44dd530000749a'),
+    0x1E3AD: bytes.fromhex("833d44dd53000074ed"),
+    0x448F0: bytes.fromhex("833d44dd53000074eb"),
+    0x6C5F4: bytes.fromhex("833d44dd530000749a"),
 }
-SPIN_PATCHED_BYTES = bytes.fromhex('c60544dd53000190 90'.replace(' ', ''))  # mov byte + 2 NOPs
+SPIN_PATCHED_BYTES = bytes.fromhex(
+    "c60544dd53000190 90".replace(" ", "")
+)  # mov byte + 2 NOPs
 assert len(SPIN_PATCHED_BYTES) == 9
 
 
@@ -95,14 +99,18 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
     digest = sha256(bytes(data))
 
-    entry_already = bytes(data[ENTRY_FILE_OFFSET:ENTRY_FILE_OFFSET + 10]) == ENTRY_PATCHED_BYTES
-    cave_already = bytes(data[CAVE_FILE_OFFSET:CAVE_FILE_OFFSET + 22]) == CAVE_PATCHED_BYTES
+    entry_already = (
+        bytes(data[ENTRY_FILE_OFFSET : ENTRY_FILE_OFFSET + 10]) == ENTRY_PATCHED_BYTES
+    )
+    cave_already = (
+        bytes(data[CAVE_FILE_OFFSET : CAVE_FILE_OFFSET + 22]) == CAVE_PATCHED_BYTES
+    )
     spins_already = all(
-        bytes(data[off:off + 9]) == SPIN_PATCHED_BYTES for off in SPIN_CMP_OFFSETS
+        bytes(data[off : off + 9]) == SPIN_PATCHED_BYTES for off in SPIN_CMP_OFFSETS
     )
     if entry_already and cave_already and spins_already:
         print(f"{path}: already patched (td-game-in-focus pin, all mechanisms)")
@@ -110,14 +118,14 @@ def patch(path: str, dry_run: bool = False) -> int:
 
     if digest not in ACCEPTED_INPUT_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
-        print(f"       accepted inputs:")
+        print("       accepted inputs:")
         for h in sorted(ACCEPTED_INPUT_SHA256):
             print(f"         {h}")
         return 1
 
     # Entry precondition
     if not entry_already:
-        actual = bytes(data[ENTRY_FILE_OFFSET:ENTRY_FILE_OFFSET + 10])
+        actual = bytes(data[ENTRY_FILE_OFFSET : ENTRY_FILE_OFFSET + 10])
         if actual != ENTRY_ORIG_BYTES:
             print(f"ERROR: entry bytes mismatch at 0x{ENTRY_FILE_OFFSET:x}")
             print(f"  expected: {ENTRY_ORIG_BYTES.hex()}")
@@ -126,14 +134,14 @@ def patch(path: str, dry_run: bool = False) -> int:
 
     # Cave precondition
     if not cave_already:
-        actual = bytes(data[CAVE_FILE_OFFSET:CAVE_FILE_OFFSET + 22])
+        actual = bytes(data[CAVE_FILE_OFFSET : CAVE_FILE_OFFSET + 22])
         if actual != CAVE_ORIG_BYTES:
             print(f"ERROR: code cave at 0x{CAVE_FILE_OFFSET:x} is not zero-padded")
             return 1
 
     # Spin-loop preconditions
     for off in SPIN_CMP_OFFSETS:
-        actual = bytes(data[off:off + 9])
+        actual = bytes(data[off : off + 9])
         if actual == SPIN_PATCHED_BYTES:
             continue  # already patched
         if actual == SPIN_ORIG_AFTER_FOCUS_SKIP:
@@ -145,7 +153,9 @@ def patch(path: str, dry_run: bool = False) -> int:
         return 1
 
     if dry_run:
-        print(f"  DRY RUN: entry detour, code cave, {len(SPIN_CMP_OFFSETS)} spin-loop re-pins")
+        print(
+            f"  DRY RUN: entry detour, code cave, {len(SPIN_CMP_OFFSETS)} spin-loop re-pins"
+        )
         return 0
 
     backup = path + ".td_game_in_focus_orig"
@@ -153,19 +163,19 @@ def patch(path: str, dry_run: bool = False) -> int:
     print(f"  Backup: {backup}")
 
     if not entry_already:
-        data[ENTRY_FILE_OFFSET:ENTRY_FILE_OFFSET + 10] = ENTRY_PATCHED_BYTES
+        data[ENTRY_FILE_OFFSET : ENTRY_FILE_OFFSET + 10] = ENTRY_PATCHED_BYTES
         print(f"  Patched entry at 0x{ENTRY_FILE_OFFSET:x} -> jmp 0x4e5c58")
 
     if not cave_already:
-        data[CAVE_FILE_OFFSET:CAVE_FILE_OFFSET + 22] = CAVE_PATCHED_BYTES
+        data[CAVE_FILE_OFFSET : CAVE_FILE_OFFSET + 22] = CAVE_PATCHED_BYTES
         print(f"  Patched code cave at 0x{CAVE_FILE_OFFSET:x} (22 bytes)")
 
     for off in SPIN_CMP_OFFSETS:
-        if bytes(data[off:off + 9]) != SPIN_PATCHED_BYTES:
-            data[off:off + 9] = SPIN_PATCHED_BYTES
+        if bytes(data[off : off + 9]) != SPIN_PATCHED_BYTES:
+            data[off : off + 9] = SPIN_PATCHED_BYTES
             print(f"  Re-pinned spin site at 0x{off:x}")
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))

@@ -1,7 +1,7 @@
 ---
 name: emscripten
 description: Use when porting C++ to WebAssembly with Emscripten, debugging WASM-specific issues, or configuring CMake/linker flags for an Emscripten build. Also trigger on symptoms like EM_ASM silently failing, WASM audio garbled or pitched wrong, black screen despite game loop running, onRuntimeInitialized never firing, getenv returning NULL in browser, IDBFS file I/O silently dropped, undefined symbols at link time, or CI timing out waiting for WASM to load.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Emscripten / WebAssembly Porting Skill
@@ -285,6 +285,94 @@ if(EMSCRIPTEN)
   target_link_libraries(my_game PRIVATE SDL2)
 endif()
 ```
+
+---
+
+## §9 — WASM memory debugging
+
+### Linear memory overflow
+
+When the game allocates more memory than `INITIAL_MEMORY`, Emscripten either
+crashes (without `ALLOW_MEMORY_GROWTH`) or expands the heap (with it).
+
+**Symptom:** Silent crash, `abort()` with no message, or `Out of memory` in
+browser console.
+
+**Diagnose:**
+```js
+// In browser DevTools console, after crash:
+console.log(Module.HEAP8.length);  // Current heap size in bytes
+console.log(Module.HEAP8.buffer.maxByteLength); // Max allowed (if growth enabled)
+```
+
+**Fix:** Increase `INITIAL_MEMORY` or enable `ALLOW_MEMORY_GROWTH`:
+```cmake
+target_link_options(my_target PRIVATE
+  -sINITIAL_MEMORY=134217728     # 128 MB
+  -sALLOW_MEMORY_GROWTH=1        # Allow growth beyond INITIAL
+  -sMAXIMUM_MEMORY=268435456     # Cap at 256 MB
+)
+```
+
+### Getting stack traces from WASM
+
+Build with debug info to get line-numbered stack traces in the browser:
+```cmake
+# In CMakeLists.txt, for debug builds:
+target_compile_options(my_target PRIVATE
+  $<$<CONFIG:Debug>:-g4 -O0 -sASSERTIONS=2>
+)
+target_link_options(my_target PRIVATE
+  $<$<CONFIG:Debug>:-g4 -sASSERTIONS=2>
+)
+```
+
+Then in DevTools:
+- Sources panel → find the `.wasm` file → DWARF info enables source-mapped stepping
+- Console: `new Error().stack` shows WASM call stack with function names
+- Use `EM_ASM({ console.trace(); })` to log a stack trace from C++
+
+### `.wasm` file size analysis
+
+If the WASM binary grows beyond GitHub's 100 MB artifact limit, identify oversized
+symbols:
+
+```bash
+# Using wasm-objdump (from wabt)
+wasm-objdump -h build-wasm/ra.wasm  # Section sizes
+
+# Using twiggy (Rust tool, npm install -g twiggy)
+twiggy top build-wasm/ra.wasm       # Largest functions by code size
+twiggy paths build-wasm/ra.wasm     # Call graph with per-path sizes
+twiggy monos build-wasm/ra.wasm     # Polymorphism overhead
+```
+
+**Common size bloat sources:**
+- C++ templates instantiated many times (check with `twiggy monos`)
+- `-g` debug info left in release build (use `-O2` + `--strip-debug`)
+- Unused functions linked in (check with `-sWASM_SIDE_MODULE` or `-ffunction-sections --gc-sections`)
+- `EM_ASM` blocks with large JS strings (each adds ~200 bytes of glue code)
+
+### Checking thread sanity
+
+The pthreads implementation creates one Web Worker per hardware thread. Verify:
+- DevTools → Sources → Threads panel shows expected number of workers
+- `Module.pthreadPoolSize` reflects the pool size at runtime
+- SharedArrayBuffer is available: `typeof SharedArrayBuffer` in console
+
+If threads don't start, check the `-sPROXY_TO_PTHREAD=1` linker flag and that
+COOP/COEP headers are set (see e2e-testing skill §2.1).
+
+### Firefox vs Chrome differences
+
+| Feature | Chrome | Firefox |
+|---------|--------|---------|
+| SharedArrayBuffer without COOP/COEP | Fails (needs `--enable-features=SharedArrayBuffer`) | Fails in Nightly, works in release with flags |
+| AudioContext sample rate | Usually 48000 | Usually 44100 |
+| OffscreenCanvas in headless mode | Requires `--headless=new` or headed Chrome on Xvfb | Works in headless mode |
+| WASM JIT cold-start | ~240s for -O2 | ~180s for -O2 |
+
+Test on both browsers before marking a WASM change as done.
 
 ---
 

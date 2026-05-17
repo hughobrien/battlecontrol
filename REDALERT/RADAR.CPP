@@ -511,7 +511,7 @@ void RadarClass::Draw_It(bool forced)
 					**	Render all pixels in the "to redraw" stack.
 					*/
 					if (LogicPage->Lock()) {
-						for (int index = 0; index < (int)PixelPtr; index++) {
+						for (int index = 0; index < (intptr_t)PixelPtr; index++) {
 							CELL cell = PixelStack[index];
 					  		if (Cell_On_Radar(cell)) {
 								(*this)[cell].IsPlot = false;

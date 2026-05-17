@@ -23,6 +23,7 @@ Expected input SHA-256 (after td-game-in-focus-patch.py):
 Output SHA-256:
     5f0f37829a7db69dcb601f920e4b24d079d878ede90d8a7a662119ba4d39273b
 """
+
 import sys
 import hashlib
 import shutil
@@ -35,12 +36,12 @@ ACCEPTED_INPUT_SHA256 = {
 }
 OUTPUT_SHA256 = "5f0f37829a7db69dcb601f920e4b24d079d878ede90d8a7a662119ba4d39273b"
 
-PATCH_OFFSET = 0x1d330    # Play_Movie entry
-ORIGINAL_BYTE = 0x51      # push %ecx
-PATCHED_BYTE  = 0xC3      # ret
+PATCH_OFFSET = 0x1D330  # Play_Movie entry
+ORIGINAL_BYTE = 0x51  # push %ecx
+PATCHED_BYTE = 0xC3  # ret
 
 # Signature at bytes 1–4 after patched byte for extra safety check
-SITE_SIGNATURE = b'\x56\x57\x55\x81'  # push esi; push edi; push ebp; sub ...
+SITE_SIGNATURE = b"\x56\x57\x55\x81"  # push esi; push edi; push ebp; sub ...
 
 
 def sha256(data: bytes) -> str:
@@ -48,7 +49,7 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
@@ -59,18 +60,22 @@ def patch(path: str, dry_run: bool = False) -> int:
 
     if digest not in ACCEPTED_INPUT_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
-        print(f"       accepted inputs:")
+        print("       accepted inputs:")
         for h in sorted(ACCEPTED_INPUT_SHA256):
             print(f"         {h}")
         return 1
 
     if data[PATCH_OFFSET] != ORIGINAL_BYTE:
-        print(f"ERROR: byte at 0x{PATCH_OFFSET:x} is 0x{data[PATCH_OFFSET]:02x}, expected 0x{ORIGINAL_BYTE:02x}")
+        print(
+            f"ERROR: byte at 0x{PATCH_OFFSET:x} is 0x{data[PATCH_OFFSET]:02x}, expected 0x{ORIGINAL_BYTE:02x}"
+        )
         return 1
 
-    sig_actual = bytes(data[PATCH_OFFSET+1:PATCH_OFFSET+5])
+    sig_actual = bytes(data[PATCH_OFFSET + 1 : PATCH_OFFSET + 5])
     if sig_actual != SITE_SIGNATURE:
-        print(f"ERROR: signature mismatch at 0x{PATCH_OFFSET+1:x}: {sig_actual.hex()}")
+        print(
+            f"ERROR: signature mismatch at 0x{PATCH_OFFSET + 1:x}: {sig_actual.hex()}"
+        )
         print(f"       expected: {SITE_SIGNATURE.hex()}")
         return 1
 
@@ -85,7 +90,7 @@ def patch(path: str, dry_run: bool = False) -> int:
     data[PATCH_OFFSET] = PATCHED_BYTE
     print(f"  Patched 0x{PATCH_OFFSET:x}: Play_Movie entry -> ret")
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))

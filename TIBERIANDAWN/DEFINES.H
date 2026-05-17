@@ -1648,7 +1648,7 @@ typedef enum RadioMessageType : unsigned char {
 **	with cell resolution. The COORD type is used for map coordinates that
 **	have a lepton resolution.
 */
-typedef unsigned long	COORDINATE;
+typedef uint32_t	COORDINATE;
 typedef signed short		CELL;
 
 typedef unsigned short	TARGET;

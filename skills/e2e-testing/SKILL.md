@@ -1,7 +1,7 @@
 ---
 name: e2e-testing
 description: Use when writing or debugging Playwright e2e tests for C&C WASM builds. Trigger on symptoms like WASM pageerror crashes, `__wasmReady` never set, COOP/COEP header failures, blank Xvfb screenshots, audio pitch detection failures, pixel-range assertions that pass while visual output is broken, or CI timing out waiting for WASM to initialize.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Playwright E2E Testing Skill
@@ -237,8 +237,59 @@ Multiple Xvfb instances can coexist (use different display numbers: :98, :99).
 | T9 | `T9-ra-wasm-mission-start.spec.ts` | RA Allied L1 mission starts |
 | T10 | `T10-ra-menu-bleed.spec.ts` | RA post-game menu bleed (SSIM >= 0.90) |
 
+> **Tier numbering:** Numbers are not sequential (T4, T5 absent). New tiers should be
+> added with the next available number to avoid renumbering existing tests. The table
+> above is kept in sync with `e2e/regression/` — if you add a new tier, add it here.
+
 T1–T2 are asset-free (no game data needed). T3–T10 require game data loaded via the
 preloader's `showDirectoryPicker`.
+
+---
+
+## §3.1 — Debugging common E2E timeouts
+
+### `waitForFunction` timeout (300s exhausted)
+
+The WASM binary is large; JIT compilation under `-O2` can take 240s+ on cold cache.
+
+```ts
+// Correct: generous timeout, gated on onRuntimeInitialized
+await page.waitForFunction(() => (window as any).__wasmReady === true, {
+  timeout: 300_000
+});
+```
+
+If this still times out:
+1. Check browser DevTools console for page errors: `page.on('pageerror', e => console.log(e.message));`
+2. Confirm COOP/COEP headers are present: DevTools → Network → response headers
+3. Check the WASM binary is not corrupt: `wasm_validate(target: "ra")`
+4. Confirm `SharedArrayBuffer` is available: `page.evaluate(() => typeof SharedArrayBuffer)`
+
+### `waitForSelector` timeout (element never appears)
+
+The game may not have reached the expected state. Add console logging:
+```ts
+page.on('console', msg => console.log(`[${msg.type()}] ${msg.text()}`));
+```
+
+Common causes:
+- Asset server not running on port 9090 → check `serve_assets` is running
+- `showDirectoryPicker` dialog blocking → game needs user gesture to proceed
+- Game loop crashed silently → look for uncaught promise rejections
+
+### `expect(locator).toBeVisible()` timeout
+
+The element exists in the DOM but is offscreen or occluded:
+```ts
+const handle = await page.waitForSelector('canvas');
+await handle.screenshot({ path: 'debug-canvas.png' });
+```
+
+### Test flakiness: the 5/5 rule
+
+WASM audio and canvas rendering races are non-deterministic. Apply the same rule
+as the Emscripten skill (§5.2): **5/5 cold-cache passes** before marking a render
+or audio test as verified. Never accept one green CI run as sufficient evidence.
 
 ---
 

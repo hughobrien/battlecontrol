@@ -175,6 +175,11 @@ visual corruption.
 Golden frames are reference PNGs generated from known-correct VQA output. They are
 used for visual comparison but **must not be committed** (derived from game assets).
 
+> **What's committed:** `e2e/goldens/vqa/test.vqa` (the synthetic test input, 2.6 KB).  
+> **What's NOT committed:** Decoded PNG frames (derived from copyrighted game VQAs).  
+> **CI gate:** Regenerates `test.vqa` from the generator script and diffs against the  
+> committed version — any drift must be intentional and committed alongside generator changes.
+
 ```bash
 # Generate golden frames for a VQA file:
 python3 scripts/vqa-pixel-diff.py /path/to/file.vqa \
@@ -184,11 +189,50 @@ python3 scripts/vqa-pixel-diff.py /path/to/file.vqa \
 # Golden frames are written to:
 #   e2e/goldens/vqa/<stem>/golden_0000.png
 #   e2e/goldens/vqa/<stem>/golden_0029.png (if --frames specified)
+
+# Regenerate the committed synthetic test VQA after generator changes:
+python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa
+git add e2e/goldens/vqa/test.vqa
 ```
 
 ---
 
-## §5 — Adding the Python decoder to the CI gate
+## §5 — Audio track verification
+
+VQA files contain ADPCM audio tracks (mono, 22050 Hz). The decoder must produce
+correct PCM output in addition to correct video frames.
+
+### Verifying C++ decoder audio output
+
+```bash
+# Extract reference audio from a known VQA using ffmpeg:
+ffmpeg -i input.vqa -f s16le -ac 1 -ar 22050 reference.raw
+
+# Compare C++ decoder output against ffmpeg reference:
+python3 scripts/vqa-audio-diff.py reference.raw decoder_output.raw
+```
+
+### Common audio bugs
+
+| Symptom | Likely cause | Check |
+|---------|-------------|-------|
+| Audio plays too fast/slow | Sample rate mismatch in VQA header parsing | Verify `audio_sample_rate` matches 22050 |
+| Static noise instead of speech | ADPCM nibble order or predictor reset wrong | Check frame-by-frame initial predictor values |
+| Audio ends early | Total sample count wrong in VQA header | Verify `total_audio_samples` vs actual decoded length |
+| Only left channel or silence | Channel count hardcoded to 2 instead of 1 | Verify VQA audio is mono (all C&C VQAs) |
+
+### Adding to CI gate
+
+When `vqa_player.cpp` changes in a way that affects audio output, add an audio
+step alongside the pixel-diff:
+
+```bash
+python3 scripts/vqa-audio-diff.py reference.raw decoder.raw --threshold 5
+```
+
+---
+
+## §6 — Adding the Python decoder to the CI gate
 
 When `vqa_player.cpp` changes in a way that affects frame output:
 
@@ -200,7 +244,7 @@ When `vqa_player.cpp` changes in a way that affects frame output:
 
 ---
 
-## §6 — CI integration
+## §7 — CI integration
 
 The `vqa-pixel-diff` job in `.github/workflows/ci.yml` runs on every PR:
 
@@ -215,12 +259,13 @@ blocking PRs from contributors without data.
 
 ---
 
-## §7 — Verification bar
+## §8 — Verification bar
 
 | Gate | Tool / Command | Expected result |
 |------|----------------|----------------|
 | Synthetic VQA | `vqa_pixel_diff(mode: "synthetic", threshold: 5)` | Exit 0, p99 ≤ 5 |
 | Generator sync | `python3 scripts/gen_test_vqa.py /tmp/test.vqa.new && diff -q e2e/goldens/vqa/test.vqa /tmp/test.vqa.new` | Identical |
+| Audio diff (if available) | `python3 scripts/vqa-audio-diff.py reference.raw decoder.raw --threshold 5` | p99 ≤ 5 |
 | Game VQA (optional) | `vqa_pixel_diff(mode: "cinematic", threshold: 5)` or `python3 scripts/vqa-pixel-diff.py ...` | Exit 0, p99 ≤ 5 |
 
 ---
@@ -231,6 +276,7 @@ blocking PRs from contributors without data.
 - `scripts/vqa-pixel-diff.py` — Pixel-diff harness (Python reference vs ffmpeg)
 - `scripts/vqa_decode_verify.py` — Python reference decoder (mirrors vqa_player.cpp)
 - `scripts/gen_test_vqa.py` — Synthetic test VQA generator
+- `scripts/vqa-audio-diff.py` — Audio PCM diff harness (create if not yet existing)
 - `linux/win32-stubs/vqa_player.cpp` — C++ runtime decoder (native + WASM)
 - `e2e/goldens/vqa/test.vqa` — 2,640-byte committed synthetic VQA
 - `e2e/tim600-english-vqa-verify.spec.ts` — WASM VQA verification test

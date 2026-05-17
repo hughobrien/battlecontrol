@@ -20,19 +20,19 @@ cd "$REPO_ROOT"
 
 echo "=== Configuring native Linux build ==="
 if [[ -n "${CXX:-}" ]]; then
-    cmake --preset linux-native -DCMAKE_CXX_COMPILER="$CXX"
+	cmake --preset linux-native -DCMAKE_CXX_COMPILER="$CXX"
 else
-    cmake --preset linux-native
+	cmake --preset linux-native
 fi
 
 if [[ "$TARGET" == "all" || "$TARGET" == "ra" ]]; then
-    echo "=== Building RA ==="
-    cmake --build build --target ra --parallel
+	echo "=== Building RA ==="
+	cmake --build build --target ra --parallel
 fi
 
 if [[ "$TARGET" == "all" || "$TARGET" == "td" ]]; then
-    echo "=== Building TD ==="
-    cmake --build build --target td --parallel
+	echo "=== Building TD ==="
+	cmake --build build --target td --parallel
 fi
 
 echo "=== Build complete ==="

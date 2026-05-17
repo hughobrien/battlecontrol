@@ -40,34 +40,35 @@ Expected input SHA-256 (C&C95.EXE after TIM-743 chain + td-ddmode-patch.py):
 Expected output SHA-256:
   19ab8620eadfe1b31ce340922fc426b7fcd407a044ba890b543144f25d1dbf58
 """
+
 import sys
 import hashlib
 import shutil
 
-INPUT_SHA256   = "46dc1eb4a81143610161e4f1930aec7a95a76f0b367e99454d08b01a6a3ccc9c"
+INPUT_SHA256 = "46dc1eb4a81143610161e4f1930aec7a95a76f0b367e99454d08b01a6a3ccc9c"
 PATCHED_SHA256 = "19ab8620eadfe1b31ce340922fc426b7fcd407a044ba890b543144f25d1dbf58"
 
 # 5-byte jmp at 0xbc6ae replacing the DDSCL_NORMAL path preamble
-JMP_OFFSET  = 0xbc6ae
-JMP_ORIG    = bytes.fromhex("6a08a14078")   # push $0x8; mov eax,[0x567840] partial
-JMP_PATCHED = bytes.fromhex("e9e89c0100")   # jmp 0x4e5f9b (rel32 = +0x019ce8)
+JMP_OFFSET = 0xBC6AE
+JMP_ORIG = bytes.fromhex("6a08a14078")  # push $0x8; mov eax,[0x567840] partial
+JMP_PATCHED = bytes.fromhex("e9e89c0100")  # jmp 0x4e5f9b (rel32 = +0x019ce8)
 
 # 24-byte code cave at 0xd639b (verified zero-filled in the original binary)
-CAVE_OFFSET  = 0xd639b
-CAVE_ORIG    = bytes(24)                     # must be all zeros
+CAVE_OFFSET = 0xD639B
+CAVE_ORIG = bytes(24)  # must be all zeros
 CAVE_PATCHED = bytes.fromhex(
-    "6a08"           # push $0x8  (DDSCL_NORMAL)
-    "a140785600"     # mov eax,[0x567840]  (DD*)
-    "8b18"           # mov ebx,[eax]        (vtable)
-    "ff3548785600"   # push [0x567848]      (real HWND)
-    "50"             # push eax             (this)
-    "ff5350"         # call [ebx+0x50]      (SetCooperativeLevel)
-    "e90963feff"     # jmp 0x4cc2bc         (resume)
+    "6a08"  # push $0x8  (DDSCL_NORMAL)
+    "a140785600"  # mov eax,[0x567840]  (DD*)
+    "8b18"  # mov ebx,[eax]        (vtable)
+    "ff3548785600"  # push [0x567848]      (real HWND)
+    "50"  # push eax             (this)
+    "ff5350"  # call [ebx+0x50]      (SetCooperativeLevel)
+    "e90963feff"  # jmp 0x4cc2bc         (resume)
 )
 
 # Sanity guard: original DDSCL_NORMAL preamble byte at jmp site
 GUARD_OFFSET = JMP_OFFSET
-GUARD_BYTES  = JMP_ORIG
+GUARD_BYTES = JMP_ORIG
 
 
 def sha256(data: bytes) -> str:
@@ -75,7 +76,7 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
@@ -86,34 +87,40 @@ def patch(path: str, dry_run: bool = False) -> int:
     if digest != INPUT_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected: {INPUT_SHA256}")
-        print(f"       apply td-focus-skip, td-game-in-focus, td-vqa-skip,")
-        print(f"       td-activateapp, then td-ddmode-patch.py first")
+        print("       apply td-focus-skip, td-game-in-focus, td-vqa-skip,")
+        print("       td-activateapp, then td-ddmode-patch.py first")
         return 1
 
-    if bytes(data[GUARD_OFFSET:GUARD_OFFSET + len(GUARD_BYTES)]) != GUARD_BYTES:
-        print(f"ERROR: guard bytes mismatch at 0x{GUARD_OFFSET:x}: "
-              f"{bytes(data[GUARD_OFFSET:GUARD_OFFSET + len(GUARD_BYTES)]).hex()} "
-              f"!= {GUARD_BYTES.hex()}")
+    if bytes(data[GUARD_OFFSET : GUARD_OFFSET + len(GUARD_BYTES)]) != GUARD_BYTES:
+        print(
+            f"ERROR: guard bytes mismatch at 0x{GUARD_OFFSET:x}: "
+            f"{bytes(data[GUARD_OFFSET : GUARD_OFFSET + len(GUARD_BYTES)]).hex()} "
+            f"!= {GUARD_BYTES.hex()}"
+        )
         return 1
 
-    if bytes(data[CAVE_OFFSET:CAVE_OFFSET + len(CAVE_ORIG)]) != CAVE_ORIG:
-        print(f"ERROR: code cave at 0x{CAVE_OFFSET:x} is not zero-filled: "
-              f"{bytes(data[CAVE_OFFSET:CAVE_OFFSET + len(CAVE_ORIG)]).hex()}")
+    if bytes(data[CAVE_OFFSET : CAVE_OFFSET + len(CAVE_ORIG)]) != CAVE_ORIG:
+        print(
+            f"ERROR: code cave at 0x{CAVE_OFFSET:x} is not zero-filled: "
+            f"{bytes(data[CAVE_OFFSET : CAVE_OFFSET + len(CAVE_ORIG)]).hex()}"
+        )
         return 1
 
     if dry_run:
-        print(f"{path}: DRY RUN — would patch 0x{JMP_OFFSET:x} (jmp) and "
-              f"0x{CAVE_OFFSET:x} (cave, {len(CAVE_PATCHED)} bytes)")
+        print(
+            f"{path}: DRY RUN — would patch 0x{JMP_OFFSET:x} (jmp) and "
+            f"0x{CAVE_OFFSET:x} (cave, {len(CAVE_PATCHED)} bytes)"
+        )
         return 0
 
     backup = path + ".setcoop_hwnd_orig"
     shutil.copy2(path, backup)
     print(f"  Backup: {backup}")
 
-    data[JMP_OFFSET:JMP_OFFSET + len(JMP_PATCHED)] = JMP_PATCHED
-    data[CAVE_OFFSET:CAVE_OFFSET + len(CAVE_PATCHED)] = CAVE_PATCHED
+    data[JMP_OFFSET : JMP_OFFSET + len(JMP_PATCHED)] = JMP_PATCHED
+    data[CAVE_OFFSET : CAVE_OFFSET + len(CAVE_PATCHED)] = CAVE_PATCHED
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))
@@ -122,7 +129,9 @@ def patch(path: str, dry_run: bool = False) -> int:
         return 1
 
     print(f"  Patched 0x{JMP_OFFSET:x}: jmp → cave at VA 0x4e5f9b")
-    print(f"  Patched 0x{CAVE_OFFSET:x}: code cave ({len(CAVE_PATCHED)} bytes) with real HWND")
+    print(
+        f"  Patched 0x{CAVE_OFFSET:x}: code cave ({len(CAVE_PATCHED)} bytes) with real HWND"
+    )
     print(f"{path}: td-setcoop-hwnd patch applied ({out_digest[:16]}…)")
     return 0
 
@@ -130,9 +139,13 @@ def patch(path: str, dry_run: bool = False) -> int:
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     dry = "--dry-run" in sys.argv
-    paths = args if args else [
-        "/opt/tiberiandawn/C&C95.EXE",
-    ]
+    paths = (
+        args
+        if args
+        else [
+            "/opt/tiberiandawn/C&C95.EXE",
+        ]
+    )
     rc = 0
     for p in paths:
         try:

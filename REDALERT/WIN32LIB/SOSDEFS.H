@@ -54,7 +54,7 @@ typedef  unsigned       WORD;
 #ifndef  LONG
 typedef  signed long    LONG;
 #endif
-typedef  unsigned long  DWORD;
+typedef  uint32_t  DWORD;
 
 typedef  BYTE  *        PBYTE;
 typedef  char near *    PSTR;

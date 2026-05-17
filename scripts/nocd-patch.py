@@ -21,21 +21,21 @@ Expected input SHA-256:
 Expected output SHA-256:
   292f858724dc215ea1db7ad36c9617fdd1acd808b4fb01593e0719ff87ee8edf
 """
+
 import sys
 import hashlib
 import shutil
-import struct
 
 ORIGINAL_SHA256 = "a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55"
-PATCHED_SHA256  = "292f858724dc215ea1db7ad36c9617fdd1acd808b4fb01593e0719ff87ee8edf"
+PATCHED_SHA256 = "292f858724dc215ea1db7ad36c9617fdd1acd808b4fb01593e0719ff87ee8edf"
 
-CALL_OFFSET = 0x1a5498   # call GetDriveTypeA
-JNE_OFFSET  = 0x1a54a1   # jne <cd_dialog>
+CALL_OFFSET = 0x1A5498  # call GetDriveTypeA
+JNE_OFFSET = 0x1A54A1  # jne <cd_dialog>
 
 # Expected bytes to verify we're patching the right location
-CALL_BYTES  = b'\xff\x15\x60\x02\x6e\x00'   # call [0x6e0260]
-CMP_BYTES   = b'\x83\xf8\x05'               # cmp eax, 5
-JNE_BYTES   = b'\x75\xdd'                   # jne -35
+CALL_BYTES = b"\xff\x15\x60\x02\x6e\x00"  # call [0x6e0260]
+CMP_BYTES = b"\x83\xf8\x05"  # cmp eax, 5
+JNE_BYTES = b"\x75\xdd"  # jne -35
 
 
 def sha256(data: bytes) -> str:
@@ -43,7 +43,7 @@ def sha256(data: bytes) -> str:
 
 
 def patch(path: str, dry_run: bool = False) -> int:
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         data = bytearray(f.read())
 
     digest = sha256(bytes(data))
@@ -57,13 +57,13 @@ def patch(path: str, dry_run: bool = False) -> int:
         return 1
 
     # Verify patch site
-    if bytes(data[CALL_OFFSET:CALL_OFFSET+6]) != CALL_BYTES:
+    if bytes(data[CALL_OFFSET : CALL_OFFSET + 6]) != CALL_BYTES:
         print(f"ERROR: call bytes mismatch at 0x{CALL_OFFSET:x}")
         return 1
-    if bytes(data[CALL_OFFSET+6:CALL_OFFSET+9]) != CMP_BYTES:
-        print(f"ERROR: cmp bytes mismatch at 0x{CALL_OFFSET+6:x}")
+    if bytes(data[CALL_OFFSET + 6 : CALL_OFFSET + 9]) != CMP_BYTES:
+        print(f"ERROR: cmp bytes mismatch at 0x{CALL_OFFSET + 6:x}")
         return 1
-    if bytes(data[JNE_OFFSET:JNE_OFFSET+2]) != JNE_BYTES:
+    if bytes(data[JNE_OFFSET : JNE_OFFSET + 2]) != JNE_BYTES:
         print(f"ERROR: jne bytes mismatch at 0x{JNE_OFFSET:x}")
         return 1
 
@@ -77,10 +77,10 @@ def patch(path: str, dry_run: bool = False) -> int:
     print(f"  Backup: {backup}")
 
     # Apply patch
-    data[JNE_OFFSET]   = 0x90  # NOP
-    data[JNE_OFFSET+1] = 0x90  # NOP
+    data[JNE_OFFSET] = 0x90  # NOP
+    data[JNE_OFFSET + 1] = 0x90  # NOP
 
-    with open(path, 'wb') as f:
+    with open(path, "wb") as f:
         f.write(data)
 
     out_digest = sha256(bytes(data))
@@ -93,10 +93,14 @@ def patch(path: str, dry_run: bool = False) -> int:
 
 
 if __name__ == "__main__":
-    paths = sys.argv[1:] if len(sys.argv) > 1 else [
-        "/opt/redalert/RA95.EXE",
-        "/opt/redalert/game/RA95.EXE",
-    ]
+    paths = (
+        sys.argv[1:]
+        if len(sys.argv) > 1
+        else [
+            "/opt/redalert/RA95.EXE",
+            "/opt/redalert/game/RA95.EXE",
+        ]
+    )
     rc = 0
     for p in paths:
         try:
