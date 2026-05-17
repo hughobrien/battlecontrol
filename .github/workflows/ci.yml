@@ -340,10 +340,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Playwright and Chromium
+      - name: Install Playwright and browsers
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium firefox
 
       - name: WASM boot smoke — ra.wasm + td.wasm load without crash
         # Asset-free regression: loads both ra.html and td.html, observes each
