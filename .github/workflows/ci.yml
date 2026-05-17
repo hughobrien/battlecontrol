@@ -13,28 +13,38 @@ concurrency:
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.txt'
-      - 'docs/**'
-      - 'skills/**'
-      - '**.md'
   pull_request:
     branches: [master]
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.txt'
-      - 'docs/**'
-      - 'skills/**'
-      - '**.md'
 
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   EM_CACHE_DIR: ${{ github.workspace }}/.emscripten-cache
 
 jobs:
+  # Always-run filter: determines which jobs are needed.
+  # Without this, paths-ignore causes skipped workflows that never report
+  # a status, deadlocking PRs with required CI checks.
+  filter:
+    name: CI path filter
+    runs-on: ubuntu-24.04
+    outputs:
+      run-ci: ${{ steps.filter.outputs.run-ci }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: dorny/paths-filter@v3.0.2
+        id: filter
+        with:
+          filters: |
+            run-ci:
+              - '!**/*.md'
+              - '!**/*.txt'
+              - '!docs/**'
+              - '!skills/**'
+
   build:
     name: Compile and link (clang)
+    needs: [filter]
+    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -69,6 +79,8 @@ jobs:
 
   vqa-pixel-diff:
     name: VQA codec pixel-diff
+    needs: [filter]
+    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -86,6 +98,8 @@ jobs:
 
   wine-comparison:
     name: Wine OG comparison
+    needs: [filter]
+    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -169,6 +183,8 @@ jobs:
 
   build-wasm:
     name: Build WASM + regression
+    needs: [filter]
+    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
 
@@ -305,6 +321,8 @@ jobs:
 
   clang-tidy:
     name: clang-tidy static analysis
+    needs: [filter]
+    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     continue-on-error: true
 
@@ -332,6 +350,8 @@ jobs:
 
   cppcheck:
     name: cppcheck static analysis
+    needs: [filter]
+    if: needs.filter.outputs.run-ci == 'true'
     runs-on: ubuntu-24.04
     continue-on-error: true
 
