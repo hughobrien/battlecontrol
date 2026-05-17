@@ -162,25 +162,6 @@ wasm_validate(target: "both")
 Outputs: `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`,
 `build-wasm/td.html`
 
-### GitHub Pages deploy (automatic)
-
-On every merge to `master`, the `gh-pages.yml` workflow:
-1. Builds `ra.wasm` + `td.wasm`
-2. Runs smoke tests (Chromium + Firefox)
-3. Runs asset-gated regression tests (if secrets configured)
-4. Deploys to GitHub Pages
-
-The deploy directory is assembled from `build-wasm/*.wasm`, `build-wasm/*.js`,
-`build-wasm/*.html`, plus `wasm/preloader.js` and
-`wasm/coi-serviceworker.min.js`. A `version.json` manifest is generated with
-commit SHA and build timestamp.
-
-Manual deploy (legacy):
-
-```bash
-gh workflow run "GitHub Pages Deploy"
-```
-
 ---
 
 ## Canonical Test Commands
@@ -480,110 +461,88 @@ moved to `scripts/archive/`.
 
 ## Worktree Protocol
 
-All engineering agents **MUST** work in a per-issue git worktree. This prevents
-filesystem collisions when multiple agents run concurrently on the same repository.
+All engineering agents **MUST** work in a per-issue git worktree when making
+changes. This prevents filesystem collisions when multiple agents run
+concurrently and keeps `master` clean.
 
-### Entering a worktree
+### Create a worktree
 
-At the start of every heartbeat that touches source files or runs builds, before doing
-anything else:
+```
+EnterWorktree(name: "<ISSUE-OR-SHORT-DESCRIPTION>")
+```
 
-**1 — Check whether a worktree already exists for this issue:**
+This creates `.claude/worktrees/<name>/` on a new branch `worktree-<name>`
+and resets it to `origin/master`.
+
+If a worktree for this name already exists, re-enter it with:
+
+```
+EnterWorktree(path: "<absolute-path-from-git-worktree-list>")
+```
+
+Check what exists:
 
 ```bash
 git worktree list
 ```
 
-Look for a path containing the issue identifier (e.g. `TIM-272`).
-
-**2 — Enter or create:**
-
-- Worktree already listed → enter it:
-  ```
-  EnterWorktree(path: "<absolute-path-shown-in-git-worktree-list>")
-  ```
-
-- No worktree yet → create one:
-  ```
-  EnterWorktree(name: "<ISSUE-IDENTIFIER>")
-  ```
-
-  This creates `.claude/worktrees/TIM-272/` on a new branch `worktree-TIM-272`.
-  After creation, immediately reset to `battlecontrol/master` so the worktree
-  starts from the team's working master, not the upstream EA base:
-
-  ```bash
-  git fetch battlecontrol
-  git reset --hard battlecontrol/master
-  ```
-
-**3 — Confirm you are on the right branch:**
-
-```bash
-git branch --show-current
-```
-
 ### Working in the worktree
 
-- Commit normally to the issue branch as you go.
-- **Never** commit directly to `master` in the root `_default` worktree while an issue
-  worktree is active.
-- Run builds and tests from inside the worktree — build artifacts are local to the
-  worktree directory, so concurrent agents don't collide.
+- `cd` into the worktree directory and do all work there.
+- Commit as you go. Build and test from inside the worktree — artifacts
+  don't collide with other worktrees.
+- **Never** commit directly to `master` in the root worktree while an
+  issue worktree is active.
 
-### Done workflow (merging back to master via Pull Request)
+### Done: PR + automerge
 
-When the issue is complete, from inside the worktree:
+From inside the worktree:
 
 ```bash
-# 1. Make sure everything is committed
-git status
-
-# 2. Sync with upstream changes
-git fetch battlecontrol
-git rebase battlecontrol/master --autostash
-
-# 3. Push your branch
-git push battlecontrol HEAD
-
-# 4. Open a PR
+git fetch origin
+git rebase origin/master --autostash
+git push origin HEAD
 gh pr create --repo hughobrien/battlecontrol \
-  --title "TIM-{id}: <short description>" \
-  --body "Closes TIM-{id}" \
+  --title "<short description>" \
+  --body "<details>" \
   --base master
-
-# 5. Enable automerge ⚠️ **REQUIRED** — never skip this step
-gh pr merge --auto --merge
+gh pr merge --auto --merge     # ⚠️ required — never skip
 ```
 
 > **Automerge is mandatory.** If CI is green, the PR merges automatically.
-> If CI is red, it waits until CI passes. Never merge manually.
+> If CI is red, it waits. Never merge manually.
 
-Then exit the worktree **keeping** the branch:
+Then exit the worktree keeping the branch:
 
 ```
 ExitWorktree(action: "keep")
 ```
 
-After GitHub merges the PR, clean up from `_default`:
+### Cleanup after merge
+
+From the root worktree:
 
 ```bash
-git pull battlecontrol master
-git worktree remove .claude/worktrees/TIM-{id}
-git branch -d worktree-TIM-{id}
+git pull origin master
+git worktree remove .claude/worktrees/<name>
+git branch -d worktree-<name>
 ```
 
-### Cancellation / abandonment
+### Cancel / abandon
 
 ```bash
-git worktree remove .claude/worktrees/TIM-{id} --force
-git branch -D worktree-TIM-{id}
+git worktree remove .claude/worktrees/<name> --force
+git branch -D worktree-<name>
 ```
 
-### Notes
+### Quick reference
 
-- Worktrees branch from `battlecontrol/master`.
-- Path: `.claude/worktrees/TIM-{id}/` (gitignored).
-- Local branch: `worktree-TIM-{id}`.
-- If `EnterWorktree` is called for a name that already exists, use the `path:` form.
+| Item | Value |
+|------|-------|
+| Remote | `origin` (not `battlecontrol`) |
+| Worktree path | `.claude/worktrees/<name>/` (gitignored) |
+| Local branch | `worktree-<name>` |
+| Base branch | `origin/master` |
+| PR base | `master` |
+| Automerge method | `--merge` |
 
