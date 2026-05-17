@@ -68,11 +68,11 @@ jobs:
 
       - uses: actions/setup-node@v6.4.0
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: Install Playwright and browsers
-        run: npm ci && npx playwright install --with-deps chromium firefox
+        run: pnpm install --frozen-lockfile && pnpx playwright install --with-deps chromium firefox
 
       - name: Build WASM + validate + smoke (ra.wasm, chromium)
         env:
