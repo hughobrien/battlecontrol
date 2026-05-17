@@ -224,7 +224,7 @@ data_verify(dir: "/path/to/data")
 
 ---
 
-## Change Cycle
+## Edit-Compile-Test Loop
 
 The standard loop for an agent working on a fix:
 
@@ -233,13 +233,11 @@ The standard loop for an agent working on a fix:
 2. Build       → native_build(target: "ra")
 3. LP64 audit  → nix run .#lint
 4. Smoke test  → run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
-5. Commit      → git commit -m "short imperative subject"
-6. CI check    → ci_local()  # ⚠️ run full CI locally before pushing
-7. Push        → git push
-8. Automerge   → gh pr merge --auto --merge
+5. CI check    → ci_local()  # ⚠️ run full CI locally before pushing
+6. Commit      → git commit -m "short imperative subject"
 ```
 
-> **Step 6 is mandatory.** Never skip local CI. GitHub CI takes 5–15 minutes;
+> **Step 5 is mandatory.** Never skip local CI. GitHub CI takes 5–15 minutes;
 > `ci_local()` catches the same failures in ~30 seconds.
 
 If the change touches rendering or palette paths, add a parity check:
@@ -247,6 +245,9 @@ If the change touches rendering or palette paths, add a parity check:
 ```
 parity_compare(imageA: "<wine-ref>", imageB: "<wasm-screenshot>", thresholdSsim: 0.90)
 ```
+
+See [Branch and PR Workflow](#branch-and-pr-workflow) below for the push, PR,
+and automerge steps.
 
 ---
 
@@ -474,48 +475,30 @@ moved to `scripts/archive/`.
 | `docs/lp64-audit.md` | LP64 porting hazards and fixes |
 | `docs/smoke-test-design-rule.md` | Assertion design rules for smoke tests |
 | `docs/codec-testing.md` | VQA codec testing methodology |
-| *(below)* | Worktree protocol for concurrent multi-agent development |
+| *(below)* | [Branch and PR Workflow](#branch-and-pr-workflow) |
 
 ---
 
-## Worktree Protocol
+## Branch and PR Workflow
 
-All engineering agents **MUST** work in a per-issue git worktree when making
-changes. This prevents filesystem collisions when multiple agents run
-concurrently and keeps `master` clean.
+All work is done on branches. Never commit directly to `master`.
 
-### Create a worktree
-
-```
-EnterWorktree(name: "<ISSUE-OR-SHORT-DESCRIPTION>")
-```
-
-This creates `.claude/worktrees/<name>/` on a new branch `worktree-<name>`
-and resets it to `origin/master`.
-
-If a worktree for this name already exists, re-enter it with:
-
-```
-EnterWorktree(path: "<absolute-path-from-git-worktree-list>")
-```
-
-Check what exists:
+### Create a branch
 
 ```bash
-git worktree list
+git fetch origin
+git checkout -b <name> origin/master
 ```
 
-### Working in the worktree
+### Work and commit
 
-- `cd` into the worktree directory and do all work there.
-- Commit as you go. Build and test from inside the worktree — artifacts
-  don't collide with other worktrees.
-- **Never** commit directly to `master` in the root worktree while an
-  issue worktree is active.
+```bash
+# Make changes, then:
+git add <files>
+git commit -m "<short imperative subject>"
+```
 
-### Done: PR + automerge
-
-From inside the worktree:
+### Push and PR
 
 ```bash
 git fetch origin
@@ -525,43 +508,22 @@ gh pr create --repo hughobrien/battlecontrol \
   --title "<short description>" \
   --body "<details>" \
   --base master
-gh pr merge --auto --merge     # ⚠️ required — never skip
+```
+
+### Enable automerge (required)
+
+```bash
+gh pr merge --auto --merge
 ```
 
 > **Automerge is mandatory.** If CI is green, the PR merges automatically.
 > If CI is red, it waits. Never merge manually.
 
-Then exit the worktree keeping the branch:
-
-```
-ExitWorktree(action: "keep")
-```
-
 ### Cleanup after merge
-
-From the root worktree:
 
 ```bash
 git pull origin master
-git worktree remove .claude/worktrees/<name>
-git branch -d worktree-<name>
+git branch -d <name>
+git push origin --delete <name>
 ```
-
-### Cancel / abandon
-
-```bash
-git worktree remove .claude/worktrees/<name> --force
-git branch -D worktree-<name>
-```
-
-### Quick reference
-
-| Item | Value |
-|------|-------|
-| Remote | `origin` (not `battlecontrol`) |
-| Worktree path | `.claude/worktrees/<name>/` (gitignored) |
-| Local branch | `worktree-<name>` |
-| Base branch | `origin/master` |
-| PR base | `master` |
-| Automerge method | `--merge` |
 

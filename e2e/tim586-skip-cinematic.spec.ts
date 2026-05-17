@@ -2,7 +2,7 @@
  * TIM-586 — Verify intro VQA cinematics can be skipped on the local WASM
  * build via canvas click or keyboard event.
  *
- * Targets http://localhost:8081 (a fresh build of this worktree). Local MIX
+ * Targets http://localhost:8081 (a fresh local build). Local MIX
  * assets are served from /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1 via
  * Playwright's context.route() interception, same as TIM-579.
  *
