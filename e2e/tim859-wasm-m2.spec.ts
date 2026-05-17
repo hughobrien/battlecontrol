@@ -21,8 +21,8 @@
  *   serve-assets.py on :9090 (RA MIX files from CD1/) or RA_ASSETS_URL
  *
  * ─── Run ───────────────────────────────────────────────────────────────────────
- *   npx playwright test e2e/tim859-wasm-m2.spec.ts
- *   WINE_RA_READY=1 npx playwright test e2e/tim859-wasm-m2.spec.ts
+ *   playwright test e2e/tim859-wasm-m2.spec.ts
+ *   WINE_RA_READY=1 playwright test e2e/tim859-wasm-m2.spec.ts
  */
 
 import { test, expect } from '@playwright/test';

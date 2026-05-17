@@ -237,8 +237,8 @@ for campaign-level screenshot comparison beyond the title/menu state.
 
 After successful capture, run Playwright parity tests:
 ```bash
-WINE_RA_READY=1 npx playwright test e2e/tim699-ra-compare.spec.ts --grep "Tier 3"
-WINE_TD_READY=1 npx playwright test e2e/tim711-td-compare.spec.ts --grep "Tier 3"
+WINE_RA_READY=1 playwright test e2e/tim699-ra-compare.spec.ts --grep "Tier 3"
+WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts --grep "Tier 3"
 ```
 
 ---

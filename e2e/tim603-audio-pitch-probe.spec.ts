@@ -21,7 +21,7 @@
  * Acceptance (TIM-603):
  *   - FAILS on a pre-TIM-602 binary   (dominant ≥ 90 Hz → above threshold).
  *   - PASSES on the post-TIM-602 binary (dominant < 90 Hz → below threshold).
- *   - Runs in the same `npx playwright test` invocation as TIM-601
+ *   - Runs in the same `playwright test` invocation as TIM-601
  *     (same playwright.config.ts at repo root).
  *   - No new servers — reuses serve-coop.py (:8080) + serve-assets.py (:9090).
  *

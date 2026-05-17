@@ -26,7 +26,7 @@
  *   serve-assets.py on :9090 (CD1 MIX files; or RA_ASSETS_URL env var)
  *
  * ─── Run ──────────────────────────────────────────────────────────────────────
- *   RA_ASSETS_URL=http://localhost:9090/ npx playwright test e2e/regression/T10-ra-menu-bleed.spec.ts
+ *   RA_ASSETS_URL=http://localhost:9090/ playwright test e2e/regression/T10-ra-menu-bleed.spec.ts
  *
  * Budget: 900 s — ~8 min for mission_test cycle + transitions.
  */

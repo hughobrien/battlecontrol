@@ -112,7 +112,7 @@ use: {
 # Start Xvfb before tests:
 Xvfb :99 -screen 0 1280x1024x24 &
 sleep 2
-DISPLAY=:99 npx playwright test ...
+DISPLAY=:99 playwright test ...
 ```
 
 **Chrome args for SharedArrayBuffer:**
@@ -193,13 +193,13 @@ Regression tests live in `e2e/regression/`.
 **Running specific tiers:**
 ```bash
 # All e2e tests:
-npx playwright test
+playwright test
 
 # Specific test file:
-npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts
+playwright test e2e/regression/T1-ra-wasm-boot.spec.ts
 
 # Specific test by name pattern:
-npx playwright test --grep "Tier 1"
+playwright test --grep "Tier 1"
 
 # TD gameplay only:
 npm run test:e2e:td
@@ -313,9 +313,9 @@ Before writing any test harness, follow `docs/smoke-test-design-rule.md`:
 | Gate | Command | Expected |
 |------|---------|----------|
 | Server starts | `python3 wasm/serve-coop.py &` | Serves on :8080 |
-| T1 smoke | `npx playwright test e2e/regression/T1-ra-wasm-boot.spec.ts` | Pass |
-| T2 smoke | `npx playwright test e2e/regression/T2-td-wasm-boot.spec.ts` | Pass |
-| Full suite | `npx playwright test` | All passing or correctly skipping |
+| T1 smoke | `playwright test e2e/regression/T1-ra-wasm-boot.spec.ts` | Pass |
+| T2 smoke | `playwright test e2e/regression/T2-td-wasm-boot.spec.ts` | Pass |
+| Full suite | `playwright test` | All passing or correctly skipping |
 
 ---
 

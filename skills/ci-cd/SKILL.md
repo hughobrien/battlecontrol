@@ -213,7 +213,7 @@ subsequent pushes.
 gh run rerun <run-id> --job <job-id>
 
 # Or run a failing test with --repeat-each locally
-npx playwright test --repeat-each 3 e2e/regression/T1-ra-wasm-boot.spec.ts
+playwright test --repeat-each 3 e2e/regression/T1-ra-wasm-boot.spec.ts
 ```
 
 ### Common flakiness patterns

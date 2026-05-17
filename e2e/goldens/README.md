@@ -32,7 +32,7 @@ Goldens must be captured from a **known-good** WASM build and manually reviewed 
 
 3. Run the capture (goldens auto-save to this directory when missing):
    ```
-   RA_ASSETS_URL=http://localhost:9090/ npx playwright test e2e/wasm-gameplay.spec.ts \
+   RA_ASSETS_URL=http://localhost:9090/ playwright test e2e/wasm-gameplay.spec.ts \
      --grep "6 ·" --reporter=line
    ```
 
