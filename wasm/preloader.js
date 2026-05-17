@@ -132,6 +132,36 @@
     if (wrap) wrap.style.display = 'block';
   }
 
+  // TIM-904: show an error message in the overlay and re-enable the retry button.
+  function showPreloaderError(msg) {
+    var errEl = document.getElementById('preloader-error');
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    }
+    var btn = document.getElementById('open-btn');
+    if (btn) btn.disabled = false;
+    var retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) {
+      retryBtn.style.display = 'inline-block';
+      retryBtn.onclick = function () {
+        if (errEl) errEl.style.display = 'none';
+        if (retryBtn) retryBtn.style.display = 'none';
+        var pwrap = document.getElementById('progress-bar-wrap');
+        if (pwrap) pwrap.style.display = 'none';
+        setProgress(0, 0);
+        openGameFolder();
+      };
+    }
+  }
+
+  function clearPreloaderError() {
+    var errEl = document.getElementById('preloader-error');
+    if (errEl) errEl.style.display = 'none';
+    var retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) retryBtn.style.display = 'none';
+  }
+
   // Normalize a base URL: ensure it ends with exactly one slash.
   function normalizeBaseUrl(url) {
     return url.replace(/\/*$/, '/');
@@ -140,6 +170,18 @@
   // S3 / HTTP mode: fetch all MIX files from baseUrl.
   async function fetchFromUrl(baseUrl) {
     var base = normalizeBaseUrl(baseUrl);
+
+    // TIM-904: retry button in S3 mode re-fetches.
+    var retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) {
+      retryBtn.style.display = 'inline-block';
+      retryBtn.onclick = function () {
+        document.getElementById('preloader-error').style.display = 'none';
+        retryBtn.style.display = 'none';
+        setProgress(0, 0);
+        fetchFromUrl(baseUrl);
+      };
+    }
 
     // Hide the local-picker UI; S3 mode starts loading immediately.
     var overlay = document.getElementById('preloader-overlay');
@@ -179,7 +221,7 @@
     }
 
     if (files.size === 0) {
-      setStatus('No MIX files could be fetched from ' + base +
+      showPreloaderError('No MIX files could be fetched from ' + base +
         '. Check the URL and CORS configuration.');
       return;
     }
@@ -217,6 +259,7 @@
   async function openGameFolder() {
     var btn = document.getElementById('open-btn');
     if (btn) btn.disabled = true;
+    clearPreloaderError();
     setStatus('Waiting for folder picker…');
 
     var dirHandle;
@@ -256,7 +299,7 @@
     }
 
     if (files.size === 0) {
-      setStatus('No MIX files found in that folder. Is this the right directory?');
+      showPreloaderError('No MIX files found in that folder. Is this the right directory?');
       if (btn) btn.disabled = false;
       return;
     }

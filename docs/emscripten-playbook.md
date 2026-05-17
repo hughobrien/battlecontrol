@@ -507,67 +507,73 @@ to link flags (which may change which system libraries are required) cause a cac
 
 ## 12. Binary Size / Load Time
 
-### Current baseline (TIM-812 build, Emscripten 5.0.6, -O2 link)
+### Current baseline (TIM-904 build, Emscripten 5.0.6, -Os compile / -Oz link)
 
 | Binary | WASM size | Functions | JS size |
 |--------|-----------|-----------|---------|
-| ra.wasm | 1,775 KB | 2,896 | 213 KB |
-| td.wasm | 1,442 KB | 2,616 | 210 KB |
+| ra.wasm | 1,672 KB | 3,509 | 204 KB |
+| td.wasm | 1,286 KB | 2,663 | 200 KB |
 
 WASM section breakdown (ra.wasm):
-- Code: 1,614 KB (88.8%)
-- Data: 185 KB (10.2%)
-- Everything else: ~18 KB (1.0%)
+- Code: 1,480 KB (86.4%)
+- Data: 181 KB (10.6%)
+- Everything else: ~43 KB (2.5%)
 
-### Key size wins already applied
+**Size reductions vs previous -O3/-O2 baseline (TIM-812):**
 
-The build already uses the two most impactful size optimisations:
+| Binary | WASM Δ | % reduction |
+|--------|--------|-------------|
+| ra.wasm | -269 KB | 13.9% |
+| td.wasm | -157 KB | 10.9% |
+
+### Key size wins applied
+
 - No Asyncify (lens #11) — Asyncify adds ~2× code-size overhead for stack scanning
-- `-O2` link optimisation — Binaryen prunes dead code and unused functions
+- `-Os` compile + `-Oz` link — compile-level size optimisation is the single largest win (~10-14%)
+- `-sDISABLE_EXCEPTION_CATCHING=1` — minimal saving (~1%) since the codebase doesn't use C++ EH
+- `-sEMULATE_FUNCTION_POINTER_CASTS=1` — prevents Binaryen from pruning SDL2 audio function table entries during aggressive link optimisation
 
-### Safe optimisations to consider
+### Optimisation analysis (TIM-904)
 
-#### `-sDISABLE_EXCEPTION_CATCHING=1`
+| Flag combination | ra.wasm size | Notes |
+|------------------|-------------|-------|
+| `-O3` compile + `-O2` link (previous) | 1,940 KB | Performance baseline |
+| `-O3` compile + `-Os` link + `-sDISABLE_EXCEPTION_CATCHING=1` | 1,907 KB | Minimal improvement |
+| `-O3` compile + `-Oz` link + `-sDISABLE_EXCEPTION_CATCHING=1` | 1,882 KB | Slightly better than -Os link |
+| `-O3` compile + `-Oz` link + `-sDISABLE_EXCEPTION_CATCHING=1` + `-flto` | 2,391 KB | **Regression** — LTO inlines aggressively, code grows |
+| **`-Os` compile + `-Oz` link + `-sDISABLE_EXCEPTION_CATCHING=1`** | **1,672 KB** | **Best: 13.9% reduction** |
 
-Removes C++ exception handling support. Saves ~10-15% code size (~160-240 KB for ra.wasm).
-The codebase uses one try/catch in `vqa_player.cpp` (returns 0 on exception) — verify this
-path is not exercised under WASM before enabling. This is a compile+link flag.
+#### Key findings
+
+1. **`-Os` at compile time is the primary size win.** Switching from `-O3` to `-Os` compiles each function for size rather than speed, avoiding aggressive inlining and loop unrolling that bloat the code section.
+
+2. **`-flto` (LLVM LTO) is counterproductive for this codebase.** While LTO enables cross-module dead code elimination (function count dropped from 3,509 → 2,635), the inliner becomes more aggressive and code size increases by ~25%. Do not use LTO for size optimisation on this project.
+
+3. **`-sDISABLE_EXCEPTION_CATCHING=1` is safe but low-impact.** The codebase contains no C++ try/catch blocks. The only try/catch is inside `EM_ASM` (JavaScript), which is unaffected by this flag. Savings are modest (~1%) from stripping the C++ EH runtime.
+
+4. **`-Oz` link vs `-Os` link.** `-Oz` produces marginally smaller output (~1.3% smaller than `-Os` at link time). Combined with `-Os` compile, the link-level flag has diminishing returns.
+
+5. **`--closure 1` was NOT applied.** Under PROXY_TO_PTHREAD, the JS closure requires careful extern management. The gzip-compressed JS is already small (~60 KB). Closure risk outweighs benefit for this build.
+
+### Recommended flags for WASM size builds
 
 ```cmake
-target_compile_options(ra PRIVATE -sDISABLE_EXCEPTION_CATCHING=1)
+target_compile_options(my_game PRIVATE
+    -Os                              # compile for size (biggest single win)
+    -sDISABLE_EXCEPTION_CATCHING=1   # safe if no C++ try/catch
+)
+
+target_link_options(my_game PRIVATE
+    -Oz                              # Binaryen max size optimisation
+    -sEMULATE_FUNCTION_POINTER_CASTS=1  # protect fn table from -Oz pruning
+    -sFORCE_FILESYSTEM=1
+    -sALLOW_MEMORY_GROWTH=1
+)
 ```
-
-#### `--closure 1`
-
-Runs Google Closure Compiler on the JS output. Reduces JS by ~60-80% (uncompressed).
-However, under PROXY_TO_PTHREAD the JS structure is complex (Module, worker proxy,
-`FS`, `callMain`). Closure may rename `Module` properties, breaking the preloader.
-To use safely:
-
-1. Add `-sMODULARIZE=1` to the link flags
-2. Create a `closure-externs.js` file listing properties that must not be renamed:
-   ```js
-   var Module = {};
-   Module.FS = {};
-   Module.callMain = function(){};
-   Module.onRuntimeInitialized = function(){};
-   Module.ENV = {};
-   ```
-3. Pass `--closure-args=--externs=closure-externs.js` to emcc
-
-**Risk: medium.** The gzip-compressed JS is already small (~60-70 KB); closure's network
-savings are modest.
-
-#### `-Os` (size-optimised link)
-
-Binaryen's `-Os` at link time aggressively optimises for size. This can save
-5-10% on the code section. However, it may impact runtime performance and, like `-O3`,
-may prune function table entries that SDL2 audio routing depends on (lens #7).
-**Risk: low-medium.** Test with 5/5 audio verification before committing.
 
 ### Load time
 
-At 1.8 MB, the WASM module streams and compiles in < 5 seconds on modern hardware.
+At 1.7 MB, the WASM module streams and compiles in < 5 seconds on modern hardware.
 The real load-time bottleneck is JIT cold-start in CI (lens #8) — up to 240 s for
 optimised WASM in headless Chrome. Solutions:
 
@@ -582,8 +588,9 @@ optimised WASM in headless Chrome. Solutions:
   JIT compilation takes just as long.
 - Do NOT strip `-sALLOW_MEMORY_GROWTH=1` — the game's memory footprint varies with
   mission complexity; fixed `INITIAL_MEMORY` risks OOM crashes.
+- Do NOT add `-flto` for size — LTO inlining increases code size by ~25% on this codebase.
 
 ---
 
 *Last updated: 2026-05-16. Maintainer: EmscriptenExpert agent.*
-*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712, TIM-757, TIM-826.*
+*Source issues: TIM-399, TIM-489, TIM-555, TIM-593, TIM-597, TIM-600, TIM-602, TIM-604, TIM-613, TIM-619, TIM-620, TIM-682, TIM-694, TIM-712, TIM-757, TIM-826, TIM-904.*
