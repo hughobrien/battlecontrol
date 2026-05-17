@@ -2,9 +2,9 @@
 # TIM-869 — Drive C&C95.EXE into GDI Mission 2 under headless Wine and
 # capture mission-start + frame-500 reference screenshots.
 #
-# Approach: td-scenario-patch.py replaces the "SC%c%02d%c%c.INI" format string
+# How: td-scenario-patch.py replaces the "SC%c%02d%c%c.INI" format string
 # at 0xdb375 with fixed "SCG02EA.INI" so Set_Scenario_Name always loads GDI M2.
-# IsFromInstall=true + side-select GDI + VQA-skipped briefing = direct mission entry.
+# IsFromInstall=true + side-select GDI + VQA-skipped briefing = direct entry.
 #
 # Outputs in $ARTIFACT_DIR (default: e2e/tim869/gdi-m2/):
 #   mission-start.png, frame-500.png, wine.log, xvfb.log, openbox.log
