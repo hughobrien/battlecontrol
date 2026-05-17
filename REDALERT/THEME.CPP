@@ -303,6 +303,7 @@ void ThemeClass::Queue_Song(ThemeType theme)
 	**	If the pending theme is available to be set and the specified theme is valid, then
 	**	set the queued theme accordingly.
 	*/
+	fprintf(stderr, "[RA Theme] Queue_Song theme=%d (%d)\n", (int)theme, (int)Score);
 	if (Pending == THEME_NONE || Pending == THEME_PICK_ANOTHER || theme == THEME_NONE || theme == THEME_QUIET) {
 		Pending = theme;
 		if (Still_Playing()) {
@@ -334,6 +335,7 @@ int ThemeClass::Play_Song(ThemeType theme)
 		Stop();
 		Score = theme;
 		if (theme != THEME_NONE && theme != THEME_QUIET) {
+			fprintf(stderr, "[RA Theme] Play_Song theme=%d name=%s\n", (int)theme, _themes[theme].Name);
 			//PG StreamLowImpact = true;
 			Current = File_Stream_Sample_Vol(Theme_File_Name(theme), 0xFF, true);
 			//PG StreamLowImpact = false;
