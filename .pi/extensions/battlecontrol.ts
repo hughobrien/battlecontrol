@@ -81,24 +81,55 @@ function hasTool(tool: string): boolean {
   }
 }
 
+/**
+ * Auto-wrap a command in `nix develop` if not already inside a nix dev shell.
+ * This ensures all tool commands run in the project's Nix environment.
+ */
+function nixWrap(cmd: string, args: string[]): { cmd: string; args: string[] } {
+  if (process.env.IN_NIX_SHELL || !hasTool("nix")) {
+    return { cmd, args };
+  }
+  return {
+    cmd: "nix",
+    args: [
+      "develop",
+      "--extra-experimental-features", "nix-command flakes",
+      "--command",
+      cmd,
+      ...args,
+    ],
+  };
+}
+
+/** Strip the nix develop banner from stderr output (printed on first load). */
+const NIX_BANNER_RE = /^(warning:.*\n)?[A-Z].*?— dev shell\n\nWorkflows \(from repo root\):[\s\S]*?Quick start:[\s\S]*?\n\n?/m;
+function stripNixBanner(text: string): string {
+  return text.replace(NIX_BANNER_RE, "");
+}
+
 /** Run a command and return { stdout, stderr, exitCode }. */
 function run(
   cmd: string,
   args: string[],
   options?: { cwd?: string; timeout?: number }
 ): { stdout: string; stderr: string; exitCode: number } {
+  const wrapped = nixWrap(cmd, args);
   try {
-    const out = execSync(`${cmd} ${args.map(a => `'${a}'`).join(" ")}`, {
+    const out = execSync(`${wrapped.cmd} ${wrapped.args.map(a => `'${a}'`).join(" ")}`, {
       cwd: options?.cwd ?? REPO_ROOT,
       timeout: options?.timeout ?? 600_000,
       stdio: ["ignore", "pipe", "pipe"],
       encoding: "utf-8",
     });
-    return { stdout: out.stdout ?? "", stderr: out.stderr ?? "", exitCode: 0 };
+    return {
+      stdout: out.stdout ?? "",
+      stderr: stripNixBanner(out.stderr ?? ""),
+      exitCode: 0,
+    };
   } catch (e: any) {
     return {
       stdout: e.stdout?.toString() ?? "",
-      stderr: e.stderr?.toString() ?? "",
+      stderr: stripNixBanner(e.stderr?.toString() ?? ""),
       exitCode: e.status ?? 1,
     };
   }
@@ -187,7 +218,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "wasm_build",
     label: "WASM Build",
-    description: "Build one or both WASM targets (ra, td) using Emscripten. Requires emcmake in PATH (nix develop).",
+    description: "Build one or both WASM targets (ra, td) using Emscripten. Auto-wraps in nix develop if needed.",
     promptSnippet: "Build the Red Alert and/or Tiberian Dawn WASM targets with emcmake/cmake",
     promptGuidelines: [
       "Use wasm_build to compile C++ sources into WASM before running screenshots or tests",
@@ -208,7 +239,7 @@ export default function (pi: ExtensionAPI) {
 
       if (!hasTool("emcmake")) {
         return {
-          content: [{ type: "text", text: "❌ `emcmake` not found in PATH. Run `nix develop` first to enter the dev shell with Emscripten tools." }],
+          content: [{ type: "text", text: "❌ `emcmake` not found in PATH (tried via nix develop). Install Emscripten or check nix flake." }],
           isError: true,
         };
       }
@@ -653,7 +684,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "toolchain_check",
     label: "Toolchain Check",
-    description: "Verify that the native build toolchain (clang++, cmake, ninja, SDL2, etc.) is installed and meets version requirements.",
+    description: "Verify that the native build toolchain (clang++, cmake, ninja, SDL2, etc.) is installed and meets version requirements. Auto-wraps in nix develop if needed.",
     promptSnippet: "Check that Clang, CMake, Ninja, SDL2, and Python are all present for native builds",
     promptGuidelines: [
       "Use toolchain_check before attempting a native build to catch missing dependencies early",
@@ -1158,10 +1189,22 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
       if (flag) args.push(flag);
       const result = run("bash", args, { timeout: 600_000 });
 
+      // Strip the nix banner from stdout (ci-local.sh re-execs via nix develop)
+      const nixBannerEnd = result.stdout.indexOf("=== CI-Local ===");
+      const cleanStdout = nixBannerEnd >= 0 ? result.stdout.slice(nixBannerEnd) : result.stdout;
+
+      // Filter stderr: only show non-banner lines (ignore nix build log noise)
+      const cleanStderr = result.stderr
+        .split("\n")
+        .filter(l => !l.includes("Git tree") && !l.includes("C&C Red Alert") && !l.includes("Workflows"))
+        .join("\n")
+        .trim();
+
       if (result.exitCode === 0) {
-        return { content: [{ type: "text", text: `✅ Local CI passed (${mode})\n${result.stdout}` }] };
+        return { content: [{ type: "text", text: `✅ Local CI passed (${mode})\n${cleanStdout}` }] };
       } else {
-        return { content: [{ type: "text", text: `❌ Local CI failed (exit ${result.exitCode}):\n${result.stderr || result.stdout}` }], isError: true };
+        const extra = cleanStderr ? `\n(stderr: ${cleanStderr})` : "";
+        return { content: [{ type: "text", text: `❌ Local CI failed (exit ${result.exitCode}):\n${cleanStdout}${extra}` }], isError: true };
       }
     },
   });
