@@ -5,6 +5,7 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
+        "narHash": "sha256-7TaLAYgh8By5JItNMMAi3A4BTwOnfc+Ps7GlcuepHQA=",
         "path": "./tools/cnc-ddraw",
         "type": "path"
       },
@@ -74,6 +75,7 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
+        "narHash": "sha256-En252qwcPsxoFqSHKdKyKVr3xPONXslljPQP5WP10fE=",
         "path": "./tools/wine-input",
         "type": "path"
       },

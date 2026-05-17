@@ -35,11 +35,6 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Configure ccache
-        run: |
-          ccache --zero-stats
-          ccache --max-size 500M
-
       - name: Cache ccache
         uses: actions/cache@v4
         with:
@@ -52,14 +47,12 @@ jobs:
         run: |
           nix develop --command bash -c "
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
+            ccache --zero-stats
+            ccache --max-size 500M
             nix run .#ci-build-native
-          "
-
-      - name: ccache stats
-        run: |
-          echo "### ccache hit rate" >> "$GITHUB_STEP_SUMMARY"
-          ccache --show-stats >> "$GITHUB_STEP_SUMMARY"
-          ccache --show-stats
+            echo "### ccache hit rate" >> "$GITHUB_STEP_SUMMARY"
+            ccache --show-stats >> "$GITHUB_STEP_SUMMARY"
+            ccache --show-stats
 
   vqa-pixel-diff:
     name: VQA codec pixel-diff
