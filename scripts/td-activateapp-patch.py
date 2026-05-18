@@ -101,7 +101,8 @@ if __name__ == "__main__":
     dry_run = "--dry-run" in sys.argv
     paths = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not paths:
-        paths = ["/opt/tiberiandawn/C&C95.EXE"]
+        print(f"Usage: {__file__} <exe-path> [exe-path ...]", file=sys.stderr)
+        sys.exit(1)
     rc = 0
     for p in paths:
         try:
