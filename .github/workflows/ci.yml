@@ -1,6 +1,6 @@
 # CI — thin wrapper around flake apps.
-# Local equivalent: nix run .#ci-build-native
-#                   nix run .#ci-vqa
+# Local equivalent: nix run .#build-native
+#                   nix run .#vqa-check
 #                   nix run .#ci-build-wasm
 #                   nix run .#ci-clang-tidy
 
@@ -49,7 +49,7 @@ jobs:
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
             ccache --zero-stats
             ccache --max-size 500M
-            nix run .#ci-build-native
+            nix run .#build-native
             echo '### ccache hit rate' >> \"$GITHUB_STEP_SUMMARY\"
             ccache --show-stats >> \"$GITHUB_STEP_SUMMARY\"
             ccache --show-stats
@@ -70,7 +70,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ffmpeg
 
       - name: Run VQA pixel-diff
-        run: nix develop --command nix run .#ci-vqa
+        run: nix develop --command nix run .#vqa-check
 
   wine-comparison:
     name: Wine OG comparison
@@ -190,7 +190,7 @@ jobs:
             echo "::notice::T3 skipped — TD_ASSETS_URL secret not set"
             exit 0
           fi
-          nix develop --command nix run .#ci-run-test -- e2e/regression/T3-td-wasm-menu.spec.ts
+          nix develop --command nix run .#test -- e2e/regression/T3-td-wasm-menu.spec.ts
 
       - name: Upload T3 artifacts on failure
         if: failure()
@@ -207,7 +207,7 @@ jobs:
             echo "::notice::T6 skipped — TD_ASSETS_URL secret not set"
             exit 0
           fi
-          nix develop --command nix run .#ci-run-test -- e2e/regression/T6-td-wasm-mission-start.spec.ts
+          nix develop --command nix run .#test -- e2e/regression/T6-td-wasm-mission-start.spec.ts
 
       - name: Upload T6 artifacts on failure
         if: failure()
@@ -224,7 +224,7 @@ jobs:
             echo "::notice::T7 skipped — TD_ASSETS_URL secret not set"
             exit 0
           fi
-          nix develop --command nix run .#ci-run-test -- e2e/regression/T7-td-audio-pitch.spec.ts
+          nix develop --command nix run .#test -- e2e/regression/T7-td-audio-pitch.spec.ts
 
       - name: Upload T7 artifacts on failure
         if: failure()
@@ -241,7 +241,7 @@ jobs:
             echo "::notice::T8 skipped — RA_ASSETS_URL not set"
             exit 0
           fi
-          nix develop --command nix run .#ci-run-test -- e2e/regression/T8-ra-audio-pitch.spec.ts
+          nix develop --command nix run .#test -- e2e/regression/T8-ra-audio-pitch.spec.ts
 
       - name: Upload T8 artifacts on failure
         if: failure()
@@ -258,7 +258,7 @@ jobs:
             echo "::notice::T9 skipped — RA_ASSETS_URL not set"
             exit 0
           fi
-          nix develop --command nix run .#ci-run-test -- e2e/regression/T9-ra-wasm-mission-start.spec.ts
+          nix develop --command nix run .#test -- e2e/regression/T9-ra-wasm-mission-start.spec.ts
 
       - name: Upload T9 artifacts on failure
         if: failure()

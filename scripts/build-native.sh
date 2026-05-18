@@ -35,6 +35,17 @@ if [[ "$TARGET" == "all" || "$TARGET" == "td" ]]; then
 	cmake --build build --target td --parallel
 fi
 
+# Validate ELF 64-bit for all built targets
+echo ""
+echo "=== Validating binaries ==="
+for bin in ra td; do
+	if [[ -f "build/$bin" ]]; then
+		if file "build/$bin" 2>/dev/null | grep -q "ELF 64-bit"; then
+			echo "$bin: $(stat -c%s "build/$bin") bytes, ELF 64-bit ✓"
+		else
+			echo "ERROR: $bin: not ELF 64-bit" >&2
+			exit 1
+		fi
+	fi
+done
 echo "=== Build complete ==="
-echo "RA binary: $(find build -name ra -type f 2>/dev/null | head -1 || echo 'not found in build/')"
-echo "TD binary: $(find build -name td -type f 2>/dev/null | head -1 || echo 'not found in build/')"
