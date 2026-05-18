@@ -74,6 +74,7 @@ cat >"$STAGE/ddraw.ini" <<'INI'
 renderer=gdi
 windowed=true
 hook=0
+maxfps=30
 INI
 
 # Wine prefix

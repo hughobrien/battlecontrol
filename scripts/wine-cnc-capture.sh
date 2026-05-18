@@ -79,6 +79,7 @@ windowed=true
 no_compat_warning=true
 fake_mode=640x400x8
 renderer=gdi
+maxfps=30
 EOF
 
 # ─── Wine prefix ────────────────────────────────────────────────────────────
