@@ -20,11 +20,11 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | Run T1 (RA boot) | — | `test-t1` | `scripts/run-e2e.sh` | `ci.yml → build-wasm` | — |
 | Run T2 (TD boot) | — | `test-t2` | `scripts/run-e2e.sh` | `ci.yml → build-wasm` | — |
 | CI gate (local) | `ci_local` | `ci` | `scripts/ci-local.sh` | — | — |
-| CI native build | — | `ci-build-native` | inline (flake.nix) | `ci.yml → build` | — |
+| CI native build | — | `build-native` | `scripts/build-native.sh` | `ci.yml → build` | — |
 | CI WASM build+smoke | — | `ci-build-wasm` | inline (flake.nix) | `ci.yml → build-wasm` | — |
 | CI WASM smoke | — | `ci-wasm-smoke` | inline (flake.nix) | called by ci-build-wasm | — |
-| CI run test | — | `ci-run-test` | inline (flake.nix) | `ci.yml → build-wasm` (T3/T6/T7/T8/T9) | — |
-| CI VQA pixel-diff | — | `ci-vqa` | inline (flake.nix) | `ci.yml → vqa-pixel-diff` | — |
+| CI test run | — | `test` | `scripts/run-e2e.sh` | `ci.yml → build-wasm` (T3/T6/T7/T8/T9) | — |
+| CI VQA pixel-diff | — | `vqa-check` | `scripts/vqa-check.sh` | `ci.yml → vqa-pixel-diff` | — |
 | CI ccache setup | — | `ci-cc-setup` | inline (flake.nix) | `gh-pages.yml` | — |
 | CI clang-tidy | — | `ci-clang-tidy` | inline (flake.nix) | `ci.yml → clang-tidy` | — |
 | CI cppcheck | — | `ci-cppcheck` | inline (flake.nix) | `ci.yml → cppcheck` | — |
@@ -101,11 +101,11 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | Local CI | `nix run .#ci [--wasm-only\|--native-only]` | Run all local CI gates (native build, LP64, WASM, VQA, /opt audit). |
 | | `ci_local(mode)` | Same, via extension tool. |
 | | `scripts/ci-local.sh [--wasm-only\|--native-only]` | Same, directly. |
-| CI native build | `nix run .#ci-build-native` | Native build + ELF 64-bit validation (for CI). |
+| CI native build | `nix run .#build-native` | Native build with integrated ELF 64-bit validation. |
 | CI WASM build | `nix run .#ci-build-wasm` | WASM build + validate + smoke T1+T2 (for CI). |
 | CI WASM smoke | `nix run .#ci-wasm-smoke` | Xvfb + serve-coop + T1+T2 Playwright tests. |
-| CI run test | `nix run .#ci-run-test -- <spec>` | Run one Playwright spec under Xvfb + WASM (for asset-gated tests). |
-| CI VQA | `nix run .#ci-vqa` | Generate test VQA + pixel-diff (for CI). |
+| CI test run | `nix run .#test -- <spec>` | Run one Playwright spec under Xvfb + WASM (for asset-gated tests). |
+| CI VQA | `nix run .#vqa-check` | Generate test VQA + pixel-diff (for CI). |
 | CI ccache setup | `nix run .#ci-cc-setup` | `ccache --zero-stats --max-size 500M`. |
 | CI clang-tidy | `nix run .#ci-clang-tidy` | Run clang-tidy static analysis. |
 | CI cppcheck | `nix run .#ci-cppcheck` | Run cppcheck static analysis. |
@@ -270,15 +270,15 @@ Every executable entry point, listed A–Z with its surface(s).
 | `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
 | `toolchain-check` | nix app | Lint | Toolchain prerequisite check. |
 | `ci` | nix app | CI | Run all local CI gates. |
-| `ci-build-native` | nix app | CI | CI native build + ELF validation. |
+| `ci-build-native` | nix app | CI | Removed — merged into `build-native`. |
 | `ci-build-wasm` | nix app | CI | CI WASM build + validate + smoke. |
 | `ci-cc-setup` | nix app | CI | Configure ccache for CI. |
 | `ci-clang-tidy` | nix app | CI | CI clang-tidy static analysis. |
 | `ci-cppcheck` | nix app | CI | CI cppcheck static analysis. |
 | `ci_local` | extension tool | CI | Run all local CI gates. |
 | `ci-local.sh` | script | CI | Run all local CI gates. |
-| `ci-run-test` | nix app | CI | Run e2e test under Xvfb+WASM (for CI). |
-| `ci-vqa` | nix app | CI | CI VQA pixel-diff gate. |
+| `ci-run-test` | nix app | CI | Removed — use `test` instead. |
+| `ci-vqa` | nix app | CI | Removed — use `vqa-check` instead. |
 | `ci-wasm-smoke` | nix app | CI | CI WASM smoke tests T1+T2. |
 | `cinematic-compare.py` | script | Parity | VQA batch comparison against ffmpeg. |
 | `parity-compare` | nix app | Parity | SSIM compare two images. |
@@ -443,11 +443,9 @@ Actions that have multiple invocation paths (candidates for consolidation):
 
 | CI-specific Nix App | General Equivalent | Recommendation |
 |--------------------|-------------------|----------------|
-| `ci-build-native` | `build-native` | Remove. CI calls `build-native` directly. |
-| `ci-build-wasm` | `build-wasm` | Remove. CI calls `build-wasm` directly. |
-| `ci-vqa` | `vqa-check` | Remove. CI calls `vqa-check` directly. |
-| `ci-wasm-smoke` | — | Keep (composite of build-wasm + validate-wasm + test-t1 + test-t2). |
-| `ci-run-test` | `test` | Remove. CI calls `test` directly. |
+| ~~`ci-build-native`~~ | `build-native` | ✅ Merged — just another target, ELF validation is always on. |
+| ~~`ci-vqa`~~ | `vqa-check` | ✅ Merged — CI calls `vqa-check` directly. |
+| ~~`ci-run-test`~~ | `test` | ✅ Merged — CI calls `test` directly. |
 | `ci-cc-setup` | — | Keep (ccache config is CI-specific). |
 | `ci-clang-tidy` | — | Keep (CI-specific static analysis). |
 | `ci-cppcheck` | — | Keep (CI-specific static analysis). |

@@ -397,7 +397,6 @@
           echo "  nix run .#test -- <spec>     run an e2e test"
           echo "  nix run .#capture-wine       Wine OG baseline capture"
           echo "  nix run .#ci-cc-setup        configure ccache (zero stats, max size)"
-          echo "  nix run .#ci-run-test -- <spec>  run an e2e test under Xvfb+WASM"
           echo "  nix run .#capture-native     Native Linux gameplay capture"
           echo "  nix run .#vqa-check          VQA pixel-diff gate"
           echo "  nix run .#vqa-golden         Generate golden frames from VQA"
@@ -411,9 +410,8 @@
           echo "  nix run .#wasm-loop   — build→validate→smoke (WASM)"
           echo "  nix run .#test-t1     — T1 RA boot smoke"
           echo "  nix run .#test-t2     — T2 TD boot smoke"
+          echo "  nix run .#test -- <spec>     run e2e test under Xvfb+WASM"
           echo "  nix run .#ci                 all local CI gates"
-          echo "  nix run .#ci-build-native     CI: native build (gcc/clang)"
-          echo "  nix run .#ci-vqa              CI: VQA pixel-diff gate"
           echo "  nix run .#ci-build-wasm       CI: WASM build + validate + smoke"
           echo "  nix run .#ci-clang-tidy       CI: clang-tidy static analysis"
           echo "  nix run .#ci-cppcheck         CI: cppcheck static analysis"
@@ -757,48 +755,9 @@
 
         # ── CI Job Apps ────────────────────────────────────────────────────
         # These reproduce the GitHub Actions CI jobs.  Run locally with:
-        #   nix run .#ci-build-native -- <gcc|clang>
-        #   nix run .#ci-vqa
-        #   nix run .#ci-wasm-smoke
-        #
         # The GitHub Actions workflows in .github/workflows/ call these same
         # apps, making CI identical to local and trivially reproducible.
         # ------------------------------------------------------------------
-
-        ci-build-native = mkApp "ci-build-native" ''
-          set -e
-          export CC=clang CXX=clang++
-          cmake --preset linux-native
-          cmake --build build --target ra --parallel
-          cmake --build build --target td --parallel
-          for bin in ra td; do
-            path="build/$bin"
-            if ! file "$path" 2>/dev/null | grep -q "ELF 64-bit"; then
-              echo "ERROR: $bin: invalid or missing at $path"
-              exit 1
-            fi
-            echo "$bin: $(stat -c%s "$path") bytes, ELF 64-bit"
-          done
-        '';
-
-        ci-vqa = mkApp "ci-vqa-pixel-diff" ''
-          set -e
-          python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa.new
-          diff -q e2e/goldens/vqa/test.vqa e2e/goldens/vqa/test.vqa.new || {
-            echo "ERROR: committed test.vqa differs from generator output"
-            echo "Run: python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa"
-            exit 1
-          }
-          rm e2e/goldens/vqa/test.vqa.new
-          python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa \
-            --frames 0,1,2 --threshold 5
-          if [ -f "build/run-172/MAIN.MIX" ]; then
-            python3 scripts/vqa-pixel-diff.py build/run-172/MAIN.MIX \
-              --frames 0,29,59 --threshold 5 --quiet
-          else
-            echo "SKIP: game VQA data absent"
-          fi
-        '';
 
         ci-wasm-smoke = mkApp "ci-wasm-smoke" ''
           set -e
@@ -834,25 +793,6 @@
               print(name + ': ' + str(size // 1024) + ' KB OK')
           "
                     nix run .#ci-wasm-smoke
-        '';
-
-        # Run a single Playwright e2e test under Xvfb with the WASM server.
-        # Usage: nix run .#ci-run-test -- e2e/regression/T3-td-wasm-menu.spec.ts
-        ci-run-test = mkApp "ci-run-test" ''
-          set -e
-          SPEC="''${1:?usage: nix run .#ci-run-test -- <spec-path>}"
-          shift
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py 8080 build-wasm &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 playwright test "$SPEC" "$@"
-          EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $EXIT
         '';
 
         ci-cc-setup = mkApp "ci-cc-setup" ''
