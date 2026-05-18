@@ -83,16 +83,17 @@ multi-step command sequences. Each script handles setup, teardown, and error rec
 
 | Script | Purpose | Referenced by |
 |--------|---------|---------------|
-| `scripts/toolchain-check.sh` | One-command toolchain prerequisite gate | native-build |
-| `scripts/wine-check.sh` | One-command Wine prerequisite gate | wine-testing |
 | `scripts/xvfb-ensure.sh` | Idempotent Xvfb start (kills stale, wait loop, EXIT trap) | native-build, e2e-testing, parity-comparison, ci-cd |
 | `scripts/serve-wasm.sh` | Start serve-coop.py with auto-cleanup EXIT trap | e2e-testing, ci-cd |
 | `scripts/run-e2e.sh` | Full E2E: Xvfb + server + Playwright test + cleanup | e2e-testing, ci-cd |
 | `scripts/build-native.sh` | Single-cmd cmake configure + build RA + build TD | native-build, ci-cd |
+| `scripts/lint.sh` | All linters (LP64, clang-tidy, cppcheck, ruff, shellcheck, yamllint, nixfmt, /opt audit) | all skills |
+| `scripts/build.sh` | Diff-gated build orchestrator (calls lint.sh first) | all skills |
+| `scripts/smoke.sh` | Build + CI-tier boot tests | all skills |
+| `scripts/test.sh` | Build + full regression | all skills |
+| `scripts/test-runner.sh` | Unified backend for all {game}-{platform}-test apps | e2e-testing |
  | `scripts/vqa-decode.py` | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg) | vqa-codec |
  | `scripts/vqa-compare.py` | Compare two VQA decode output dirs | vqa-codec |
-| `scripts/ci-wasm-smoke.sh` | Full WASM CI: emcmake, build, validate, T1+T2 smoke | ci-cd |
-| `scripts/ci-local.sh` | Local CI: run all available gates with one command, auto-skip missing deps | all skills |
 | `scripts/check-gha-versions.sh` | Scan workflow files for stale action versions | gha-updater |
 | `scripts/generate-include-shim.py` | Case-folding include symlink generator | native-build |
 
