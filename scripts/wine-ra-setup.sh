@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TIM-699 — One-shot setup: install wine32 + download RA95.EXE from archive.org.
+# TIM-699 — One-shot RA setup: download RA95.EXE + DLLs from archive.org.
 #
 # Fetches RA95.EXE and its required DLLs from the Allied CD ISO hosted at
 # archive.org.  Uses HTTP range requests so only the relevant sectors are
@@ -17,32 +17,22 @@
 #
 # After this runs, verify with:
 #   bash scripts/wine-ra.sh
+#
+# Prerequisites:
+#   Wine (from nix develop shell or system)
+#   i686-w64-mingw32-gcc for stub THIPX32.DLL (in nix develop shell)
 
 set -euo pipefail
 
 ISO_URL="https://archive.org/download/cnc-red-alert/redalert_allied.iso"
 OUT_DIR="/opt/redalert"
 
-echo "=== TIM-699 Wine + RA95.EXE setup ==="
+echo "=== TIM-699 RA95.EXE + DLL download ==="
 echo ""
 
-# ─── 1. wine32 ───────────────────────────────────────────────────────────────
+# ─── 1. RA95.EXE ─────────────────────────────────────────────────────────────
 
-echo "=== Step 1: Install wine32 (32-bit support) ==="
-if wine --version 2>&1 | grep -q "wine32 is missing"; then
-	echo "  Installing wine32:i386..."
-	sudo dpkg --add-architecture i386
-	sudo apt-get update -qq
-	sudo apt-get install -y wine32:i386
-	echo "  wine32 installed."
-else
-	echo "  wine32 already available: $(wine --version)"
-fi
-echo ""
-
-# ─── 2. RA95.EXE ─────────────────────────────────────────────────────────────
-
-echo "=== Step 2: Download RA95.EXE from archive.org ISO ==="
+echo "=== Step 1: Download RA95.EXE from archive.org ISO ==="
 sudo mkdir -p "$OUT_DIR"
 sudo chmod 777 "$OUT_DIR"
 

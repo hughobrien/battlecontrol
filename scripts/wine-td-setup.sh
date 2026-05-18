@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TIM-711 — One-shot setup: install wine32 + extract C&C95.EXE + THIPX32.DLL
+# TIM-711 — One-shot setup: extract C&C95.EXE + THIPX32.DLL
 #           from archive.org, then apply Wine-compatibility patch.
 #
 # C&C95.EXE is the Win95 C&C Tiberian Dawn game binary.  It is extracted from
@@ -69,26 +69,12 @@ CC95_DDSCL_PATCH_OFFSET=0xbc6af # byte position of 0x11 in SetCooperativeLevel c
 CC95_DDSCL_ORIG=0x11            # DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN
 CC95_DDSCL_PATCHED=0x08         # DDSCL_NORMAL
 
-echo "=== TIM-711 Wine + C&C95.EXE setup ==="
+echo "=== TIM-711 C&C95.EXE + THIPX32.DLL setup ==="
 echo ""
 
-# ─── 1. wine32 ───────────────────────────────────────────────────────────────
+# ─── 1. Output directory ─────────────────────────────────────────────────────
 
-echo "=== Step 1: Install wine32 (32-bit support) ==="
-if wine --version 2>&1 | grep -q "wine32 is missing"; then
-	echo "  Installing wine32:i386..."
-	sudo dpkg --add-architecture i386
-	sudo apt-get update -qq
-	sudo apt-get install -y wine32:i386
-	echo "  wine32 installed."
-else
-	echo "  wine32 already available: $(wine --version)"
-fi
-echo ""
-
-# ─── 2. Output directory ─────────────────────────────────────────────────────
-
-echo "=== Step 2: Prepare output directory ==="
+echo "=== Step 1: Prepare output directory ==="
 sudo mkdir -p "$OUT_DIR"
 sudo chmod 777 "$OUT_DIR"
 echo "  Output: $OUT_DIR"
@@ -96,7 +82,7 @@ echo ""
 
 # ─── 3. Extract C&C95.EXE from ZIP via HTTP range + Python zlib ──────────────
 
-echo "=== Step 3: Download and decompress C&C95.EXE from archive.org ==="
+echo "=== Step 2: Download and decompress C&C95.EXE from archive.org ==="
 CC95="$OUT_DIR/C&C95.EXE"
 
 if [[ -f "$CC95" ]]; then
@@ -156,7 +142,7 @@ echo ""
 
 # ─── 4. Extract THIPX32.DLL from the same ZIP ────────────────────────────────
 
-echo "=== Step 4: Download and decompress THIPX32.DLL from archive.org ==="
+echo "=== Step 3: Download and decompress THIPX32.DLL from archive.org ==="
 THIPX="$OUT_DIR/THIPX32.DLL"
 
 if [[ -f "$THIPX" ]]; then
@@ -212,7 +198,7 @@ echo ""
 
 # ─── 5. Apply Wine-compatibility DDSCL patch to C&C95.EXE ───────────────────
 
-echo "=== Step 5: Apply Wine-compatibility patch to C&C95.EXE ==="
+echo "=== Step 4: Apply Wine-compatibility patch to C&C95.EXE ==="
 echo "  Patch: offset 0x${CC95_DDSCL_PATCH_OFFSET##0x}bc6af:"
 echo "         SetCooperativeLevel flags 0x11 (DDSCL_EXCLUSIVE|FULLSCREEN)"
 echo "         -> 0x08 (DDSCL_NORMAL, windowed)"

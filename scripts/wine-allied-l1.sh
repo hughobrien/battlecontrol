@@ -6,13 +6,13 @@
 # ─────────────────────────────────
 # With the TIM-708 patch chain applied (focus-skip, game-in-focus,
 # cdlabel, vqa-skip) the RA95.EXE boot path goes:
-#   wineboot → Westwood/RA VQAs skipped → AUTODEMO record plays back
-#   Allied Mission 1 ("Find Einstein", SCG01EA.INI) for ~6 s before the
-#   recording-side defect at 0x00534273 raises a Wine app-error dialog
-#   on top of the still-rendered mission terrain.
+#  wineboot → Westwood/RA VQAs skipped → AUTODEMO record plays back
+#  Allied Mission 1 ("Find Einstein", SCG01EA.INI) for ~6 s before the
+#  recording-side defect at 0x00534273 raises a Wine app-error dialog
+#  on top of the still-rendered mission terrain.
 #
 # That AUTODEMO playback is the live Allied L1 mission: same terrain,
-# units, sidebar, and HUD as a fresh "New Campaign → Allied" start.  We
+# units, sidebar, and HUD as a fresh "New Campaign → Allied" start. We
 # capture the mission state during and after playback to hit the
 # frame-100 / 250 / 500 milestones required by the TIM-752 spec.
 #
@@ -20,45 +20,45 @@
 # ────────────────────────────────────
 # The script uses tools/wine-input/ra-sendinput.exe (TIM-728) to drive
 # the in-mission menu through SendInput → WH_KEYBOARD_LL → DInput:
-#   * VK_ESCAPE   opens the in-mission Options dialog (pauses the sim)
-#   * Click on "Resume Mission" lets the AUTODEMO continue toward its
-#     natural crash point so we capture the canonical "Allied L1
-#     terrain with overlay" frame at the 500-tick milestone
+#  * VK_ESCAPE  opens the in-mission Options dialog (pauses the sim)
+#  * Click on "Resume Mission" lets the AUTODEMO continue toward its
+#   natural crash point so we capture the canonical "Allied L1
+#   terrain with overlay" frame at the 500-tick milestone
 # Synthetic X events (xdotool/XTest) cannot reach DInput-state-array
 # reads — only SendInput does.
 #
 # Rendering
 # ─────────
-#   * cnc-ddraw master build with the TIM-740 scanline_double patch
-#     (scripts/build-cnc-ddraw.sh → /tmp/cnc-ddraw-master/ddraw.dll)
-#   * GDI renderer + windowed mode so the framebuffer is captured via
-#     ffmpeg x11grab from Xvfb
-#   * openbox WM so the Wine window is decorated and DInput attaches
+#  * cnc-ddraw master build with the TIM-740 scanline_double patch
+#   (scripts/build-cnc-ddraw.sh → /tmp/cnc-ddraw-master/ddraw.dll)
+#  * GDI renderer + windowed mode so the framebuffer is captured via
+#   ffmpeg x11grab from Xvfb
+#  * openbox WM so the Wine window is decorated and DInput attaches
 #
 # Wine version
 # ────────────
-# Pinned to Wine 10.0 (/usr/bin/wine).  Wine 11.x regressed the d:=cdrom
+# Pinned to Wine 10.0 (/usr/bin/wine). Wine 11.x regressed the d:=cdrom
 # detection path: GetVolumeInformationA returns FALSE for the symlinked
 # drive even with the cdlabel-patch applied, the "Please insert a Red
 # Alert CD" modal appears, and no synthetic input (xdotool, SendInput)
-# can dismiss it.  See [TIM-752] worklog.
+# can dismiss it. See [TIM-752] worklog.
 #
 # Outputs in $ARTIFACT_DIR (default: e2e/report/data/wine-ra-allied-l1/):
-#   frame-0.png    — pre-Options, AUTODEMO mid-mission
-#   frame-100.png  — Options dialog over Allied L1 terrain (paused)
-#   frame-250.png  — post-resume, crash-dialog over Allied L1 terrain
-#   frame-500.png  — same state ~33 s after mission start
-#   wine.log helper.log xvfb.log openbox.log
+#  frame-0.png  — pre-Options, AUTODEMO mid-mission
+#  frame-100.png — Options dialog over Allied L1 terrain (paused)
+#  frame-250.png — post-resume, crash-dialog over Allied L1 terrain
+#  frame-500.png — same state ~33 s after mission start
+#  wine.log helper.log xvfb.log openbox.log
 #
 # Exit:
-#   0 — frame-500.png has ≥64 unique colours and ≥5 KB on disk
-#   non-zero otherwise
+#  0 — frame-500.png has ≥64 unique colours and ≥5 KB on disk
+#  non-zero otherwise
 
 set -euo pipefail
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
-# Wine 10.0 (Debian 10.0~repack-6).  Wine 11.x regression — see header.
+# Wine 10.0 (Debian 10.0~repack-6). Wine 11.x regression — see header.
 WINE="${WINE:-/usr/bin/wine}"
 WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim752-allied}"
 RA_EXE_PATH="${RA_EXE_PATH:-/opt/redalert/game/RA95.EXE.focus_orig}"
@@ -94,7 +94,7 @@ done
 }
 [[ -f "$CNC_DDRAW_DIR/ddraw.dll" ]] || {
 	echo "FAIL: cnc-ddraw (TIM-740 scanline_double build) missing at $CNC_DDRAW_DIR"
-	echo "   run: bash scripts/build-cnc-ddraw.sh"
+	echo "  run: bash scripts/build-cnc-ddraw.sh"
 	exit 1
 }
 [[ -f "$SENDINPUT_SRC" ]] || {
@@ -106,12 +106,12 @@ done
 [[ -f "$SENDINPUT_EXE" && "$SENDINPUT_SRC" -ot "$SENDINPUT_EXE" ]] ||
 	i686-w64-mingw32-gcc -o "$SENDINPUT_EXE" "$SENDINPUT_SRC" -luser32
 
-echo "  wine:       $($WINE --version)"
-echo "  ra-input:   $SENDINPUT_EXE"
-echo "  cnc-ddraw:  $CNC_DDRAW_DIR/ddraw.dll"
-echo "  prefix:     $WINEPREFIX"
-echo "  data:       $DATA_DIR"
-echo "  artifacts:  $ARTIFACT_DIR"
+echo " wine:    $($WINE --version)"
+echo " ra-input:  $SENDINPUT_EXE"
+echo " cnc-ddraw: $CNC_DDRAW_DIR/ddraw.dll"
+echo " prefix:   $WINEPREFIX"
+echo " data:    $DATA_DIR"
+echo " artifacts: $ARTIFACT_DIR"
 
 # ─── Pick free X display ─────────────────────────────────────────────────────
 
@@ -126,7 +126,7 @@ pick_display() {
 	exit 1
 }
 XDISP="${XDISP:-$(pick_display)}"
-echo "  display:    $XDISP"
+echo " display:  $XDISP"
 
 # ─── Stage ───────────────────────────────────────────────────────────────────
 
@@ -145,13 +145,13 @@ echo
 echo "=== applying binary patches ==="
 for patch in focus-skip-patch.py game-in-focus-patch.py cdlabel-patch.py vqa-skip-patch.py; do
 	if [[ -f "$THIS_DIR/$patch" ]]; then
-		echo "  $patch:"
-		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | sed 's/^/    /' | tail -3 || true
+		echo " $patch:"
+		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | sed 's/^/  /' | tail -3 || true
 	fi
 done
-echo "  final sha256: $(sha256sum "$STAGE/RA95.EXE" | cut -d' ' -f1)"
+echo " final sha256: $(sha256sum "$STAGE/RA95.EXE" | cut -d' ' -f1)"
 
-# cnc-ddraw drop-in.  scanline_double=true is the TIM-740 fix for RA's
+# cnc-ddraw drop-in. scanline_double=true is the TIM-740 fix for RA's
 # scanline-doubled primary buffer.
 cp "$CNC_DDRAW_DIR/ddraw.dll" "$STAGE/ddraw.dll"
 cat >"$STAGE/ddraw.ini" <<'EOF'
@@ -173,8 +173,8 @@ cp "$SENDINPUT_EXE" "$STAGE/ra-sendinput.exe"
 # ─── Wine prefix ─────────────────────────────────────────────────────────────
 
 if [[ ! -d "$WINEPREFIX" ]]; then
-	echo "  creating $WINEPREFIX..."
-	WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all \
+	echo " creating $WINEPREFIX..."
+	WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all \
 		"$WINE" wineboot --init 2>/dev/null
 fi
 mkdir -p "$WINEPREFIX/dosdevices"
@@ -190,7 +190,7 @@ sleep 1
 echo
 echo "=== starting Xvfb + openbox on $XDISP ==="
 # 1024x768 leaves headroom for cnc-ddraw's 640×400 window plus openbox
-# decorations.  800x600 clips the right edge of the window under Wine 10.
+# decorations. 800x600 clips the right edge of the window under Wine 10.
 Xvfb "$XDISP" -screen 0 1024x768x24 -ac >"$ARTIFACT_DIR/xvfb.log" 2>&1 &
 XVFB_PID=$!
 sleep 1
@@ -215,19 +215,19 @@ echo "=== launching RA95.EXE ==="
 (
 	cd "$STAGE"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
-		WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEPREFIX="$WINEPREFIX" \
 		WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
 		WINEDEBUG=-all AUDIODEV=null \
 		timeout 240 "$WINE" RA95.EXE
 ) >"$ARTIFACT_DIR/wine.log" 2>&1 &
 RA_PID=$!
 
-echo "  waiting for Red Alert window..."
+echo " waiting for Red Alert window..."
 # shellcheck disable=SC2034
 WIN_TIME=0
 for i in $(seq 1 30); do
 	if DISPLAY="$XDISP" xdotool search --name "^Red Alert$" >/dev/null 2>&1; then
-		echo "  Red Alert window appeared after ${i}s"
+		echo " Red Alert window appeared after ${i}s"
 		break
 	fi
 	sleep 1
@@ -239,7 +239,7 @@ done
 
 send_key() {
 	local vk="$1" label="${2:-key}"
-	echo "  SendInput key[$label]: vk=$vk"
+	echo " SendInput key[$label]: vk=$vk"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
 		WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" key "$vk" \
 		>>"$ARTIFACT_DIR/helper.log" 2>&1 || true
@@ -247,7 +247,7 @@ send_key() {
 
 send_click() {
 	local x="$1" y="$2" label="${3:-click}"
-	echo "  SendInput click[$label]: client=($x,$y)"
+	echo " SendInput click[$label]: client=($x,$y)"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
 		WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" click "$x" "$y" \
 		>>"$ARTIFACT_DIR/helper.log" 2>&1 || true
@@ -260,12 +260,12 @@ shoot() {
 		-i "$XDISP" -frames:v 1 -y "$png" 2>/dev/null || true
 	local sz
 	sz=$(stat -c%s "$png" 2>/dev/null || echo "0")
-	echo "  shot $name: $sz bytes"
+	echo " shot $name: $sz bytes"
 }
 
 # ─── Capture sequence (TIM-705 + TIM-752 spec) ───────────────────────────────
 #
-# AUTODEMO is Allied L1 mission replay.  TICKS_PER_SECOND=15
+# AUTODEMO is Allied L1 mission replay. TICKS_PER_SECOND=15
 # (REDALERT/DEFINES.H:3152) — the frame-100 / 250 / 500 labels are wall-
 # clock approximations of those mission ticks anchored to frame-0.
 # Past ~tick 90 the AUTODEMO playback hits its known defect at
@@ -287,7 +287,7 @@ if ! kill -0 $RA_PID 2>/dev/null; then
 fi
 
 # Menu navigation: Esc pauses the simulation and pops the in-mission
-# Options dialog.  This satisfies the TIM-752 "ra-sendinput.exe for
+# Options dialog. This satisfies the TIM-752 "ra-sendinput.exe for
 # menu navigation" requirement and incidentally lets us prove the
 # Options overlay renders correctly over Allied L1 terrain.
 send_key 0x1B "esc-options"
@@ -317,7 +317,7 @@ PASS=1
 TARGET="$ARTIFACT_DIR/frame-500.png"
 
 if [[ ! -f "$TARGET" ]]; then
-	echo "  FAIL frame-500.png missing"
+	echo " FAIL frame-500.png missing"
 	PASS=0
 else
 	sz=$(stat -c%s "$TARGET")
@@ -326,11 +326,11 @@ else
 	else
 		ncolors="unknown"
 	fi
-	echo "  frame-500.png: $sz bytes, $ncolors unique colours"
+	echo " frame-500.png: $sz bytes, $ncolors unique colours"
 	if [[ "$sz" -ge 5000 && "$ncolors" -ge 64 ]]; then
-		echo "  PASS frame-500.png is non-black Allied L1 (≥5 KB and ≥64 colours)"
+		echo " PASS frame-500.png is non-black Allied L1 (≥5 KB and ≥64 colours)"
 	else
-		echo "  FAIL frame-500.png does not meet thresholds (need ≥5 KB and ≥64 colours)"
+		echo " FAIL frame-500.png does not meet thresholds (need ≥5 KB and ≥64 colours)"
 		PASS=0
 	fi
 fi
@@ -346,9 +346,9 @@ for name in frame-0 frame-100 frame-250 frame-500; do
 		else
 			nc="?"
 		fi
-		echo "  $name.png — $sz bytes, $nc colours"
+		echo " $name.png — $sz bytes, $nc colours"
 	else
-		echo "  $name.png — MISSING"
+		echo " $name.png — MISSING"
 	fi
 done
 

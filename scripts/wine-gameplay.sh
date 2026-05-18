@@ -10,35 +10,35 @@
 # in DATA_DIR, xdotool, ImageMagick (import or scrot).
 #
 # ─── Usage ───────────────────────────────────────────────────────────────────
-#    bash scripts/wine-gameplay.sh [EXE_PATH] [DATA_DIR] [SCREENSHOT_DIR]
+#  bash scripts/wine-gameplay.sh [EXE_PATH] [DATA_DIR] [SCREENSHOT_DIR]
 #
-#    EXE_PATH        path to RA95.EXE     (default: /opt/redalert/RA95.EXE)
-#    DATA_DIR        CD1 data directory   (default: /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1)
-#    SCREENSHOT_DIR  output dir           (default: e2e/screenshots)
+#  EXE_PATH    path to RA95.EXE   (default: /opt/redalert/RA95.EXE)
+#  DATA_DIR    CD1 data directory  (default: /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1)
+#  SCREENSHOT_DIR output dir      (default: e2e/screenshots)
 #
 # ─── Outputs ─────────────────────────────────────────────────────────────────
-# wine-allied-l1-t0.png   — immediately after mission load (~mission start)
-# wine-allied-l1-t5.png   — t+5s
-# wine-allied-l1-t30.png  — t+30s
-# wine-allied-l1-t60.png  — t+60s
+# wine-allied-l1-t0.png  — immediately after mission load (~mission start)
+# wine-allied-l1-t5.png  — t+5s
+# wine-allied-l1-t30.png — t+30s
+# wine-allied-l1-t60.png — t+60s
 # wine-allied-l1-t120.png — t+120s
 #
 # ─── Wine menu navigation ────────────────────────────────────────────────────
 # The OG game's 640×480 menu layout matches the port (same resolution).
 # Navigation path from main menu → Allied L1:
-#   1. Dismiss DirectSound dialog (Enter)
-#   2. Wait ~5s for main menu
-#   3. Click "New Campaign" button — approximately (322, 183) in 640×480 coords
-#      Mapped to screen: depends on Xvfb window placement.
-#      With Xvfb 640×480, game is full screen → coordinates are literal.
-#   4. Difficulty dialog: click OK/Easy at approx (470, 244)
-#   5. Faction dialog: click Allied at approx (258, 268)
-#   6. Wait for briefing VQA to finish (~15s for ALLIES.VQA)
-#   7. Mission start — capture t=0 screenshot
-#   8. Wait 5s → t=5 screenshot
-#   9. Wait 25s → t=30 screenshot
-#  10. Wait 30s → t=60 screenshot
-#  11. Wait 60s → t=120 screenshot
+#  1. Dismiss DirectSound dialog (Enter)
+#  2. Wait ~5s for main menu
+#  3. Click "New Campaign" button — approximately (322, 183) in 640×480 coords
+#   Mapped to screen: depends on Xvfb window placement.
+#   With Xvfb 640×480, game is full screen → coordinates are literal.
+#  4. Difficulty dialog: click OK/Easy at approx (470, 244)
+#  5. Faction dialog: click Allied at approx (258, 268)
+#  6. Wait for briefing VQA to finish (~15s for ALLIES.VQA)
+#  7. Mission start — capture t=0 screenshot
+#  8. Wait 5s → t=5 screenshot
+#  9. Wait 25s → t=30 screenshot
+# 10. Wait 30s → t=60 screenshot
+# 11. Wait 60s → t=120 screenshot
 #
 # ─── Known behavior ──────────────────────────────────────────────────────────
 # • DirectSound dialog appears ~6s after launch — dismiss with Enter
@@ -68,7 +68,7 @@ if ! command -v wine >/dev/null 2>&1; then
 fi
 if [[ ! -f "$RA_EXE_PATH" ]]; then
 	echo "SKIP: RA95.EXE not found at $RA_EXE_PATH"
-	echo "  Run: bash scripts/wine-ra-setup.sh"
+	echo " Run: bash scripts/wine-ra-setup.sh"
 	exit 2
 fi
 if [[ ! -d "$DATA_DIR" ]]; then
@@ -76,16 +76,16 @@ if [[ ! -d "$DATA_DIR" ]]; then
 	exit 1
 fi
 if ! command -v xdotool >/dev/null 2>&1; then
-	echo "FAIL: xdotool not found — install with: sudo apt-get install xdotool"
+	echo "FAIL: xdotool not found. Run from nix develop shell."
 	exit 1
 fi
 
 WINE_VER=$(wine --version 2>/dev/null || echo "unknown")
-echo "  wine: $WINE_VER"
-echo "  exe:  $RA_EXE_PATH"
-echo "  data: $DATA_DIR"
-echo "  out:  $SCREENSHOT_DIR"
-echo "  display: $DISPLAY_NUM"
+echo " wine: $WINE_VER"
+echo " exe: $RA_EXE_PATH"
+echo " data: $DATA_DIR"
+echo " out: $SCREENSHOT_DIR"
+echo " display: $DISPLAY_NUM"
 echo ""
 
 # ─── Stage ───────────────────────────────────────────────────────────────────
@@ -119,13 +119,13 @@ for dll in THIPX32.DLL THIPX16.DLL; do
 done
 
 # Apply VQA skip patch so the game bypasses the ENGLISH.VQA intro that blocks on
-# audio-position sync under Wine (no hardware audio device).  Play_Movie returns
+# audio-position sync under Wine (no hardware audio device). Play_Movie returns
 # immediately for all VQA calls; cut-scenes are skipped.
 PATCH_SCRIPT="$(dirname "$0")/vqa-skip-patch.py"
 if [[ -f "$PATCH_SCRIPT" ]]; then
-	python3 "$PATCH_SCRIPT" "$RA_STAGE/RA95.EXE" || echo "  WARN: vqa-skip-patch returned non-zero"
+	python3 "$PATCH_SCRIPT" "$RA_STAGE/RA95.EXE" || echo " WARN: vqa-skip-patch returned non-zero"
 else
-	echo "  WARN: $PATCH_SCRIPT not found — VQA intro may block"
+	echo " WARN: $PATCH_SCRIPT not found — VQA intro may block"
 fi
 
 # Write the Windows volume label so RA's Get_CD_Index() matches "CD1".
@@ -134,7 +134,7 @@ printf 'CD1' >"$RA_STAGE/.windows-label"
 
 if [[ ! -d "$WINE_PREFIX" ]]; then
 	echo "Creating 32-bit Wine prefix..."
-	WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
+	WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
 
 # Map the staging directory as drive d: (cdrom type) so Init_CDROM_Access finds it.
@@ -147,10 +147,10 @@ WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
 
 # Configure Wine for screenshot capture:
 # 1. Virtual desktop mode: game runs in a managed window (not exclusive/fullscreen)
-#    so the Xvfb framebuffer includes the game content.
+#  so the Xvfb framebuffer includes the game content.
 # 2. GDI/software DirectDraw renderer: renders via X11 XPutImage (visible to
-#    x11grab/import) instead of the default OpenGL path (invisible to all X11
-#    capture tools because OpenGL renders into its own surface).
+#  x11grab/import) instead of the default OpenGL path (invisible to all X11
+#  capture tools because OpenGL renders into its own surface).
 # 3. Kill and restart wineserver so registry changes take effect before launch.
 echo "Configuring Wine virtual desktop + GDI DirectDraw renderer..."
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
@@ -176,7 +176,7 @@ cleanup_all() {
 }
 trap "cleanup_all" EXIT
 sleep 1
-echo "  Xvfb pid=$XVFB_PID"
+echo " Xvfb pid=$XVFB_PID"
 
 # ─── Window Manager ───────────────────────────────────────────────────────────
 # A lightweight WM is required so Wine's DirectInput layer attaches to a
@@ -195,9 +195,9 @@ if command -v "$WINE_WM" >/dev/null 2>&1; then
 	}
 	trap "cleanup_all" EXIT
 	sleep 2
-	echo "  WM pid=$WM_PID"
+	echo " WM pid=$WM_PID"
 else
-	echo "  WARN: $WINE_WM not found — input may not reach the game"
+	echo " WARN: $WINE_WM not found — input may not reach the game"
 	WM_PID=""
 fi
 
@@ -210,12 +210,12 @@ take_shot() {
 	if command -v ffmpeg >/dev/null 2>&1; then
 		ffmpeg -nostdin -loglevel error -f x11grab -video_size 800x600 \
 			-i "$DISPLAY_NUM" -frames:v 1 -y "$out" 2>/dev/null &&
-			echo "  Screenshot: $out"
+			echo " Screenshot: $out"
 	elif command -v import >/dev/null 2>&1; then
 		DISPLAY="$DISPLAY_NUM" import -window root "$out" 2>/dev/null &&
-			echo "  Screenshot: $out (import)"
+			echo " Screenshot: $out (import)"
 	else
-		echo "  WARN: no screenshot tool (ffmpeg/import) found"
+		echo " WARN: no screenshot tool (ffmpeg/import) found"
 	fi
 }
 
@@ -265,7 +265,7 @@ xdo_click() {
 	local gx="$1" gy="$2"
 	local sx=$((WIN_OX + gx))
 	local sy=$((WIN_OY + gy))
-	echo "  click game=($gx,$gy) screen=($sx,$sy)"
+	echo " click game=($gx,$gy) screen=($sx,$sy)"
 	DISPLAY="$DISPLAY_NUM" xdotool mousemove "$sx" "$sy" click 1 2>/dev/null || true
 	sleep 0.5
 }
@@ -285,7 +285,7 @@ echo "=== Launching RA95.EXE ==="
 LOG="$(mktemp /tmp/wine-gameplay-XXXXXX.log)"
 (
 	cd "$RA_STAGE"
-	DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
+	DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" \
 		WINEDEBUG=-all AUDIODEV=null \
 		timeout 300 wine RA95.EXE
 ) >"$LOG" 2>&1 &
@@ -294,14 +294,14 @@ trap 'kill "$RA_PID" 2>/dev/null || true; cleanup_all' EXIT
 
 # ─── Step 1: Find Wine Desktop window and resolve click origin ───────────────
 
-echo "  Waiting for Wine Desktop window (up to 30s)..."
+echo " Waiting for Wine Desktop window (up to 30s)..."
 WINE_WIN_ID=$(find_wine_win 30) || {
 	echo "FAIL: Wine Desktop window never appeared"
 	exit 1
 }
-echo "  Wine Desktop wid=$WINE_WIN_ID"
+echo " Wine Desktop wid=$WINE_WIN_ID"
 read -r WIN_OX WIN_OY < <(wine_win_origin "$WINE_WIN_ID")
-echo "  Window origin: ($WIN_OX, $WIN_OY)"
+echo " Window origin: ($WIN_OX, $WIN_OY)"
 DISPLAY="$DISPLAY_NUM" xdotool windowfocus --sync "$WINE_WIN_ID" 2>/dev/null || true
 
 # ─── Step 1a: Handle CD-ROM dialog if it appears ─────────────────────────────
@@ -309,7 +309,7 @@ DISPLAY="$DISPLAY_NUM" xdotool windowfocus --sync "$WINE_WIN_ID" 2>/dev/null || 
 # data on CD drive D:. Dismiss with Return (OK button). This can appear before
 # the DirectSound warning.
 
-echo "  Waiting for game to settle (~5s)..."
+echo " Waiting for game to settle (~5s)..."
 sleep 5
 take_shot "wine-gameplay-t5.png"
 
@@ -321,9 +321,9 @@ sleep 1
 
 # ─── Step 2: Dismiss DirectSound dialog ──────────────────────────────────────
 
-echo "  Waiting for DirectSound dialog (~5s more)..."
+echo " Waiting for DirectSound dialog (~5s more)..."
 sleep 5
-echo "  Dismissing DirectSound warning..."
+echo " Dismissing DirectSound warning..."
 xdo_key "Return"
 sleep 1
 xdo_key "Return"
@@ -331,7 +331,7 @@ sleep 1
 
 # ─── Step 3: Wait for main menu ──────────────────────────────────────────────
 
-echo "  Waiting for main menu (~5s)..."
+echo " Waiting for main menu (~5s)..."
 sleep 5
 take_shot "wine-gameplay-menu.png"
 
@@ -339,33 +339,33 @@ take_shot "wine-gameplay-menu.png"
 # Main menu button coordinates are relative to the 640×480 game client area.
 # "New Campaign" button center: approx game-x=322, game-y=183.
 
-echo "  Clicking New Campaign at game (322, 183)..."
+echo " Clicking New Campaign at game (322, 183)..."
 xdo_click 322 183
 sleep 2
 take_shot "wine-gameplay-after-newgame.png"
 
 # ─── Step 5: Difficulty dialog → Easy/OK ─────────────────────────────────────
 
-echo "  Accepting difficulty dialog at game (470, 244)..."
+echo " Accepting difficulty dialog at game (470, 244)..."
 xdo_click 470 244
 sleep 1
 
 # ─── Step 6: Faction dialog → Allied ─────────────────────────────────────────
 
-echo "  Selecting Allied faction at game (258, 268)..."
+echo " Selecting Allied faction at game (258, 268)..."
 xdo_click 258 268
 sleep 1
 
 # ─── Step 7: Dismiss mission briefing screen ─────────────────────────────────
 # After faction selection the game shows a mission briefing screen (custom
-# DirectDraw rendering, NOT a VQA).  The player must press Space or click
-# anywhere to start the mission.  Without this the game stays on the briefing
+# DirectDraw rendering, NOT a VQA). The player must press Space or click
+# anywhere to start the mission. Without this the game stays on the briefing
 # screen for the entire observation window.
 
-echo "  Waiting for briefing screen (~8s)..."
+echo " Waiting for briefing screen (~8s)..."
 sleep 8
 take_shot "wine-gameplay-briefing.png"
-echo "  Dismissing briefing (Space key + click)..."
+echo " Dismissing briefing (Space key + click)..."
 xdo_key "space"
 sleep 1
 # Click centre of screen as fallback in case Space didn't land
@@ -376,7 +376,7 @@ sleep 1
 
 # ─── Step 8: Wait for mission load ───────────────────────────────────────────
 
-echo "  Waiting for mission to load (~15s)..."
+echo " Waiting for mission to load (~15s)..."
 sleep 15
 
 # ─── Step 7: t=0 screenshot ──────────────────────────────────────────────────
@@ -384,7 +384,7 @@ sleep 15
 # shellcheck disable=SC2034
 MISSION_START_TIME="$SECONDS"
 take_shot "wine-allied-l1-t0.png"
-echo "  Mission started at t=${SECONDS}s"
+echo " Mission started at t=${SECONDS}s"
 
 # ─── Step 8: t=5s ────────────────────────────────────────────────────────────
 
@@ -420,13 +420,13 @@ for name in wine-gameplay-menu wine-allied-l1-t0 wine-allied-l1-t5 wine-allied-l
 	if [[ -f "$shot" ]]; then
 		sz=$(stat -c%s "$shot")
 		if [[ $sz -gt 5000 ]]; then
-			echo "  OK   ${name}.png ($sz bytes)"
+			echo " OK  ${name}.png ($sz bytes)"
 			PASS=$((PASS + 1))
 		else
-			echo "  WARN ${name}.png is small ($sz bytes) — may be blank"
+			echo " WARN ${name}.png is small ($sz bytes) — may be blank"
 		fi
 	else
-		echo "  MISS ${name}.png — not captured"
+		echo " MISS ${name}.png — not captured"
 	fi
 done
 

@@ -313,13 +313,13 @@ export default function (pi: ExtensionAPI) {
       if (killExisting) killPort(port);
 
       const script = repoPath("wasm", "serve-coop.py");
-      const { kill } = background("python3", [script, String(port), BUILD_DIR]);
+      const { proc, kill } = background("python3", [script, String(port), BUILD_DIR]);
 
       try {
         await waitForServer(`http://localhost:${port}/`, 10_000, "WASM server");
         return {
-          content: [{ type: "text", text: `✅ WASM server running at http://localhost:${port}/ra.html (and /td.html)\nKill with: kill ${kill.toString().match(/\d+/)?.[0] ?? "the process"}` }],
-          details: { port, pid: (kill as any).pid },
+          content: [{ type: "text", text: `✅ WASM server running at http://localhost:${port}/ra.html (and /td.html)\n  PID: ${proc.pid}` }],
+          details: { port, pid: proc.pid },
         };
       } catch (e: any) {
         kill();
@@ -751,8 +751,7 @@ ${result.stderr || result.stdout}` }], isError: true };
       // Configure
       if (!fs.existsSync(buildDirNative) || clean) {
         onUpdate?.({ content: [{ type: "text", text: "Configuring with cmake --preset linux-native..." }] });
-        const env = { CXX: "clang++" };
-        const cfg = run("bash", ["-c", cfgCmd], { timeout: 120_000 });
+        const cfg = run("cmake", ["--preset", "linux-native"], { timeout: 120_000 });
         if (cfg.exitCode !== 0) {
           return { content: [{ type: "text", text: `❌ cmake configure failed:
 ${cfg.stderr || cfg.stdout}` }], isError: true };
@@ -905,13 +904,15 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
   pi.registerTool({
     name: "wine_capture",
     label: "Wine Capture",
-    description: "Capture Wine OG baseline screenshots (title screen + menu) for Red Alert or Tiberian Dawn. Requires Wine, game data, and the original EXE.",
+    description: "Capture Wine OG baseline screenshots (title screen) for Red Alert or Tiberian Dawn under Xvfb. Requires Wine, game data, and the original EXE. Note: title→menu transition requires a GPU GL context — under Xvfb the menu screenshot will match the title screen.",
     promptSnippet: "Capture baseline screenshots from original Wine RA95.EXE or C&C95.EXE",
     promptGuidelines: [
       "Use wine_capture to generate reference screenshots for visual parity comparison",
       "Requires the original Win32 EXE (RA95.EXE or C&C95.EXE) and game data",
       "Screenshots are saved to e2e/screenshots/wine-{game}-title.png and wine-{game}-menu.png",
       "Run wine_check first to verify prerequisites",
+      "Wine 11.0 (wow64) requires the stub THIPX32.DLL from tools/stub-thipx/",
+      "Title→menu transition fails without GL context — only title screen is captured",
     ],
     parameters: Type.Object({
       game: Type.Union(
