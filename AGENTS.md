@@ -424,8 +424,9 @@ Things an agent must never break:
    pixel-diff assertion — fill% alone is insufficient. See
    `docs/smoke-test-design-rule.md`.
 
-7. **Include shim regeneration.** After adding a new `#include` to any .CPP file,
-   run `nix run .#include-shim`.
+7. **Include shim regeneration.** CMake auto-runs `generate-include-shim.py` as a
+   build dependency. After adding a new `#include` or header, a rebuild regenerates
+   it automatically. For manual regeneration: `python3 scripts/generate-include-shim.py`.
 
 8. **Never use `git add -A` (or `git add .` / `git add --all`).** Always stage
    specific files with explicit paths. Blind `-A` picks up unrelated changes and
