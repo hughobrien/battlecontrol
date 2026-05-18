@@ -57,4 +57,16 @@ else
 	echo "$errors prerequisite(s) missing."
 fi
 
+# Optional: verify game data integrity
+if [[ -n "${RA_ASSETS:-}" ]] && [[ -d "$RA_ASSETS" ]]; then
+	echo ""
+	echo "--- Game data integrity ---"
+	if python3 scripts/ra-data-verify.py "$RA_ASSETS"; then
+		echo "  RA game data: OK"
+	else
+		echo "  RA game data: CORRUPT (run with valid data)"
+		errors=$((errors + 1))
+	fi
+fi
+
 exit $errors

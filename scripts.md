@@ -28,7 +28,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |Toolchain check|`toolchain-check`|`scripts/toolchain-check.sh`|—|—|
 |Wine check|`wine-check`|`scripts/wine-check.sh`|—|—|
 |Wine capture|`capture-wine`|`scripts/wine-cnc-capture.sh`|`ci.yml → wine-comparison`|—|
-|Native capture|`capture-native`|`scripts/capture-checkpoint.py`|—|—|
 |Capture orchestrator|`capture-checkpoint`|`scripts/capture-checkpoint.py`|—|—|
 |Parity compare|`parity-compare`|`scripts/parity-compare.py`|—|—|
 |Parity report|`parity-report`|`scripts/parity-report.sh`|—|—|
@@ -38,7 +37,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |LP64 lint|`lint-lp64`|`scripts/lint-lp64.py`|—|—|
 |Full lint suite|`lint-all`|inline (flake.nix)|—|—|
 |Include shim|`include-shim`|`scripts/generate-include-shim.py`|—|—|
-|Data verify|`data-verify`|`scripts/ra-data-verify.py`|—|—|
 |Edit loop (native)|`edit-loop`|inline (flake.nix)|—|—|
 |WASM loop|`wasm-loop`|inline (flake.nix)|—|—|
 |Release build RA|`release-build-ra`|`scripts/first-run-pass-94.sh` + strip + tar|`release.yml`|—|
@@ -106,8 +104,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | | `scripts/wine-gdi-m2.sh` | C&C95.EXE → GDI Mission 2 gameplay. |
 | | `scripts/wine-nod-l1.sh` | C&C95.EXE → Nod Mission 1 gameplay. |
 | | `scripts/wine-nod-m1.sh` | C&C95.EXE → Nod Mission 1 (with side-select click). |
-| Native capture | `nix run .#capture-native -- <mission>` | Launch native RA under Xvfb + `RA_AUTOSTART`, capture gameplay. ⚠️ Uses `scripts/capture-checkpoint.py` |
-| | `capture_native(mission)` | Delegates to `scripts/capture-checkpoint.py`. |
 | Capture checkpoint | `nix run .#capture-checkpoint -- <mode> <id> --targets <t>` | Unified orchestrator: run any mission/VQA at any frame across Wine/native/WASM. |
 | | `scripts/capture-checkpoint.py` | Same, directly. |
 | | `scripts/drivers/wine.py` | Wine capture driver (class `WineCapture`). |
@@ -139,9 +135,9 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Full lint | `nix run .#lint-all` | LP64 + clang-tidy + cppcheck + ruff + yamllint + shellcheck + shfmt + nixfmt. |
 | Include shim | `nix run .#include-shim` | Regenerate case-folding include shim after adding #include or headers. |
 | | `scripts/generate-include-shim.py` | Same, directly. |
-| Data verify | `nix run .#data-verify -- [dir]` | Verify game data MIX files against SHA-256 checksums. |
-| | `scripts/ra-data-verify.py [dir]` | Same, directly. |
-| Toolchain check | `nix run .#toolchain-check` | Verify native build toolchain (clang++, cmake, ninja, SDL2, etc.). |
+| Toolchain check | `nix run .#toolchain-check` | Verify toolchain + game data integrity. |
+| | `scripts/toolchain-check.sh` | Same, directly. |
+| Data verify (direct) | `python3 scripts/ra-data-verify.py <dir>` | Verify game data MIX checksums directly. |
 | | `scripts/toolchain-check.sh` | Same, directly. |
 | Wine check | `wine_check()` | Check Wine + xdotool + ffmpeg + ImageMagick installed. |
 | | `scripts/wine-check.sh` | Same, directly. |
@@ -214,7 +210,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `build-td.sh` | script | Build | Configure CMake and build TD. |
 | `build-wasm` | nix app | Build | Build RA and/or TD WASM targets. |
 | `capture-checkpoint` | nix app | Capture | Unified capture orchestrator. |
-| `capture-native` | nix app | Capture | Native Linux gameplay capture. |
+| `capture-native` | nix app | Capture | Removed — use `capture-checkpoint --targets native`. |
 | `capture-wine` | nix app | Capture | Wine OG baseline capture. |
 | `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
 | `toolchain-check` | nix app | Lint | Toolchain prerequisite check. |
@@ -292,7 +288,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `test-t2` | nix app | Test | Run T2 TD boot smoke test. |
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
 | `validate-wasm` | nix app | Build | Validate WASM magic + size. |
-| `data-verify` | nix app | Lint | Verify game data checksums. |
+| `data-verify` | nix app | Lint | Removed — folded into `toolchain-check`. |
 | `vqa-check` | nix app | Parity | VQA pixel-diff gate. |
 | `vqa-cinematic` | nix app | Parity | Cinematic/VQA batch comparison. |
 | `vqa-golden` | nix app | Parity | Generate golden VQA frames. |

@@ -398,11 +398,11 @@
           echo "  nix run .#test -- <spec>     run an e2e test"
           echo "  nix run .#capture-wine       Wine OG baseline capture"
 
-          echo "  nix run .#capture-native     Native Linux gameplay capture"
+
           echo "  nix run .#vqa-check          VQA pixel-diff gate"
           echo "  nix run .#vqa-golden         Generate golden frames from VQA"
           echo "  nix run .#parity-compare -- a b   SSIM compare two screenshots"
-          echo "  nix run .#data-verify        verify game data checksums"
+
           echo "  nix run .#smoke-ra           RA native smoke test"
           echo "  nix run .#smoke-td           TD native smoke test"
           echo "  nix run .#regression          Run regression suite"
@@ -649,11 +649,6 @@
           exec bash scripts/wine-cnc-capture.sh "$PATCHEXE" "$DATA" "$SHOTS"
         '';
 
-        data-verify = mkApp "data-verify" ''
-          DIR="''${1:-$RA_ASSETS}"
-          exec python3 scripts/ra-data-verify.py "$DIR"
-        '';
-
         parity-compare = mkApp "parity-compare" ''
           if [ $# -lt 2 ]; then
             echo "Usage: nix run .#parity-compare -- <imageA> <imageB> [threshold]"
@@ -695,15 +690,6 @@
 
         capture-checkpoint = mkApp "capture-checkpoint" ''
           exec python3 scripts/capture-checkpoint.py "$@"
-        '';
-
-        capture-native = mkApp "capture-native" ''
-          if [ $# -eq 0 ]; then
-            echo "Usage: nix run .#capture-native -- <mission>"
-            echo "  e.g. nix run .#capture-native -- allied-l1"
-            exit 1
-          fi
-          exec python3 scripts/capture-checkpoint.py mission "$1" --targets native
         '';
 
         vqa-golden = mkApp "vqa-golden" ''
