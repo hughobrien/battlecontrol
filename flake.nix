@@ -397,7 +397,7 @@
           echo "  nix run .#screenshot         capture WASM screenshot"
           echo "  nix run .#test -- <spec>     run an e2e test"
           echo "  nix run .#capture-wine       Wine OG baseline capture"
-          echo "  nix run .#ci-cc-setup        configure ccache (zero stats, max size)"
+
           echo "  nix run .#capture-native     Native Linux gameplay capture"
           echo "  nix run .#vqa-check          VQA pixel-diff gate"
           echo "  nix run .#vqa-golden         Generate golden frames from VQA"
@@ -749,40 +749,14 @@
           echo "=== WASM loop: build → validate → smoke ==="
           nix run .#build-wasm
           nix run .#validate-wasm
-          nix run .#ci-wasm-smoke
-        '';
-
-        # Build the stub THIPX32.DLL for Wine 11.0 wow64 compatibility.
-        build-stub-thipx = mkApp "build-stub-thipx" ''
-          exec bash scripts/build-stub-thipx.sh "$@"
+          nix run .#test-t1
+          nix run .#test-t2
         '';
 
         # ── CI Job Apps ────────────────────────────────────────────────────
-        # These reproduce the GitHub Actions CI jobs.  Run locally with:
         # The GitHub Actions workflows in .github/workflows/ call these same
         # apps, making CI identical to local and trivially reproducible.
         # ------------------------------------------------------------------
-
-        ci-wasm-smoke = mkApp "ci-wasm-smoke" ''
-          set -e
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          sleep 2
-          python3 wasm/serve-coop.py 8080 build-wasm &
-          SERVER_PID=$!
-          sleep 2
-          DISPLAY=:99 playwright test \
-            e2e/regression/T1-ra-wasm-boot.spec.ts \
-            e2e/regression/T2-td-wasm-boot.spec.ts
-          SMOKE_EXIT=$?
-          kill $SERVER_PID 2>/dev/null || true
-          kill $XVFB_PID 2>/dev/null || true
-          exit $SMOKE_EXIT
-        '';
-
-        ci-cc-setup = mkApp "ci-cc-setup" ''
-          ccache --zero-stats && ccache --max-size 500M
-        '';
 
       };
     };

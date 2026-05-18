@@ -20,7 +20,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |CI gate (local)|`ci`|`scripts/ci-local.sh`|—|—|
 |CI native build|`build-native`|`scripts/build-native.sh`|`ci.yml → build`|—|
 |WASM loop (CI)|`wasm-loop`|inline (flake.nix)|`ci.yml → build-wasm`|—|
-|CI WASM smoke|`ci-wasm-smoke`|inline (flake.nix)|called by wasm-loop|—|
+|WASM loop smoke|`wasm-loop`|`scripts/run-e2e.sh` (via test-t1+test-t2)|called by wasm-loop|—|
 |CI test run|`test`|`scripts/run-e2e.sh`|`ci.yml → build-wasm` (T3/T6/T7/T8/T9)|—|
 |CI VQA pixel-diff|`vqa-check`|`scripts/vqa-check.sh`|`ci.yml → vqa-pixel-diff`|—|
 |CI ccache setup|`ci-cc-setup`|inline (flake.nix)|`gh-pages.yml`|—|
@@ -221,13 +221,13 @@ Every executable entry point, listed A–Z with its surface(s).
 | `ci` | nix app | CI | Run all local CI gates. |
 | `ci-build-native` | nix app | CI | Removed — merged into `build-native`. |
 | `ci-build-wasm` | nix app | CI | Removed — use `wasm-loop` instead. |
-| `ci-cc-setup` | nix app | CI | Configure ccache for CI. |
+| `ci-cc-setup` | nix app | CI | Removed — inline in `gh-pages.yml`. |
 | `ci-clang-tidy` | nix app | CI | Removed — folded into `ci`. |
 | `ci-cppcheck` | nix app | CI | Removed — folded into `ci`. |
 | `ci-local.sh` | script | CI | Run all local CI gates. |
 | `ci-run-test` | nix app | CI | Removed — use `test` instead. |
 | `ci-vqa` | nix app | CI | Removed — use `vqa-check` instead. |
-| `ci-wasm-smoke` | nix app | CI | CI WASM smoke tests T1+T2. |
+| `ci-wasm-smoke` | nix app | CI | Removed — use `wasm-loop` instead. |
 | `cinematic-compare.py` | script | Parity | VQA batch comparison against ffmpeg. |
 | `parity-compare` | nix app | Parity | SSIM compare two images. |
 | `ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
@@ -264,7 +264,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
 | `include-shim` | nix app | Lint | Regenerate include shim. |
-| `ci-wasm-smoke.sh` | script | CI | Full local WASM CI smoke. |
+| `ci-wasm-smoke.sh` | script | CI | Removed — use `wasm-loop` instead. |
 | `build-native.sh` | script | Build | Single-command native build. |
 | `run-e2e.sh` | script | Test | Xvfb + WASM server + Playwright test. |
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
