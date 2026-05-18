@@ -384,11 +384,11 @@
           echo "C&C Red Alert — dev shell"
           echo ""
           echo "Workflows (from repo root):"
-          echo "  nix run .#check              toolchain prerequisites"
+          echo "  nix run .#toolchain-check    toolchain prerequisites"
           echo "  nix run .#build-native       native Linux build (ra/td/both)"
           echo "  nix run .#release-build-ra    release build: RA native + package"
           echo "  nix run .#release-build-td    release build: TD native + package"
-          echo "  nix run .#lint               LP64 hazard audit"
+          echo "  nix run .#lint-lp64          LP64 hazard audit"
           echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
           echo "  nix run .#build-wasm         WASM build (ra/td/both)"
           echo "  nix run .#validate-wasm      WASM binary validation"
@@ -401,13 +401,13 @@
           echo "  nix run .#capture-native     Native Linux gameplay capture"
           echo "  nix run .#vqa-check          VQA pixel-diff gate"
           echo "  nix run .#vqa-golden         Generate golden frames from VQA"
-          echo "  nix run .#compare -- a b     SSIM compare two screenshots"
-          echo "  nix run .#verify             verify game data checksums"
+          echo "  nix run .#parity-compare -- a b   SSIM compare two screenshots"
+          echo "  nix run .#data-verify        verify game data checksums"
           echo "  nix run .#smoke-ra           RA native smoke test"
           echo "  nix run .#smoke-td           TD native smoke test"
           echo "  nix run .#regression          Run regression suite"
-          echo "  nix run .#report -- <scene>   Three-way parity report"
-          echo "  nix run .#edit-loop   — shim→lint→build→smoke (native)"
+          echo "  nix run .#parity-report -- <scene>  Three-way parity report"
+          echo "  nix run .#edit-loop   — include-shim→lint-lp64→build→smoke (native)"
           echo "  nix run .#wasm-loop   — build→validate→smoke (WASM)"
           echo "  nix run .#test-t1     — T1 RA boot smoke"
           echo "  nix run .#test-t2     — T2 TD boot smoke"
@@ -427,7 +427,7 @@
           echo "  or use the pi agent: 19 extension tools"
           echo ""
           echo "Quick start:"
-          echo "  nix run .#check && nix run .#build-native"
+          echo "  nix run .#toolchain-check && nix run .#build-native"
         '';
       };
 
@@ -480,7 +480,7 @@
         # ── Developer workflow apps ────────────────────────────────────────
         # nix run .#<name> [args...]  from the repo root.
 
-        check = mkApp "check-toolchain" ''
+        toolchain-check = mkApp "toolchain-check" ''
           exec bash scripts/skill-dev-check.sh
         '';
 
@@ -508,7 +508,7 @@
           echo "td-linux-x86_64.tar.gz: $(stat -c%s td-linux-x86_64.tar.gz) bytes"
         '';
 
-        lint = mkApp "lint-lp64" ''
+        lint-lp64 = mkApp "lint-lp64" ''
           exec python3 scripts/lint-lp64.py --errors-only
         '';
 
@@ -553,7 +553,7 @@
           find . -name '*.nix' -not -path './build/*' -exec nixfmt --check {} + 2>&1 || true
         '';
 
-        shim = mkApp "generate-shim" ''
+        include-shim = mkApp "include-shim" ''
           exec python3 scripts/generate-include-shim.py \
             --repo-root . --shim-root build/include-shim --quiet
         '';
@@ -647,14 +647,14 @@
           exec bash scripts/wine-cnc-capture.sh "$PATCHEXE" "$DATA" "$SHOTS"
         '';
 
-        verify = mkApp "verify-data" ''
+        data-verify = mkApp "data-verify" ''
           DIR="''${1:-$RA_ASSETS}"
           exec python3 scripts/ra-data-verify.py "$DIR"
         '';
 
-        compare = mkApp "parity-compare" ''
+        parity-compare = mkApp "parity-compare" ''
           if [ $# -lt 2 ]; then
-            echo "Usage: nix run .#compare -- <imageA> <imageB> [threshold]"
+            echo "Usage: nix run .#parity-compare -- <imageA> <imageB> [threshold]"
             exit 1
           fi
           A="$1"; shift
@@ -719,10 +719,10 @@
           exec env REGRESSION_TIER="$TIER" bash scripts/regression-suite.sh
         '';
 
-        report = mkApp "parity-report" ''
+        parity-report = mkApp "parity-report" ''
           if [ $# -lt 1 ]; then
-            echo "Usage: nix run .#report -- <scene> [mode] [targets]"
-            echo "  e.g. nix run .#report -- ENGLISH --mode vqa --targets wine,wasm"
+            echo "Usage: nix run .#parity-report -- <scene> [mode] [targets]"
+            echo "  e.g. nix run .#parity-report -- ENGLISH --mode vqa --targets wine,wasm"
             exit 1
           fi
           SCENE="$1"; shift
@@ -735,9 +735,9 @@
 
         edit-loop = mkApp "edit-loop" ''
           set -e
-          echo "=== edit loop: shim → lint → build → smoke ==="
-          nix run .#shim 2>/dev/null || true
-          nix run .#lint 2>/dev/null || true
+          echo "=== edit loop: include-shim → lint-lp64 → build → smoke ==="
+          nix run .#include-shim 2>/dev/null || true
+          nix run .#lint-lp64 2>/dev/null || true
           nix run .#build-native
           nix run .#test -- e2e/regression/T1-ra-wasm-boot.spec.ts
         '';
