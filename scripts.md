@@ -13,12 +13,11 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |Serve (WASM+assets)|`serve`|`wasm/serve-coop.py` + `wasm/serve-assets.py`|—|—|
 |WASM screenshot|`screenshot`|inline (flake.nix)|—|—|
 |Run e2e test|`test`|`scripts/run-e2e.sh`|—|`test:e2e`|
-|Run T1 (RA boot)|`test-t1`|`scripts/run-e2e.sh`|`ci.yml → build-wasm`|—|
-|Run T2 (TD boot)|`test-t2`|`scripts/run-e2e.sh`|`ci.yml → build-wasm`|—|
+|Run e2e tests|`test`|`scripts/run-e2e.sh`|`ci.yml → build-wasm`|—|
 |CI gate (local)|`ci`|`scripts/ci-local.sh`|—|—|
 |CI native build|`build-native`|`scripts/build-native.sh`|`ci.yml → build`|—|
 |WASM loop (CI)|`wasm-loop`|inline (flake.nix)|`ci.yml → build-wasm`|—|
-|WASM loop smoke|`wasm-loop`|`scripts/run-e2e.sh` (via test-t1+test-t2)|called by wasm-loop|—|
+|WASM loop smoke|`wasm-loop`|`scripts/run-e2e.sh` (via `test`)|called by wasm-loop|—|
 |CI test run|`test`|`scripts/run-e2e.sh`|`ci.yml → build-wasm` (T3/T6/T7/T8/T9)|—|
 |CI VQA pixel-diff|`vqa-check`|`scripts/vqa-check.sh`|`ci.yml → vqa-pixel-diff`|—|
 |CI ccache setup|`ci-cc-setup`|inline (flake.nix)|`gh-pages.yml`|—|
@@ -66,8 +65,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |---------|-----------|-------------|
 | Run e2e test | `nix run .#test -- <spec> [args]` | Run any Playwright e2e spec under Xvfb + WASM server. |
 | | `npx playwright test <spec>` | Same, directly (if servers already running). |
-| T1 RA boot | `nix run .#test-t1` | Shorthand for RA WASM boot smoke test. |
-| T2 TD boot | `nix run .#test-t2` | Shorthand for TD WASM boot smoke test. |
+| E2E tests | `nix run .#test` | T1 + T2 boot smokes by default, or pass a spec. |
 | Regression suite | `nix run .#regression [tier]` | Run T1-T12 regression suite. Set `REGRESSION_TIER=ci\|full`. |
 | | `scripts/regression-suite.sh` | Same, directly. |
 | Smoke RA | `nix run .#smoke-ra` | Run RA native for 30s with `RA_AUTOSTART=1`, verify 100+ frames. |
@@ -279,8 +277,8 @@ Every executable entry point, listed A–Z with its surface(s).
 | `td-side-preview-skip-patch.py` | script | Patch (TD) | NOP side-preview animation. |
 | `td-vqa-skip-patch.py` | script | Patch (TD) | Skip TD cutscenes. |
 | `test` | nix app | Test | Run e2e test spec. |
-| `test-t1` | nix app | Test | Run T1 RA boot smoke test. |
-| `test-t2` | nix app | Test | Run T2 TD boot smoke test. |
+| `test-t1` | nix app | Test | Removed — use `test` (runs T1+T2 by default). |
+| `test-t2` | nix app | Test | Removed — use `test` (runs T1+T2 by default). |
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
 | `validate-wasm` | nix app | Build | Validate WASM magic + size. |
 | `data-verify` | nix app | Lint | Removed — folded into `toolchain-check`. |
