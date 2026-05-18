@@ -596,14 +596,6 @@
           kill $WASM_PID $ASSET_PID 2>/dev/null || true
         '';
 
-        test-t1 = mkApp "test-t1" ''
-          exec bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
-        '';
-
-        test-t2 = mkApp "test-t2" ''
-          exec bash scripts/run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
-        '';
-
         test = mkApp "run-e2e" ''
           if [ $# -eq 0 ]; then
             # Default: T1 + T2 asset-free boot smokes
