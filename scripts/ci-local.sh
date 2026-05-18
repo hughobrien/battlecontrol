@@ -148,6 +148,47 @@ else
 fi
 
 # ======================================================================
+# G7: clang-tidy static analysis
+# ======================================================================
+echo ""
+echo "--- G7: clang-tidy ---"
+if have clang-tidy && [[ "$MODE" != "--wasm-only" ]]; then
+	cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>/dev/null || true
+	find REDALERT TIBERIANDAWN -type f \
+		\! -path '*/WIN32LIB/*' \
+		\( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
+		| xargs -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
+		| tee /tmp/clang-tidy-report.txt | tail -5
+	COUNT=$(grep -c 'warning:\|error:' /tmp/clang-tidy-report.txt 2>/dev/null || echo 0)
+	echo "  $COUNT clang-tidy finding(s)"
+	gate_pass "G7: clang-tidy"  # informational — never fails
+else
+	gate_skip "G7: clang-tidy" "clang-tidy not found or wasm-only mode"
+fi
+
+# ======================================================================
+# G8: cppcheck static analysis
+# ======================================================================
+echo ""
+echo "--- G8: cppcheck ---"
+if have cppcheck && [[ "$MODE" != "--wasm-only" ]]; then
+	cppcheck --enable=warning,performance,portability,information \
+		--suppress=missingIncludeSystem \
+		--suppress=unmatchedSuppression \
+		--inline-suppr --error-exitcode=0 \
+		-j "$(nproc)" --quiet \
+		-I REDALERT -I REDALERT/WIN32LIB \
+		-I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
+		-I linux/win32-stubs \
+		REDALERT TIBERIANDAWN 2>&1 | tee /tmp/cppcheck-report.txt | tail -5
+	COUNT=$(grep -c 'error:\|warning:' /tmp/cppcheck-report.txt 2>/dev/null || echo 0)
+	echo "  $COUNT cppcheck finding(s)"
+	gate_pass "G8: cppcheck"  # informational — never fails
+else
+	gate_skip "G8: cppcheck" "cppcheck not found or wasm-only mode"
+fi
+
+# ======================================================================
 # Summary
 # ======================================================================
 echo ""

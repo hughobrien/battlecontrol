@@ -2,7 +2,7 @@
 # Local equivalent: nix run .#build-native
 #                   nix run .#vqa-check
 #                   nix run .#ci-build-wasm
-#                   nix run .#ci-clang-tidy
+#                   nix run .#ci
 
 name: CI
 
@@ -267,8 +267,8 @@ jobs:
           name: t9-ra-wasm-mission-start-results
           path: e2e/screenshots/t9-ra-wasm-*.png
 
-  clang-tidy:
-    name: clang-tidy static analysis
+  ci:
+    name: Local CI gate (incl. static analysis)
     runs-on: ubuntu-24.04
     continue-on-error: true
 
@@ -281,47 +281,9 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Run clang-tidy
-        id: clang-tidy
+      - name: Install deps
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends cppcheck ffmpeg
+
+      - name: Run CI gate (G1–G8)
         continue-on-error: true
-        run: nix develop --command nix run .#ci-clang-tidy
-
-      - name: Upload clang-tidy report
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: clang-tidy-report
-          path: clang-tidy-report.txt
-          if-no-files-found: ignore
-
-  cppcheck:
-    name: cppcheck static analysis
-    runs-on: ubuntu-24.04
-    continue-on-error: true
-
-    steps:
-      - uses: actions/checkout@v6.0.2
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31.10.6
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Install cppcheck
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cppcheck
-
-      - name: Run cppcheck
-        id: cppcheck
-        continue-on-error: true
-        run: nix develop --command nix run .#ci-cppcheck
-
-      - name: Upload cppcheck report
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: cppcheck-report
-          path: cppcheck-report.txt
-          if-no-files-found: ignore
+        run: nix develop --command nix run .#ci

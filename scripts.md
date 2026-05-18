@@ -24,8 +24,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |CI test run|`test`|`scripts/run-e2e.sh`|`ci.yml → build-wasm` (T3/T6/T7/T8/T9)|—|
 |CI VQA pixel-diff|`vqa-check`|`scripts/vqa-check.sh`|`ci.yml → vqa-pixel-diff`|—|
 |CI ccache setup|`ci-cc-setup`|inline (flake.nix)|`gh-pages.yml`|—|
-|CI clang-tidy|`ci-clang-tidy`|inline (flake.nix)|`ci.yml → clang-tidy`|—|
-|CI cppcheck|`ci-cppcheck`|inline (flake.nix)|`ci.yml → cppcheck`|—|
+|CI gate + static analysis|`ci`|`scripts/ci-local.sh`|`ci.yml → ci`|—|
 |Toolchain check|`toolchain-check`|`scripts/toolchain-check.sh`|—|—|
 |Wine check|`wine-check`|`scripts/wine-check.sh`|—|—|
 |Wine capture|`capture-wine`|`scripts/wine-cnc-capture.sh`|`ci.yml → wine-comparison`|—|
@@ -93,9 +92,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | CI WASM smoke | `nix run .#ci-wasm-smoke` | Xvfb + serve-coop + T1+T2 Playwright tests. |
 | CI test run | `nix run .#test -- <spec>` | Run one Playwright spec under Xvfb + WASM (for asset-gated tests). |
 | CI VQA | `nix run .#vqa-check` | Generate test VQA + pixel-diff (for CI). |
-| CI ccache setup | `nix run .#ci-cc-setup` | `ccache --zero-stats --max-size 500M`. |
-| CI clang-tidy | `nix run .#ci-clang-tidy` | Run clang-tidy static analysis. |
-| CI cppcheck | `nix run .#ci-cppcheck` | Run cppcheck static analysis. |
 ### Capture / Screenshot
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -226,8 +222,8 @@ Every executable entry point, listed A–Z with its surface(s).
 | `ci-build-native` | nix app | CI | Removed — merged into `build-native`. |
 | `ci-build-wasm` | nix app | CI | Removed — use `wasm-loop` instead. |
 | `ci-cc-setup` | nix app | CI | Configure ccache for CI. |
-| `ci-clang-tidy` | nix app | CI | CI clang-tidy static analysis. |
-| `ci-cppcheck` | nix app | CI | CI cppcheck static analysis. |
+| `ci-clang-tidy` | nix app | CI | Removed — folded into `ci`. |
+| `ci-cppcheck` | nix app | CI | Removed — folded into `ci`. |
 | `ci-local.sh` | script | CI | Run all local CI gates. |
 | `ci-run-test` | nix app | CI | Removed — use `test` instead. |
 | `ci-vqa` | nix app | CI | Removed — use `vqa-check` instead. |
