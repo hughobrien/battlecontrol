@@ -16,7 +16,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Serve | `serve` | `wasm/serve-coop.py` + `wasm/serve-assets.py` | — | — |
 | LP64 lint | `lint-lp64` | `scripts/lint-lp64.py` | — | — |
 | Full lint | `lint-all` | inline — multi-tool | — | — |
-| Include shim | `include-shim` | `scripts/generate-include-shim.py` | — | — |
+| Include shim | _(auto by CMake)_ | `scripts/generate-include-shim.py` | — | — |
 | Toolchain check | `toolchain-check` | `scripts/toolchain-check.sh` | — | — |
 | Wine check | `wine-check` | `scripts/wine-check.sh` | — | — |
 | Parity compare | `parity-compare` | `scripts/parity-compare.py` | — | — |
@@ -118,8 +118,8 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | LP64 lint | `nix run .#lint-lp64` | Scan C++ for LP64 hazards (`sizeof(long)==8` bugs). Must exit 0. |
 | | `scripts/lint-lp64.py [--errors-only]` | Same, directly. |
 | Full lint | `nix run .#lint-all` | LP64 + clang-tidy + cppcheck + ruff + yamllint + shellcheck + shfmt + nixfmt. |
-| Include shim | `nix run .#include-shim` | Regenerate case-folding include shim after adding #include or headers. |
-| | `scripts/generate-include-shim.py` | Same, directly. |
+| Include shim | `scripts/generate-include-shim.py` | Regenerate case-folding include shim (auto-run by CMake). |
+| | `cmake --build <dir>` | Auto-regenerates as build dependency. |
 | Toolchain check | `nix run .#toolchain-check` | Verify toolchain + game data integrity. |
 | | `scripts/toolchain-check.sh` | Same, directly. |
 | Data verify (direct) | `python3 scripts/ra-data-verify.py <dir>` | Verify game data MIX checksums directly. |
@@ -219,7 +219,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `gen-vqa-golden.py` | script | Parity | Generate golden VQA frames. |
 | `gen-all-vqa-goldens.sh` | script | Parity | Generate golden frames for all intro VQAs. |
 | `gen_test_vqa.py` | script | Utility | Generate synthetic test VQA. |
-| `generate-include-shim.py` | script | Lint | Regenerate case-folding include shim. |
+| `generate-include-shim.py` | script | Build | Regenerate case-folding include shim (auto-run by CMake). |
 | `lint-lp64` | nix app | Lint | LP64 hazard audit. |
 | `lint-all` | nix app | Lint | Full multi-tool lint suite. |
 | `lint-lp64.py` | script | Lint | LP64 static hazard scanner. |
@@ -243,7 +243,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `serve-wasm` | nix app | Serve | Removed — use `serve` instead. |
 | `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
-| `include-shim` | nix app | Lint | Regenerate include shim. |
+| `include-shim` | nix app | Lint | Removed — auto-run by CMake. |
 | `ci-wasm-smoke.sh` | script | CI | Removed — use `wasm-loop` instead. |
 | `build-native.sh` | script | Build | Single-command native build. |
 | `run-e2e.sh` | script | Test | Xvfb + WASM server + Playwright test. |

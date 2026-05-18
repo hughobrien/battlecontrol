@@ -557,11 +557,6 @@
           ls -lh redalert-linux-x86_64.tar.gz td-linux-x86_64.tar.gz
         '';
 
-        include-shim = mkApp "include-shim" ''
-          exec python3 scripts/generate-include-shim.py \
-            --repo-root . --shim-root build/include-shim --quiet
-        '';
-
         serve = mkApp "serve-both" ''
           WASM_PORT="''${1:-8080}"
           ASSET_PORT="''${2:-9090}"
