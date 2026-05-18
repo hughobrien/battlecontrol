@@ -9,7 +9,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |--------|---------|-----------|--------|------------|
 |Build native|`build-native`|`scripts/build-native.sh`|`ci.yml → build`|—|
 |Build WASM|`build-wasm`|inline (flake.nix)|`ci.yml → build-wasm`|—|
-|Validate WASM|`validate-wasm`|inline (flake.nix)|`ci.yml → build-wasm`|—|
+|Validate WASM|`build-wasm`|inline (flake.nix) — validation is always on|`ci.yml → build-wasm`|—|
 |Serve (WASM+assets)|`serve`|`wasm/serve-coop.py` + `wasm/serve-assets.py`|—|—|
 |WASM screenshot|`screenshot`|inline (flake.nix)|—|—|
 |Run e2e test|`test`|`scripts/run-e2e.sh`|—|`test:e2e`|
@@ -147,7 +147,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
 | Edit loop (native) | `nix run .#edit-loop` | shim → lint → native build → smoke T1. |
-| WASM loop | `nix run .#wasm-loop` | WASM build → validate → smoke T1+T2. |
+| WASM loop | `nix run .#wasm-loop` | Build (with validation) → smoke T1+T2. |
 ### Utility
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -280,14 +280,14 @@ Every executable entry point, listed A–Z with its surface(s).
 | `test-t1` | nix app | Test | Removed — use `test` (runs T1+T2 by default). |
 | `test-t2` | nix app | Test | Removed — use `test` (runs T1+T2 by default). |
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
-| `validate-wasm` | nix app | Build | Validate WASM magic + size. |
+| `validate-wasm` | nix app | Build | Removed — validation baked into `build-wasm`. |
 | `data-verify` | nix app | Lint | Removed — folded into `toolchain-check`. |
 | `vqa-check` | nix app | Parity | VQA pixel-diff gate. |
 | `vqa-cinematic` | nix app | Parity | Cinematic/VQA batch comparison. |
 | `vqa-golden` | nix app | Parity | Generate golden VQA frames. |
 | `vqa_decode_verify.py` | script | Utility | Python VQA decoder. |
 | `vqa-pixel-diff.py` | script | Parity | VQA decoder vs ffmpeg comparison. |
-| `wasm-loop` | nix app | Loop | WASM build → validate → smoke. |
+| `wasm-loop` | nix app | Loop | build-wasm → smoke tests. |
 | `wine-cnc-capture.sh` | script | Capture | Generic RA95 Wine capture. |
 | `wine-exe-hashes.json` | data | — | SHA-256 hashes for patched EXEs. |
 | `wine-gdi-m1.sh` | script | Capture | GDI M1 gameplay capture. |

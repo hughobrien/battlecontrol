@@ -390,8 +390,7 @@
           echo "  nix run .#release            release build: RA + TD native tarballs"
           echo "  nix run .#lint-lp64          LP64 hazard audit"
           echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
-          echo "  nix run .#build-wasm         WASM build (ra/td/both)"
-          echo "  nix run .#validate-wasm      WASM binary validation"
+          echo "  nix run .#build-wasm         WASM build (ra/td/both, with validation)"
           echo "  nix run .#serve              WASM + asset dev servers"
           echo "  nix run .#screenshot         capture WASM screenshot"
           echo "  nix run .#test -- <spec>     run an e2e test"
@@ -563,20 +562,17 @@
           for t in ra td; do
             [ "$TARGET" != "$t" ] && [ "$TARGET" != "both" ] && continue
             cmake --build build-wasm --target "$t" --parallel
-          done
-        '';
-
-        validate-wasm = mkApp "validate-wasm" ''
-                    python3 -c "
+            fn="build-wasm/$t.wasm"
+            python3 -c "
           import os, struct
-          for fn in ['build-wasm/ra.wasm', 'build-wasm/td.wasm']:
-              if not os.path.exists(fn): continue
-              with open(fn,'rb') as f:
-                  assert f.read(4) == b'\\x00asm', fn + ': bad magic'
-              sz = os.path.getsize(fn)
-              assert sz > 1_000_000, fn + ': too small (' + str(sz) + ' bytes)'
-              print('  ' + fn.split('/')[1] + ': ' + str(sz//1024) + ' KB OK')
+          with open('$fn','rb') as f:
+              magic = f.read(4)
+          assert magic == b'\\x00asm', '$fn: bad magic'
+          sz = os.path.getsize('$fn')
+          assert sz > 1_000_000, '$fn: too small (' + str(sz) + ' bytes)'
+          print('  $t.wasm: ' + str(sz//1024) + ' KB OK')
           "
+          done
         '';
 
         wine-check = mkApp "wine-check" ''
@@ -712,9 +708,8 @@
 
         wasm-loop = mkApp "wasm-loop" ''
           set -e
-          echo "=== WASM loop: build → validate → smoke ==="
+          echo "=== WASM loop: build (with validation) → smoke ==="
           nix run .#build-wasm
-          nix run .#validate-wasm
           nix run .#test
         '';
 
