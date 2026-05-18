@@ -38,6 +38,11 @@ imagemagick are all present. Exits 1 with a list of what's missing.
 | DirectDraw surface renders black on Xvfb | GDI renderer not configured or wrong color depth | §2.4 |
 | Game exits immediately with `THIPX16.DLL` error | 16-bit thunking unsupported in wow64 | §2.5 |
 | Title screen shows but menu crashes (video buffer) | No GL context on Xvfb — title only | §2.4 |
+| Screenshot is 176 B (1-bit, all black) | wined3d no3d mode — NULL draw_texture | §2.6 |
+| Screenshot is ~3.5 KB RGB with small gray area | cnc-ddraw loaded, game stuck on error dialog | §2.6 |
+| Screenshot is ~5 KB RGB with gray dialog | Game showing "Insert CD" or blocking dialog | §2.6 |
+| Screenshot is ~7 KB paletted with navy blue | Game close — CD label comparison failing | §2.6 |
+| Screenshot is 47-88 KB paletted, 117-177 colors | **Real game content** — rendering correctly! | §2.6 |
 | `wine-ra.sh` / `wine-td.sh` exit 2 (SKIP) | EXE or data not found — first-time setup needed | §3 |
 
 ---
@@ -110,9 +115,25 @@ DISPLAY=:98 import -window root screenshots/wine-ra-menu.png
 ffmpeg -f x11grab -video_size 640x400 -i :99 -frames:v 1 screenshots/wine-td-menu.png -y
 ```
 
-**Validation:** After capture, verify the file is >1000 bytes (not >5000). The title
-screen under the GDI renderer is ~4266 bytes (TrueColor 8-bit sRGB). Screenshots under
-1000 bytes are blank (only the GDI dialog frame captured).
+**Validation — file-size heuristics:**
+
+Use the PNG file size of the captured screenshot as a quick diagnostic:
+
+| Size | Mode | Colors | Meaning |
+|-----:|:----:|:------:|---------|
+| **176 B** | 1-bit | 1 (black) | wined3d no3d: NULL draw_texture, all black |
+| **~3.5 KB** | RGB | ~470 | cnc-ddraw loaded, game stuck on error dialog |
+| **~5 KB** | RGB | ~470 | Windows dialog ("Insert CD" etc.) |
+| **~7 KB** | P | ~42 | 8-bit paletted active, CD label mismatch |
+| **~24-29 KB** | P | ~100 | More content, game progressing |
+| **47-88 KB** | P | 117-177 | **Real game content!** Loading/menu |
+| **100+ KB** | P | 256 | Full rendering with terrain/units |
+
+**Quick rule:** under 10 KB → dialog/error. Over 30 KB + paletted → real content.
+Over 80 KB → full graphics.
+
+The title screen under the GDI renderer is ~4266 bytes (TrueColor 8-bit sRGB).
+Screenshots under 1000 bytes are blank (only the GDI dialog frame captured).
 
 ---
 
@@ -168,12 +189,42 @@ Xvfb :99 -screen 0 640x400x8 -ac &   # TD: 8-bit (required for GDI renderer)
 Xvfb :98 -screen 0 640x480x24 -ac &   # RA: 24-bit
 ```
 
-**Title→Menu limitation:** The game can show the title screen (~4266 bytes, ~277 colors)
-but crashes when transitioning to the main menu with "Error - Unable to allocate primary
-video buffer — aborting." This is because the menu transition requires allocating a new
-DirectDraw primary surface which fails without a hardware GL context. The menu screenshot
-will match the title screen. This affects RA only; TD may have the same limitation under
-Xvfb.
+**Title→Menu limitation:** Without a GL context, wined3d's no3d fallback cannot
+create draw textures. The game's primary surface exists in system memory but content
+is never copied to the X11 window — resulting in black screenshots.
+
+**Workaround: cnc-ddraw.** Replace Wine's builtin ddraw with cnc-ddraw — a Win32
+DLL that intercepts DirectDraw calls and renders via GDI. This bypasses wined3d
+entirely and works on any X server, including Xvfb.
+
+```bash
+# Build cnc-ddraw from upstream
+nix build .#cnc-ddraw
+
+# Use in game directory
+cp result/bin/ddraw.dll <game_dir>/DDRAW.DLL
+# Create ddraw.ini:
+cat ><game_dir>/ddraw.ini <<'EOF'
+[ddraw]
+fullscreen=false
+windowed=true
+no_compat_warning=true
+fake_mode=640x400x8
+EOF
+```
+
+Then launch with:
+```bash
+WINEDLLOVERRIDES="ddraw=n" wine RA95.EXE
+```
+
+**Required patches for the EXE** (apply in order):
+1. `scripts/nocd-patch.py` — NOP the GetDriveType CD check
+2. `scripts/ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
+3. `scripts/cdlabel-patch.py` — Zero the "CD1" volume label string (Wine doesn't return ISO volume labels on directory mounts)
+
+With cnc-ddraw + all three patches, the game renders menu screens correctly:
+~88 KB (loading) → ~47 KB (menu), 8-bit paletted, 177 unique colors.
 
 ---
 
@@ -212,6 +263,71 @@ i686-w64-mingw32-gcc -shared -o thipx32.dll stub.c thipx32.def
 `_IPX_Send_Packet95`, `_IPX_Shut_Down95`, `_IPX_Start_Listening95`,
 `_IPX_Get_Outstanding_Buffer95`, `_IPX_Get_Version`, and `_Thipx_ThunkData32`.
 
+
+---
+
+## §2.6 — cnc-ddraw: bypassing wined3d for headless rendering
+
+When wined3d's no3d mode produces NULL draw_textures (black screenshots), the
+solution is cnc-ddraw — a Win32 DLL that replaces DirectDraw entirely and renders
+via GDI. This works on any X server, including Xvfb without a GPU.
+
+**Build:**
+```bash
+nix build .#cnc-ddraw --impure
+```
+
+**Staging directory:**
+```bash
+STAGE=$(mktemp -p /tmp -d)
+cp /mnt/redalert/MAIN.MIX "$STAGE/"          # Game data from mounted ISO
+cp /mnt/redalert/INSTALL/REDALERT.MIX "$STAGE/"
+cat >"$STAGE/REDALERT.INI" <<'EOF'
+[Sound]
+Card=-1
+Port=-1
+IRQ=-1
+DMA=-1
+[Options]
+HardwareFills=no
+[Intro]
+PlayIntro=no
+EOF
+
+cat >"$STAGE/ddraw.ini" <<'EOF'
+[ddraw]
+fullscreen=false
+windowed=true
+no_compat_warning=true
+fake_mode=640x400x8
+EOF
+
+cp /opt/redalert/RA95.EXE "$STAGE/RA95.EXE"  # Must have NoCD+DDSCL+cdlabel patches
+cp tools/stub-thipx/thipx32.dll "$STAGE/THIPX32.DLL"
+cp "$(nix build .#cnc-ddraw --impure --print-out-paths)/bin/ddraw.dll" "$STAGE/DDRAW.DLL"
+```
+
+**Launch:**
+```bash
+cd "$STAGE"
+DISPLAY=:96 WINEPREFIX=$HOME/.wine-ra \
+    WINEDLLOVERRIDES="ddraw=n" \
+    timeout 30 wine RA95.EXE
+```
+
+**EXE patches required** (applied in order):
+1. `scripts/nocd-patch.py` — NOP the GetDriveType CD check
+2. `scripts/ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
+3. Manual: zero byte at 0x1BFCB7 in RA95.EXE — cdlabel workaround
+
+**Screenshot diagnostics (file-size heuristics):**
+- **176 B** — wined3d no3d: blank black image
+- **~3.5 KB** — cnc-ddraw loaded, error dialog
+- **~5 KB** — Windows dialog ("Insert CD")
+- **~7 KB** — paletted mode active, CD label mismatch
+- **24-29 KB** — game progressing, more content
+- **47-88 KB** — **real game content!** (117-177 colors, palette mode)
+- **100+ KB** — full rendering with terrain/units
 
 ---
 
@@ -271,6 +387,7 @@ for campaign-level screenshot comparison beyond the title/menu state.
 | **Wine installed** | `wine --version` succeeds, no "wine32 is missing" (may be irrelevant for wow64) |
 | **wine-ra.sh** | Title screenshot >1000 bytes (TrueColor 8-bit sRGB, ~4266 bytes typical) |
 | **wine-td.sh** | Title + menu screenshots >1000 bytes each (may be GDI-only) |
+| **cnc-ddraw + patches** | Screenshot 47-88 KB, 8-bit paletted, 117-177 colors = game rendering |
 | **CI gate** | Script exits 0 or 2 (never 1 on data-absent runner) |
 
 After successful capture, run Playwright parity tests:
@@ -289,7 +406,8 @@ WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts --grep "Tier 3"
 - `scripts/wine-td-setup.sh` — First-time TD setup
 - `tools/stub-thipx/` — Stub THIPX32.DLL (source + .def + prebuilt binary)
 - `tools/wine-input/` — Synthetic input injectors (ra-sendinput.exe etc.)
-- `nix build path:./tools/cnc-ddraw#cnc-ddraw` — cnc-ddraw wrapper builder
+- `nix build .#cnc-ddraw` — cnc-ddraw upstream build (from Nix flake input)
+- `docs/wine-headless-rendering.md` — Full field guide: all approaches tried
 - `scripts/wine-soviet-l1.sh`, `scripts/wine-allied-l1.sh` — Campaign-specific captures
 - `scripts/wine-vqa-capture.sh` — VQA cinematic capture under Wine
 - `scripts/wine-gameplay.sh` — Generic gameplay capture under Wine

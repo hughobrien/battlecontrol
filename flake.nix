@@ -5,7 +5,14 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-wine10.url = "github:NixOS/nixpkgs/nixos-25.05";
     wine-input.url = "path:./tools/wine-input";
-    cnc-ddraw.url = "path:./tools/cnc-ddraw";
+
+    # Upstream: cnc-ddraw — DirectDraw wrapper for old Win32 games under Wine.
+    # Source: https://github.com/FunkyFr3sh/cnc-ddraw
+    # Built as a Win32 DLL (MinGW) in packages.${system}.cnc-ddraw
+    cnc-ddraw = {
+      url = "github:FunkyFr3sh/cnc-ddraw";
+      flake = false;
+    };
 
     # Upstream sources from archive.org Allied CD ISO.
     # Source: https://archive.org/details/cnc-red-alert
@@ -270,6 +277,32 @@
                 chmod 644 "$out"
               '';
 
+          # cnc-ddraw — Win32 DirectDraw wrapper that replaces wined3d with GDI.
+          # Built from upstream GitHub source with MinGW.
+          # nix build .#cnc-ddraw  →  result/bin/ddraw.dll
+          cnc-ddraw = pkgs.stdenv.mkDerivation {
+            pname = "cnc-ddraw";
+            version = "unstable-2026-05-16";
+            src = cnc-ddraw;
+            nativeBuildInputs = [ pkgs.pkgsCross.mingw32.buildPackages.gcc ];
+            buildPhase = ''
+              runHook preBuild
+              make -j"$(nproc)"
+              runHook postBuild
+            '';
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out/bin"
+              install -m755 ddraw.dll "$out/bin/ddraw.dll"
+              runHook postInstall
+            '';
+            meta = with pkgs.lib; {
+              description = "cnc-ddraw — DirectDraw wrapper for old Win32 games under Wine";
+              homepage = "https://github.com/FunkyFr3sh/cnc-ddraw";
+              platforms = [ "x86_64-linux" ];
+            };
+          };
+
           default = p.redalert;
         };
 
@@ -420,7 +453,7 @@
           echo "  nix run .#redalert           run Red Alert (needs RA data)"
           echo "  nix run .#tiberiandawn        run Tiberian Dawn (needs TD data)"
           echo "  nix build path:./tools/wine-input#ra-sendinput   build Wine SendInput helpers"
-          echo "  nix build path:./tools/cnc-ddraw#cnc-ddraw       build cnc-ddraw ddraw.dll"
+          echo "  nix build .#cnc-ddraw                         build cnc-ddraw ddraw.dll (upstream)"
           echo "  nix run .#build-stub-thipx           build stub THIPX32.DLL (for Wine 11.0 wow64)"
           echo ""
           echo "  or use the pi agent: 19 extension tools"
