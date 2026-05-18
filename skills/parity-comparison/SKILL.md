@@ -6,9 +6,6 @@ version: 0.2.0
 
 # Parity Comparison Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `data_verify`, `capture_wine`,
-> `parity_compare`, `wasm_screenshot`, `vqa_pixel_diff`, `run_e2e_test`.
-> Ask the agent to run these instead of typing raw commands.
 
 You are comparing output from the WASM or native Linux C&C build against the original
 Windows Red Alert (RA95.EXE) or Tiberian Dawn (C&C95.EXE) running under Wine. The goal
@@ -422,9 +419,6 @@ When a previously-passing parity check fails, bisect to find the offending commi
 ### Extension tools (preferred — ask the agent)
 
 See the [skills index](../README.md#companion-scripts) for the full list of
-`pi-battlecontrol-dev` extension tools. Parity-relevant tools:
-
-| Tool | Purpose |
 |------|---------|
 | `data_verify` | MIX checksum + INI verification |
 | `capture_wine` | Wine OG title + menu screenshots |

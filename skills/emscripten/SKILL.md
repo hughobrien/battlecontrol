@@ -6,9 +6,6 @@ version: 0.2.0
 
 # Emscripten / WebAssembly Porting Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `build_wasm`, `wasm_validate`,
-> `wasm_screenshot`, `run_e2e_test`.
-> Ask the agent to run these instead of typing raw commands.
 
 You are guiding work on a C++ → WASM port using Emscripten. This project has an active
 playbook at `docs/emscripten-playbook.md` — read it first for symptom→root-cause→fix
