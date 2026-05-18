@@ -277,12 +277,8 @@ native_build(target: "ra")
 # (build-cnc-ddraw.sh still manual)
 
 # Generate gameplay goldens from Wine (the reference)
-bash scripts/gen-gameplay-goldens.sh allied-l1
-bash scripts/gen-gameplay-goldens.sh soviet-l1
-
-# Capture same state from native Linux (manual)
-bash scripts/native-capture.sh allied-l1
-bash scripts/native-capture.sh soviet-l1
+python3 scripts/capture-checkpoint.py mission allied-l1 --targets wine,native,wasm
+python3 scripts/capture-checkpoint.py mission soviet-l1 --targets wine,native,wasm
 
 # Capture same state from WASM
 run_e2e_test(spec: "e2e/tim708-wasm-allied-l1.spec.ts")
@@ -307,12 +303,16 @@ e2e/
     diffs/diff-<mission>-<target>.png       # Pixel diff visualisation
 ```
 
-**Mechanism for native mission start:**
+**Mechanism for capture (all three targets):**
 
-| Mission | Autostart mechanism |
-|---------|-------------------|
-| Allied L1 | `RA_AUTOSTART=1` → SCG01EA.INI (built-in) |
-| Soviet L1 | `RA_AUTOSTART=1` + `RA_AUTOSTART_SCENARIO.FLAG` containing `SCU01EA.INI` (TIM-812 override) |
+| Target | Mechanism |
+|--------|-----------|
+| Wine OG | `python3 scripts/capture-checkpoint.py mission <id> --targets wine` — binary patches + Xvfb + cnc-ddraw |
+| Native | `python3 scripts/capture-checkpoint.py mission <id> --targets native` — RA_AUTOSTART + Xvfb |
+| WASM | `python3 scripts/capture-checkpoint.py mission <id> --targets wasm` — Playwright + dev server |
+
+The native build skips intro VQAs when `RA_AUTOSTART=1` is set (TIM-500),
+going directly to Start_Scenario.  Mission terrain renders within 5-10s.
 
 The native build skips intro VQAs when `RA_AUTOSTART=1` is set (TIM-500),
 going directly to Start_Scenario.  Mission terrain renders within 5-10s.
@@ -321,8 +321,8 @@ going directly to Start_Scenario.  Mission terrain renders within 5-10s.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/native-capture.sh` | Launch native RA under Xvfb, auto-start mission, capture screenshot |
-| `scripts/gen-gameplay-goldens.sh` | Run Wine capture + stage golden + manifest.json |
+| `scripts/capture-checkpoint.py` | Unified capture orchestrator: run any mission/VQA at any frame across Wine/native/WASM targets |
+| `scripts/drivers/*.py` | Capture drivers: wine.py, native.py, wasm.py, compare.py |
 | `scripts/parity-report.sh --mode gameplay` | Three-way SSIM comparison for single-frame gameplay scenes |
 
 ### Step-by-step for a VQA cinematic frame comparison
@@ -435,13 +435,18 @@ Things an agent must never break:
    specific files with explicit paths. Blind `-A` picks up unrelated changes and
    risks committing garbage (node_modules/ logs, build artifacts, generated files).
 
-9. **Wine builds are FPS-limited via cnc-ddraw.** All Wine capture scripts set
+9. **Capture scripts are in `scripts/drivers/`.** The old per-campaign capture scripts
+   (`wine-allied-l1.sh`, `wine-soviet-l1.sh`, `wine-vqa-capture.sh`, `wine-gameplay.sh`,
+   `native-capture.sh`, `gen-gameplay-goldens.sh`) have been subsumed by the Python
+   `capture-checkpoint.py` orchestrator and its drivers. Use `capture-checkpoint`
+   for all new capture work.
+
+10. **Wine builds are FPS-limited via cnc-ddraw.** All Wine capture scripts set
    `maxfps=30` in `ddraw.ini` (under `[ddraw]`). This applies to both RA and TD.
-   Never remove or change this without updating all 11 scripts:
-   `wine-allied-l1.sh`, `wine-allied-m2.sh`, `wine-soviet-l1.sh`,
-   `wine-soviet-m2.sh`, `wine-nod-l1.sh`, `wine-nod-m1.sh`, `wine-gdi-m1.sh`,
-   `wine-gdi-m2.sh`, `wine-vqa-capture.sh`, `wine-cnc-capture.sh`,
-   `wine-ra-difficulty-capture.sh`.
+   Never remove or change this without updating all remaining scripts:
+   `wine-allied-m2.sh`, `wine-soviet-m2.sh`, `wine-nod-l1.sh`,
+   `wine-nod-m1.sh`, `wine-gdi-m1.sh`, `wine-gdi-m2.sh`,
+   `wine-cnc-capture.sh`, `wine-ra-difficulty-capture.sh`.
 
 ---
 
@@ -469,12 +474,12 @@ moved to `scripts/archive/`.
 | `cinematic-compare.py` | Cinematic/VQA batch comparison |
 | `generate-include-shim.py` | Case-folding include shim generator |
 | `gen-vqa-golden.py` / `gen-all-vqa-goldens.sh` | VQA golden frame generation |
-| `gen-gameplay-goldens.sh` | Gameplay golden from Wine capture + manifest |
-| `native-capture.sh` | Native Linux gameplay capture under Xvfb |
-| `ci-local.sh` | Local CI: run all available gates |
+| `capture-checkpoint.py` | Unified capture orchestrator: run any mission/VQA at any frame across Wine/native/WASM targets |
+| `drivers/wine.py` | Wine capture driver (generalizes wine-allied-l1.sh, wine-vqa-capture.sh) |
+| `drivers/native.py` | Native capture driver (generalizes native-capture.sh) |
+| `drivers/wasm.py` | WASM capture driver (Playwright headless) |
+| `drivers/compare.py` | Wrapper around parity-compare.py for multi-target comparison |
 | `wine-ra-setup.sh` / `wine-td-setup.sh` | First-time Wine prefix setup |
-| `wine-allied-l1.sh` / `wine-soviet-l1.sh` | Campaign-specific Wine captures |
-| `wine-vqa-capture.sh` | Wine VQA playback frame capture |
 | `ra-autostart-patch.py` | Binary patch for RA95.EXE: zero-click auto-boot into any Allied mission at Normal difficulty. See [Auto-launch patch](#auto-launch-patch-wine) below. |
 | `ra-scenario-patch.py` | Replace hardcoded mission name in RA95.EXE (e.g. SCG01EA→SCG02EA) |
 | `tools/wine-input/*` | SendInput injectors + BitBlt capture inside Wine |

@@ -691,13 +691,17 @@
           exec bash scripts/run-td-cheat.sh
         '';
 
+        capture-checkpoint = mkApp "capture-checkpoint" ''
+          exec python3 scripts/capture-checkpoint.py "$@"
+        '';
+
         capture-native = mkApp "capture-native" ''
           if [ $# -eq 0 ]; then
             echo "Usage: nix run .#capture-native -- <mission>"
             echo "  e.g. nix run .#capture-native -- allied-l1"
             exit 1
           fi
-          exec bash scripts/native-capture.sh "$1"
+          exec python3 scripts/capture-checkpoint.py mission "$1" --targets native
         '';
 
         vqa-golden = mkApp "vqa-golden" ''
