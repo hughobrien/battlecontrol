@@ -453,7 +453,9 @@ def main(argv=None):
         skip_dirs = [repo_root / d for d in args.skip_dir]
         missing = [d for d in dirs if not d.exists()]
         if missing:
-            print(f"lint-lp64: directories not found: {', '.join(str(m) for m in missing)}")
+            print(
+                f"lint-lp64: directories not found: {', '.join(str(m) for m in missing)}"
+            )
             sys.exit(1)
         findings = scan_dirs(dirs, skip_dirs, RULES)
 

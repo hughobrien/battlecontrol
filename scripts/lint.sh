@@ -16,23 +16,23 @@ echo ""
 echo "=== clang-tidy ==="
 cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>/dev/null || true
 find REDALERT TIBERIANDAWN -type f \
-  \! -path '*/WIN32LIB/*' \
-  \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
-  -print0 | xargs -0 -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
-  | tee /tmp/clang-tidy-report.txt || true
+	\! -path '*/WIN32LIB/*' \
+	\( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
+	-print0 | xargs -0 -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 |
+	tee /tmp/clang-tidy-report.txt || true
 echo "$(grep -c 'warning:\|error:' /tmp/clang-tidy-report.txt 2>/dev/null || echo 0) clang-tidy finding(s)"
 
 echo ""
 echo "=== cppcheck ==="
 cppcheck --enable=warning,performance,portability,information \
-  --suppress=missingIncludeSystem \
-  --suppress=unmatchedSuppression \
-  --inline-suppr --error-exitcode=0 \
-  -j "$(nproc)" --quiet \
-  -I REDALERT -I REDALERT/WIN32LIB \
-  -I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
-  -I linux/win32-stubs \
-  REDALERT TIBERIANDAWN 2>&1 | tee /tmp/cppcheck-report.txt
+	--suppress=missingIncludeSystem \
+	--suppress=unmatchedSuppression \
+	--inline-suppr --error-exitcode=0 \
+	-j "$(nproc)" --quiet \
+	-I REDALERT -I REDALERT/WIN32LIB \
+	-I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
+	-I linux/win32-stubs \
+	REDALERT TIBERIANDAWN 2>&1 | tee /tmp/cppcheck-report.txt
 echo "$(grep -c 'error:\|warning:' /tmp/cppcheck-report.txt 2>/dev/null || echo 0) cppcheck finding(s)"
 
 echo ""
@@ -57,17 +57,17 @@ echo ""
 echo "=== /opt path audit ==="
 HITS=$(rg -n '/opt/(redalert|tiberiandawn)' scripts/ | grep -v 'lint.sh' || true)
 if [[ -n "$HITS" ]]; then
-  echo "FAIL: scripts/ still contains /opt/redalert or /opt/tiberiandawn"
-  echo "$HITS"
-  FAIL=1
+	echo "FAIL: scripts/ still contains /opt/redalert or /opt/tiberiandawn"
+	echo "$HITS"
+	FAIL=1
 else
-  echo "  OK: no /opt paths in scripts/"
+	echo "  OK: no /opt paths in scripts/"
 fi
 
 if [ "$FAIL" -ne 0 ]; then
-  echo ""
-  echo "✗ Lint failed"
-  exit 1
+	echo ""
+	echo "✗ Lint failed"
+	exit 1
 fi
 echo ""
 echo "✓ Lint passed"
