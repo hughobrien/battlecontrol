@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-wine10.url = "github:NixOS/nixpkgs/nixos-25.05";
     wine-input.url = "path:./tools/wine-input";
     cnc-ddraw.url = "path:./tools/cnc-ddraw";
   };
@@ -11,12 +12,14 @@
     {
       self,
       nixpkgs,
+      nixpkgs-wine10,
       wine-input,
       cnc-ddraw,
     }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      pkgs-wine10 = nixpkgs-wine10.legacyPackages.${system};
       mkApp = name: script: rec {
         type = "app";
         program = toString (pkgs.writeShellScript name script);
@@ -184,6 +187,8 @@
           gh
           clang-tools
           cppcheck
+          # Mingw-w64 cross-compiler (for stub THIPX32.DLL)
+          pkgs.pkgsCross.mingw32.buildPackages.gcc
           # Linting tools
           ruff
           shellcheck
@@ -203,8 +208,9 @@
           openbox
           xdotool
           imagemagick
+          mono
           curl
-          wineWow64Packages.stable
+          pkgs-wine10.winePackages.stableFull
         ];
 
         shellHook = ''
@@ -302,6 +308,7 @@
           echo "  nix run .#tiberiandawn        run Tiberian Dawn (needs TD data)"
           echo "  nix build path:./tools/wine-input#ra-sendinput   build Wine SendInput helpers"
           echo "  nix build path:./tools/cnc-ddraw#cnc-ddraw       build cnc-ddraw ddraw.dll"
+          echo "  nix run .#build-stub-thipx           build stub THIPX32.DLL (for Wine 11.0 wow64)"
           echo ""
           echo "  or use the pi agent: 19 extension tools"
           echo ""
@@ -623,6 +630,11 @@
           nix run .#build-wasm
           nix run .#validate-wasm
           nix run .#ci-wasm-smoke
+        '';
+
+        # Build the stub THIPX32.DLL for Wine 11.0 wow64 compatibility.
+        build-stub-thipx = mkApp "build-stub-thipx" ''
+          exec bash scripts/build-stub-thipx.sh "$@"
         '';
 
         # ── CI Job Apps ────────────────────────────────────────────────────

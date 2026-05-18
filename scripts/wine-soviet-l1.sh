@@ -11,38 +11,38 @@
 #
 # This script swaps the auto-start target to Soviet L1 (SCU01EA.INI) by
 # substituting `scripts/soviet-cdlabel-patch.py` for the standard
-# `scripts/cdlabel-patch.py`.  The Soviet variant zeros the first byte
+# `scripts/cdlabel-patch.py`. The Soviet variant zeros the first byte
 # of "CD2" in _CD_Volume_Label[] (file offset 0x1BFCBB) instead of the
 # first byte of "CD1" — so Wine's empty CIFS volume label matches
-# index 1 (Soviet) instead of index 0 (Allied).  Get_CD_Index then
+# index 1 (Soviet) instead of index 0 (Allied). Get_CD_Index then
 # returns 1, CurrentCD = 1, and the IsFromInstall branch at
 # INIT.CPP:1032-1036 selects SCU01EA.INI.
 #
 # No menu navigation is needed — Soviet L1 launches automatically the
-# same way Allied L1 does in wine-allied-l1.sh.  The two scripts differ
+# same way Allied L1 does in wine-allied-l1.sh. The two scripts differ
 # only in the cdlabel patch applied.
 #
 # Rendering
 # ─────────
-#   * cnc-ddraw master build with TIM-740 scanline_double patch
-#   * GDI renderer + windowed mode (framebuffer reaches X11 → ffmpeg)
-#   * openbox WM so the Wine window is decorated for DInput attach
+#  * cnc-ddraw master build with TIM-740 scanline_double patch
+#  * GDI renderer + windowed mode (framebuffer reaches X11 → ffmpeg)
+#  * openbox WM so the Wine window is decorated for DInput attach
 #
 # Wine version
 # ────────────
-# Pinned to Wine 10.0.  Wine 11.x regressed the d:=cdrom detection path
+# Pinned to Wine 10.0. Wine 11.x regressed the d:=cdrom detection path
 # (see project memory `wine_11x_volume_label_regression`).
 #
 # Outputs in $ARTIFACT_DIR (default: e2e/report/data/wine-ra-soviet-l1/):
-#   frame-0.png    — pre-Options, Soviet L1 mission rendering
-#   frame-100.png  — Options dialog over Soviet L1 terrain (paused)
-#   frame-250.png  — post-resume, Soviet L1 ~16 s after mission start
-#   frame-500.png  — Soviet L1 ~33 s after mission start (15 TPS × 33)
-#   wine.log helper.log xvfb.log openbox.log
+#  frame-0.png  — pre-Options, Soviet L1 mission rendering
+#  frame-100.png — Options dialog over Soviet L1 terrain (paused)
+#  frame-250.png — post-resume, Soviet L1 ~16 s after mission start
+#  frame-500.png — Soviet L1 ~33 s after mission start (15 TPS × 33)
+#  wine.log helper.log xvfb.log openbox.log
 #
 # Exit:
-#   0 — frame-500.png has ≥64 unique colours and ≥5 KB on disk
-#   non-zero otherwise
+#  0 — frame-500.png has ≥64 unique colours and ≥5 KB on disk
+#  non-zero otherwise
 
 set -euo pipefail
 
@@ -83,7 +83,7 @@ done
 }
 [[ -f "$CNC_DDRAW_DIR/ddraw.dll" ]] || {
 	echo "FAIL: cnc-ddraw (TIM-740 scanline_double build) missing at $CNC_DDRAW_DIR"
-	echo "   run: bash scripts/build-cnc-ddraw.sh"
+	echo "  run: bash scripts/build-cnc-ddraw.sh"
 	exit 1
 }
 [[ -f "$SENDINPUT_SRC" ]] || {
@@ -94,12 +94,12 @@ done
 [[ -f "$SENDINPUT_EXE" && "$SENDINPUT_SRC" -ot "$SENDINPUT_EXE" ]] ||
 	i686-w64-mingw32-gcc -o "$SENDINPUT_EXE" "$SENDINPUT_SRC" -luser32
 
-echo "  wine:       $($WINE --version)"
-echo "  ra-input:   $SENDINPUT_EXE"
-echo "  cnc-ddraw:  $CNC_DDRAW_DIR/ddraw.dll"
-echo "  prefix:     $WINEPREFIX"
-echo "  data:       $DATA_DIR"
-echo "  artifacts:  $ARTIFACT_DIR"
+echo " wine:    $($WINE --version)"
+echo " ra-input:  $SENDINPUT_EXE"
+echo " cnc-ddraw: $CNC_DDRAW_DIR/ddraw.dll"
+echo " prefix:   $WINEPREFIX"
+echo " data:    $DATA_DIR"
+echo " artifacts: $ARTIFACT_DIR"
 
 # ─── Pick free X display ─────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ pick_display() {
 	exit 1
 }
 XDISP="${XDISP:-$(pick_display)}"
-echo "  display:    $XDISP"
+echo " display:  $XDISP"
 
 # ─── Stage ───────────────────────────────────────────────────────────────────
 
@@ -133,11 +133,11 @@ echo "=== applying binary patches ==="
 # soviet-cdlabel-patch.py replaces cdlabel-patch.py — see header comment.
 for patch in focus-skip-patch.py game-in-focus-patch.py soviet-cdlabel-patch.py vqa-skip-patch.py; do
 	if [[ -f "$THIS_DIR/$patch" ]]; then
-		echo "  $patch:"
-		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | sed 's/^/    /' | tail -3 || true
+		echo " $patch:"
+		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | sed 's/^/  /' | tail -3 || true
 	fi
 done
-echo "  final sha256: $(sha256sum "$STAGE/RA95.EXE" | cut -d' ' -f1)"
+echo " final sha256: $(sha256sum "$STAGE/RA95.EXE" | cut -d' ' -f1)"
 
 cp "$CNC_DDRAW_DIR/ddraw.dll" "$STAGE/ddraw.dll"
 cat >"$STAGE/ddraw.ini" <<'EOF'
@@ -156,8 +156,8 @@ cp "$SENDINPUT_EXE" "$STAGE/ra-sendinput.exe"
 # ─── Wine prefix ─────────────────────────────────────────────────────────────
 
 if [[ ! -d "$WINEPREFIX" ]]; then
-	echo "  creating $WINEPREFIX..."
-	WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all \
+	echo " creating $WINEPREFIX..."
+	WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all \
 		"$WINE" wineboot --init 2>/dev/null
 fi
 mkdir -p "$WINEPREFIX/dosdevices"
@@ -196,17 +196,17 @@ echo "=== launching RA95.EXE ==="
 (
 	cd "$STAGE"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
-		WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEPREFIX="$WINEPREFIX" \
 		WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
 		WINEDEBUG=-all AUDIODEV=null \
 		timeout 240 "$WINE" RA95.EXE
 ) >"$ARTIFACT_DIR/wine.log" 2>&1 &
 RA_PID=$!
 
-echo "  waiting for Red Alert window..."
+echo " waiting for Red Alert window..."
 for i in $(seq 1 30); do
 	if DISPLAY="$XDISP" xdotool search --name "^Red Alert$" >/dev/null 2>&1; then
-		echo "  Red Alert window appeared after ${i}s"
+		echo " Red Alert window appeared after ${i}s"
 		break
 	fi
 	sleep 1
@@ -216,7 +216,7 @@ done
 
 send_key() {
 	local vk="$1" label="${2:-key}"
-	echo "  SendInput key[$label]: vk=$vk"
+	echo " SendInput key[$label]: vk=$vk"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
 		WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" key "$vk" \
 		>>"$ARTIFACT_DIR/helper.log" 2>&1 || true
@@ -224,7 +224,7 @@ send_key() {
 
 send_click() {
 	local x="$1" y="$2" label="${3:-click}"
-	echo "  SendInput click[$label]: client=($x,$y)"
+	echo " SendInput click[$label]: client=($x,$y)"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
 		WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" click "$x" "$y" \
 		>>"$ARTIFACT_DIR/helper.log" 2>&1 || true
@@ -237,17 +237,17 @@ shoot() {
 		-i "$XDISP" -frames:v 1 -y "$png" 2>/dev/null || true
 	local sz
 	sz=$(stat -c%s "$png" 2>/dev/null || echo "0")
-	echo "  shot $name: $sz bytes"
+	echo " shot $name: $sz bytes"
 }
 
 # ─── Capture sequence (mirrors wine-allied-l1.sh) ────────────────────────────
 #
 # Boot under the soviet-cdlabel patch chain:
-#   * 0–3 s   : Wine launches RA95.EXE
-#   * 3-6 s   : Get_CD_Index returns 1 (CD2 label matched empty Wine label)
-#                CurrentCD = 1, IsFromInstall = true, scenario auto-set to
-#                SCU01EA.INI by INIT.CPP:1032-1036
-#   * frame 0 : Soviet Mission 1 rendered ~6 s after window appears.
+#  * 0–3 s  : Wine launches RA95.EXE
+#  * 3-6 s  : Get_CD_Index returns 1 (CD2 label matched empty Wine label)
+#        CurrentCD = 1, IsFromInstall = true, scenario auto-set to
+#        SCU01EA.INI by INIT.CPP:1032-1036
+#  * frame 0 : Soviet Mission 1 rendered ~6 s after window appears.
 
 echo
 echo "=== capture sequence ==="
@@ -261,7 +261,7 @@ if ! kill -0 $RA_PID 2>/dev/null; then
 	exit 3
 fi
 
-# Esc opens the in-mission Options dialog (pauses the sim).  Same pattern
+# Esc opens the in-mission Options dialog (pauses the sim). Same pattern
 # as wine-allied-l1.sh — proves the input pipeline is healthy and gives a
 # paused-over-terrain reference frame.
 send_key 0x1B "esc-options"
@@ -274,7 +274,7 @@ send_click 215 273 "resume-mission"
 sleep 7
 shoot "frame-250"
 
-# Frame 500 ≈ 33 s after mission start at 15 TPS.  Wait 17 s more from
+# Frame 500 ≈ 33 s after mission start at 15 TPS. Wait 17 s more from
 # frame-250 (10 s mark) to reach the ~33 s mark.
 sleep 17
 shoot "frame-500"
@@ -287,7 +287,7 @@ PASS=1
 TARGET="$ARTIFACT_DIR/frame-500.png"
 
 if [[ ! -f "$TARGET" ]]; then
-	echo "  FAIL frame-500.png missing"
+	echo " FAIL frame-500.png missing"
 	PASS=0
 else
 	sz=$(stat -c%s "$TARGET")
@@ -296,11 +296,11 @@ else
 	else
 		ncolors="unknown"
 	fi
-	echo "  frame-500.png: $sz bytes, $ncolors unique colours"
+	echo " frame-500.png: $sz bytes, $ncolors unique colours"
 	if [[ "$sz" -ge 5000 && "$ncolors" -ge 64 ]]; then
-		echo "  PASS frame-500.png is non-black Soviet L1 (≥5 KB and ≥64 colours)"
+		echo " PASS frame-500.png is non-black Soviet L1 (≥5 KB and ≥64 colours)"
 	else
-		echo "  FAIL frame-500.png does not meet thresholds (need ≥5 KB and ≥64 colours)"
+		echo " FAIL frame-500.png does not meet thresholds (need ≥5 KB and ≥64 colours)"
 		PASS=0
 	fi
 fi
@@ -316,9 +316,9 @@ for name in frame-0 frame-100 frame-250 frame-500; do
 		else
 			nc="?"
 		fi
-		echo "  $name.png — $sz bytes, $nc colours"
+		echo " $name.png — $sz bytes, $nc colours"
 	else
-		echo "  $name.png — MISSING"
+		echo " $name.png — MISSING"
 	fi
 done
 

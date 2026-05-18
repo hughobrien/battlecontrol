@@ -1,7 +1,7 @@
 ---
 name: parity-comparison
 description: Use when comparing WASM/native Linux C&C output against original Wine/RA95 baseline screenshots. Trigger on symptoms like SSIM below threshold, parity test regression, Wine OG capture failure, MIX checksum mismatch, cinematic pixel-diff failure, or any new visual change that needs parity validation. Also trigger when adding a new scene/menu/mission to the parity gate.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Parity Comparison Skill
@@ -65,6 +65,55 @@ wine_capture(game: "td")
 
 **Output:** `e2e/screenshots/wine-{game}-title.png` and `wine-{game}-menu.png`
 
+**⚠️ Wine 11.0 wow64 caveat:** Wine 11 ships as `wineWow64Packages.stable`
+(Nix) which does NOT support `WINEARCH=win32` (`wineWowPackages.stable`
+is deprecated upstream). However, it **can** run 32-bit RA95.EXE natively
+— just omit `WINEARCH=win32` entirely. The 64-bit prefix auto-handles
+32-bit binaries.
+
+**⚠️ Patch chain order for RA95.EXE under Wine 11:**
+Apply patches in this exact order, or the game will crash immediately:
+```bash
+cp RA95.EXE ./RA95_patched.EXE
+python3 scripts/nocd-patch.py ./RA95_patched.EXE
+python3 scripts/cdlabel-patch.py ./RA95_patched.EXE
+python3 scripts/vqa-skip-patch.py ./RA95_patched.EXE
+```
+(`focus-skip-patch.py` and `game-in-focus-patch.py` are for the AUTODEMO
+workflow only — not needed for basic gameplay screenshots.)
+
+**Direct Wine capture (no script):**
+```bash
+STAGE=$(mktemp -d /tmp/wine-capture-XXXX)
+for f in /path/to/data/*.MIX /path/to/data/*.INI; do ln -sf "$f" "$STAGE/$(basename \"$f\")"; done
+cp RA95_patched.EXE "$STAGE/RA95.EXE"
+cp result/bin/ddraw.dll "$STAGE/ddraw.dll"    # cnc-ddraw
+cat >"$STAGE/ddraw.ini" <<'EOF'
+[ddraw]
+renderer=gdi
+windowed=true
+hook=0
+window_state=normal
+[ra95]
+scanline_double=true
+EOF
+
+Xvfb :99 -screen 0 640x480x24 -ac &
+sleep 1
+DISPLAY=:99 openbox --sm-disable &
+sleep 1
+
+cd "$STAGE"
+WINEPREFIX=/tmp/.wine-og \
+  WINEDLLOVERRIDES="ddraw=n,b" \
+  DISPLAY=:99 \
+  timeout 60 wine RA95.EXE &
+
+# Capture with ImageMagick import (more reliable than ffmpeg x11grab for Wine)
+sleep 4
+DISPLAY=:99 import -window root -depth 8 /tmp/wine-screenshot.png
+```
+
 **Campaign-specific captures** (manual scripts only):
 ```bash
 bash scripts/wine-allied-l1.sh    # Allied L1
@@ -93,13 +142,37 @@ run_e2e_test(spec: "e2e/tim710-wasm-parity.spec.ts")
 # (run wine_capture first, then set WINE_RA_READY=1)
 ```
 
-**Native Linux:** (manual only)
+**WASM Allied L1 gameplay (early frames):**
+```
+run_e2e_test(spec: "e2e/tim708-wasm-allied-l1.spec.ts")
+```
+Output screenshots:
+- `e2e/tim708/allied-l1/wasm-t5.png` (5s)
+- `e2e/tim708/allied-l1/wasm-t15.png` (15s)
+- `e2e/tim708/allied-l1/wasm-t30.png` (30s)
+- `e2e/screenshots/wasm-gameplay/allied-l1/capture.png` (canonical)
+
+**Native Linux (via built-in BMP capture hooks):**
+
+The native build has TIM-490 hooks that save BMP screenshots at game loop
+frames 10, 50, and 100. Run with:
 ```bash
 source scripts/skill-xvfb-ensure.sh :99 640x480x24
-DISPLAY=:99 ./build/ra &
-sleep 10
-ffmpeg -f x11grab -video_size 640x480 -i :99 -frames:v 1 native-menu.png -y
+DISPLAY=:99 SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
+  RA_AUTOSTART=1 timeout 30 ./build/ra
+# BMPs saved to /tmp/redalert-gameplay-f{010,050,100}.bmp
 ```
+
+**Native Linux (manual capture with ImageMagick):**
+```bash
+source scripts/skill-xvfb-ensure.sh :99 640x480x24
+DISPLAY=:99 SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
+  RA_AUTOSTART=1 ./build/ra &
+sleep 5
+DISPLAY=:99 import -window root -depth 8 native-screenshot.png
+```
+> **Note:** `import` (ImageMagick) is more reliable for Xvfb capture than
+> `ffmpeg x11grab`, which often returns blank frames.
 
 ### §2.3 — Step 3: Run parity comparison
 
@@ -192,6 +265,42 @@ run_e2e_test(spec: "e2e/tim600-english-vqa-verify.spec.ts")
 
 ---
 
+## §4.5 — Diagnosing rendering bugs (shape decode / blit issues)
+
+If the rendering looks corrupted ("many small coloured squares", garbled textures,
+wrong colours), the issue is likely in the shape blit pipeline rather than in the
+shape decode itself. The shape format (KeyFrameHeaderType + LCW decompression)
+is tested separately — corrupted-but-right-sized output points to the blit step.
+
+**Check the stride calculation in shape blit functions.**
+
+Every row-based blit must include `Get_Pitch()` in its stride. All correct
+functions follow this pattern:
+```cpp
+int stride = vp->Get_Width() + vp->Get_XAdd() + vp->Get_Pitch();
+```
+
+Key files to check:
+| File | Function | Status |
+|------|----------|--------|
+| `linux/win32-stubs/wwlib-asm-stub.cpp` | `Buffer_Frame_To_Page` | ✅ Fixed (TIM-1054) |
+| `linux/td-win32-stubs.cpp` | `Buffer_Frame_To_Page` | ✅ Fixed (TIM-1054) |
+| `linux/win32-stubs/wwlib-asm-stub.cpp` | `Buffer_Draw_Stamp` | ✅ Correct |
+| `linux/win32-stubs/wwlib-asm-stub.cpp` | `Linear_Blit_To_Linear` | ✅ Correct |
+| `linux/win32-stubs/wwlib-asm-stub.cpp` | `Buffer_Fill_Rect` | ✅ Correct |
+| `linux/win32-stubs/wwlib-asm-stub.cpp` | `Buffer_Clear` | ✅ Correct |
+| `linux/win32-stubs/wwlib-asm-stub.cpp` | `Buffer_Remap` | ✅ Correct |
+
+Without `Get_Pitch()`, each successive row is drawn `Pitch` bytes too early,
+progressively shearing the image. `Pitch = SDL_Get_Primary_Pitch() - Width`
+(set in `GBUFFER.CPP:599`) and is almost always non-zero for SDL surfaces.
+
+**Reproduction:** The oil derrick pump (STRUCT_PUMP, shape "V19") in Allied
+Mission 1 displays as coloured squares when this stride is wrong. Check by
+capturing WASM or native screenshots and comparing against Wine OG.
+
+---
+
 ## §5 — Diagnosing SSIM regression
 
 When a previously-passing parity check starts failing:
@@ -225,6 +334,24 @@ When a previously-passing parity check starts failing:
    (The `parity_compare` tool doesn't expose `--print-bbox` yet — use the Python script directly for this.)
    If the content bboxes differ significantly, the captures are from different
    game states.
+
+### Native capture troubleshooting
+
+If native capture produces blank/black frames with ffmpeg, try:
+1. Use ImageMagick `import` instead: `DISPLAY=:99 import -window root capture.png`
+2. Ensure `SDL_RENDER_DRIVER=software` is set (avoids GPU dependency)
+3. Ensure `SDL_AUDIODRIVER=dummy` is set (no audio card needed)
+4. Wait at least 4s for the first frame to render (the game loads MIX files first)
+5. The TIM-490 BMP hooks fire at frames 10, 50, 100 automatically in autostart mode
+
+### WASM capture troubleshooting
+
+- If the page shows a black canvas, ensure COOP/COEP headers are set (the WASM
+  server at `wasm/serve-coop.py` provides these)
+- If `__wasmReady` never fires, check the browser console for pageerrors
+- First screenshot may be mostly black (~55% fill) while assets load
+
+---
 
 ### Automated bisection for parity regressions
 

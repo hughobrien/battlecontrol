@@ -905,13 +905,15 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
   pi.registerTool({
     name: "wine_capture",
     label: "Wine Capture",
-    description: "Capture Wine OG baseline screenshots (title screen + menu) for Red Alert or Tiberian Dawn. Requires Wine, game data, and the original EXE.",
+    description: "Capture Wine OG baseline screenshots (title screen) for Red Alert or Tiberian Dawn under Xvfb. Requires Wine, game data, and the original EXE. Note: title→menu transition requires a GPU GL context — under Xvfb the menu screenshot will match the title screen.",
     promptSnippet: "Capture baseline screenshots from original Wine RA95.EXE or C&C95.EXE",
     promptGuidelines: [
       "Use wine_capture to generate reference screenshots for visual parity comparison",
       "Requires the original Win32 EXE (RA95.EXE or C&C95.EXE) and game data",
       "Screenshots are saved to e2e/screenshots/wine-{game}-title.png and wine-{game}-menu.png",
       "Run wine_check first to verify prerequisites",
+      "Wine 11.0 (wow64) requires the stub THIPX32.DLL from tools/stub-thipx/",
+      "Title→menu transition fails without GL context — only title screen is captured",
     ],
     parameters: Type.Object({
       game: Type.Union(

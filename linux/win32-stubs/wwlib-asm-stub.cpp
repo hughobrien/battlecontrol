@@ -250,7 +250,7 @@ long Buffer_Frame_To_Page(int x, int y, int w, int h,
 
     int vw     = dest.Get_Width();
     int vh     = dest.Get_Height();
-    int stride = vw + dest.Get_XAdd(); // row stride of the underlying buffer
+    int stride = vw + dest.Get_XAdd() + dest.Get_Pitch(); // row stride of the underlying buffer (includes Pitch for surface alignment)
 
     // Clip source rect against viewport bounds.
     int sx0 = 0, sy0 = 0, dw = w, dh = h;
