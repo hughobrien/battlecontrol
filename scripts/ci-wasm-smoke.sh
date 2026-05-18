@@ -3,7 +3,7 @@
 # Used by: ci-cd skill §4.
 #
 # Usage:
-#   bash scripts/skill-ci-wasm-smoke.sh
+#   bash scripts/ci-wasm-smoke.sh
 #
 # Steps:
 #   1. emcmake cmake --preset wasm
@@ -62,11 +62,11 @@ echo "--- Step 5-6: Smoke tests ---"
 
 # Start Xvfb
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/skill-xvfb-ensure.sh" :99 1280x1024x24
+source "$SCRIPT_DIR/xvfb-ensure.sh" :99 1280x1024x24
 
 # Start WASM server
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/skill-wasm-serve.sh" 8080
+source "$SCRIPT_DIR/serve-wasm.sh" 8080
 
 # Run T1: RA boot smoke
 echo ""

@@ -3,7 +3,7 @@
 # Used by: wine-testing skill Phase 0.
 #
 # Usage:
-#   bash scripts/skill-wine-check.sh
+#   bash scripts/wine-check.sh
 #
 # Exit code: 0 = all prerequisites met, 1 = one or more missing.
 

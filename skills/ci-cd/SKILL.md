@@ -223,7 +223,7 @@ playwright test --repeat-each 3 e2e/regression/T1-ra-wasm-boot.spec.ts
 | WASM JIT cold-start | T1/T2 pass 50% of time | Increase `waitForFunction` timeout to 300s |
 | Audio timing race | Audio pitch probe passes ~60% | Apply 5/5 cold-cache rule; add retry |
 | Asset server race | Game loads blank if assets not ready | Add `waitForResponse` before interaction |
-| Xvfb display collision | `xdpyinfo` fails intermittently | Use `skill-xvfb-ensure.sh` (idempotent) |
+| Xvfb display collision | `xdpyinfo` fails intermittently | Use `xvfb-ensure.sh` (idempotent) |
 
 ### Mitigation techniques
 
@@ -234,7 +234,7 @@ playwright test --repeat-each 3 e2e/regression/T1-ra-wasm-boot.spec.ts
   with:
     timeout_minutes: 10
     max_attempts: 2
-    command: bash scripts/skill-run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+    command: bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
 ```
 
 Before adding retries, try fixing the root cause. Retry should be a last resort.
@@ -288,7 +288,7 @@ For runner-level issues (disk space, Docker daemon):
    is a single step:
    ```yaml
    - name: WASM — T{N} {description}
-     run: bash scripts/skill-run-e2e.sh e2e/regression/T{N}-{name}.spec.ts
+     run: bash scripts/run-e2e.sh e2e/regression/T{N}-{name}.spec.ts
    ```
 3. Upload screenshots on failure:
    ```yaml

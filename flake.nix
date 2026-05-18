@@ -481,12 +481,12 @@
         # nix run .#<name> [args...]  from the repo root.
 
         toolchain-check = mkApp "toolchain-check" ''
-          exec bash scripts/skill-dev-check.sh
+          exec bash scripts/toolchain-check.sh
         '';
 
         build-native = mkApp "build-native" ''
           export CC=clang CXX=clang++
-          exec bash scripts/skill-native-build.sh "$@"
+          exec bash scripts/build-native.sh "$@"
         '';
 
         release-build-ra = mkApp "release-build-ra" ''
@@ -607,11 +607,11 @@
         '';
 
         test-t1 = mkApp "test-t1" ''
-          exec bash scripts/skill-run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+          exec bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
         '';
 
         test-t2 = mkApp "test-t2" ''
-          exec bash scripts/skill-run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
+          exec bash scripts/run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
         '';
 
         test = mkApp "run-e2e" ''
@@ -620,7 +620,7 @@
             echo "  e.g. nix run .#test -- e2e/regression/T1-ra-wasm-boot.spec.ts"
             exit 1
           fi
-          exec bash scripts/skill-run-e2e.sh "$@"
+          exec bash scripts/run-e2e.sh "$@"
         '';
 
         screenshot = mkApp "screenshot" ''

@@ -3,10 +3,10 @@
 # Used by: native-build, ci-cd skills.
 #
 # Usage:
-#   bash scripts/skill-native-build.sh              # both targets
-#   bash scripts/skill-native-build.sh ra           # RA only
-#   bash scripts/skill-native-build.sh td           # TD only
-#   bash scripts/skill-native-build.sh              # default: clang++
+#   bash scripts/build-native.sh              # both targets
+#   bash scripts/build-native.sh ra           # RA only
+#   bash scripts/build-native.sh td           # TD only
+#   bash scripts/build-native.sh              # default: clang++
 #
 # Exit code: 0 if all builds pass, 1 if any fails.
 

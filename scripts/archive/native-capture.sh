@@ -66,7 +66,7 @@ if [[ ! -x "$RA_BIN" ]]; then
 fi
 if [[ ! -x "$RA_BIN" ]]; then
 	echo "FAIL: RA native binary not found at $RA_BIN" >&2
-	echo "  Run: bash scripts/skill-native-build.sh ra" >&2
+	echo "  Run: bash scripts/build-native.sh ra" >&2
 	exit 2
 fi
 

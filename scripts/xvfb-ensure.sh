@@ -3,9 +3,9 @@
 # Used by: native-build, e2e-testing, ci-cd, parity-comparison skills.
 #
 # Usage:
-#   source scripts/skill-xvfb-ensure.sh           # :99 1280x1024x24
-#   source scripts/skill-xvfb-ensure.sh :98       # custom display
-#   source scripts/skill-xvfb-ensure.sh :99 640x480x24  # custom geometry
+#   source scripts/xvfb-ensure.sh           # :99 1280x1024x24
+#   source scripts/xvfb-ensure.sh :98       # custom display
+#   source scripts/xvfb-ensure.sh :99 640x480x24  # custom geometry
 #
 # After sourcing, XVFB_DISPLAY and XVFB_PID are exported.
 # The script sets EXIT trap to kill Xvfb automatically.

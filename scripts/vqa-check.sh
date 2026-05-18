@@ -3,7 +3,7 @@
 # Used by: ci-cd, vqa-codec skills.
 #
 # Usage:
-#   bash scripts/skill-vqa-check.sh
+#   bash scripts/vqa-check.sh
 #
 # Steps:
 #   1. Regenerate synthetic test VQA to /tmp, diff against committed file
