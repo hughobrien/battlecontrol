@@ -11,7 +11,14 @@ if [ "$TIER" != "full" ]; then
 fi
 
 FAIL=0
-run() { local script="$1"; echo "---- $script ----"; bash "$script" || { rc=$?; [ "$rc" -eq 77 ] || FAIL=$((FAIL + 1)); }; }
+run() {
+	local script="$1"
+	echo "---- $script ----"
+	bash "$script" || {
+		rc=$?
+		[ "$rc" -eq 77 ] || FAIL=$((FAIL + 1))
+	}
+}
 
 run scripts/regression/T5-td-native-menu.sh
 run scripts/regression/T12-td-native-m2-smoke.sh
