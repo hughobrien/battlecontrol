@@ -102,13 +102,10 @@ def patch(path: str, dry_run: bool = False) -> int:
 
 
 if __name__ == "__main__":
-    paths = (
-        sys.argv[1:]
-        if len(sys.argv) > 1
-        else [
-            "/opt/redalert/game/RA95.EXE",
-        ]
-    )
+    if len(sys.argv) < 2:
+        print(f"Usage: {__file__} <exe-path> [exe-path ...]", file=sys.stderr)
+        sys.exit(1)
+    paths = sys.argv[1:]
     rc = 0
     for p in paths:
         try:
