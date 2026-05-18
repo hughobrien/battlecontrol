@@ -473,7 +473,7 @@
           );
         };
 
-        default = redalert;
+        default = toolchain-check;
 
         # ── Developer workflow apps ────────────────────────────────────────
         # nix run .#<name> [args...]  from the repo root.
