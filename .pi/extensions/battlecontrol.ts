@@ -1324,13 +1324,11 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
       mission: Type.String({ description: "Mission identifier (e.g. 'allied-l1', 'soviet-l1', 'gdi-m1', 'nod-l1')" }),
     }),
     async execute(_toolCallId: string, params: any, _signal: AbortSignal | undefined, onUpdate: any, _ctx: any) {
-      const script = repoPath("scripts", "native-capture.sh");
-      if (!fs.existsSync(script)) {
-        return { content: [{ type: "text", text: `❌ ${script} not found` }], isError: true };
-      }
       const mission = params.mission;
-      onUpdate?.({ content: [{ type: "text", text: `Capturing native Linux gameplay for ${mission}...` }] });
-      const result = run("bash", [script, mission], { timeout: 120_000 });
+      onUpdate?.({ content: [{ type: "text", text: `Capturing native Linux gameplay for ${mission} via capture-checkpoint...` }] });
+      const result = run("python3", [
+        repoPath("scripts", "capture-checkpoint.py"), "mission", mission, "--targets", "native"
+      ], { timeout: 120_000 });
       if (result.exitCode === 0) {
         return { content: [{ type: "text", text: `✅ Native capture: ${mission}\n${result.stdout}` }] };
       } else {

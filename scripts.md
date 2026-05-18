@@ -31,7 +31,7 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | Toolchain check | `toolchain_check` | `toolchain-check` | `scripts/toolchain-check.sh` | — | — |
 | Wine check | `wine_check` | — | `scripts/wine-check.sh` | — | — |
 | Wine capture | `wine_capture` | `capture-wine` | `scripts/wine-cnc-capture.sh` | `ci.yml → wine-comparison` | — |
-| Native capture | `native_capture` ⚠️ | `capture-native` | `scripts/capture-checkpoint.py` | — | — |
+| Native capture | `native_capture` | `capture-native` | `scripts/capture-checkpoint.py` | — | — |
 | Capture orchestrator | — | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
 | Parity compare | `parity_compare` | `parity-compare` | `scripts/parity-compare.py` | — | — |
 | Parity report | `parity_report` | `parity-report` | `scripts/parity-report.sh` | — | — |
@@ -301,7 +301,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `lint_lp64` | extension tool | Lint | LP64 hazard audit. |
 | `lint-lp64.py` | script | Lint | LP64 static hazard scanner. |
 | `native_build` | extension tool | Build | Build RA + TD native Linux. |
-| `native_capture` | extension tool | Capture | ⚠️ STALE — points to archived script. |
+| `native_capture` | extension tool | Capture | Delegates to `capture-checkpoint.py` (was pointing to archived script). |
 | `nocd-patch.py` | script | Patch (RA) | Skip CD error dialog. |
 | `parity_compare` | extension tool | Parity | SSIM compare two images. |
 | `parity-compare.py` | script | Parity | SSIM + fill% + p99 pixel diff. |
@@ -437,7 +437,7 @@ Actions that have multiple invocation paths (candidates for consolidation):
 | Data verify | `data_verify` (tool) ↔ `data-verify` (nix) ↔ `ra-data-verify.py` (script) | ✅ Canonical |
 | Toolchain check | `toolchain_check` (tool) ↔ `toolchain-check` (nix) ↔ `toolchain-check.sh` (script) | ✅ Canonical |
 | Wine capture | `wine_capture` (tool) ↔ `capture-wine` (nix) | Keep `capture-wine` as canonical. |
-| Native capture | `native_capture` (tool) ⚠️ | **STALE** — tool calls archived script. Fix to use `capture-native` / `capture-checkpoint.py`. |
+| Native capture | `native_capture` (tool) | ✅ Fixed — delegates to `capture-checkpoint.py`. |
 
 ### CI-specific duplicates (same implementation, CI-only wrappers)
 
