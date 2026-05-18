@@ -75,7 +75,7 @@ from pathlib import Path
 try:
     from PIL import Image
 except ImportError:
-    print("T5 SKIP: PIL not installed (apt-get install python3-pil)")
+    print("T5 SKIP: PIL not installed")
     sys.exit(77)
 
 img = Image.open(sys.argv[1]).convert("RGB")

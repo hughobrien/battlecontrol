@@ -50,9 +50,9 @@ done
 [[ -f "$SENDINPUT_EXE" && "$SENDINPUT_SRC" -ot "$SENDINPUT_EXE" ]] ||
 	i686-w64-mingw32-gcc -o "$SENDINPUT_EXE" "$SENDINPUT_SRC" -luser32
 
-echo "  wine:       $($WINE --version)"
-echo "  cnc-ddraw:  $CNC_DDRAW_DIR/ddraw.dll"
-echo "  artifacts:  $ARTIFACT_DIR"
+echo " wine:    $($WINE --version)"
+echo " cnc-ddraw: $CNC_DDRAW_DIR/ddraw.dll"
+echo " artifacts: $ARTIFACT_DIR"
 
 pick_display() {
 	for d in 86 87 88 89 90 91 92 93 94 96 97 98; do
@@ -78,8 +78,8 @@ done
 echo "=== applying binary patches ==="
 for patch in focus-skip-patch.py game-in-focus-patch.py soviet-cdlabel-patch.py soviet-m2-scenario-patch.py vqa-skip-patch.py; do
 	if [[ -f "$THIS_DIR/$patch" ]]; then
-		echo "  $patch:"
-		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | sed 's/^/    /' | tail -3 || true
+		echo " $patch:"
+		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | sed 's/^/  /' | tail -3 || true
 	fi
 done
 
@@ -97,7 +97,7 @@ EOF
 cp "$SENDINPUT_EXE" "$STAGE/ra-sendinput.exe"
 
 if [[ ! -d "$WINEPREFIX" ]]; then
-	WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all "$WINE" wineboot --init 2>/dev/null
+	WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all "$WINE" wineboot --init 2>/dev/null
 fi
 mkdir -p "$WINEPREFIX/dosdevices"
 ln -sfT "$STAGE" "$WINEPREFIX/dosdevices/d:"
@@ -129,17 +129,17 @@ echo "=== launching RA95.EXE ==="
 (
 	cd "$STAGE"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
-		WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEPREFIX="$WINEPREFIX" \
 		WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
 		WINEDEBUG=-all AUDIODEV=null \
 		timeout 240 "$WINE" RA95.EXE
 ) >"$ARTIFACT_DIR/wine.log" 2>&1 &
 RA_PID=$!
 
-echo "  waiting for Red Alert window..."
+echo " waiting for Red Alert window..."
 for i in $(seq 1 30); do
 	if DISPLAY="$XDISP" xdotool search --name "^Red Alert$" >/dev/null 2>&1; then
-		echo "  Red Alert window appeared after ${i}s"
+		echo " Red Alert window appeared after ${i}s"
 		break
 	fi
 	sleep 1
@@ -161,7 +161,7 @@ shoot() {
 	local png="$ARTIFACT_DIR/${1}.png"
 	ffmpeg -nostdin -loglevel error -f x11grab -video_size 1024x768 \
 		-i "$XDISP" -frames:v 1 -y "$png" 2>/dev/null || true
-	echo "  shot $1: $(stat -c%s "$png" 2>/dev/null || echo 0) bytes"
+	echo " shot $1: $(stat -c%s "$png" 2>/dev/null || echo 0) bytes"
 }
 
 echo "=== capture sequence ==="
@@ -184,7 +184,7 @@ echo "=== validation ==="
 PASS=1
 TARGET="$ARTIFACT_DIR/frame-500.png"
 if [[ ! -f "$TARGET" ]]; then
-	echo "  FAIL frame-500.png missing"
+	echo " FAIL frame-500.png missing"
 	PASS=0
 else
 	sz=$(stat -c%s "$TARGET")
@@ -193,11 +193,11 @@ else
 	else
 		ncolors="unknown"
 	fi
-	echo "  frame-500.png: $sz bytes, $ncolors unique colours"
+	echo " frame-500.png: $sz bytes, $ncolors unique colours"
 	if [[ "$sz" -ge 5000 && "$ncolors" -ge 64 ]]; then
-		echo "  PASS frame-500.png is non-black Soviet M2"
+		echo " PASS frame-500.png is non-black Soviet M2"
 	else
-		echo "  FAIL frame-500.png below thresholds"
+		echo " FAIL frame-500.png below thresholds"
 		PASS=0
 	fi
 fi

@@ -1205,7 +1205,7 @@ long Buffer_Frame_To_Page(int x, int y, int w, int h,
     const unsigned char *pixels = (const unsigned char*)src;
     if (flags & 0x0020) { x -= w / 2; y -= h / 2; }
     int vw = dest.Get_Width(), vh = dest.Get_Height();
-    int stride = vw + dest.Get_XAdd();
+    int stride = vw + dest.Get_XAdd() + dest.Get_Pitch();
     int sx0 = 0, sy0 = 0, dw = w, dh = h;
     if (x < 0)       { sx0 = -x;    dw += x;    x = 0; }
     if (y < 0)       { sy0 = -y;    dh += y;    y = 0; }

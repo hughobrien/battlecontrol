@@ -3,13 +3,13 @@
 #
 # Launches RA95.EXE with cnc-ddraw GDI renderer (no VQA skip), lets the
 # intro VQAs play, and captures N BMP frames with ra-screenshot.exe at
-# evenly-spaced timing offsets.  Converts BMP to PNG.
+# evenly-spaced timing offsets. Converts BMP to PNG.
 #
-# This is the Wine side of the three-way parity comparison.  Goldens are
+# This is the Wine side of the three-way parity comparison. Goldens are
 # generated from the VQA decoder via gen-vqa-golden.py.
 #
 # Usage:
-#   bash scripts/wine-vqa-capture.sh ENGLISH [DATA_DIR] [ARTIFACT_DIR] [FRAMES]
+#  bash scripts/wine-vqa-capture.sh ENGLISH [DATA_DIR] [ARTIFACT_DIR] [FRAMES]
 #
 # Exit: 0 = all frames captured, >5KB each.
 
@@ -54,7 +54,7 @@ done
 }
 [[ -f "$CNC_DDRAW_DIR/ddraw.dll" ]] || {
 	echo "FAIL: cnc-ddraw missing at $CNC_DDRAW_DIR"
-	echo "  run: bash scripts/build-cnc-ddraw.sh"
+	echo " run: bash scripts/build-cnc-ddraw.sh"
 	exit 1
 }
 
@@ -68,10 +68,10 @@ done
 i686-w64-mingw32-gcc -o "$SENDINPUT_EXE" "$SENDINPUT_SRC" -luser32 2>/dev/null
 i686-w64-mingw32-gcc -o "$SCREENSHOT_EXE" "$SCREENSHOT_SRC" -lgdi32 -luser32 2>/dev/null
 
-echo "  vqa:     $VQA_STEM.VQA"
-echo "  data:    $DATA_DIR"
-echo "  out:     $ARTIFACT_DIR"
-echo "  frames:  $FRAMES"
+echo " vqa:   $VQA_STEM.VQA"
+echo " data:  $DATA_DIR"
+echo " out:   $ARTIFACT_DIR"
+echo " frames: $FRAMES"
 
 # --- Pick free X display ---
 pick_display() {
@@ -85,7 +85,7 @@ pick_display() {
 	exit 1
 }
 XDISP="$(pick_display)"
-echo "  display: $XDISP"
+echo " display: $XDISP"
 
 # --- Stage ---
 STAGE="$(mktemp -d /tmp/wine-vqa-XXXX)"
@@ -104,11 +104,11 @@ echo
 echo "=== applying patches (no vqa-skip) ==="
 for patch in focus-skip-patch.py game-in-focus-patch.py cdlabel-patch.py; do
 	if [[ -f "$THIS_DIR/$patch" ]]; then
-		echo "  $patch"
+		echo " $patch"
 		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | tail -3 || true
 	fi
 done
-echo "  final sha256: $(sha256sum "$STAGE/RA95.EXE" | cut -d' ' -f1)"
+echo " final sha256: $(sha256sum "$STAGE/RA95.EXE" | cut -d' ' -f1)"
 
 # cnc-ddraw drop-in
 cp "$CNC_DDRAW_DIR/ddraw.dll" "$STAGE/ddraw.dll"
@@ -128,8 +128,8 @@ cp "$SCREENSHOT_EXE" "$STAGE/ra-screenshot.exe"
 
 # --- Wine prefix ---
 if [[ ! -d "$WINEPREFIX" ]]; then
-	echo "  creating $WINEPREFIX..."
-	WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all \
+	echo " creating $WINEPREFIX..."
+	WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all \
 		"$WINE" wineboot --init 2>/dev/null
 fi
 mkdir -p "$WINEPREFIX/dosdevices"
@@ -174,7 +174,7 @@ shoot() {
 	fi
 	local sz=0
 	[[ -f "$png" ]] && sz=$(stat -c%s "$png")
-	echo "  shot $stem: ${sz} bytes"
+	echo " shot $stem: ${sz} bytes"
 }
 
 # --- Launch RA95.EXE ---
@@ -183,7 +183,7 @@ echo "=== launching RA95.EXE ==="
 (
 	cd "$STAGE"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
-		WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEPREFIX="$WINEPREFIX" \
 		WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
 		WINEDEBUG=-all AUDIODEV=null \
 		timeout 120 "$WINE" RA95.EXE
@@ -191,11 +191,11 @@ echo "=== launching RA95.EXE ==="
 RA_PID=$!
 
 # --- Wait for Red Alert window ---
-echo "  waiting for Red Alert window..."
+echo " waiting for Red Alert window..."
 WINDOW_READY=0
 for i in $(seq 1 30); do
 	if DISPLAY="$XDISP" xdotool search --name "^Red Alert$" >/dev/null 2>&1; then
-		echo "  window appeared after ${i}s"
+		echo " window appeared after ${i}s"
 		WINDOW_READY=1
 		break
 	fi
@@ -212,7 +212,7 @@ sleep 5
 DISPLAY="$XDISP" xdotool key Return 2>/dev/null || true
 sleep 1
 DISPLAY="$XDISP" xdotool key Return 2>/dev/null || true
-echo "  DirectSound dialog dismissed"
+echo " DirectSound dialog dismissed"
 
 # --- VQA playback capture ---
 # Read golden manifest to get total frames and calculate timing
@@ -221,13 +221,13 @@ MANIFEST="$GOLDEN_DIR/manifest.json"
 VQA_FPS=15
 VQA_DURATION=30
 if [[ -f "$MANIFEST" ]]; then
-	echo "  golden manifest: $MANIFEST"
+	echo " golden manifest: $MANIFEST"
 	TOTAL_FRAMES=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['total_frames'])" 2>/dev/null || echo "0")
 	VQA_FPS=15
 	VQA_DURATION=$(python3 -c "print($TOTAL_FRAMES / $VQA_FPS)" 2>/dev/null || echo "0")
-	echo "  total_frames=$TOTAL_FRAMES  duration=${VQA_DURATION}s"
+	echo " total_frames=$TOTAL_FRAMES duration=${VQA_DURATION}s"
 else
-	echo "  WARN: no golden manifest at $MANIFEST — using defaults"
+	echo " WARN: no golden manifest at $MANIFEST — using defaults"
 fi
 
 # Capture FRAMES checkpoints at even intervals
@@ -245,7 +245,7 @@ for i in $(seq 0 $((FRAMES - 1))); do
 	fi
 	shoot "vqa-${VQA_STEM}-$(printf '%04d' "$i")" 0
 	if ! kill -0 $RA_PID 2>/dev/null; then
-		echo "  RA exited early"
+		echo " RA exited early"
 		break
 	fi
 done
@@ -260,18 +260,18 @@ for i in $(seq 0 $((FRAMES - 1))); do
 	if [[ -f "$png" ]]; then
 		sz=$(stat -c%s "$png")
 		if [[ $sz -gt 5000 ]]; then
-			echo "  OK  $png  ${sz} bytes"
+			echo " OK $png ${sz} bytes"
 			pass=$((pass + 1))
 		else
-			echo "  WARN $png  ${sz} bytes (too small)"
+			echo " WARN $png ${sz} bytes (too small)"
 			fail=$((fail + 1))
 		fi
 	else
-		echo "  MISS $png"
+		echo " MISS $png"
 		fail=$((fail + 1))
 	fi
 done
 
-echo "  captured: $pass/$FRAMES  failed: $fail"
+echo " captured: $pass/$FRAMES failed: $fail"
 [[ $fail -gt 0 ]] && exit 1
 exit 0

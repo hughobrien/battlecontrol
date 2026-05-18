@@ -17,14 +17,14 @@
 # Scenario data location
 # ──────────────────────
 # SCG02EA.INI lives in MAIN.MIX at raw offset 0xF60D4C as an embedded
-# text block.  The game reads it via MixFileClass::Retrieve through its
+# text block. The game reads it via MixFileClass::Retrieve through its
 # virtual filesystem — no loose file is needed in the staging directory.
 #
 # AUTODEMO interaction
 # ────────────────────
 # The patched binary reaches SEL_START_NEW_GAME via IsFromInstall before
 # the AUTODEMO attract-mode timeout fires (~3600 ticks = well after the
-# menu code executes).  If AUTODEMO does fire first, the recording still
+# menu code executes). If AUTODEMO does fire first, the recording still
 # plays back Allied L1 inputs on the M2 map (terrain mismatch but not a
 # crash — the game engine loads whatever scenario Set_Scenario_Name names).
 # Once the game enters the menu code (keypress or auto-advance), the
@@ -32,28 +32,28 @@
 #
 # Rendering
 # ─────────
-#   * cnc-ddraw master build with the TIM-740 scanline_double patch
-#     (scripts/build-cnc-ddraw.sh → /tmp/cnc-ddraw-master/ddraw.dll)
-#   * GDI renderer + windowed mode so the framebuffer is captured via
-#     ffmpeg x11grab from Xvfb
-#   * openbox WM so the Wine window is decorated and DInput attaches
+#  * cnc-ddraw master build with the TIM-740 scanline_double patch
+#   (scripts/build-cnc-ddraw.sh → /tmp/cnc-ddraw-master/ddraw.dll)
+#  * GDI renderer + windowed mode so the framebuffer is captured via
+#   ffmpeg x11grab from Xvfb
+#  * openbox WM so the Wine window is decorated and DInput attaches
 #
 # Wine version
 # ────────────
-# Pinned to Wine 10.0 (/usr/bin/wine).  Wine 11.x regressed the d:=cdrom
+# Pinned to Wine 10.0 (/usr/bin/wine). Wine 11.x regressed the d:=cdrom
 # detection path: GetVolumeInformationA returns FALSE for the symlinked
 # drive even with the cdlabel-patch applied.
 #
 # Outputs in $ARTIFACT_DIR (default: e2e/report/data/wine-ra-allied-m2/):
-#   frame-0.png    — pre-Options, M2 mission rendering
-#   frame-100.png  — Options dialog over M2 terrain (paused)
-#   frame-250.png  — post-resume, M2 gameplay in progress
-#   frame-500.png  — M2 ~33 s after mission start
-#   wine.log helper.log xvfb.log openbox.log
+#  frame-0.png  — pre-Options, M2 mission rendering
+#  frame-100.png — Options dialog over M2 terrain (paused)
+#  frame-250.png — post-resume, M2 gameplay in progress
+#  frame-500.png — M2 ~33 s after mission start
+#  wine.log helper.log xvfb.log openbox.log
 #
 # Exit:
-#   0 — frame-500.png has >=64 unique colours and >=5 KB on disk
-#   non-zero otherwise
+#  0 — frame-500.png has >=64 unique colours and >=5 KB on disk
+#  non-zero otherwise
 
 set -euo pipefail
 
@@ -95,7 +95,7 @@ done
 }
 [[ -f "$CNC_DDRAW_DIR/ddraw.dll" ]] || {
 	echo "FAIL: cnc-ddraw (TIM-740 scanline_double build) missing at $CNC_DDRAW_DIR"
-	echo "   run: bash scripts/build-cnc-ddraw.sh"
+	echo "  run: bash scripts/build-cnc-ddraw.sh"
 	exit 1
 }
 [[ -f "$SENDINPUT_SRC" ]] || {
@@ -106,13 +106,13 @@ done
 [[ -f "$SENDINPUT_EXE" && "$SENDINPUT_SRC" -ot "$SENDINPUT_EXE" ]] ||
 	i686-w64-mingw32-gcc -o "$SENDINPUT_EXE" "$SENDINPUT_SRC" -luser32
 
-echo "  wine:       $($WINE --version)"
-echo "  scenario:   $SCENARIO"
-echo "  ra-input:   $SENDINPUT_EXE"
-echo "  cnc-ddraw:  $CNC_DDRAW_DIR/ddraw.dll"
-echo "  prefix:     $WINEPREFIX"
-echo "  data:       $DATA_DIR"
-echo "  artifacts:  $ARTIFACT_DIR"
+echo " wine:    $($WINE --version)"
+echo " scenario:  $SCENARIO"
+echo " ra-input:  $SENDINPUT_EXE"
+echo " cnc-ddraw: $CNC_DDRAW_DIR/ddraw.dll"
+echo " prefix:   $WINEPREFIX"
+echo " data:    $DATA_DIR"
+echo " artifacts: $ARTIFACT_DIR"
 
 # ─── Pick free X display ─────────────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ pick_display() {
 	exit 1
 }
 XDISP="${XDISP:-$(pick_display)}"
-echo "  display:    $XDISP"
+echo " display:  $XDISP"
 
 # ─── Stage ───────────────────────────────────────────────────────────────────
 
@@ -146,15 +146,15 @@ echo
 echo "=== applying binary patches ==="
 for patch in focus-skip-patch.py game-in-focus-patch.py cdlabel-patch.py vqa-skip-patch.py; do
 	if [[ -f "$THIS_DIR/$patch" ]]; then
-		echo "  $patch:"
-		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | sed 's/^/    /' | tail -3 || true
+		echo " $patch:"
+		python3 "$THIS_DIR/$patch" "$STAGE/RA95.EXE" 2>&1 | sed 's/^/  /' | tail -3 || true
 	fi
 done
 
 # Apply scenario override: SCG01EA -> SCG02EA (Allied M2)
-echo "  ra-scenario-patch.py: $SCENARIO"
-python3 "$THIS_DIR/ra-scenario-patch.py" "$STAGE/RA95.EXE" "$SCENARIO" 2>&1 | sed 's/^/    /'
-echo "  final sha256: $(sha256sum "$STAGE/RA95.EXE" | cut -d' ' -f1)"
+echo " ra-scenario-patch.py: $SCENARIO"
+python3 "$THIS_DIR/ra-scenario-patch.py" "$STAGE/RA95.EXE" "$SCENARIO" 2>&1 | sed 's/^/  /'
+echo " final sha256: $(sha256sum "$STAGE/RA95.EXE" | cut -d' ' -f1)"
 
 # cnc-ddraw drop-in
 cp "$CNC_DDRAW_DIR/ddraw.dll" "$STAGE/ddraw.dll"
@@ -174,8 +174,8 @@ cp "$SENDINPUT_EXE" "$STAGE/ra-sendinput.exe"
 # ─── Wine prefix ─────────────────────────────────────────────────────────────
 
 if [[ ! -d "$WINEPREFIX" ]]; then
-	echo "  creating $WINEPREFIX..."
-	WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all \
+	echo " creating $WINEPREFIX..."
+	WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all \
 		"$WINE" wineboot --init 2>/dev/null
 fi
 mkdir -p "$WINEPREFIX/dosdevices"
@@ -214,19 +214,19 @@ echo "=== launching RA95.EXE ==="
 (
 	cd "$STAGE"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
-		WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEPREFIX="$WINEPREFIX" \
 		WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
 		WINEDEBUG=-all AUDIODEV=null \
 		timeout 240 "$WINE" RA95.EXE
 ) >"$ARTIFACT_DIR/wine.log" 2>&1 &
 RA_PID=$!
 
-echo "  waiting for Red Alert window..."
+echo " waiting for Red Alert window..."
 # shellcheck disable=SC2034
 WIN_TIME=0
 for i in $(seq 1 30); do
 	if DISPLAY="$XDISP" xdotool search --name "^Red Alert$" >/dev/null 2>&1; then
-		echo "  Red Alert window appeared after ${i}s"
+		echo " Red Alert window appeared after ${i}s"
 		break
 	fi
 	sleep 1
@@ -236,7 +236,7 @@ done
 
 send_key() {
 	local vk="$1" label="${2:-key}"
-	echo "  SendInput key[$label]: vk=$vk"
+	echo " SendInput key[$label]: vk=$vk"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
 		WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" key "$vk" \
 		>>"$ARTIFACT_DIR/helper.log" 2>&1 || true
@@ -244,7 +244,7 @@ send_key() {
 
 send_click() {
 	local x="$1" y="$2" label="${3:-click}"
-	echo "  SendInput click[$label]: client=($x,$y)"
+	echo " SendInput click[$label]: client=($x,$y)"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" WINEPREFIX="$WINEPREFIX" \
 		WINEDEBUG=-all "$WINE" "$STAGE/ra-sendinput.exe" click "$x" "$y" \
 		>>"$ARTIFACT_DIR/helper.log" 2>&1 || true
@@ -257,17 +257,17 @@ shoot() {
 		-i "$XDISP" -frames:v 1 -y "$png" 2>/dev/null || true
 	local sz
 	sz=$(stat -c%s "$png" 2>/dev/null || echo "0")
-	echo "  shot $name: $sz bytes"
+	echo " shot $name: $sz bytes"
 }
 
 # ─── Capture sequence ────────────────────────────────────────────────────────
 #
 # TICKS_PER_SECOND = 15 (REDALERT/DEFINES.H:3152).
 # Frame labels are wall-clock approximations anchored to frame-0:
-#   frame-0   -> ~0 ticks  (first rendered frame after Autodemo loads)
-#   frame-100 -> ~100 ticks (Options overlay, paused)
-#   frame-250 -> ~250 ticks (post-resume gameplay)
-#   frame-500 -> ~500 ticks (~33 s after mission start)
+#  frame-0  -> ~0 ticks (first rendered frame after Autodemo loads)
+#  frame-100 -> ~100 ticks (Options overlay, paused)
+#  frame-250 -> ~250 ticks (post-resume gameplay)
+#  frame-500 -> ~500 ticks (~33 s after mission start)
 
 echo
 echo "=== capture sequence ==="
@@ -304,7 +304,7 @@ PASS=1
 TARGET="$ARTIFACT_DIR/frame-500.png"
 
 if [[ ! -f "$TARGET" ]]; then
-	echo "  FAIL frame-500.png missing"
+	echo " FAIL frame-500.png missing"
 	PASS=0
 else
 	sz=$(stat -c%s "$TARGET")
@@ -313,11 +313,11 @@ else
 	else
 		ncolors="unknown"
 	fi
-	echo "  frame-500.png: $sz bytes, $ncolors unique colours"
+	echo " frame-500.png: $sz bytes, $ncolors unique colours"
 	if [[ "$sz" -ge 5000 && "$ncolors" -ge 64 ]]; then
-		echo "  PASS frame-500.png is non-black (>=5 KB and >=64 colours)"
+		echo " PASS frame-500.png is non-black (>=5 KB and >=64 colours)"
 	else
-		echo "  FAIL frame-500.png does not meet thresholds (need >=5 KB and >=64 colours)"
+		echo " FAIL frame-500.png does not meet thresholds (need >=5 KB and >=64 colours)"
 		PASS=0
 	fi
 fi
@@ -333,9 +333,9 @@ for name in frame-0 frame-100 frame-250 frame-500; do
 		else
 			nc="?"
 		fi
-		echo "  $name.png -- $sz bytes, $nc colours"
+		echo " $name.png -- $sz bytes, $nc colours"
 	else
-		echo "  $name.png -- MISSING"
+		echo " $name.png -- MISSING"
 	fi
 done
 
