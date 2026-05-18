@@ -140,19 +140,19 @@ any X server — even Xvfb without a GPU.
 ## Quick Start (the working approach)
 
 ```bash
-# Prerequisites: built cnc-ddraw
-nix build .#cnc-ddraw
+# Single command — builds everything from the ISO
+nix run .#capture-wine
 
-# Run timed capture
-bash scripts/wine-timed-capture.sh \
-    /opt/redalert/RA95.EXE \
-    /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1 \
-    e2e/screenshots/timed
+# Timed mode (every 5s for 30s):
+TIMED=1 nix run .#capture-wine
+
+# Custom output directory:
+nix run .#capture-wine -- /tmp/my-shots
 ```
 
-This launches RA95.EXE under Wine + Xvfb with cnc-ddraw handling DirectDraw,
-takes a screenshot every 5 seconds for 30 seconds, and saves them to the
-specified output directory.
+This downloads the Allied CD ISO from archive.org (653 MB, cached by Nix),
+extracts and patches RA95.EXE, extracts MIX data, builds cnc-ddraw, creates
+a Wine prefix, starts Xvfb, and captures timed screenshots of the game menu.
 
 ---
 
