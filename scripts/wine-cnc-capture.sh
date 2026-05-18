@@ -26,8 +26,8 @@ mkdir -p "$SHOT_DIR"
 # ─── Build cnc-ddraw if needed ──────────────────────────────────────────────
 CNC_DLL=$(nix build .#cnc-ddraw --impure --print-out-paths 2>/dev/null)/bin/ddraw.dll
 if [[ ! -f "$CNC_DLL" ]]; then
-    echo "Building cnc-ddraw..."
-    CNC_DLL=$(nix build .#cnc-ddraw --impure 2>/dev/null --print-out-paths)/bin/ddraw.dll
+	echo "Building cnc-ddraw..."
+	CNC_DLL=$(nix build .#cnc-ddraw --impure --print-out-paths 2>/dev/null)/bin/ddraw.dll
 fi
 
 # ─── Preflight ───────────────────────────────────────────────────────────────
@@ -45,11 +45,11 @@ cp "$RA_EXE" "$STAGE/RA95.EXE"
 cp "$CNC_DLL" "$STAGE/DDRAW.DLL"
 cp "$REPO/tools/stub-thipx/thipx32.dll" "$STAGE/THIPX32.DLL" 2>/dev/null || true
 
-# Copy MIX files from data directory
-cp "$DATA_DIR/MAIN.MIX" "$STAGE/"
-if [[ -f "$DATA_DIR/INSTALL/REDALERT.MIX" ]]; then
-    cp "$DATA_DIR/INSTALL/REDALERT.MIX" "$STAGE/"
-fi
+# Copy MIX files to writable staging dir (Nix store is read-only)
+cp "$DATA_DIR/MAIN.MIX" "$STAGE/" 2>/dev/null
+cp "$DATA_DIR/main.mix" "$STAGE/" 2>/dev/null || true
+cp "$DATA_DIR/REDALERT.MIX" "$STAGE/" 2>/dev/null
+cp "$DATA_DIR/redalert.mix" "$STAGE/" 2>/dev/null || true
 
 cat >"$STAGE/REDALERT.INI" <<'EOF'
 [Sound]
@@ -72,19 +72,24 @@ EOF
 # ─── Wine prefix ────────────────────────────────────────────────────────────
 WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-ra-cnc}"
 if [[ ! -d "$WINE_PREFIX" ]]; then
-    WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
+	WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
 # Virtual desktop for window positioning
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-    'HKCU\Software\Wine\Explorer\Desktops' \
-    /v Default /t REG_SZ /d "640x480" /f >/dev/null 2>&1 || true
+	'HKCU\Software\Wine\Explorer\Desktops' \
+	/v Default /t REG_SZ /d "640x480" /f >/dev/null 2>&1 || true
 
-# Map CD drive to data dir (needed for Get_CD_Index file-open check)
+# Map CD drive to staging dir (writable copy of data)
 mkdir -p "$WINE_PREFIX/dosdevices"
 rm -f "$WINE_PREFIX/dosdevices/d:"
-ln -sfn "$DATA_DIR" "$WINE_PREFIX/dosdevices/d:"
+ln -sfn "$STAGE" "$WINE_PREFIX/dosdevices/d:"
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --restart 2>/dev/null || true
-sleep 4
+sleep 6
+# Verify D: drive is accessible
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine cmd /c 'dir /b D:\MAIN.MIX' 2>/dev/null | grep -q MAIN || {
+    echo "WARNING: D: drive not accessible, sleeping more..."
+    sleep 6
+}
 
 # ─── Xvfb ────────────────────────────────────────────────────────────────────
 DISPLAY=":97"
@@ -94,11 +99,11 @@ sleep 1
 
 # ─── Launch ──────────────────────────────────────────────────────────────────
 (
-    cd "$STAGE"
-    DISPLAY="$DISPLAY" WINEPREFIX="$WINE_PREFIX" \
-        WINEDLLOVERRIDES="ddraw=n" \
-        WINEDEBUG=-all AUDIODEV=null \
-        timeout 40 wine RA95.EXE
+	cd "$STAGE"
+	DISPLAY="$DISPLAY" WINEPREFIX="$WINE_PREFIX" \
+		WINEDLLOVERRIDES="ddraw=n" \
+		WINEDEBUG=-all AUDIODEV=null \
+		timeout 40 wine RA95.EXE
 ) >/dev/null 2>&1 &
 RA_PID=$!
 
@@ -108,29 +113,33 @@ DISPLAY="$DISPLAY" xdotool key Return 2>/dev/null || true
 
 # ─── Screenshots ─────────────────────────────────────────────────────────────
 take_shot() {
-    local out="$1"
-    if DISPLAY="$DISPLAY" import -window root "$out" 2>/dev/null; then
-        sz=$(stat -c%s "$out" 2>/dev/null || echo 0)
-        printf "  %-30s %d bytes" "$out" "$sz"
-        if [[ $sz -gt 30000 ]]; then echo "  *** GAME ***"
-        elif [[ $sz -gt 10000 ]]; then echo "  game progressing"
-        elif [[ $sz -gt 3000 ]]; then echo "  dialog"
-        else echo "  blank"
-        fi
-    fi
+	local out="$1"
+	if DISPLAY="$DISPLAY" import -window root "$out" 2>/dev/null; then
+		sz=$(stat -c%s "$out" 2>/dev/null || echo 0)
+		printf "  %-30s %d bytes" "$out" "$sz"
+		if [[ $sz -gt 30000 ]]; then
+			echo "  *** GAME ***"
+		elif [[ $sz -gt 10000 ]]; then
+			echo "  game progressing"
+		elif [[ $sz -gt 3000 ]]; then
+			echo "  dialog"
+		else
+			echo "  blank"
+		fi
+	fi
 }
 
 if [[ "$TIMED" == "1" ]]; then
-    sleep 3
-    for i in 5 10 15 20 25 30; do
-        sleep 5
-        take_shot "$SHOT_DIR/frame-t${i}s.png"
-    done
+	sleep 3
+	for i in 5 10 15 20 25 30; do
+		sleep 5
+		take_shot "$SHOT_DIR/frame-t${i}s.png"
+	done
 else
-    sleep 3
-    take_shot "$SHOT_DIR/wine-cnc-title.png"
-    sleep 12
-    take_shot "$SHOT_DIR/wine-cnc-menu.png"
+	sleep 3
+	take_shot "$SHOT_DIR/wine-cnc-title.png"
+	sleep 12
+	take_shot "$SHOT_DIR/wine-cnc-menu.png"
 fi
 
 kill "$RA_PID" 2>/dev/null || true

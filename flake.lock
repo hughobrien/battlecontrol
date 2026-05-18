@@ -48,62 +48,23 @@
         "type": "github"
       }
     },
-    "ra-redalert-mix": {
+    "redalert-iso": {
       "flake": false,
       "locked": {
-        "narHash": "sha256-vzlrJLsw13olA3DmIZF9pbPKUWHB+SwolI9oQUvYpxM=",
+        "narHash": "sha256-BVcuRCmDcllmkDYY/vqOFrW2MStgW0PqYx/raYYQihw=",
         "type": "file",
-        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FREDALERT.MIX"
+        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso"
       },
       "original": {
         "type": "file",
-        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FREDALERT.MIX"
-      }
-    },
-    "ra-thipx16": {
-      "flake": false,
-      "locked": {
-        "narHash": "sha256-gGWql6FUTMdDG71OhCR8g9tcQKQzdr3xpGwTHmp2tUM=",
-        "type": "file",
-        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FTHIPX16.DLL"
-      },
-      "original": {
-        "type": "file",
-        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FTHIPX16.DLL"
-      }
-    },
-    "ra-thipx32": {
-      "flake": false,
-      "locked": {
-        "narHash": "sha256-hEOonASYJg1/whQz1gAf8oNZ6AW5BWG2mFUhcdFUCnQ=",
-        "type": "file",
-        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FTHIPX32.DLL"
-      },
-      "original": {
-        "type": "file",
-        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FTHIPX32.DLL"
-      }
-    },
-    "ra95-exe": {
-      "flake": false,
-      "locked": {
-        "narHash": "sha256-eW0h/to/IbRQQfXoUlMQJHcuQGGijEu6ZFYn4P9PRk8=",
-        "type": "file",
-        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FRA95.EXE"
-      },
-      "original": {
-        "type": "file",
-        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FRA95.EXE"
+        "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso"
       }
     },
     "root": {
       "inputs": {
         "cnc-ddraw": "cnc-ddraw",
         "nixpkgs": "nixpkgs",
-        "ra-redalert-mix": "ra-redalert-mix",
-        "ra-thipx16": "ra-thipx16",
-        "ra-thipx32": "ra-thipx32",
-        "ra95-exe": "ra95-exe",
+        "redalert-iso": "redalert-iso",
         "wine-input": "wine-input"
       }
     },

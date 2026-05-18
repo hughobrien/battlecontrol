@@ -14,31 +14,10 @@
       flake = false;
     };
 
-    # Upstream sources from archive.org Allied CD ISO.
-    # Source: https://archive.org/details/cnc-red-alert
-    # ISO viewer paths are stable and serve individual files from the ISO.
-
-    # RA95.EXE (2.1 MB) — INSTALL/RA95.EXE on the CD
-    ra95-exe = {
-      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FRA95.EXE";
-      flake = false;
-    };
-
-    # REDALERT.MIX (23 MB) — INSTALL/REDALERT.MIX on the CD
-    ra-redalert-mix = {
-      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FREDALERT.MIX";
-      flake = false;
-    };
-
-    # THIPX32.DLL (25 KB) — required by RA95.EXE for IPX networking under Wine
-    ra-thipx32 = {
-      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FTHIPX32.DLL";
-      flake = false;
-    };
-
-    # THIPX16.DLL (4 KB) — required by RA95.EXE for IPX networking under Wine
-    ra-thipx16 = {
-      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FTHIPX16.DLL";
+    # Allied CD ISO from archive.org — single source for all game assets.
+    # Files are extracted via unar at build time.
+    redalert-iso = {
+      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso";
       flake = false;
     };
   };
@@ -50,10 +29,7 @@
 
       wine-input,
       cnc-ddraw,
-      ra95-exe,
-      ra-redalert-mix,
-      ra-thipx32,
-      ra-thipx16,
+      redalert-iso,
     }:
     let
       system = "x86_64-linux";
@@ -206,75 +182,67 @@
             };
           };
 
-          # ── Upstream archive.org packages ──────────────────────────────────
-          # nix build .#ra95-exe  →  store path with the unmodified original.
+          # ── ISO extraction packages ────────────────────────────────────────
+          # All extracted from the redalert-iso flake input via unar.
 
-          ra95-exe =
-            pkgs.runCommand "ra95-exe"
+          ra-patched-exe =
+            pkgs.runCommand "ra-patched-exe"
               {
-                src = ra95-exe;
-                meta = with pkgs.lib; {
-                  description = "Red Alert 95 executable (from archive.org Allied CD ISO)";
-                  homepage = "https://archive.org/details/cnc-red-alert";
-                  sourceProvenance = with sourceTypes; [ binaryNativeCode ];
-                  license = licenses.unfreeRedistributable;
-                  platforms = [ "x86_64-linux" ];
-                };
+                src = redalert-iso;
+                nativeBuildInputs = [
+                  pkgs.unar
+                  pkgs.python3
+                ];
               }
               ''
-                cp "$src" "$out"
-                chmod 644 "$out"
+                unar -q -o "$(pwd)" -D "$src" INSTALL/RA95.EXE 2>/dev/null
+                cp INSTALL/RA95.EXE "$out"
+                chmod +w "$out"
+                python3 ${./scripts/nocd-patch.py} "$out"
+                python3 ${./scripts/ddscl-patch.py} "$out"
+                # cdlabel: zero the first byte of the "CD1" volume label string
+                printf '\x00' | dd of="$out" bs=1 seek=$((0x1BFCB7)) conv=notrunc 2>/dev/null
               '';
 
-          ra-redalert-mix =
-            pkgs.runCommand "ra-redalert-mix"
+          ra-data =
+            pkgs.runCommand "ra-data"
               {
-                src = ra-redalert-mix;
-                meta = with pkgs.lib; {
-                  description = "REDALERT.MIX (23 MB) from archive.org Allied CD ISO INSTALL/";
-                  homepage = "https://archive.org/details/cnc-red-alert";
-                  sourceProvenance = with sourceTypes; [ binaryNativeCode ];
-                  license = licenses.unfreeRedistributable;
-                  platforms = [ "x86_64-linux" ];
-                };
+                src = redalert-iso;
+                nativeBuildInputs = [ pkgs.unar ];
               }
               ''
-                cp "$src" "$out"
-                chmod 644 "$out"
+                mkdir -p "$out"
+                unar -q -o "$out" -D "$src" MAIN.MIX 2>/dev/null
+                unar -q -o "$out" -D "$src" INSTALL/REDALERT.MIX 2>/dev/null
+                if [ -d "$out/INSTALL" ]; then
+                  mv "$out/INSTALL"/* "$out/"
+                  rmdir "$out/INSTALL"
+                fi
+                # Case-insensitive symlinks for the game's lowercase file lookups
+                ln -sf MAIN.MIX "$out/main.mix"
+                ln -sf REDALERT.MIX "$out/redalert.mix"
               '';
 
-          ra-thipx32 =
-            pkgs.runCommand "ra-thipx32"
+          ra-thipx32-dll =
+            pkgs.runCommand "ra-thipx32-dll"
               {
-                src = ra-thipx32;
-                meta = with pkgs.lib; {
-                  description = "THIPX32.DLL (25 KB) from archive.org Allied CD ISO INSTALL/";
-                  homepage = "https://archive.org/details/cnc-red-alert";
-                  sourceProvenance = with sourceTypes; [ binaryNativeCode ];
-                  license = licenses.unfreeRedistributable;
-                  platforms = [ "x86_64-linux" ];
-                };
+                src = redalert-iso;
+                nativeBuildInputs = [ pkgs.unar ];
               }
               ''
-                cp "$src" "$out"
-                chmod 644 "$out"
+                unar -q -o "$(pwd)" -D "$src" INSTALL/THIPX32.DLL 2>/dev/null
+                cp INSTALL/THIPX32.DLL "$out"
               '';
 
-          ra-thipx16 =
-            pkgs.runCommand "ra-thipx16"
+          ra-thipx16-dll =
+            pkgs.runCommand "ra-thipx16-dll"
               {
-                src = ra-thipx16;
-                meta = with pkgs.lib; {
-                  description = "THIPX16.DLL (4 KB) from archive.org Allied CD ISO INSTALL/";
-                  homepage = "https://archive.org/details/cnc-red-alert";
-                  sourceProvenance = with sourceTypes; [ binaryNativeCode ];
-                  license = licenses.unfreeRedistributable;
-                  platforms = [ "x86_64-linux" ];
-                };
+                src = redalert-iso;
+                nativeBuildInputs = [ pkgs.unar ];
               }
               ''
-                cp "$src" "$out"
-                chmod 644 "$out"
+                unar -q -o "$(pwd)" -D "$src" INSTALL/THIPX16.DLL 2>/dev/null
+                cp INSTALL/THIPX16.DLL "$out"
               '';
 
           # cnc-ddraw — Win32 DirectDraw wrapper that replaces wined3d with GDI.
@@ -671,12 +639,12 @@
         '';
 
         capture-wine = mkApp "capture-wine" ''
-          GAME="''${1:-ra}"
-          if [ "$GAME" = "ra" ]; then
-            exec bash scripts/wine-ra.sh
-          else
-            exec bash scripts/wine-td.sh
-          fi
+          set -euo pipefail
+          SHOTS="''${1:-e2e/screenshots/wine}"
+          export TIMED=''${TIMED:-0}
+          PATCHEXE=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null)
+          DATA=$(nix build .#ra-data --impure --print-out-paths 2>/dev/null)
+          exec bash scripts/wine-cnc-capture.sh "$PATCHEXE" "$DATA" "$SHOTS"
         '';
 
         verify = mkApp "verify-data" ''
