@@ -65,7 +65,7 @@ jobs:
       - name: Build ra.wasm
         env:
           EM_CACHE: ~/.emscripten_cache
-        run: nix develop --command nix run .#build-wasm ra
+        run: nix develop --command nix run .#ra-wasm-build
 
       - name: Package ra-wasm.zip
         run: |
@@ -106,7 +106,7 @@ jobs:
       - name: Build td.wasm
         env:
           EM_CACHE: ~/.emscripten_cache
-        run: nix develop --command nix run .#build-wasm td
+        run: nix develop --command nix run .#td-wasm-build
 
       - name: Package td-wasm.zip
         run: |

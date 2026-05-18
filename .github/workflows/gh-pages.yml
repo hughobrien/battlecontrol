@@ -1,6 +1,6 @@
 # GitHub Pages Deploy — manual trigger only.
 # Builds WASM targets, runs full regression suite, deploys to GitHub Pages.
-# Local equivalent: nix run .#wasm-loop
+# Local equivalent: nix run .#ra-wasm-build && nix run .#td-wasm-build
 
 name: GitHub Pages Deploy
 
@@ -61,15 +61,12 @@ jobs:
       - name: Build ra.wasm
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: nix develop --command nix run .#build-wasm ra
+        run: nix develop --command nix run .#ra-wasm-build
 
       - name: Build td.wasm
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: nix develop --command nix run .#build-wasm td
-
-      - name: Validate and smoke test
-        run: nix develop --command bash -c "nix run .#validate-wasm && nix run .#ci-wasm-smoke"
+        run: nix develop --command nix run .#td-wasm-build
 
       - name: Start Xvfb and WASM server
         run: |

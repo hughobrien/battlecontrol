@@ -147,11 +147,18 @@ no SIGSEGV / Aborted.  Shell: `scripts/regression/T6-ra-native-smoke.sh`.
 ## Running
 
 ```bash
-# CI tier: T1 + T2 (asset-free, always green).
-REGRESSION_TIER=ci  bash scripts/regression-suite.sh
+# Per-combo runners:
+bash scripts/regression/ra-wasm.sh        # RA WASM: T1, T11 (ci); +T3-ra, T4, T5, T8–T10 (full)
+bash scripts/regression/td-wasm.sh        # TD WASM: T2, T12 (ci); +T3-td, T6, T7 (full)
+bash scripts/regression/ra-native.sh      # RA native: full tier only (T6, T11)
+bash scripts/regression/td-native.sh      # TD native: full tier only (T5, T12)
 
-# Local tier: all (requires CnCRemastered assets at CD1/).
-REGRESSION_TIER=full bash scripts/regression-suite.sh
+# Set tier (default ci):
+REGRESSION_TIER=full bash scripts/regression/ra-wasm.sh
+
+# Or via nix:
+nix run .#ra-wasm-regression
+REGRESSION_TIER=full nix run .#td-wasm-regression
 ```
 
 ## How to add a new test-point

@@ -1,8 +1,6 @@
 # CI — thin wrapper around flake apps.
-# Local equivalent: nix run .#build-native
+# Local equivalent: nix run .#ra-native-build && nix run .#td-native-build
 #                   nix run .#vqa-check
-#                   nix run .#ci-build-wasm
-#                   nix run .#ci
 
 name: CI
 
@@ -49,7 +47,7 @@ jobs:
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
             ccache --zero-stats
             ccache --max-size 500M
-            nix run .#build-native
+            nix run .#ra-native-build && nix run .#td-native-build
             echo '### ccache hit rate' >> \"$GITHUB_STEP_SUMMARY\"
             ccache --show-stats >> \"$GITHUB_STEP_SUMMARY\"
             ccache --show-stats
@@ -177,95 +175,51 @@ jobs:
           restore-keys: |
             emcc-cache-5.0.6-
 
-      - name: Build WASM + validate + smoke (T1/T2)
+      - name: Build ra.wasm + td.wasm
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: nix develop --command nix run .#wasm-loop
-
-      - name: WASM regression — T3 TD menu click (asset-gated)
-        env:
-          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
         run: |
-          if [ -z "$TD_ASSETS_URL" ]; then
-            echo "::notice::T3 skipped — TD_ASSETS_URL secret not set"
-            exit 0
-          fi
-          nix develop --command nix run .#test -- e2e/regression/T3-td-wasm-menu.spec.ts
+          nix develop --command nix run .#ra-wasm-build
+          nix develop --command nix run .#td-wasm-build
 
-      - name: Upload T3 artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: t3-td-wasm-menu-results
-          path: e2e/screenshots/t3-td-wasm-menu-*.png
+      - name: WASM CI tier — RA (T1, T11)
+        run: nix develop --command nix run .#ra-wasm-regression
 
-      - name: WASM regression — T6 TD mission start (asset-gated)
-        env:
-          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
-        run: |
-          if [ -z "$TD_ASSETS_URL" ]; then
-            echo "::notice::T6 skipped — TD_ASSETS_URL secret not set"
-            exit 0
-          fi
-          nix develop --command nix run .#test -- e2e/regression/T6-td-wasm-mission-start.spec.ts
+      - name: WASM CI tier — TD (T2, T12)
+        run: nix develop --command nix run .#td-wasm-regression
 
-      - name: Upload T6 artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: t6-td-wasm-mission-start-results
-          path: e2e/screenshots/t6-td-wasm-*.png
-
-      - name: WASM regression — T7 TD audio pitch (asset-gated)
-        env:
-          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
-        run: |
-          if [ -z "$TD_ASSETS_URL" ]; then
-            echo "::notice::T7 skipped — TD_ASSETS_URL secret not set"
-            exit 0
-          fi
-          nix develop --command nix run .#test -- e2e/regression/T7-td-audio-pitch.spec.ts
-
-      - name: Upload T7 artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: t7-td-audio-pitch-results
-          path: e2e/screenshots/t7-td-*.png
-
-      - name: WASM regression — T8 RA audio pitch (asset-gated)
+      - name: WASM full tier — RA (T3-ra, T4, T5, T8, T9, T10, asset-gated)
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
+          REGRESSION_TIER: full
         run: |
           if [ -z "$RA_ASSETS_URL" ]; then
-            echo "::notice::T8 skipped — RA_ASSETS_URL not set"
+            echo "::notice::RA full regression skipped — RA_ASSETS_URL not set"
             exit 0
           fi
-          nix develop --command nix run .#test -- e2e/regression/T8-ra-audio-pitch.spec.ts
+          nix develop --command nix run .#ra-wasm-regression
 
-      - name: Upload T8 artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: t8-ra-audio-pitch-results
-          path: e2e/screenshots/t8-ra-*.png
-
-      - name: WASM regression — T9 RA mission start (asset-gated)
+      - name: WASM full tier — TD (T3-td, T6, T7, asset-gated)
         env:
-          RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
+          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
+          REGRESSION_TIER: full
         run: |
-          if [ -z "$RA_ASSETS_URL" ]; then
-            echo "::notice::T9 skipped — RA_ASSETS_URL not set"
+          if [ -z "$TD_ASSETS_URL" ]; then
+            echo "::notice::TD full regression skipped — TD_ASSETS_URL not set"
             exit 0
           fi
-          nix develop --command nix run .#test -- e2e/regression/T9-ra-wasm-mission-start.spec.ts
+          nix develop --command nix run .#td-wasm-regression
 
-      - name: Upload T9 artifacts on failure
+      - name: Upload regression artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: t9-ra-wasm-mission-start-results
-          path: e2e/screenshots/t9-ra-wasm-*.png
+          name: wasm-regression-results
+          path: |
+            e2e/screenshots/
+            e2e/test-results/
+            e2e/report/
+          if-no-files-found: ignore
 
   ci:
     name: Local CI gate (incl. static analysis)
