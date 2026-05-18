@@ -6,7 +6,7 @@ version: 0.1.0
 
 # VQA Codec Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `vqa_pixel_diff`.
+> **Nix app:** `nix run .#vqa-check`.
 > Ask the agent to run this instead of typing raw commands.
 
 You are working on the VQA (Westwood Vector Quantized Animation) codec used by C&C

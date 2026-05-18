@@ -78,7 +78,6 @@ python3 scripts/lint-lp64.py
 | `nix develop --command git commit ...` (unnecessary wrapper) | `git commit ...` |
 | Running outside dev shell — tools missing from PATH | Enter `nix develop` first |
 
-> The extension tools (e.g. `build_native`, `build_wasm`, `run_e2e_test`) also
 > expect to run inside the dev shell and do not wrap themselves.
 
 ## ⚠️ After every PR: always enable automerge
@@ -103,7 +102,6 @@ before pushing to catch failures instantly:
 nix run .#ci
 ```
 
-Or use the extension tool:
 
 ```
 ci_local()
@@ -131,11 +129,10 @@ dependencies (e.g., no emcmake = WASM skipped), so it's safe to run anywhere.
 
 ## Quickstart (verify readiness)
 
-The `pi-battlecontrol-dev` extension (`.pi/extensions/battlecontrol.ts`) registers
-13 tools for build, test, screenshot, and parity workflows. Run:
+All workflows are available via `nix run .#<name>` commands. Run:
 
 ```
-toolchain_check()
+nix run .#toolchain-check
 ```
 
 
@@ -383,7 +380,6 @@ The `seq` subcommand of `ra-sendinput.exe` can chain a full navigation:
 ## Skill Index
 
 When an agent hits a symptom, read the corresponding skill for diagnostic guidance.
-Each skill lists which extension tools apply.
 
 | Domain | Skill | Extension tools | Trigger symptoms |
 |--------|-------|----------------|-----------------|
@@ -456,16 +452,16 @@ moved to `scripts/archive/`.
 
 | Script / Tool | Purpose |
 |---------------|---------|
-| `build_native` tool / `build-native.sh` | One-command native Linux build (ra + td) |
-| `build_wasm` + `wasm_validate` / `ci-wasm-smoke.sh` | Full WASM CI cycle |
-| `run_e2e_test` tool / `run-e2e.sh` | Xvfb + WASM server + Playwright test |
-| `serve_wasm` tool / `serve-wasm.sh` | WASM dev server with COOP/COEP |
-| `toolchain_check` tool / `toolchain-check.sh` | Toolchain prerequisite check |
-| `vqa_pixel_diff` tool / `vqa-pixel-diff.py` | VQA pixel diff against ffmpeg |
-| `parity_compare` tool / `parity-compare.py` | SSIM + fill% + p99 pixel diff |
-| `data_verify` tool / `*-data-verify.py` | MIX checksum verification |
-| `wine_check` tool / `wine-check.sh` | Wine prerequisite check |
-| `capture_wine` tool / `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
+| `build-native.sh` | One-command native Linux build (ra + td) |
+| `build-wasm` / `ci-wasm-smoke.sh` | Full WASM CI cycle |
+| `run-e2e.sh` | Xvfb + WASM server + Playwright test |
+| `serve-wasm.sh` | WASM dev server with COOP/COEP |
+| `toolchain-check.sh` | Toolchain prerequisite check |
+| `vqa-pixel-diff.py` | VQA pixel diff against ffmpeg |
+| `parity-compare.py` | SSIM + fill% + p99 pixel diff |
+| `*-data-verify.py` | MIX checksum verification |
+| `wine-check.sh` | Wine prerequisite check |
+| `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
 | `xvfb-ensure.sh` | Idempotent Xvfb launcher (source it) |
 | `vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff |
 | `parity-report.sh` | Three-way parity report (vqa + gameplay modes) |

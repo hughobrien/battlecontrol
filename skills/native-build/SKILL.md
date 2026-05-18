@@ -6,7 +6,7 @@ version: 0.1.0
 
 # Native Linux Build Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `build_native`, `toolchain_check`.
+> **Nix apps:** `nix run .#build-native`, `nix run .#toolchain-check`.
 > Ask the agent to run these instead of typing raw commands.
 
 You are working on the native Linux port of C&C Red Alert or Tiberian Dawn. The build

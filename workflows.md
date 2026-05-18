@@ -5,7 +5,6 @@ progress on this repo. Each workflow covers **when to use it**, **what to run**,
 and **what success looks like**.
 
 See [`scripts.md`](scripts.md) for the full command catalog across all surfaces
-(nix apps, extension tools, scripts).
 
 ---
 
@@ -433,7 +432,6 @@ When hitting a specific problem, load the corresponding skill before debugging:
 
 | You want to... | Run this |
 |----------------|----------|
-| Check toolchain | `nix run .#toolchain-check` |
 | Build native | `nix run .#build-native` |
 | Build WASM | `nix run .#build-wasm` |
 | Validate WASM | `nix run .#validate-wasm` |

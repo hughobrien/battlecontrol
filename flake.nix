@@ -384,6 +384,7 @@
           echo "C&C Red Alert — dev shell"
           echo ""
           echo "Workflows (from repo root):"
+          echo "  nix run .#wine-check         Wine toolchain prerequisites"
           echo "  nix run .#toolchain-check    toolchain prerequisites"
           echo "  nix run .#build-native       native Linux build (ra/td/both)"
           echo "  nix run .#release-build-ra    release build: RA native + package"
@@ -577,6 +578,10 @@
               assert sz > 1_000_000, fn + ': too small (' + str(sz) + ' bytes)'
               print('  ' + fn.split('/')[1] + ': ' + str(sz//1024) + ' KB OK')
           "
+        '';
+
+        wine-check = mkApp "wine-check" ''
+          exec bash scripts/wine-check.sh
         '';
 
         serve-wasm = mkApp "serve-wasm" ''

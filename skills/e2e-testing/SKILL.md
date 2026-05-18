@@ -85,7 +85,7 @@ The WASM build uses PROXY_TO_PTHREAD with OffscreenCanvas. Chromium's headless
 shell mode (`--headless=new` or `headless: true` in Playwright config) does not
 support OffscreenCanvas → black screen.
 
-**One-command E2E runner (using extension tool):**
+**One-command E2E runner:**
 
 ```
 run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")

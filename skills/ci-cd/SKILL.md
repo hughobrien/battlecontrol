@@ -6,9 +6,6 @@ version: 0.2.0
 
 # CI/CD Pipeline Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `build_wasm`, `wasm_validate`,
-> `build_native`, `toolchain_check`, `capture_wine`, `vqa_pixel_diff`, `run_e2e_test`.
-> Ask the agent to run these instead of typing raw commands.
 
 You are working on the CI/CD pipeline for the C&C native Linux and WASM builds. The
 pipeline has three GitHub Actions workflows: `ci.yml` (push/PR), `gh-pages.yml`
@@ -123,9 +120,6 @@ gh-pages URL and the downloaded artifacts.
 
 ## §4 — Running CI jobs locally
 
-Use the `pi-battlecontrol-dev` extension tools instead of typing raw commands:
-
-| CI Job | Tool | Notes |
 |--------|------|-------|
 | Native build | `build_native(target: "both")` | Builds RA + TD native Linux |
 | WASM build | `build_wasm(target: "both")` | Builds ra.wasm + td.wasm |
