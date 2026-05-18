@@ -28,7 +28,7 @@ Inside the same Wine prefix as the running game:
 
 ```bash
 WINEPREFIX=~/.wine-ra-wayland \
-  /opt/wine-devel/bin/wine ra-sendinput.exe 0x0D 0   # VK_RETURN, no delay
+  wine ra-sendinput.exe 0x0D 0   # VK_RETURN, no delay (wine from nix develop shell)
 ```
 
 Common VKs:
