@@ -10,9 +10,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |Build native|`build-native`|`scripts/build-native.sh`|`ci.yml → build`|—|
 |Build WASM|`build-wasm`|inline (flake.nix)|`ci.yml → build-wasm`|—|
 |Validate WASM|`validate-wasm`|inline (flake.nix)|`ci.yml → build-wasm`|—|
-|Serve WASM|`serve-wasm`|`wasm/serve-coop.py`|—|—|
-|Serve assets|`serve-assets`|`wasm/serve-assets.py`|—|—|
-|Serve both|`serve`|inline (flake.nix)|—|—|
+|Serve (WASM+assets)|`serve`|`wasm/serve-coop.py` + `wasm/serve-assets.py`|—|—|
 |WASM screenshot|`screenshot`|inline (flake.nix)|—|—|
 |Run e2e test|`test`|`scripts/run-e2e.sh`|—|`test:e2e`|
 |Run T1 (RA boot)|`test-t1`|`scripts/run-e2e.sh`|`ci.yml → build-wasm`|—|
@@ -143,10 +141,9 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Serve / Dev Server
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Serve WASM | `nix run .#serve-wasm [port]` | Start HTTP server with COOP/COEP headers for SharedArrayBuffer. |
+| Serve both | `nix run .#serve [port]` | Start WASM + asset dev servers. |
 | | `python3 wasm/serve-coop.py <port> <build-dir>` | Same, directly. |
-| Serve assets | `nix run .#serve-assets [port]` | Start HTTP server with CORS for game data MIX files. |
-| | `python3 wasm/serve-assets.py <assetDir> <port>` | Same, directly. |
+| Serve assets (direct) | `python3 wasm/serve-assets.py <assetDir> <port>` | Start asset server directly (no nix app — use `serve` for both). |
 | Serve both | `nix run .#serve` | Start both servers in background. |
 ### Iteration Loops
 | Command | Invocation | What It Does |
@@ -253,8 +250,8 @@ Every executable entry point, listed A–Z with its surface(s).
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
 | `screenshot` | nix app | Test | WASM screenshot capture. |
 | `serve` | nix app | Serve | Start both WASM + asset servers. |
-| `serve-assets` | nix app | Serve | Start game asset server. |
-| `serve-wasm` | nix app | Serve | Start WASM dev server. |
+| `serve-assets` | nix app | Serve | Removed — use `serve` instead. |
+| `serve-wasm` | nix app | Serve | Removed — use `serve` instead. |
 | `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
 | `include-shim` | nix app | Lint | Regenerate include shim. |
