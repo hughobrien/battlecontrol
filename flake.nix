@@ -392,7 +392,7 @@
           echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
           echo "  nix run .#build-wasm         WASM build (ra/td/both)"
           echo "  nix run .#validate-wasm      WASM binary validation"
-          echo "  nix run .#serve              both dev servers"
+          echo "  nix run .#serve              WASM + asset dev servers"
           echo "  nix run .#screenshot         capture WASM screenshot"
           echo "  nix run .#test -- <spec>     run an e2e test"
           echo "  nix run .#capture-wine       Wine OG baseline capture"
@@ -584,29 +584,17 @@
           exec bash scripts/wine-check.sh
         '';
 
-        serve-wasm = mkApp "serve-wasm" ''
-          PORT="''${1:-8080}"
-          exec python3 wasm/serve-coop.py "$PORT" build-wasm
-        '';
-
-        serve-assets = mkApp "serve-assets" ''
-          GAME="''${1:-ra}"
-          PORT="''${2:-9090}"
-          if [ "$GAME" = "ra" ]; then
-            exec python3 wasm/serve-assets.py "$RA_ASSETS" "$PORT"
-          else
-            exec python3 wasm/serve-assets.py "$TD_ASSETS" "$PORT"
-          fi
-        '';
-
         serve = mkApp "serve-both" ''
           WASM_PORT="''${1:-8080}"
           ASSET_PORT="''${2:-9090}"
-          nix run .#serve-wasm "$WASM_PORT" &
-          nix run .#serve-assets ra "$ASSET_PORT" &
+          python3 wasm/serve-coop.py "$WASM_PORT" build-wasm &
+          WASM_PID=$!
+          python3 wasm/serve-assets.py "$RA_ASSETS" "$ASSET_PORT" &
+          ASSET_PID=$!
           echo "WASM:   http://localhost:$WASM_PORT"
           echo "Assets: http://localhost:$ASSET_PORT"
           wait
+          kill $WASM_PID $ASSET_PID 2>/dev/null || true
         '';
 
         test-t1 = mkApp "test-t1" ''
