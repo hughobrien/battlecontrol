@@ -19,20 +19,20 @@ set -euo pipefail
 
 CC95_EXE_PATH="${1:-}"
 if [[ -z "$CC95_EXE_PATH" ]]; then
-  echo "=== C&C95.EXE resolution ==="
-  echo ""
-  echo "ERROR: No C&C95.EXE path provided."
-  echo ""
-  echo "  Usage: bash scripts/wine-td-setup.sh <path-to-C&C95.EXE>"
-  echo ""
-  echo "  C&C95.EXE must be extracted from the C&C Gold ZIP."
-  echo "  See the manual download instructions below."
-  exit 1
+	echo "=== C&C95.EXE resolution ==="
+	echo ""
+	echo "ERROR: No C&C95.EXE path provided."
+	echo ""
+	echo "  Usage: bash scripts/wine-td-setup.sh <path-to-C&C95.EXE>"
+	echo ""
+	echo "  C&C95.EXE must be extracted from the C&C Gold ZIP."
+	echo "  See the manual download instructions below."
+	exit 1
 fi
 
 if [[ ! -f "$CC95_EXE_PATH" ]]; then
-  echo "ERROR: File not found: $CC95_EXE_PATH"
-  exit 1
+	echo "ERROR: File not found: $CC95_EXE_PATH"
+	exit 1
 fi
 
 EXE_SHA=$(sha256sum "$CC95_EXE_PATH" | awk '{print $1}')

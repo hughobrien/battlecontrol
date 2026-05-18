@@ -63,11 +63,11 @@ WINE="${WINE:-/usr/bin/wine}"
 WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim857-allied-m2}"
 RA_EXE_PATH="${1:-${RA_EXE_PATH:-}}"
 if [[ -z "$RA_EXE_PATH" ]]; then
-  RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
+	RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
 fi
 if [[ -z "$RA_EXE_PATH" ]] || [[ ! -f "$RA_EXE_PATH" ]]; then
-  echo "ERROR: RA95.EXE not found. Set RA_EXE_PATH or run from nix develop."
-  exit 1
+	echo "ERROR: RA95.EXE not found. Set RA_EXE_PATH or run from nix develop."
+	exit 1
 fi
 RA_DLL_DIR="$(dirname "$RA_EXE_PATH")"
 DATA_DIR="${DATA_DIR:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
