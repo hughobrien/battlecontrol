@@ -7,47 +7,38 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ## Cross-Reference Matrix
 | Action | Nix App | Script(s) | CI Job | npm Script |
 |--------|---------|-----------|--------|------------|
-|Build native|`build-native`|`scripts/build-native.sh`|`ci.yml → build`|—|
-|Build WASM|`build-wasm`|inline (flake.nix)|`ci.yml → build-wasm`|—|
-|Validate WASM|`build-wasm`|inline (flake.nix) — validation is always on|`ci.yml → build-wasm`|—|
-|Serve (WASM+assets)|`serve`|`wasm/serve-coop.py` + `wasm/serve-assets.py`|—|—|
-|WASM screenshot|`screenshot`|inline (flake.nix)|—|—|
-|Run e2e test|`test`|`scripts/run-e2e.sh`|—|`test:e2e`|
-|Run e2e tests|`test`|`scripts/run-e2e.sh`|`ci.yml → build-wasm`|—|
-|CI gate (local)|`ci`|`scripts/ci-local.sh`|—|—|
-|CI native build|`build-native`|`scripts/build-native.sh`|`ci.yml → build`|—|
-|WASM loop (CI)|`wasm-loop`|inline (flake.nix)|`ci.yml → build-wasm`|—|
-|WASM loop smoke|`wasm-loop`|`scripts/run-e2e.sh` (via `test`)|called by wasm-loop|—|
-|CI test run|`test`|`scripts/run-e2e.sh`|`ci.yml → build-wasm` (T3/T6/T7/T8/T9)|—|
-|CI VQA pixel-diff|`vqa-check`|`scripts/vqa-check.sh`|`ci.yml → vqa-pixel-diff`|—|
-|CI ccache setup|`ci-cc-setup`|inline (flake.nix)|`gh-pages.yml`|—|
-|CI gate + static analysis|`ci`|`scripts/ci-local.sh`|`ci.yml → ci`|—|
-|Toolchain check|`toolchain-check`|`scripts/toolchain-check.sh`|—|—|
-|Wine check|`wine-check`|`scripts/wine-check.sh`|—|—|
-|Wine capture|`capture-wine`|`scripts/wine-cnc-capture.sh`|`ci.yml → wine-comparison`|—|
-|Capture orchestrator|`capture-checkpoint`|`scripts/capture-checkpoint.py`|—|—|
-|Parity compare|`parity-compare`|`scripts/parity-compare.py`|—|—|
-|Parity report|`parity-report`|`scripts/parity-report.sh`|—|—|
-|VQA pixel diff|`vqa-check`|`scripts/vqa-pixel-diff.py`|—|—|
-|VQA golden frames|`vqa-golden`|`scripts/gen-vqa-golden.py`|—|—|
-|VQA cinematic compare|`vqa-cinematic`|`scripts/cinematic-compare.py`|—|`cinematic-compare`|
-|LP64 lint|`lint-lp64`|`scripts/lint-lp64.py`|—|—|
-|Full lint suite|`lint-all`|inline (flake.nix)|—|—|
-|Include shim|`include-shim`|`scripts/generate-include-shim.py`|—|—|
-|Edit loop (native)|`edit-loop`|inline (flake.nix)|—|—|
-|WASM loop|`wasm-loop`|inline (flake.nix)|—|—|
-|Release (RA+TD native)|`release`|`scripts/first-run-pass-94.sh` + cmake + tar|`release.yml`|—|
-|Build stub THIPX|`build-stub-thipx`|`scripts/build-stub-thipx.sh`|—|—|
-|Regression suite|`regression`|`scripts/regression-suite.sh`|—|—|
-|Smoke test (RA)|`smoke-ra`|`scripts/first-run-pass-94.sh`|—|—|
-|Smoke test (TD)|`smoke-td`|`scripts/run-td-cheat.sh`|—|—|
-|Run RA|`redalert`|(cmake target)|—|—|
-|Run TD|`tiberiandawn`|(cmake target)|—|—|
-|E2E RA gameplay|—|—|—|`test:e2e:ra`|
-|E2E TD gameplay|—|—|—|`test:e2e:td`|
-|E2E WASM parity|—|—|—|`test:e2e:wasm-parity`|
-|E2E TD compare|—|—|—|`test:e2e:td-compare`|
-|E2E TIM-705 eq.|—|—|—|`test:e2e:tim705`|
+| Build | `build-native` | `scripts/build-native.sh` | `ci.yml → build` | — |
+| Build WASM | `build-wasm` | inline — includes validation | `ci.yml → build-wasm` | — |
+| Test | `test` | `scripts/run-e2e.sh` | T3+ asset-gated in ci.yml | `test:e2e` |
+| CI gate | `ci` | `scripts/ci-local.sh` | `ci.yml → ci` | — |
+| Edit loop | `edit-loop` | inline — shim→lint→build→smoke | — | — |
+| WASM loop | `wasm-loop` | inline — build-wasm→test | — | — |
+| Serve | `serve` | `wasm/serve-coop.py` + `wasm/serve-assets.py` | — | — |
+| LP64 lint | `lint-lp64` | `scripts/lint-lp64.py` | — | — |
+| Full lint | `lint-all` | inline — multi-tool | — | — |
+| Include shim | `include-shim` | `scripts/generate-include-shim.py` | — | — |
+| Toolchain check | `toolchain-check` | `scripts/toolchain-check.sh` | — | — |
+| Wine check | `wine-check` | `scripts/wine-check.sh` | — | — |
+| Parity compare | `parity-compare` | `scripts/parity-compare.py` | — | — |
+| Parity report | `parity-report` | `scripts/parity-report.sh` | — | — |
+| VQA check | `vqa-check` | `scripts/vqa-check.sh` | `ci.yml → vqa-pixel-diff` | — |
+| VQA cinematic | `vqa-cinematic` | `scripts/cinematic-compare.py` | — | `cinematic-compare` |
+| VQA golden | `vqa-golden` | `scripts/gen-vqa-golden.py` | — | — |
+| Capture (Wine OG) | `capture-wine` | `scripts/wine-cnc-capture.sh` | `ci.yml → wine-comparison` | — |
+| Capture (checkpoint) | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
+| Release | `release` | `scripts/first-run-pass-94.sh` + cmake + tar | `release.yml` | — |
+| Regression suite | `regression` | `scripts/regression-suite.sh` | — | — |
+| Smoke (RA) | `smoke-ra` | `scripts/first-run-pass-94.sh` | — | — |
+| Smoke (TD) | `smoke-td` | `scripts/run-td-cheat.sh` | — | — |
+| Screenshot | `screenshot` | inline — serve + playwright | — | — |
+| Run RA | `redalert` | cmake target | — | — |
+| Run TD | `tiberiandawn` | cmake target | — | — |
+| Default | `default` | → `toolchain-check` | — | — |
+| E2E RA gameplay | — | — | — | `test:e2e:ra` |
+| E2E TD gameplay | — | — | — | `test:e2e:td` |
+| E2E WASM parity | — | — | — | `test:e2e:wasm-parity` |
+| E2E TD compare | — | — | — | `test:e2e:td-compare` |
+| E2E TIM-705 eq. | — | — | — | `test:e2e:tim705` |
 
 
 ## By Category
@@ -81,7 +72,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | | `scripts/ci-local.sh [--wasm-only\|--native-only]` | Same, directly. |
 | CI native build | `nix run .#build-native` | Native build with integrated ELF 64-bit validation. |
 | WASM loop | `nix run .#wasm-loop` | Build → validate → smoke T1+T2. |
-| CI WASM smoke | `nix run .#ci-wasm-smoke` | Xvfb + serve-coop + T1+T2 Playwright tests. |
+| WASM loop smoke | `nix run .#test` | T1 + T2 Playwright smoke tests (via `wasm-loop`). |
 | CI test run | `nix run .#test -- <spec>` | Run one Playwright spec under Xvfb + WASM (for asset-gated tests). |
 | CI VQA | `nix run .#vqa-check` | Generate test VQA + pixel-diff (for CI). |
 ### Capture / Screenshot

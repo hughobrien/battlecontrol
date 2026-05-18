@@ -144,9 +144,8 @@ build_wasm(target: "ra", clean: true)
 
 **Output validation:**
 ```bash
-nix run .#validate-wasm
-# Must show: ra.wasm: OK (magic \x00asm, size >1MB)
-# Must show: td.wasm: OK (magic \x00asm, size >1MB)
+# Validation is baked into build-wasm — it checks magic + size after build.
+# To verify manually:
 ```
 
 **⚠️ Stale CMake cache:** If `build_wasm` fails with `include could not find
@@ -434,20 +433,20 @@ When hitting a specific problem, load the corresponding skill before debugging:
 |----------------|----------|
 | Build native | `nix run .#build-native` |
 | Build WASM | `nix run .#build-wasm` |
-| Validate WASM | `nix run .#validate-wasm` |
 | Run LP64 lint | `nix run .#lint-lp64` |
 | Run full lint | `nix run .#lint-all` |
 | Regenerate include shim | `nix run .#include-shim` |
-| Run e2e test | `nix run .#test -- <spec>` |
+| Run e2e test (T1+T2 default) | `nix run .#test` |
+| Run e2e test (custom spec) | `nix run .#test -- <spec>` |
 | Run CI gate | `nix run .#ci` |
-| Serve WASM locally | `nix run .#serve` |
-| Capture WASM screenshot | `wasm_screenshot(target: "ra")` |
+| Serve (WASM + assets) | `nix run .#serve` |
 | Compare two images | `nix run .#parity-compare -- <imgA> <imgB>` |
 | Run parity report | `nix run .#parity-report -- --mode gameplay allied-l1` |
 | Run VQA check | `nix run .#vqa-check` |
-| Generate VQA golden | `nix run .#vqa-golden -- <vqa> <n>` |
 | Run native smoke (RA) | `nix run .#smoke-ra` |
 | Run native smoke (TD) | `nix run .#smoke-td` |
-| Verify game data | `nix run .#data-verify -- <dir>` |
 | Edit loop (native) | `nix run .#edit-loop` |
 | Edit loop (WASM) | `nix run .#wasm-loop` |
+| Release (RA+TD tarballs) | `nix run .#release` |
+| Verify toolchain + data | `nix run .#toolchain-check` |
+| Check Wine setup | `nix run .#wine-check` |
