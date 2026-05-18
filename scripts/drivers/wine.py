@@ -6,23 +6,34 @@ from .common import *
 
 class WineCapture:
     """Capture screenshots from RA95.EXE under Wine.
-    
+
     Generalized parameterization of wine-allied-l1.sh / wine-vqa-capture.sh.
     """
 
     VQA_TIMINGS = {
-        "WESTWOOD": 15.0, "RA_LOGO": 5.0, "INTRO2": 62.0,
-        "ENGLISH": 80.0, "PROLOG": 6.0, "ALLY1": 8.0,
-        "SOVIET1": 8.0, "SOVIET2": 12.0,
+        "WESTWOOD": 15.0,
+        "RA_LOGO": 5.0,
+        "INTRO2": 62.0,
+        "ENGLISH": 80.0,
+        "PROLOG": 6.0,
+        "ALLY1": 8.0,
+        "SOVIET1": 8.0,
+        "SOVIET2": 12.0,
     }
 
-    def __init__(self, wine="/usr/bin/wine", wineprefix=None,
-                 ra_exe=None, cnc_ddraw_dir="/tmp/cnc-ddraw-master",
-                 data_dir="/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1",
-                 scripts_dir=None):
+    def __init__(
+        self,
+        wine="/usr/bin/wine",
+        wineprefix=None,
+        ra_exe=None,
+        cnc_ddraw_dir="/tmp/cnc-ddraw-master",
+        data_dir="/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1",
+        scripts_dir=None,
+    ):
         self.wine = pathlib.Path(wine)
         self.wineprefix = pathlib.Path(
-            wineprefix or os.path.expanduser("~/.wine-checkpoint"))
+            wineprefix or os.path.expanduser("~/.wine-checkpoint")
+        )
         self.ra_exe = pathlib.Path(ra_exe) if ra_exe else self._resolve_ra_exe()
         self.cnc_ddraw_dir = pathlib.Path(cnc_ddraw_dir)
         self.data_dir = pathlib.Path(data_dir)
@@ -35,14 +46,16 @@ class WineCapture:
     def _resolve_ra_exe(self) -> pathlib.Path:
         r = subprocess.run(
             ["nix", "build", ".#ra-patched-exe", "--impure", "--print-out-paths"],
-            capture_output=True, text=True, timeout=60)
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
         if r.returncode != 0:
             # Fallback: check RA_EXE_PATH env var
             env_path = os.environ.get("RA_EXE_PATH")
             if env_path:
                 return pathlib.Path(env_path)
-            raise RuntimeError(
-                "RA95.EXE not found via nix. Set RA_EXE_PATH env var.")
+            raise RuntimeError("RA95.EXE not found via nix. Set RA_EXE_PATH env var.")
         return pathlib.Path(r.stdout.strip())
 
     def _ensure_build_inputs(self):
@@ -50,12 +63,19 @@ class WineCapture:
         src = self.scripts_dir / ".." / "tools" / "wine-input" / "ra-sendinput.c"
         self._sendinput_exe = pathlib.Path(tempfile.gettempdir()) / "ra-sendinput.exe"
         if not self._sendinput_exe.exists() or (
-                src.exists() and
-                src.stat().st_mtime > self._sendinput_exe.stat().st_mtime):
+            src.exists() and src.stat().st_mtime > self._sendinput_exe.stat().st_mtime
+        ):
             subprocess.run(
-                ["i686-w64-mingw32-gcc", "-o", str(self._sendinput_exe),
-                 str(src), "-luser32"],
-                capture_output=True, timeout=60)
+                [
+                    "i686-w64-mingw32-gcc",
+                    "-o",
+                    str(self._sendinput_exe),
+                    str(src),
+                    "-luser32",
+                ],
+                capture_output=True,
+                timeout=60,
+            )
 
     def _patch_chain(self, exe: pathlib.Path, scenario=None, skip_vqa=True):
         patches = [
@@ -94,7 +114,8 @@ class WineCapture:
         (staging / "ddraw.ini").write_text(
             "[ddraw]\nrenderer=gdi\nwindowed=true\nhook=0\n"
             "window_state=normal\nmaxfps=30\n\n"
-            "[ra95]\nscanline_double=true\n")
+            "[ra95]\nscanline_double=true\n"
+        )
         self._patch_chain(staging / "RA95.EXE", scenario, skip_vqa)
         return staging
 
@@ -102,9 +123,14 @@ class WineCapture:
         if not self.wineprefix.exists():
             subprocess.run(
                 [str(self.wine), "wineboot", "--init"],
-                env={**os.environ, "WINEPREFIX": str(self.wineprefix),
-                     "WINEDEBUG": "-all"},
-                capture_output=True, timeout=120)
+                env={
+                    **os.environ,
+                    "WINEPREFIX": str(self.wineprefix),
+                    "WINEDEBUG": "-all",
+                },
+                capture_output=True,
+                timeout=120,
+            )
         dos = self.wineprefix / "dosdevices"
         dos.mkdir(parents=True, exist_ok=True)
         d_link = dos / "d:"
@@ -116,12 +142,17 @@ class WineCapture:
         return subprocess.Popen(
             [str(self.wine), str(staging / "RA95.EXE")],
             cwd=str(staging),
-            env={**os.environ,
-                 "WINEPREFIX": str(self.wineprefix),
-                 "WINEDLLOVERRIDES": "ddraw=n;mscoree=;mshtml=",
-                 "WINEDEBUG": "-all", "AUDIODEV": "null",
-                 "WAYLAND_DISPLAY": ""},
-            stdout=logfile, stderr=logfile)
+            env={
+                **os.environ,
+                "WINEPREFIX": str(self.wineprefix),
+                "WINEDLLOVERRIDES": "ddraw=n;mscoree=;mshtml=",
+                "WINEDEBUG": "-all",
+                "AUDIODEV": "null",
+                "WAYLAND_DISPLAY": "",
+            },
+            stdout=logfile,
+            stderr=logfile,
+        )
 
     def _cleanup(self, staging, wine_proc, xvfb, wm):
         for p in [wine_proc, wm, xvfb]:
@@ -129,12 +160,14 @@ class WineCapture:
         subprocess.run(
             ["wineserver", "-k"],
             env={**os.environ, "WINEPREFIX": str(self.wineprefix)},
-            capture_output=True, timeout=10)
+            capture_output=True,
+            timeout=10,
+        )
         shutil.rmtree(staging, ignore_errors=True)
 
-    def capture_mission(self, scenario: str, frame: int,
-                        output_dir: pathlib.Path,
-                        logfile=None) -> pathlib.Path:
+    def capture_mission(
+        self, scenario: str, frame: int, output_dir: pathlib.Path, logfile=None
+    ) -> pathlib.Path:
         """Capture a screenshot from a mission at the given game frame."""
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
@@ -149,9 +182,12 @@ class WineCapture:
                 raise RuntimeError("Red Alert window never appeared")
             # Dismiss DirectSound dialog, skip VQAs
             time.sleep(5)
-            subprocess.run(["xdotool", "key", "Return"],
-                           env={**os.environ, "DISPLAY": disp},
-                           capture_output=True, timeout=5)
+            subprocess.run(
+                ["xdotool", "key", "Return"],
+                env={**os.environ, "DISPLAY": disp},
+                capture_output=True,
+                timeout=5,
+            )
             # Wait for target frame
             frame_wait = max(frame / 15.0, 3.0)
             time.sleep(frame_wait)
@@ -162,9 +198,9 @@ class WineCapture:
         finally:
             self._cleanup(staging, wine_proc, xvfb, wm)
 
-    def capture_vqa(self, vqa_stem: str, frame: int,
-                    output_dir: pathlib.Path,
-                    logfile=None) -> pathlib.Path:
+    def capture_vqa(
+        self, vqa_stem: str, frame: int, output_dir: pathlib.Path, logfile=None
+    ) -> pathlib.Path:
         """Capture a screenshot from a VQA at the given frame."""
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
@@ -179,13 +215,19 @@ class WineCapture:
                 raise RuntimeError("Red Alert window never appeared")
             # Dismiss boot dialogs
             time.sleep(5)
-            subprocess.run(["xdotool", "key", "Return"],
-                           env={**os.environ, "DISPLAY": disp},
-                           capture_output=True, timeout=5)
+            subprocess.run(
+                ["xdotool", "key", "Return"],
+                env={**os.environ, "DISPLAY": disp},
+                capture_output=True,
+                timeout=5,
+            )
             time.sleep(1)
-            subprocess.run(["xdotool", "key", "Return"],
-                           env={**os.environ, "DISPLAY": disp},
-                           capture_output=True, timeout=5)
+            subprocess.run(
+                ["xdotool", "key", "Return"],
+                env={**os.environ, "DISPLAY": disp},
+                capture_output=True,
+                timeout=5,
+            )
             # Wait for VQA start + frame offset
             pre_vqa = self._get_vqa_offsets().get(vqa_stem, 0.0)
             frame_time = frame / 15.0

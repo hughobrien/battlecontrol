@@ -5,11 +5,13 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
       system = "x86_64-linux";
-      pkgs   = nixpkgs.legacyPackages.${system};
-    in {
+      pkgs = nixpkgs.legacyPackages.${system};
+    in
+    {
       packages.${system} = rec {
         ra-sendinput = pkgs.stdenv.mkDerivation {
           pname = "ra-sendinput";

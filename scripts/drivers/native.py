@@ -20,12 +20,11 @@ class NativeCapture:
         env_bin = os.environ.get("RA_BIN")
         if env_bin:
             return pathlib.Path(env_bin)
-        raise RuntimeError(
-            "native RA binary not found; set RA_BIN or build first")
+        raise RuntimeError("native RA binary not found; set RA_BIN or build first")
 
-    def capture_mission(self, scenario: str, frame: int,
-                        output_dir: pathlib.Path,
-                        logfile=None) -> pathlib.Path:
+    def capture_mission(
+        self, scenario: str, frame: int, output_dir: pathlib.Path, logfile=None
+    ) -> pathlib.Path:
         """Capture screenshot from native RA at given game frame."""
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
@@ -33,14 +32,17 @@ class NativeCapture:
         try:
             xvfb = start_xvfb(disp, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
-            env = {**os.environ, "DISPLAY": disp,
-                   "RA_AUTOSTART": "1",
-                   "RA_AUTOSTART_SCENARIO": f"{scenario}.INI"}
+            env = {
+                **os.environ,
+                "DISPLAY": disp,
+                "RA_AUTOSTART": "1",
+                "RA_AUTOSTART_SCENARIO": f"{scenario}.INI",
+            }
             if self.data_dir:
                 env["DATA_DIR"] = self.data_dir
             ra_proc = subprocess.Popen(
-                [str(self.ra_bin)], env=env,
-                stdout=logfile, stderr=logfile)
+                [str(self.ra_bin)], env=env, stdout=logfile, stderr=logfile
+            )
             # Probe for non-black canvas (up to 45s)
             deadline = time.time() + 45
             found = False
@@ -55,8 +57,7 @@ class NativeCapture:
                         break
                 time.sleep(1)
             if not found:
-                raise RuntimeError(
-                    "native RA never rendered non-black canvas")
+                raise RuntimeError("native RA never rendered non-black canvas")
             # Wait remaining frames
             wait = max(frame / 15.0, 1.0)
             time.sleep(wait)

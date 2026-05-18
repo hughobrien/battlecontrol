@@ -12,19 +12,27 @@ class WasmCapture:
         self.port = port
 
     def _start_server(self, logfile):
-        server_script = (pathlib.Path(__file__).resolve().parent.parent
-                         / "wasm" / "serve-coop.py")
+        server_script = (
+            pathlib.Path(__file__).resolve().parent.parent / "wasm" / "serve-coop.py"
+        )
         proc = subprocess.Popen(
-            [sys.executable, str(server_script),
-             "--directory", str(self.wasm_dir),
-             "--port", str(self.port)],
-            stdout=logfile, stderr=logfile)
+            [
+                sys.executable,
+                str(server_script),
+                "--directory",
+                str(self.wasm_dir),
+                "--port",
+                str(self.port),
+            ],
+            stdout=logfile,
+            stderr=logfile,
+        )
         time.sleep(2)
         return proc
 
-    def capture_mission(self, scenario: str, frame: int,
-                        output_dir: pathlib.Path,
-                        logfile=None) -> pathlib.Path:
+    def capture_mission(
+        self, scenario: str, frame: int, output_dir: pathlib.Path, logfile=None
+    ) -> pathlib.Path:
         """Capture WASM canvas at given game frame."""
         logfile = logfile or subprocess.DEVNULL
         server = None
@@ -40,6 +48,7 @@ class WasmCapture:
 
     def _playwright_capture(self, scenario: str, frame: int, output_path: str):
         from playwright.sync_api import sync_playwright
+
         scenario_name = f"{scenario}.INI"
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -47,10 +56,13 @@ class WasmCapture:
             page.goto(
                 f"http://localhost:{self.port}/ra.html"
                 f"?autostart=1&scenario={scenario_name}",
-                wait_until="networkidle", timeout=60000)
+                wait_until="networkidle",
+                timeout=60000,
+            )
             page.wait_for_function(
                 "() => typeof Module !== 'undefined' && Module.__wasmReady",
-                timeout=60000)
+                timeout=60000,
+            )
             frame_wait = max(frame / 15.0, 3.0)
             page.wait_for_timeout(int(frame_wait * 1000))
             canvas = page.query_selector("canvas")
@@ -60,8 +72,8 @@ class WasmCapture:
                 page.screenshot(path=output_path)
             browser.close()
 
-    def capture_vqa(self, vqa_stem: str, frame: int,
-                    output_dir: pathlib.Path,
-                    logfile=None) -> pathlib.Path:
+    def capture_vqa(
+        self, vqa_stem: str, frame: int, output_dir: pathlib.Path, logfile=None
+    ) -> pathlib.Path:
         """Capture WASM VQA frame — stub, not yet implemented."""
         raise NotImplementedError("WASM VQA capture not yet implemented")

@@ -45,19 +45,16 @@ import sys
 PATCHES = [
     # 1. selection = SEL_START_NEW_GAME (value 1) instead of SEL_MULTIPLAYER (value 4)
     #    VA 0x4fd505: mov esi, 4   →  mov esi, 1
-    (0x004fd505, b'\xbe\x04\x00\x00\x00', b'\xbe\x01\x00\x00\x00'),
-
+    (0x004FD505, b"\xbe\x04\x00\x00\x00", b"\xbe\x01\x00\x00\x00"),
     # 2. NOP je after IsFromInstall->testb in SEL_START_NEW_GAME handler.
     #    VA 0x4fdc67: je +0x68   →  nop nop
-    (0x004fdc67, b'\x74\x68', b'\x90\x90'),
-
+    (0x004FDC67, b"\x74\x68", b"\x90\x90"),
     # 3. Change jne->jmp after IsFromInstall test for faction/Choose_Side.
     #    VA 0x4fdd10: jne +0x5d  →  jmp +0x5d
-    (0x004fdd10, b'\x75\x5d', b'\xeb\x5d'),
-
+    (0x004FDD10, b"\x75\x5d", b"\xeb\x5d"),
     # 4. NOP jne after Choose_Side returns (Allies/Soviets flag check).
     #    VA 0x4fdd8f: jne +0x07  →  nop nop
-    (0x004fdd8f, b'\x75\x07', b'\x90\x90'),
+    (0x004FDD8F, b"\x75\x07", b"\x90\x90"),
 ]
 
 
@@ -67,10 +64,10 @@ def sha256(data: bytes) -> str:
 
 def va_to_file_offset(va: int) -> int:
     """Convert VA to PE file offset for this RA95.EXE binary."""
-    if 0x00410000 <= va < 0x005cce00:       # BEGTEXT (.text)
+    if 0x00410000 <= va < 0x005CCE00:  # BEGTEXT (.text)
         return 0x00000400 + (va - 0x00410000)
-    if 0x005d0000 <= va < 0x00605000:       # DGROUP (.data)
-        return 0x001bd200 + (va - 0x005d0000)
+    if 0x005D0000 <= va < 0x00605000:  # DGROUP (.data)
+        return 0x001BD200 + (va - 0x005D0000)
     raise ValueError(f"VA 0x{va:08x} not in mapped sections")
 
 
@@ -81,14 +78,14 @@ def patch(path: str, dry_run: bool = False) -> int:
     applied = 0
     for va, expected, replacement in PATCHES:
         fo = va_to_file_offset(va)
-        actual = bytes(data[fo:fo + len(expected)])
+        actual = bytes(data[fo : fo + len(expected)])
 
         if actual != expected:
             print(f"SKIP VA 0x{va:08x}: expected {expected.hex()}, got {actual.hex()}")
             continue
 
         if not dry_run:
-            data[fo:fo + len(replacement)] = replacement
+            data[fo : fo + len(replacement)] = replacement
 
         old_mnem = disasm_hint(expected, replacement)
         print(f"  VA 0x{va:08x} file 0x{fo:08x}: {old_mnem}")
@@ -121,10 +118,13 @@ def patch(path: str, dry_run: bool = False) -> int:
 def disasm_hint(old: bytes, new: bytes) -> str:
     """Return a human-readable description of the patch."""
     hints = {
-        (0xbe04000000, 0xbe01000000): "1. selection = SEL_START_NEW_GAME (1) instead of SEL_MULTIPLAYER (4)",
-        (0x7468, 0x9090):             "2. NOP je -> always DIFF_NORMAL (skip Fetch_Difficulty)",
-        (0x755d, 0xeb5d):             "3. jne->jmp -> always Choose_Side (skip faction dialog)",
-        (0x7507, 0x9090):             "4. NOP jne -> always Allies/SCG01EA.INI after Choose_Side",
+        (
+            0xBE04000000,
+            0xBE01000000,
+        ): "1. selection = SEL_START_NEW_GAME (1) instead of SEL_MULTIPLAYER (4)",
+        (0x7468, 0x9090): "2. NOP je -> always DIFF_NORMAL (skip Fetch_Difficulty)",
+        (0x755D, 0xEB5D): "3. jne->jmp -> always Choose_Side (skip faction dialog)",
+        (0x7507, 0x9090): "4. NOP jne -> always Allies/SCG01EA.INI after Choose_Side",
     }
     key = (bytes(old), bytes(new))
     if key in hints:

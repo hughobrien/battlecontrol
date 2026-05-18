@@ -147,18 +147,23 @@ no SIGSEGV / Aborted.  Shell: `scripts/regression/T6-ra-native-smoke.sh`.
 ## Running
 
 ```bash
-# Per-combo runners:
-bash scripts/regression/ra-wasm.sh        # RA WASM: T1, T11 (ci); +T3-ra, T4, T5, T8–T10 (full)
-bash scripts/regression/td-wasm.sh        # TD WASM: T2, T12 (ci); +T3-td, T6, T7 (full)
-bash scripts/regression/ra-native.sh      # RA native: full tier only (T6, T11)
-bash scripts/regression/td-native.sh      # TD native: full tier only (T5, T12)
+# Via nix (recommended):
+nix run .#ra-wasm-test              # RA WASM: CI tier (T1, T11)
+nix run .#ra-wasm-test -- --full    # RA WASM: full tier (+T3, T4, T5, T8–T10)
+nix run .#td-wasm-test              # TD WASM: CI tier (T2, T12)
+nix run .#td-wasm-test -- --full    # TD WASM: full tier (+T3, T6, T7)
+nix run .#ra-native-test            # RA native: CI tier
+nix run .#ra-native-test -- --full  # RA native: full tier (+T6, T11)
+nix run .#td-native-test            # TD native: CI tier
+nix run .#td-native-test -- --full  # TD native: full tier (+T5, T12)
 
-# Set tier (default ci):
-REGRESSION_TIER=full bash scripts/regression/ra-wasm.sh
+# Or via tier orchestrators (diff-gated):
+nix run .#smoke                     # build + CI-tier boot tests
+nix run .#test -- --all             # build + full regression for all targets
 
-# Or via nix:
-nix run .#ra-wasm-regression
-REGRESSION_TIER=full nix run .#td-wasm-regression
+# Or directly:
+bash scripts/test-runner.sh ra wasm        # CI tier
+bash scripts/test-runner.sh ra wasm --full # full tier
 ```
 
 ## How to add a new test-point
@@ -174,13 +179,12 @@ REGRESSION_TIER=full nix run .#td-wasm-regression
    `scripts/regression/`.
 6. Update this README's table and pass/fail section.
 7. If CI-runnable:
-   - Asset-free tests (T1/T2 class): wire into both
-     `.github/workflows/ci.yml` (PR gate) and
-     `.github/workflows/gh-pages.yml` (deploy gate).
-   - Asset-gated tests: wire into `.github/workflows/gh-pages.yml` only.
+   - Asset-free tests (T1/T2 class): wired into `scripts/test-runner.sh` CI tier.
+   - Asset-gated tests: wired into `scripts/test-runner.sh --full` tier.
      Use a bash `if [ -z "$ASSET_URL" ]; then exit 0; fi` guard — not a
      YAML `if:` condition (secrets in `if:` cause "0 jobs created"
      validation failures).
+   - GitHub CI runs `nix run .#test -- --all`.
 
 ## Design notes
 

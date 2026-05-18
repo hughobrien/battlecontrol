@@ -345,26 +345,30 @@
         ];
 
         shellHook = ''
-          export RA_ASSETS="''${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
-          export TD_ASSETS="''${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
+                    export RA_ASSETS="''${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
+                    export TD_ASSETS="''${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
 
 
 
-          # Install git pre-commit hook calling the lint tier
-          REPO_ROOT="''$(git rev-parse --show-toplevel 2>/dev/null || true)"
-          if [ -n "$REPO_ROOT" ] && [ ! -f "$REPO_ROOT/.git/hooks/pre-commit" ]; then
-            HOOK="$REPO_ROOT/.git/hooks/pre-commit"
-            cat > "$HOOK" << 'PREHOOK'
-#!/usr/bin/env bash
-set -euo pipefail
-nix run .#lint
-PREHOOK
-            chmod +x "$HOOK"
-            echo "Installed git pre-commit hook: nix run .#lint"
+                    # Install git pre-commit hook calling the lint tier
+                    REPO_ROOT="''$(git rev-parse --show-toplevel 2>/dev/null || true)"
+                    if [ -n "$REPO_ROOT" ] && [ ! -f "$REPO_ROOT/.git/hooks/pre-commit" ]; then
+                      HOOK="$REPO_ROOT/.git/hooks/pre-commit"
+                      cat > "$HOOK" << 'PREHOOK'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [[ -z "''${IN_NIX_SHELL:-}" ]]; then
+            echo "pre-commit: must be run inside nix develop" >&2
+            exit 1
           fi
+          nix run .#lint
+          PREHOOK
+                      chmod +x "$HOOK"
+                      echo "Installed git pre-commit hook: nix run .#lint"
+                    fi
 
-          echo "C&C Red Alert — dev shell"
-          echo "  nix flake show   to list available apps and packages"
+                    echo "C&C Red Alert — dev shell"
+                    echo "  nix flake show   to list available apps and packages"
         '';
       };
 
