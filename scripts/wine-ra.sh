@@ -23,42 +23,15 @@
 #     screen is captured reliably under Xvfb.
 # Result: game launches to title screen (~4266 bytes, 8-bit sRGB)
 #
-# ─── First-time setup ────────────────────────────────────────────────────────
-# Run this once to get all prerequisites:
-#   bash scripts/wine-ra-setup.sh
+# ─── Prerequisites ──────────────────────────────────────────────────────────
+# Requires:
+#   - Wine (provided by nix develop shell)
+#   - RA95.EXE (auto-resolved from Nix store via .#ra-patched-exe)
+#   - RA game data at RA_ASSETS (default: /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1)
+#   - Stub THIPX32.DLL at tools/stub-thipx/thipx32.dll
 #
-# Manual steps:
-#   1. Install Wine (Nix sourcery or apt):
-#        ## Nix:  already in nix develop shell (wine-wow64-11.0)
-#        ## Nix: already in nix develop shell (wine-wow64-11.0)
-#
-#   2. Download RA95.EXE (from the Allied CD ISO at archive.org):
-#        sudo mkdir -p /opt/redalert
-#        sudo chmod 777 /opt/redalert
-#        # Read only the EXE bytes from the ISO (LBA 45220, size 2181632):
-#        START=$((45220 * 2048))
-#        END=$((START + 2181632 - 1))
-#        curl -L -r "${START}-${END}" \
-#          "https://archive.org/download/cnc-red-alert/redalert_allied.iso" \
-#          -o /opt/redalert/RA95.EXE
-#        # Expected SHA-256:
-#        # a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55
-#
-#   3. Build the stub THIPX32.DLL (needed for Wine 11.0 wow64):
-#        cd tools/stub-thipx
-#        i686-w64-mingw32-gcc -shared -o thipx32.dll stub.c thipx32.def
-#
-#   4. Download original DLLs from the same ISO (for fallback):
-#        # THIPX32.DLL (LBA 58881, size 25902):
-#        START=$((58881 * 2048))
-#        curl -L -r "${START}-$((START+25901))" \
-#          "https://archive.org/download/cnc-red-alert/redalert_allied.iso" \
-#          -o /opt/redalert/THIPX32.DLL
-#        # THIPX16.DLL (LBA 58878, size 4192):
-#        START=$((58878 * 2048))
-#        curl -L -r "${START}-$((START+4191))" \
-#          "https://archive.org/download/cnc-red-alert/redalert_allied.iso" \
-#          -o /opt/redalert/THIPX16.DLL
+# Run this once to install stub THIPX32.DLL:
+#   bash scripts/build-stub-thipx.sh tools/stub-thipx
 #
 # ─── Known behavior under Wine ───────────────────────────────────────────────
 # • DirectSound warning: "Warning - Unable to create Direct Sound Object"
@@ -79,8 +52,8 @@
 # ─── Usage ───────────────────────────────────────────────────────────────────
 #    bash scripts/wine-ra.sh [EXE_PATH] [DATA_DIR] [SCREENSHOT_DIR]
 #
-#    EXE_PATH        path to RA95.EXE     (default: /opt/redalert/RA95.EXE)
-#    DATA_DIR        CD1 data directory   (default: /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1)
+#    EXE_PATH        path to RA95.EXE     (default: Nix store ra-patched-exe)
+#    DATA_DIR        CD1 data directory   (default: RA_ASSETS env var)
 #    SCREENSHOT_DIR  output dir           (default: e2e/screenshots)
 #
 # ─── Outputs ─────────────────────────────────────────────────────────────────
@@ -93,14 +66,25 @@
 
 set -euo pipefail
 
-RA_EXE_PATH="${1:-${RA_EXE_PATH:-/opt/redalert/RA95.EXE}}"
-# If patched EXE not found, fall back to original in game/
-if [[ ! -f "$RA_EXE_PATH" ]]; then
-	RA_EXE_PATH="/opt/redalert/game/RA95.EXE.orig"
+# Argument defaults: explicit arg → env var → Nix store → error
+RA_EXE_PATH="${1:-${RA_EXE_PATH:-}}"
+if [[ -z "$RA_EXE_PATH" ]]; then
+	RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
 fi
-DATA_DIR="${2:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
+if [[ -z "$RA_EXE_PATH" ]] || [[ ! -f "$RA_EXE_PATH" ]]; then
+	echo "ERROR: RA95.EXE not found."
+	echo "  Pass as first argument, set RA_EXE_PATH, or run from nix develop."
+	exit 1
+fi
+
+DATA_DIR="${2:-${RA_ASSETS:-}}"
+if [[ -z "$DATA_DIR" ]]; then
+	echo "ERROR: RA game data directory not found."
+	echo "  Pass as second argument or set RA_ASSETS."
+	exit 1
+fi
+
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
-WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-ra}"
 DISPLAY_NUM="${WINE_DISPLAY:-:98}"
 
 mkdir -p "$SCREENSHOT_DIR"
@@ -140,17 +124,36 @@ echo "  exe:  $RA_EXE_PATH (sha256=$EXE_SHA)"
 echo "  data: $DATA_DIR"
 echo ""
 
-# ─── Wine prefix + staging ───────────────────────────────────────────────────
+# ─── Ephemeral WINEPREFIX + staging ──────────────────────────────────────────
 
 echo "=== Wine staging ==="
-RA_STAGE="$(mktemp -d)"
-trap 'rm -rf "$RA_STAGE"' EXIT
 
-# Link MIX data into staging directory.
+# Create ephemeral prefix under /tmp (no /opt, no $HOME/.wine-ra)
+WINE_PREFIX="$(mktemp -d /tmp/wine-ra-XXXXXX)"
+
+# Stage directory inside the prefix
+RA_STAGE="$WINE_PREFIX/drive_c/game"
+mkdir -p "$RA_STAGE"
+
+# Initialize the prefix
+echo "  Prefix: $WINE_PREFIX"
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
+
+# Configure Wine GDI renderer + virtual desktop (needed under Xvfb for DirectDraw).
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+	'HKCU\Software\Wine\Explorer\Desktops' \
+	/v Default /t REG_SZ /d "640x480" /f >/dev/null 2>&1 || true
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+	'HKCU\Software\Wine\Direct3D' \
+	/v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
+
+# Link MIX data into staging
+echo "  Linking data: $DATA_DIR"
 for f in "$DATA_DIR"/*.MIX; do
 	[[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
 done
-# Write REDALERT.INI with intro skipping (cannot symlink, need write access).
+
+# Write REDALERT.INI with intro skipping
 cat >"$RA_STAGE/REDALERT.INI" <<'INIEOF'
 [Sound]
 Card=0
@@ -164,8 +167,10 @@ HardwareFills=no
 [Intro]
 PlayIntro=no
 INIEOF
-# Copy EXE and IPX DLLs to staging.
+
+# Copy EXE into staging
 cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
+
 # Use stub THIPX32.DLL (avoids 16-bit THIPX16.DLL thunking not supported
 # by Wine 11.0 wow64). The stub provides the same exports but returns
 # sensible defaults — networking will be non-functional, which is fine
@@ -173,28 +178,10 @@ cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
 STUB_DIR="$(cd "$(dirname "$0")/.." && pwd)/tools/stub-thipx"
 if [[ -f "$STUB_DIR/thipx32.dll" ]]; then
 	cp "$STUB_DIR/thipx32.dll" "$RA_STAGE/THIPX32.DLL"
-else
-	# Fallback: copy original THIPX DLLs if stub not built
-	THIPX_DIR="$(dirname "$RA_EXE_PATH")"
-	for dll in THIPX32.DLL THIPX16.DLL; do
-		[[ -f "$THIPX_DIR/$dll" ]] && cp "$THIPX_DIR/$dll" "$RA_STAGE/$dll"
-	done
 fi
 
-if [[ ! -d "$WINE_PREFIX" ]]; then
-	echo "  Creating Wine prefix at $WINE_PREFIX..."
-	WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
-fi
 echo "  Staging: $RA_STAGE"
 echo ""
-
-# Configure Wine GDI renderer + virtual desktop (needed under Xvfb for DirectDraw).
-WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-	'HKCU\Software\Wine\Explorer\Desktops' \
-	/v Default /t REG_SZ /d "640x480" /f >/dev/null 2>&1 || true
-WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-	'HKCU\Software\Wine\Direct3D' \
-	/v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
 
 # ─── Xvfb ────────────────────────────────────────────────────────────────────
 
@@ -203,7 +190,7 @@ pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
 Xvfb "$DISPLAY_NUM" -screen 0 640x480x24 -ac &
 XVFB_PID=$!
 cleanup_xvfb() { kill -9 "$XVFB_PID" 2>/dev/null || true; }
-trap 'rm -rf "$RA_STAGE"; cleanup_xvfb' EXIT
+trap 'rm -rf "$WINE_PREFIX"; cleanup_xvfb' EXIT
 sleep 1
 echo "  Xvfb pid=$XVFB_PID"
 

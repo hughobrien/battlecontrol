@@ -22,8 +22,15 @@ FRAMES="${4:-4}"
 
 THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
 HELPER_DIR="$THIS_DIR/../tools/wine-input"
-RA_EXE_PATH="${RA_EXE_PATH:-/opt/redalert/game/RA95.EXE.focus_orig}"
-RA_DLL_DIR="${RA_DLL_DIR:-/opt/redalert/game}"
+RA_EXE_PATH="${1:-${RA_EXE_PATH:-}}"
+if [[ -z "$RA_EXE_PATH" ]]; then
+	RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
+fi
+if [[ -z "$RA_EXE_PATH" ]] || [[ ! -f "$RA_EXE_PATH" ]]; then
+	echo "ERROR: RA95.EXE not found. Set RA_EXE_PATH or run from nix develop."
+	exit 1
+fi
+RA_DLL_DIR="$(dirname "$RA_EXE_PATH")"
 CNC_DDRAW_DIR="${CNC_DDRAW_DIR:-/tmp/cnc-ddraw-master}"
 WINEPREFIX="${WINEPREFIX:-$HOME/.wine-vqa-capture}"
 WINE="${WINE:-/usr/bin/wine}"
