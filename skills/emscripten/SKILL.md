@@ -6,7 +6,7 @@ version: 0.2.0
 
 # Emscripten / WebAssembly Porting Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `wasm_build`, `wasm_validate`,
+> **Tools available via `pi-battlecontrol-dev` extension:** `build_wasm`, `wasm_validate`,
 > `wasm_screenshot`, `run_e2e_test`.
 > Ask the agent to run these instead of typing raw commands.
 
@@ -256,7 +256,7 @@ Target: collapse the porting work to 2–3 commits using this checklist.
 
 | Gate | How | Minimum proof |
 |------|-----|---------------|
-| **Build** | `wasm_build(target: "ra")` then `wasm_validate(target: "ra")` | `.wasm` + `.js` produced, magic + size > 1MB valid |
+| **Build** | `build_wasm(target: "ra")` then `wasm_validate(target: "ra")` | `.wasm` + `.js` produced, magic + size > 1MB valid |
 | **Loads** | `run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")` | `onRuntimeInitialized` fires; no `Uncaught` in DevTools |
 | **File I/O** | Required assets accessible via VFS (preload log or runtime probe) | Manual check |
 | **Audio** | `run_e2e_test(spec: "e2e/tim603-audio-pitch-probe.spec.ts")` | 5/5 cold-cache CI runs pass |

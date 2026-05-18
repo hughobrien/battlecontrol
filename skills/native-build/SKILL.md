@@ -6,7 +6,7 @@ version: 0.1.0
 
 # Native Linux Build Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `native_build`, `toolchain_check`.
+> **Tools available via `pi-battlecontrol-dev` extension:** `build_native`, `toolchain_check`.
 > Ask the agent to run these instead of typing raw commands.
 
 You are working on the native Linux port of C&C Red Alert or Tiberian Dawn. The build
@@ -208,8 +208,8 @@ cmake --build build/ra-sanitize
 ### One-command build
 
 ```
-native_build(target: "both", compiler: "gcc")
-native_build(target: "ra", compiler: "clang")
+build_native(target: "both", compiler: "gcc")
+build_native(target: "ra", compiler: "clang")
 ```
 
 ### Smoke test (RA)
@@ -234,9 +234,9 @@ Expected: 10+ frames, cheat milestones pass (credits, tech unlock, map reveal, m
 
 | Gate | Tool / Command | Minimum proof |
 |------|----------------|---------------|
-| **Configure** | Run `native_build` once or `cmake --preset linux-native` | exits 0 |
-| **Build RA** | `native_build(target: "ra")` | All RA sources compile (`grep -c '\\.cpp' build/ra/CMakeFiles/ra.dir/src_files.cmake` units), link exits 0 |
-| **Build TD** | `native_build(target: "td")` | All TD sources compile, link exits 0 |
+| **Configure** | Run `build_native` once or `cmake --preset linux-native` | exits 0 |
+| **Build RA** | `build_native(target: "ra")` | All RA sources compile (`grep -c '\\.cpp' build/ra/CMakeFiles/ra.dir/src_files.cmake` units), link exits 0 |
+| **Build TD** | `build_native(target: "td")` | All TD sources compile, link exits 0 |
 | **LP64 audit** | `nix run .#lint-lp64` | returns 0 |
 | **Sanitizer** | `cmake --preset linux-sanitize && ./build/ra` (if preset exists) | No UAF/overflow at startup |
 | **Smoke — RA** | `nix run .#smoke-ra` | 1000+ frames stable, ≥1 win, no SIGSEGV |
