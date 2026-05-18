@@ -6,6 +6,34 @@
     nixpkgs-wine10.url = "github:NixOS/nixpkgs/nixos-25.05";
     wine-input.url = "path:./tools/wine-input";
     cnc-ddraw.url = "path:./tools/cnc-ddraw";
+
+    # Upstream sources from archive.org Allied CD ISO.
+    # Source: https://archive.org/details/cnc-red-alert
+    # ISO viewer paths are stable and serve individual files from the ISO.
+
+    # RA95.EXE (2.1 MB) — INSTALL/RA95.EXE on the CD
+    ra95-exe = {
+      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FRA95.EXE";
+      flake = false;
+    };
+
+    # REDALERT.MIX (23 MB) — INSTALL/REDALERT.MIX on the CD
+    ra-redalert-mix = {
+      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FREDALERT.MIX";
+      flake = false;
+    };
+
+    # THIPX32.DLL (25 KB) — required by RA95.EXE for IPX networking under Wine
+    ra-thipx32 = {
+      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FTHIPX32.DLL";
+      flake = false;
+    };
+
+    # THIPX16.DLL (4 KB) — required by RA95.EXE for IPX networking under Wine
+    ra-thipx16 = {
+      url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso/INSTALL%2FTHIPX16.DLL";
+      flake = false;
+    };
   };
 
   outputs =
@@ -15,6 +43,10 @@
       nixpkgs-wine10,
       wine-input,
       cnc-ddraw,
+      ra95-exe,
+      ra-redalert-mix,
+      ra-thipx32,
+      ra-thipx16,
     }:
     let
       system = "x86_64-linux";
@@ -29,142 +61,217 @@
       # -----------------------------------------------------------------------
       # packages.redalert  —  builds the redalert binary
       # -----------------------------------------------------------------------
-      packages.${system} = rec {
-        redalert = pkgs.stdenv.mkDerivation {
-          pname = "cnc-redalert";
-          version = "unstable-2026-05-09";
+      packages.${system} =
+        let
+          p = self.packages.${system};
+        in
+        {
+          redalert = pkgs.stdenv.mkDerivation {
+            pname = "cnc-redalert";
+            version = "unstable-2026-05-09";
 
-          src = ./.;
+            src = ./.;
 
-          nativeBuildInputs = with pkgs; [ python3 ];
-          buildInputs = with pkgs; [
-            SDL2
-            SDL2.dev
-          ];
+            nativeBuildInputs = with pkgs; [ python3 ];
+            buildInputs = with pkgs; [
+              SDL2
+              SDL2.dev
+            ];
 
-          buildPhase = ''
-            runHook preBuild
+            buildPhase = ''
+              runHook preBuild
 
-            SHIM="$PWD/build/include-shim"
-            RA="$PWD/REDALERT"
-            STUBS="$PWD/linux/win32-stubs"
-            OBJS="$PWD/build/obj"
-            mkdir -p "$OBJS/RA" "$OBJS/W32" "$OBJS/STUBS"
+              SHIM="$PWD/build/include-shim"
+              RA="$PWD/REDALERT"
+              STUBS="$PWD/linux/win32-stubs"
+              OBJS="$PWD/build/obj"
+              mkdir -p "$OBJS/RA" "$OBJS/W32" "$OBJS/STUBS"
 
-            python3 scripts/generate-include-shim.py \
-              --repo-root "$PWD" --shim-root "$SHIM" --quiet
+              python3 scripts/generate-include-shim.py \
+                --repo-root "$PWD" --shim-root "$SHIM" --quiet
 
-            CXXF="-std=c++17 -c -fno-strict-aliasing -w -O2 \
-              -I$SHIM/redalert -I$SHIM/win32lib \
-              -I$RA -I$RA/WIN32LIB -I$STUBS \
-              -include $STUBS/msvc-compat.h"
+              CXXF="-std=c++17 -c -fno-strict-aliasing -w -O2 \
+                -I$SHIM/redalert -I$SHIM/win32lib \
+                -I$RA -I$RA/WIN32LIB -I$STUBS \
+                -include $STUBS/msvc-compat.h"
 
-            ok=0; fail=0
-            obj_list=$(mktemp)
+              ok=0; fail=0
+              obj_list=$(mktemp)
 
-            compile() {
-              local src=$1 obj=$2
-              if g++ $CXXF "$src" -o "$obj"; then
-                ok=$((ok+1)); echo "$obj" >> "$obj_list"
-              else
-                fail=$((fail+1)); echo "FAIL: $src" >&2
-              fi
-            }
+              compile() {
+                local src=$1 obj=$2
+                if g++ $CXXF "$src" -o "$obj"; then
+                  ok=$((ok+1)); echo "$obj" >> "$obj_list"
+                else
+                  fail=$((fail+1)); echo "FAIL: $src" >&2
+                fi
+              }
 
-            for src in "$RA"/*.CPP "$RA"/*.cpp; do
-              [ -f "$src" ] || continue
-              base=$(basename "$src")
-              upper=$(echo "$base" | tr '[:lower:]' '[:upper:]')
-              case "$upper" in DTABLE.CPP|ITABLE.CPP|LZWOTRAW.CPP|STUB.CPP) continue ;; esac
-              stem=$(basename "$src" .cpp); stem=$(basename "$stem" .CPP)
-              compile "$src" "$OBJS/RA/$stem.o"
-            done
+              for src in "$RA"/*.CPP "$RA"/*.cpp; do
+                [ -f "$src" ] || continue
+                base=$(basename "$src")
+                upper=$(echo "$base" | tr '[:lower:]' '[:upper:]')
+                case "$upper" in DTABLE.CPP|ITABLE.CPP|LZWOTRAW.CPP|STUB.CPP) continue ;; esac
+                stem=$(basename "$src" .cpp); stem=$(basename "$stem" .CPP)
+                compile "$src" "$OBJS/RA/$stem.o"
+              done
 
-            for src in "$RA/WIN32LIB"/*.CPP "$RA/WIN32LIB"/*.cpp; do
-              [ -f "$src" ] || continue
-              stem=$(basename "$src" .cpp); stem=$(basename "$stem" .CPP)
-              compile "$src" "$OBJS/W32/$stem.o"
-            done
+              for src in "$RA/WIN32LIB"/*.CPP "$RA/WIN32LIB"/*.cpp; do
+                [ -f "$src" ] || continue
+                stem=$(basename "$src" .cpp); stem=$(basename "$stem" .CPP)
+                compile "$src" "$OBJS/W32/$stem.o"
+              done
 
-            for src in "$STUBS"/*.cpp; do
-              [ -f "$src" ] || continue
-              stem=$(basename "$src" .cpp)
-              compile "$src" "$OBJS/STUBS/$stem.o"
-            done
+              for src in "$STUBS"/*.cpp; do
+                [ -f "$src" ] || continue
+                stem=$(basename "$src" .cpp)
+                compile "$src" "$OBJS/STUBS/$stem.o"
+              done
 
-            echo "Compile: ok=$ok fail=$fail"
-            [ "$fail" -eq 0 ] || { echo "Build failed"; exit 1; }
+              echo "Compile: ok=$ok fail=$fail"
+              [ "$fail" -eq 0 ] || { echo "Build failed"; exit 1; }
 
-            g++ -no-pie $(cat "$obj_list" | tr '\n' ' ') -o redalert -lSDL2
+              g++ -no-pie $(cat "$obj_list" | tr '\n' ' ') -o redalert -lSDL2
 
-            runHook postBuild
-          '';
-
-          installPhase = ''
-            runHook preInstall
-            mkdir -p "$out/bin"
-            install -m755 redalert "$out/bin/redalert"
-            runHook postInstall
-          '';
-
-          meta = with pkgs.lib; {
-            description = "Command & Conquer: Red Alert — native Linux port";
-            longDescription = ''
-              Native Linux port of Command & Conquer: Red Alert built from the
-              EA GPL open-source release. Requires legally-acquired game data to run.
-              See README for data setup instructions.
+              runHook postBuild
             '';
-            license = licenses.gpl3Plus;
-            platforms = [ "x86_64-linux" ];
-            mainProgram = "redalert";
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out/bin"
+              install -m755 redalert "$out/bin/redalert"
+              runHook postInstall
+            '';
+
+            meta = with pkgs.lib; {
+              description = "Command & Conquer: Red Alert — native Linux port";
+              longDescription = ''
+                Native Linux port of Command & Conquer: Red Alert built from the
+                EA GPL open-source release. Requires legally-acquired game data to run.
+                See README for data setup instructions.
+              '';
+              license = licenses.gpl3Plus;
+              platforms = [ "x86_64-linux" ];
+              mainProgram = "redalert";
+            };
           };
-        };
 
-        tiberiandawn = pkgs.stdenv.mkDerivation {
-          pname = "cnc-tiberiandawn";
-          version = "unstable-2026-05-09";
+          tiberiandawn = pkgs.stdenv.mkDerivation {
+            pname = "cnc-tiberiandawn";
+            version = "unstable-2026-05-09";
 
-          src = ./.;
+            src = ./.;
 
-          nativeBuildInputs = with pkgs; [
-            cmake
-            ninja
-            python3
-            pkg-config
-          ];
-          buildInputs = with pkgs; [
-            SDL2
-            SDL2.dev
-            openal
-            libx11
-          ];
+            nativeBuildInputs = with pkgs; [
+              cmake
+              ninja
+              python3
+              pkg-config
+            ];
+            buildInputs = with pkgs; [
+              SDL2
+              SDL2.dev
+              openal
+              libx11
+            ];
 
-          buildPhase = ''
-            runHook preBuild
-            cmake -S . -B build-td -G Ninja \
-              -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-              -DCMAKE_CXX_FLAGS="-w"
-            cmake --build build-td --target td --parallel
-            runHook postBuild
-          '';
+            buildPhase = ''
+              runHook preBuild
+              cmake -S . -B build-td -G Ninja \
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                -DCMAKE_CXX_FLAGS="-w"
+              cmake --build build-td --target td --parallel
+              runHook postBuild
+            '';
 
-          installPhase = ''
-            runHook preInstall
-            mkdir -p "$out/bin"
-            install -m755 build-td/td "$out/bin/tiberiandawn"
-            runHook postInstall
-          '';
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out/bin"
+              install -m755 build-td/td "$out/bin/tiberiandawn"
+              runHook postInstall
+            '';
 
-          meta = with pkgs.lib; {
-            description = "Command & Conquer: Tiberian Dawn — native Linux port";
-            license = licenses.gpl3Plus;
-            platforms = [ "x86_64-linux" ];
-            mainProgram = "tiberiandawn";
+            meta = with pkgs.lib; {
+              description = "Command & Conquer: Tiberian Dawn — native Linux port";
+              license = licenses.gpl3Plus;
+              platforms = [ "x86_64-linux" ];
+              mainProgram = "tiberiandawn";
+            };
           };
-        };
 
-        default = redalert;
-      };
+          # ── Upstream archive.org packages ──────────────────────────────────
+          # nix build .#ra95-exe  →  store path with the unmodified original.
+
+          ra95-exe =
+            pkgs.runCommand "ra95-exe"
+              {
+                src = ra95-exe;
+                meta = with pkgs.lib; {
+                  description = "Red Alert 95 executable (from archive.org Allied CD ISO)";
+                  homepage = "https://archive.org/details/cnc-red-alert";
+                  sourceProvenance = with sourceTypes; [ binaryNativeCode ];
+                  license = licenses.unfreeRedistributable;
+                  platforms = [ "x86_64-linux" ];
+                };
+              }
+              ''
+                cp "$src" "$out"
+                chmod 644 "$out"
+              '';
+
+          ra-redalert-mix =
+            pkgs.runCommand "ra-redalert-mix"
+              {
+                src = ra-redalert-mix;
+                meta = with pkgs.lib; {
+                  description = "REDALERT.MIX (23 MB) from archive.org Allied CD ISO INSTALL/";
+                  homepage = "https://archive.org/details/cnc-red-alert";
+                  sourceProvenance = with sourceTypes; [ binaryNativeCode ];
+                  license = licenses.unfreeRedistributable;
+                  platforms = [ "x86_64-linux" ];
+                };
+              }
+              ''
+                cp "$src" "$out"
+                chmod 644 "$out"
+              '';
+
+          ra-thipx32 =
+            pkgs.runCommand "ra-thipx32"
+              {
+                src = ra-thipx32;
+                meta = with pkgs.lib; {
+                  description = "THIPX32.DLL (25 KB) from archive.org Allied CD ISO INSTALL/";
+                  homepage = "https://archive.org/details/cnc-red-alert";
+                  sourceProvenance = with sourceTypes; [ binaryNativeCode ];
+                  license = licenses.unfreeRedistributable;
+                  platforms = [ "x86_64-linux" ];
+                };
+              }
+              ''
+                cp "$src" "$out"
+                chmod 644 "$out"
+              '';
+
+          ra-thipx16 =
+            pkgs.runCommand "ra-thipx16"
+              {
+                src = ra-thipx16;
+                meta = with pkgs.lib; {
+                  description = "THIPX16.DLL (4 KB) from archive.org Allied CD ISO INSTALL/";
+                  homepage = "https://archive.org/details/cnc-red-alert";
+                  sourceProvenance = with sourceTypes; [ binaryNativeCode ];
+                  license = licenses.unfreeRedistributable;
+                  platforms = [ "x86_64-linux" ];
+                };
+              }
+              ''
+                cp "$src" "$out"
+                chmod 644 "$out"
+              '';
+
+          default = p.redalert;
+        };
 
       # -----------------------------------------------------------------------
       # devShells.default  —  nix develop
@@ -175,7 +282,13 @@
           cmake
           gnumake
           ninja
-          python3
+          (python3.withPackages (
+            ps: with ps; [
+              numpy
+              pillow
+              scikit-image
+            ]
+          ))
           pkg-config
           emscripten # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
           # CI deps
