@@ -77,12 +77,11 @@ The skills README table lists companion scripts including:
 a DeepSeek-based agent (or any non-Paperclip agent) reads this file, these
 instructions are either irrelevant or confusing.
 
-### 5. No local "run full CI" command
-CI consists of 4 parallel jobs (native build, VQA pixel-diff, Wine
-comparison, WASM build+smoke). A developer — or an agent — should be able to
-run the full CI suite locally with one command before pushing a PR. Currently
-this requires sequencing multiple scripts manually across the different
-skills.
+### 5. ✓ Resolved — four-tier workflow provides single-command CI
+CI is now a single command: `nix run .#test -- --all`. Four tiers
+(`lint` → `build` → `smoke` → `test`) each exposed as a nix app, with
+diff-gating so only changed targets are tested. GitHub CI runs the same
+command. See the four-tier workflow table in R2 below.
 
 ### 6. History scripts are mixed with reusable scripts, creating ambiguity
 Some historical scripts are genuinely useful for agents (e.g.,
@@ -139,33 +138,26 @@ git add scripts/archive/
 git commit -m "Archive historical build-pass scripts out of the active scripts/ directory"
 ```
 
-#### R2. Create `scripts/ci-local.sh` — single-command local CI
+#### R2. Four-tier workflow — single-command local CI ✓ (implemented)
 
-A script that runs the full CI pipeline locally, respecting what's available:
+Local CI is now a four-tier hierarchy, each exposed as a nix app:
 
-```bash
-#!/usr/bin/env bash
-# Run the full CI pipeline locally. Skips gates that require absent dependencies.
-#
-# Usage:
-#   bash scripts/ci-local.sh                # all available gates
-#   bash scripts/ci-local.sh --wasm-only    # WASM build + smoke only
-#   bash scripts/ci-local.sh --native-only  # native build + lint only
-#
-# Exit code: 0 = all available gates pass, 1 = one or more failed.
-#
-# Gates (auto-skip if deps missing):
-#   G1: Native build (ra + td)           requires: cmake, ninja, SDL2
-#   G2: LP64 audit                       requires: python3
-#   G3: WASM build + smoke (ra.wasm)     requires: emsdk
-#   G4: WASM build + smoke (td.wasm)     requires: emsdk
-#   G5: VQA pixel-diff (unit)            requires: python3 + ffmpeg
-#   G6: Playwright T1-T2 smoke           requires: node, chromium
-#   G7: Wine comparison (if WINE_RA_READY)
-```
+| Tier | Command | What it does | Time |
+|------|---------|-------------|------|
+| L1 | `nix run .#lint` | All linters + /opt audit | seconds |
+| L2 | `nix run .#build [--all]` | L1 + diff-gated compile | <1 min |
+| L3 | `nix run .#smoke [--all]` | L2 + CI-tier boot tests | <2 min |
+| L4 | `nix run .#test [--all]` | L2 + full regression | minutes |
 
-This immediately gives an agent a single command to run the entire verification
-chain, with per-gate reporting and skip semantics.
+Each tier calls the one before it. `--all` forces every gate (default: diff
+against origin/master). `--base REF` diffs against a different ref.
+
+Backed by `scripts/lint.sh`, `scripts/build.sh`, `scripts/smoke.sh`, `scripts/test.sh`,
+with `scripts/_gating.sh` providing diff analysis and `scripts/test-runner.sh`
+as the unified backend for all `{game}-{platform}-test` apps.
+
+A single command runs the entire verification chain, with per-gate reporting
+and diff-aware skip semantics. GitHub CI calls `nix run .#test -- --all`.
 
 #### R3. Add `AGENTS.md` as the canonical agent entry point
 
@@ -268,15 +260,14 @@ for f in skills/*/SKILL.md; do
 done
 ```
 
-#### R11. Tag which scripts are CI-only vs local-safe
+#### R11. Tag which scripts are tier-level vs individual
 
-Some scripts (`ci-wasm-smoke.sh`) run the full CI build + smoke cycle
-and take 5–10 minutes. Others (`toolchain-check.sh`) take under a second.
-Add a comment convention:
+Some scripts (`test.sh`) run the full CI cycle and take minutes. Others
+(`lint.sh`) take seconds. Add a comment convention:
 
 ```bash
-# @ci: true   — runs in CI, long-running
-# @local: true — fast, safe to run interactively
+# @tier: lint|build|smoke|test  — which tier this script belongs to
+# @time: <seconds>              — approximate runtime
 ```
 
 #### R12. Provide a Nix flake devShell with all agent prerequisites
@@ -294,7 +285,7 @@ can `nix develop` and have the full toolchain.
 |------|------|--------|--------|
 | 1 | R1 — Archive historical scripts | Low (one `mv` + commit) | High |
 | 2 | R3 — Create `AGENTS.md` | Low (one new file) | High |
-| 3 | R2 — `ci-local.sh` | Medium (new script) | High |
+| 3 | R2 — `ci-local.sh` ✓ implemented as four-tier `lint`/`build`/`smoke`/`test` | — | — |
 | 4 | R4 — Fix skill script references | Low (edits to 7 files) | Medium |
 | 5 | R5 — `skill-verify.sh` gate | Low (new script) | Medium |
 | 6 | R6 — Skill `depends_on` frontmatter | Low (7 YAML blocks) | Medium |

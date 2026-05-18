@@ -7,32 +7,24 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ## Cross-Reference Matrix
 | Action | Nix App | Script(s) | CI Job | npm Script |
 |--------|---------|-----------|--------|------------|
-| Build | `build-native` | `scripts/build-native.sh` | `ci.yml → build` | — |
-| Build WASM | `build-wasm` | inline — includes validation | `ci.yml → build-wasm` | — |
-| Test | `test` | `scripts/run-e2e.sh` | T3+ asset-gated in ci.yml | `test:e2e` |
-| CI gate | `ci` | `scripts/ci-local.sh` | `ci.yml → ci` | — |
-| Edit loop | `edit-loop` | inline — shim→lint→build→smoke | — | — |
-| WASM loop | `wasm-loop` | inline — build-wasm→test | — | — |
+| Lint | `lint` | `scripts/lint.sh` | `ci.yml → test` | — |
+| Build | `build` | `scripts/build.sh` | `ci.yml → test` | — |
+| Smoke | `smoke` | `scripts/smoke.sh` | `ci.yml → test` | — |
+| Test (full) | `test` | `scripts/test.sh` | `ci.yml → test` | — |
+| Build (single) | `ra-native-build` etc. | `scripts/build-native.sh`, inline WASM | — | — |
+| Test (single) | `ra-native-test` etc. | `scripts/test-runner.sh` (+ `--full` for regression) | — | — |
 | Serve | `serve` | `wasm/serve-coop.py` + `wasm/serve-assets.py` | — | — |
-| LP64 lint | `lint-lp64` | `scripts/lint-lp64.py` | — | — |
-| Full lint | `lint-all` | inline — multi-tool | — | — |
-| Include shim | _(auto by CMake)_ | `scripts/generate-include-shim.py` | — | — |
-| Toolchain check | `toolchain-check` | `scripts/toolchain-check.sh` | — | — |
-| Wine check | `wine-check` | `scripts/wine-check.sh` | — | — |
 | Parity compare | `parity-compare` | `scripts/parity-compare.py` | — | — |
 | Parity report | `parity-report` | `scripts/parity-report.sh` | — | — |
 | VQA decode | `vqa-decode` | `scripts/vqa-decode.py` + `tools/vqa_dump/vqa_dump.cpp` | — | — |
 | VQA compare | `vqa-compare` | `scripts/vqa-compare.py` | — | — |
-| Capture (Wine OG) | `capture-wine` | `scripts/wine-cnc-capture.sh` | `ci.yml → wine-comparison` | — |
+| Capture (Wine OG) | `capture-wine` | `scripts/wine-cnc-capture.sh` | — | — |
 | Capture (checkpoint) | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
 | Release | `release` | `scripts/first-run-pass-94.sh` + cmake + tar | `release.yml` | — |
-| Regression suite | `regression` | `scripts/regression-suite.sh` | — | — |
-| Smoke (RA) | `smoke-ra` | `scripts/first-run-pass-94.sh` | — | — |
-| Smoke (TD) | `smoke-td` | `scripts/run-td-cheat.sh` | — | — |
 | Screenshot | `screenshot` | inline — serve + playwright | — | — |
-| Run RA | `redalert` | cmake target | — | — |
-| Run TD | `tiberiandawn` | cmake target | — | — |
-| Default | `default` | → `toolchain-check` | — | — |
+| Run RA | `ra` | native binary (via flake app) | — | — |
+| Run TD | `td` | native binary (via flake app) | — | — |
+| Default | `default` | → `ra` | — | — |
 | E2E RA gameplay | — | — | — | `test:e2e:ra` |
 | E2E TD gameplay | — | — | — | `test:e2e:td` |
 | E2E WASM parity | — | — | — | `test:e2e:wasm-parity` |
@@ -44,35 +36,30 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Build
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Native build | `nix run .#build-native [ra\|td\|both] [clang]` | Configure + build RA and/or TD native Linux with cmake + ninja. Calls `scripts/build-native.sh`. |
-| | `scripts/ci-local.sh` | Also runs native build as G1. |
-| WASM build | `nix run .#build-wasm [ra\|td\|both]` | Build ra.wasm and/or td.wasm via emcmake + cmake + ninja. |
-| THIPX stub | `nix run .#build-stub-thipx` | Build stub THIPX32.DLL for Wine 11 wow64 compat. |
+| Native build | `nix run .#ra-native-build` / `.#td-native-build` | Build RA or TD native Linux with cmake + ninja. |
+| | `nix run .#build` | Diff-gated build orchestrator (lint + compile changed targets). |
+| WASM build | `nix run .#ra-wasm-build` / `.#td-wasm-build` | Build ra.wasm and/or td.wasm via emcmake + cmake + ninja. |
+| `build-stub-thipx` | nix app | Build | Build stub THIPX32.DLL for Wine 11 wow64 compat. |
 | | `scripts/build-stub-thipx.sh` | Same, directly. |
 | Release (RA+TD) | `nix run .#release` | Build + strip + tarball both binaries. |
 ### Test / QA
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Run e2e test | `nix run .#test -- <spec> [args]` | Run any Playwright e2e spec under Xvfb + WASM server. |
-| | `npx playwright test <spec>` | Same, directly (if servers already running). |
-| E2E tests | `nix run .#test` | T1 + T2 boot smokes by default, or pass a spec. |
-| Regression suite | `nix run .#regression [tier]` | Run T1-T12 regression suite. Set `REGRESSION_TIER=ci\|full`. |
-| | `scripts/regression-suite.sh` | Same, directly. |
-| Smoke RA | `nix run .#smoke-ra` | Run RA native for 30s with `RA_AUTOSTART=1`, verify 100+ frames. |
-| | `scripts/first-run-pass-94.sh` | Same, directly. |
-| Smoke TD | `nix run .#smoke-td` | Run TD native with `TD_CHEAT=1`, verify debug cheat progression. |
-| | `scripts/run-td-cheat.sh` | Same, directly. |
-| WASM screenshot | `wasm_screenshot(target, waitMs, ...)` | Build WASM, serve, open headless Chromium, capture screenshot. |
-| | `nix run .#screenshot` | Same, via nix. |
+| Lint | `nix run .#lint` | All linters (LP64, clang-tidy, cppcheck, ruff, shellcheck, yamllint, nixfmt, /opt audit). |
+| Build | `nix run .#build [--all] [--base REF]` | Lint + diff-gated compile. |
+| Smoke | `nix run .#smoke [--all] [--base REF]` | Build + CI-tier boot tests (T1/T2, first-run-pass). |
+| Test (full) | `nix run .#test [--all] [--base REF]` | Build + full regression. |
+| Test (single game) | `nix run .#ra-wasm-test [--full]` | Run WASM tests for RA. `--full` for regression tier. |
+| | `nix run .#td-native-test [--full]` | Run native tests for TD. `--full` adds T5+T12. |
+| | `nix run .#ra-native-test [--full]` | Run native tests for RA. `--full` adds T6+T11. |
+| | `nix run .#td-wasm-test [--full]` | Run WASM tests for TD. `--full` adds T3+T6+T7. |
+| WASM screenshot | `nix run .#screenshot` | Build WASM, serve, capture via Playwright. |
 ### CI / Gate
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Local CI | `nix run .#ci [--wasm-only\|--native-only]` | Run all local CI gates (native build, LP64, WASM, VQA, /opt audit). |
-| | `scripts/ci-local.sh [--wasm-only\|--native-only]` | Same, directly. |
-| CI native build | `nix run .#build-native` | Native build with integrated ELF 64-bit validation. |
-| WASM loop | `nix run .#wasm-loop` | Build → validate → smoke T1+T2. |
-| WASM loop smoke | `nix run .#test` | T1 + T2 Playwright smoke tests (via `wasm-loop`). |
-| CI test run | `nix run .#test -- <spec>` | Run one Playwright spec under Xvfb + WASM (for asset-gated tests). |
+| Full CI locally | `nix run .#test -- --all` | Run every gate: lint → build → full regression. Same as GitHub CI. |
+| Pre-push check | `nix run .#smoke` | Diff-gated: build + boot tests for changed targets. |
+| Pre-commit check | `nix run .#lint` | All static analysis + format checks (installed as git hook). |
 ### Capture / Screenshot
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -109,17 +96,11 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Lint / Audit
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| LP64 lint | `nix run .#lint-lp64` | Scan C++ for LP64 hazards (`sizeof(long)==8` bugs). Must exit 0. |
-| | `scripts/lint-lp64.py [--errors-only]` | Same, directly. |
-| Full lint | `nix run .#lint-all` | LP64 + clang-tidy + cppcheck + ruff + yamllint + shellcheck + shfmt + nixfmt. |
+| Full lint | `nix run .#lint` | All linters: LP64 + clang-tidy + cppcheck + ruff + yamllint + shellcheck + shfmt + nixfmt + /opt audit. |
+| | `bash scripts/lint.sh` | Same, directly. |
+| LP64 lint | `python3 scripts/lint-lp64.py [--errors-only]` | Scan C++ for LP64 hazards (also included in `lint`). |
 | Include shim | `scripts/generate-include-shim.py` | Regenerate case-folding include shim (auto-run by CMake). |
 | | `cmake --build <dir>` | Auto-regenerates as build dependency. |
-| Toolchain check | `nix run .#toolchain-check` | Verify toolchain + game data integrity. |
-| | `scripts/toolchain-check.sh` | Same, directly. |
-| Data verify (direct) | `python3 scripts/ra-data-verify.py <dir>` | Verify game data MIX checksums directly. |
-| | `scripts/toolchain-check.sh` | Same, directly. |
-| Wine check | `wine_check()` | Check Wine + xdotool + ffmpeg + ImageMagick installed. |
-| | `scripts/wine-check.sh` | Same, directly. |
 | Layout probe | `scripts/probe-layout.cpp` | C++ layout probe: prints sizeof/offsetof for LP64 struct audit. |
 ### Serve / Dev Server
 | Command | Invocation | What It Does |
@@ -131,8 +112,8 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Iteration Loops
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Edit loop (native) | `nix run .#edit-loop` | shim → lint → native build → smoke T1. |
-| WASM loop | `nix run .#wasm-loop` | Build (with validation) → smoke T1+T2. |
+| Full test | `nix run .#test -- --all` | Lint → build → full regression for all targets. |
+| Smoke check | `nix run .#smoke` | Diff-gated: lint → build → boot tests for changed targets. |
 ### Utility
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -181,35 +162,23 @@ These Python scripts apply binary patches to RA95.EXE:
 Every executable entry point, listed A–Z with its surface(s).
 | Name | Surface | Category | Summary |
 |------|---------|----------|---------|
-| `build-native` | nix app | Build | Build RA + TD native Linux. |
-| `build-stub-thipx` | nix app | Build | Build stub THIPX32.DLL for Wine. |
+| `build` | nix app | CI | Diff-gated build orchestrator (calls lint first). |
+| `build-native.sh` | script | Build | Single-command native build (cmake + ninja RA/TD). |
+| `build.sh` | script | CI | Lint + diff-gated compile (sources _gating.sh). |
 | `build-td.sh` | script | Build | Configure CMake and build TD. |
-| `build-wasm` | nix app | Build | Build RA and/or TD WASM targets. |
 | `capture-checkpoint` | nix app | Capture | Unified capture orchestrator. |
 | `capture-native` | nix app | Capture | Removed — use `capture-checkpoint --targets native`. |
 | `capture-wine` | nix app | Capture | Wine OG baseline capture. |
 | `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
-| `toolchain-check` | nix app | Lint | Toolchain prerequisite check. |
-| `ci` | nix app | CI | Run all local CI gates. |
-| `ci-build-native` | nix app | CI | Removed — merged into `build-native`. |
-| `ci-build-wasm` | nix app | CI | Removed — use `wasm-loop` instead. |
-| `ci-cc-setup` | nix app | CI | Removed — inline in `gh-pages.yml`. |
-| `ci-clang-tidy` | nix app | CI | Removed — folded into `ci`. |
-| `ci-cppcheck` | nix app | CI | Removed — folded into `ci`. |
-| `ci-local.sh` | script | CI | Run all local CI gates. |
-| `ci-run-test` | nix app | CI | Removed — use `test` instead. |
-| `ci-vqa` | nix app | CI | Removed — folded into `ci`. |
-| `ci-wasm-smoke` | nix app | CI | Removed — use `wasm-loop` instead. |
+| `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`smoke`/`test` tiers. |
+| `ci-local.sh` | script | CI | Removed — replaced by `lint.sh`/`build.sh`/`smoke.sh`/`test.sh`. |
 | `parity-compare` | nix app | Parity | SSIM compare two images. |
 | `ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
-| `edit-loop` | nix app | Loop | shim → lint → build → smoke. |
 | `extract_mix.py` | script | Utility | Westwood MIX file extractor. |
 | `first-run-pass-94.sh` | script | Test | RA native smoke test. |
 | `focus-skip-patch.py` | script | Patch (RA) | NOP GameInFocus spin loops. |
 | `game-in-focus-patch.py` | script | Patch (RA) | Pin GameInFocus=TRUE. |
 | `generate-include-shim.py` | script | Build | Regenerate case-folding include shim (auto-run by CMake). |
-| `lint-lp64` | nix app | Lint | LP64 hazard audit. |
-| `lint-all` | nix app | Lint | Full multi-tool lint suite. |
 | `lint-lp64.py` | script | Lint | LP64 static hazard scanner. |
 | `nocd-patch.py` | script | Patch (RA) | Skip CD error dialog. |
 | `parity-compare.py` | script | Parity | SSIM + fill% + p99 pixel diff. |
@@ -219,29 +188,36 @@ Every executable entry point, listed A–Z with its surface(s).
 | `ra-data-verify.py` | script | Lint | Verify RA MIX checksums. |
 | `ra-scenario-patch.py` | script | Patch (RA) | Replace mission name in EXE. |
 | `redalert` | nix app | Run | Run native RA binary. |
-| `regression` | nix app | Test | Run regression suite (T1-T12). |
-| `regression-suite.sh` | script | Test | Orchestrate E2E regression tests. |
-| `release-build-ra` | nix app | Build | Removed — merged into `release`. |
-| `release-build-td` | nix app | Build | Removed — merged into `release`. |
+| `lint` | nix app | Lint | All static analysis + format checks + /opt audit. |
+| `lint.sh` | script | Lint | All linters in one script (sourced by build/smoke/test). |
+| `ra-native-build` | nix app | Build | Build RA native Linux. |
+| `ra-native-test` | nix app | Test | RA native tests. `--full` for regression tier. |
+| `ra-wasm-build` | nix app | Build | Build RA WASM. |
+| `ra-wasm-test` | nix app | Test | RA WASM tests (CI tier). `--full` for full regression. |
+| `smoke` | nix app | CI | Build + CI-tier boot tests. |
+| `smoke.sh` | script | CI | Diff-gated build + boot test orchestrator. |
+| `td-native-build` | nix app | Build | Build TD native Linux. |
+| `td-native-test` | nix app | Test | TD native tests. `--full` for regression tier. |
+| `td-wasm-build` | nix app | Build | Build TD WASM. |
+| `td-wasm-test` | nix app | Test | TD WASM tests (CI tier). `--full` for full regression. |
+| `test` | nix app | CI | Build + full regression. |
+| `test-runner.sh` | script | Test | Unified backend for all `{game}-{platform}-test` apps. |
+| `test.sh` | script | CI | Diff-gated build + full regression orchestrator. |
+| `release` | nix app | Build | Build + strip + tarball both RA and TD. |
 | `parity-report` | nix app | Parity | Three-way parity report. |
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
 | `screenshot` | nix app | Test | WASM screenshot capture. |
 | `serve` | nix app | Serve | Start both WASM + asset servers. |
-| `serve-assets` | nix app | Serve | Removed — use `serve` instead. |
-| `serve-wasm` | nix app | Serve | Removed — use `serve` instead. |
 | `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
-| `include-shim` | nix app | Lint | Removed — auto-run by CMake. |
-| `ci-wasm-smoke.sh` | script | CI | Removed — use `wasm-loop` instead. |
+| `_gating.sh` | script | CI | Diff-analysis helper sourced by build/smoke/test. |
 | `build-native.sh` | script | Build | Single-command native build. |
 | `run-e2e.sh` | script | Test | Xvfb + WASM server + Playwright test. |
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
-| `toolchain-check.sh` | script | Lint | Toolchain prerequisite check. |
 | `vqa-decode.py` | script | Parity | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg). |
-| `wine-check.sh` | script | Lint | Wine toolchain check. |
 | `xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
-| `smoke-ra` | nix app | Test | RA native smoke test. |
-| `smoke-td` | nix app | Test | TD native smoke test. |
+| `ra-native-test` | nix app | Test | RA native smoke test. `--full` for T6+T11. |
+| `td-native-test` | nix app | Test | TD native smoke test. `--full` for T5+T12. |
 | `soviet-cdlabel-patch.py` | script | Patch (RA) | Zero CD2 label for Soviet. |
 | `soviet-m2-scenario-patch.py` | script | Patch (RA) | Override Soviet M2 scenario. |
 | `td-activateapp-patch.py` | script | Patch (TD) | Prevent WM_ACTIVATEAPP clearing focus. |
@@ -256,14 +232,10 @@ Every executable entry point, listed A–Z with its surface(s).
 | `td-side-preview-skip-patch.py` | script | Patch (TD) | NOP side-preview animation. |
 | `td-vqa-skip-patch.py` | script | Patch (TD) | Skip TD cutscenes. |
 | `test` | nix app | Test | Run e2e test spec. |
-| `test-t1` | nix app | Test | Removed — use `test` (runs T1+T2 by default). |
-| `test-t2` | nix app | Test | Removed — use `test` (runs T1+T2 by default). |
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
-| `validate-wasm` | nix app | Build | Removed — validation baked into `build-wasm`. |
-| `data-verify` | nix app | Lint | Removed — folded into `toolchain-check`. |
 | `vqa-compare` | nix app | Parity | Compare two VQA decode output dirs. |
 | `vqa-decode` | nix app | Parity | Extract VQA from MIX and decode with --engine. |
-| `wasm-loop` | nix app | Loop | build-wasm → smoke tests. |
+| `wasm-loop` | nix app | Loop | Removed — use `smoke` or `test`. |
 | `wine-cnc-capture.sh` | script | Capture | Generic RA95 Wine capture. |
 | `wine-exe-hashes.json` | data | — | SHA-256 hashes for patched EXEs. |
 | `wine-gdi-m1.sh` | script | Capture | GDI M1 gameplay capture. |
@@ -315,7 +287,7 @@ These live in `scripts/archive/` — subsumed by the Python `capture-checkpoint.
 | Surface | Convention | Example |
 |---------|-----------|---------|
 | Nix apps | `kebab-case` | `build-native`, `parity-compare` |
-| Shell scripts | `kebab-case.sh` | `ci-local.sh`, `run-e2e.sh` |
+| Shell scripts | `kebab-case.sh` | `lint.sh`, `run-e2e.sh` |
 | Python scripts | `kebab-case.py` | `lint-lp64.py`, `parity-compare.py` |
 | npm scripts | `:` delimited | `test:e2e:ra`, `test:e2e:td` |
 
