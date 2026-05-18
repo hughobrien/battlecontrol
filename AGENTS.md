@@ -203,7 +203,7 @@ run_e2e_test(spec: "e2e/regression/T2-td-wasm-boot.spec.ts")
 ### LP64 audit
 
 ```bash
-nix run .#lint                                      # gate: must exit 0
+nix run .#lint-lp64                                 # gate: must exit 0
 ```
 
 ### VQA pixel-diff
@@ -238,7 +238,7 @@ The standard loop for an agent working on a fix:
 ```
 1. Edit source
 2. Build       → native_build(target: "ra")
-3. LP64 audit  → nix run .#lint
+3. LP64 audit  → nix run .#lint-lp64
 4. Smoke test  → run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
 5. CI check    → ci_local()  # ⚠️ run full CI locally before pushing
 6. Commit      → git commit -m "short imperative subject"
@@ -429,7 +429,7 @@ Things an agent must never break:
    `docs/smoke-test-design-rule.md`.
 
 7. **Include shim regeneration.** After adding a new `#include` to any .CPP file,
-   run `nix run .#shim`.
+   run `nix run .#include-shim`.
 
 8. **Never use `git add -A` (or `git add .` / `git add --all`).** Always stage
    specific files with explicit paths. Blind `-A` picks up unrelated changes and

@@ -376,7 +376,7 @@ This applies to:
 
 This skill is referenced by:
 - **ci-cd** — CI/CD pipeline commands use nix-shell extensively
-- **native-build** — `nix run .#lint` and `nix run .#smoke-*` commands
+- **native-build** — `nix run .#lint-lp64` and `nix run .#smoke-*` commands
 - **vqa-codec** — `nix run .#vqa-check` command
 
 For the project's canonical nix-shell usage patterns, see `flake.nix` and the
