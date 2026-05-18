@@ -46,17 +46,17 @@ set -euo pipefail
 # Argument defaults: explicit arg → env var → error
 CC95_EXE_PATH="${1:-${CC95_EXE_PATH:-}}"
 if [[ -z "$CC95_EXE_PATH" ]] || [[ ! -f "$CC95_EXE_PATH" ]]; then
-  echo "ERROR: C&C95.EXE not found."
-  echo "  Pass as first argument, set TD_EXE_PATH, or download manually."
-  echo "  See: bash scripts/wine-td-setup.sh"
-  exit 1
+	echo "ERROR: C&C95.EXE not found."
+	echo "  Pass as first argument, set TD_EXE_PATH, or download manually."
+	echo "  See: bash scripts/wine-td-setup.sh"
+	exit 1
 fi
 
 DATA_DIR="${2:-${TD_ASSETS:-}}"
 if [[ -z "$DATA_DIR" ]]; then
-  echo "ERROR: TD game data directory not found."
-  echo "  Pass as second argument or set TD_ASSETS."
-  exit 1
+	echo "ERROR: TD game data directory not found."
+	echo "  Pass as second argument or set TD_ASSETS."
+	exit 1
 fi
 
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
@@ -114,25 +114,25 @@ WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
 
 # Configure Wine virtual desktop (640x400) and GDI renderer
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-  'HKCU\Software\Wine\Explorer\Desktops' \
-  /v Default /t REG_SZ /d "640x400" /f >/dev/null 2>&1 || true
+	'HKCU\Software\Wine\Explorer\Desktops' \
+	/v Default /t REG_SZ /d "640x400" /f >/dev/null 2>&1 || true
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-  'HKCU\Software\Wine\Direct3D' \
-  /v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
+	'HKCU\Software\Wine\Direct3D' \
+	/v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
 
 # Link MIX data into staging
 echo "  Linking data: $DATA_DIR"
 for f in "$DATA_DIR"/*.MIX; do
-  [[ -e "$f" ]] && ln -sf "$f" "$TD_STAGE/$(basename "$f")"
+	[[ -e "$f" ]] && ln -sf "$f" "$TD_STAGE/$(basename "$f")"
 done
 
 # Copy EXE into staging
 cp "$CC95_EXE_PATH" "$TD_STAGE/C&C95.EXE"
 
-# Use stub THIPX32.DLL (no /opt/tiberiandawn fallback)
+# Use stub THIPX32.DLL (no filesystem-path fallback)
 STUB_DIR="$(cd "$(dirname "$0")/.." && pwd)/tools/stub-thipx"
 if [[ -f "$STUB_DIR/thipx32.dll" ]]; then
-  cp "$STUB_DIR/thipx32.dll" "$TD_STAGE/THIPX32.DLL"
+	cp "$STUB_DIR/thipx32.dll" "$TD_STAGE/THIPX32.DLL"
 fi
 
 # CONQUER.INI: disable hardware blits

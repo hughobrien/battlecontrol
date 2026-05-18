@@ -2,7 +2,7 @@
 # TIM-724 — Drive C&C95.EXE through GDI Mission 1 under headless Wine.
 #
 # Rendering strategy (TIM-743 + TIM-747):
-#  The C&C95.EXE binary at /opt/tiberiandawn is the CnCNet build.
+#  The C&C95.EXE binary is the CnCNet build.
 #  Uses cnc-ddraw (ddraw=n, renderer=gdi) as the DDraw backend inside a
 #  Wine virtual desktop (explorer /desktop=tim724,640x400).
 #
@@ -57,8 +57,8 @@ WINE="${WINE:-/usr/bin/wine}"
 WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim724-gdi}"
 TD_EXE_PATH="${1:-${TD_EXE_PATH:-}}"
 if [[ -z "$TD_EXE_PATH" ]] || [[ ! -f "$TD_EXE_PATH" ]]; then
-  echo "ERROR: C&C95.EXE not found. Set TD_EXE_PATH or pass as first argument."
-  exit 1
+	echo "ERROR: C&C95.EXE not found. Set TD_EXE_PATH or pass as first argument."
+	exit 1
 fi
 TD_DLL_DIR="$(dirname "$TD_EXE_PATH")"
 CNC_DDRAW_DIR="${CNC_DDRAW_DIR:-/tmp/cnc-ddraw}"
