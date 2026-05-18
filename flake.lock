@@ -1,19 +1,20 @@
 {
   "nodes": {
     "cnc-ddraw": {
-      "inputs": {
-        "nixpkgs": "nixpkgs"
-      },
+      "flake": false,
       "locked": {
-        "narHash": "sha256-7TaLAYgh8By5JItNMMAi3A4BTwOnfc+Ps7GlcuepHQA=",
-        "path": "./tools/cnc-ddraw",
-        "type": "path"
+        "lastModified": 1751539807,
+        "narHash": "sha256-2D01XQwv0dGAa+OepG2qpPKmYTTHami8a0as6s509ng=",
+        "owner": "FunkyFr3sh",
+        "repo": "cnc-ddraw",
+        "rev": "a0b81b11553e1af358396f15ed7f30b9674c390e",
+        "type": "github"
       },
       "original": {
-        "path": "./tools/cnc-ddraw",
-        "type": "path"
-      },
-      "parent": []
+        "owner": "FunkyFr3sh",
+        "repo": "cnc-ddraw",
+        "type": "github"
+      }
     },
     "nixpkgs": {
       "locked": {
@@ -48,22 +49,6 @@
       }
     },
     "nixpkgs_2": {
-      "locked": {
-        "lastModified": 1778869304,
-        "narHash": "sha256-30sZNZoA1cqF5JNO9fVX+wgiQYjB7HJqqJ4ztCDeBZE=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_3": {
       "locked": {
         "lastModified": 1778869304,
         "narHash": "sha256-30sZNZoA1cqF5JNO9fVX+wgiQYjB7HJqqJ4ztCDeBZE=",
@@ -130,7 +115,7 @@
     "root": {
       "inputs": {
         "cnc-ddraw": "cnc-ddraw",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs",
         "nixpkgs-wine10": "nixpkgs-wine10",
         "ra-redalert-mix": "ra-redalert-mix",
         "ra-thipx16": "ra-thipx16",
@@ -141,7 +126,7 @@
     },
     "wine-input": {
       "inputs": {
-        "nixpkgs": "nixpkgs_3"
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "narHash": "sha256-En252qwcPsxoFqSHKdKyKVr3xPONXslljPQP5WP10fE=",
