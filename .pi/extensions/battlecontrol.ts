@@ -313,13 +313,13 @@ export default function (pi: ExtensionAPI) {
       if (killExisting) killPort(port);
 
       const script = repoPath("wasm", "serve-coop.py");
-      const { kill } = background("python3", [script, String(port), BUILD_DIR]);
+      const { proc, kill } = background("python3", [script, String(port), BUILD_DIR]);
 
       try {
         await waitForServer(`http://localhost:${port}/`, 10_000, "WASM server");
         return {
-          content: [{ type: "text", text: `✅ WASM server running at http://localhost:${port}/ra.html (and /td.html)\nKill with: kill ${kill.toString().match(/\d+/)?.[0] ?? "the process"}` }],
-          details: { port, pid: (kill as any).pid },
+          content: [{ type: "text", text: `✅ WASM server running at http://localhost:${port}/ra.html (and /td.html)\n  PID: ${proc.pid}` }],
+          details: { port, pid: proc.pid },
         };
       } catch (e: any) {
         kill();
@@ -751,8 +751,7 @@ ${result.stderr || result.stdout}` }], isError: true };
       // Configure
       if (!fs.existsSync(buildDirNative) || clean) {
         onUpdate?.({ content: [{ type: "text", text: "Configuring with cmake --preset linux-native..." }] });
-        const env = { CXX: "clang++" };
-        const cfg = run("bash", ["-c", cfgCmd], { timeout: 120_000 });
+        const cfg = run("cmake", ["--preset", "linux-native"], { timeout: 120_000 });
         if (cfg.exitCode !== 0) {
           return { content: [{ type: "text", text: `❌ cmake configure failed:
 ${cfg.stderr || cfg.stdout}` }], isError: true };
