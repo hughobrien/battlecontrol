@@ -216,7 +216,7 @@ export default function (pi: ExtensionAPI) {
   // ── Tool: wasm_build ────────────────────────────────────────────────────
 
   pi.registerTool({
-    name: "wasm_build",
+    name: "build_wasm",
     label: "WASM Build",
     description: "Build one or both WASM targets (ra, td) using Emscripten. Auto-wraps in nix develop if needed.",
     promptSnippet: "Build the Red Alert and/or Tiberian Dawn WASM targets with emcmake/cmake",
@@ -712,7 +712,7 @@ ${result.stderr || result.stdout}` }], isError: true };
   // From: skills/native-build §3
 
   pi.registerTool({
-    name: "native_build",
+    name: "build_native",
     label: "Native Build",
     description: "Build Red Alert and/or Tiberian Dawn native Linux targets with cmake + ninja (Clang).",
     promptSnippet: "Build the native Linux binary for Red Alert and/or Tiberian Dawn",
@@ -902,7 +902,7 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
   // From: skills/wine-testing §3
 
   pi.registerTool({
-    name: "wine_capture",
+    name: "capture_wine",
     label: "Wine Capture",
     description: "Capture Wine OG baseline screenshots (title screen) for Red Alert or Tiberian Dawn under Xvfb. Requires Wine, game data, and the original EXE. Note: title→menu transition requires a GPU GL context — under Xvfb the menu screenshot will match the title screen.",
     promptSnippet: "Capture baseline screenshots from original Wine RA95.EXE or C&C95.EXE",
@@ -1128,7 +1128,7 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
   // Wraps: scripts/generate-include-shim.py
 
   pi.registerTool({
-    name: "generate_include_shim",
+    name: "include_shim",
     label: "Generate Include Shim",
     description:
       "Regenerate the case-folding include shim (build/include-shim/) after adding a new " +
@@ -1214,7 +1214,7 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
   // Wraps: scripts/gen-vqa-golden.py
 
   pi.registerTool({
-    name: "gen_vqa_golden",
+    name: "vqa_golden",
     label: "Generate VQA Golden Frames",
     description:
       "Decode a VQA file into N evenly-spaced golden PNG frames for visual reference. " +
@@ -1309,7 +1309,7 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
   // Wraps: scripts/native-capture.sh
 
   pi.registerTool({
-    name: "native_capture",
+    name: "capture_native",
     label: "Native Linux Capture",
     description:
       "Launch the native Linux binary under Xvfb, auto-start a campaign mission, and capture " +

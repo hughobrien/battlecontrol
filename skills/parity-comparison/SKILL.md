@@ -6,7 +6,7 @@ version: 0.2.0
 
 # Parity Comparison Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `data_verify`, `wine_capture`,
+> **Tools available via `pi-battlecontrol-dev` extension:** `data_verify`, `capture_wine`,
 > `parity_compare`, `wasm_screenshot`, `vqa_pixel_diff`, `run_e2e_test`.
 > Ask the agent to run these instead of typing raw commands.
 
@@ -53,14 +53,14 @@ comparison will be invalid regardless of code correctness.
 
 ### §2.1 — Step 1: Capture Wine OG reference screenshots
 
-Use the `wine_capture` tool:
+Use the `capture_wine` tool:
 
 ```
 # Red Alert title + menu (takes ~30s):
-wine_capture(game: "ra")
+capture_wine(game: "ra")
 
 # Tiberian Dawn title + menu:
-wine_capture(game: "td")
+capture_wine(game: "td")
 ```
 
 **Output:** `e2e/screenshots/wine-{game}-title.png` and `wine-{game}-menu.png`
@@ -139,7 +139,7 @@ Or run the full parity E2E test suite:
 ```
 run_e2e_test(spec: "e2e/tim710-wasm-parity.spec.ts")
 # With Wine OG comparison:
-# (run wine_capture first, then set WINE_RA_READY=1)
+# (run capture_wine first, then set WINE_RA_READY=1)
 ```
 
 **WASM Allied L1 gameplay (early frames):**
@@ -305,7 +305,7 @@ capturing WASM or native screenshots and comparing against Wine OG.
 
 When a previously-passing parity check starts failing:
 
-1. **Check if the Wine OG reference changed.** Re-run `wine_capture(game: "ra")` and compare the
+1. **Check if the Wine OG reference changed.** Re-run `capture_wine(game: "ra")` and compare the
    new screenshot against the old one:
    ```
    parity_compare(imageA: "old-wine-menu.png", imageB: "e2e/screenshots/wine-ra-menu.png", thresholdSsim: 0.95)
@@ -367,7 +367,7 @@ When a previously-passing parity check fails, bisect to find the offending commi
    #!/bin/bash
    # bisect-parity.sh — exits 0 (good) if parity passes, 125 (skip) if build fails
    set -e
-   wasm_build target=ra || exit 125
+   build_wasm target=ra || exit 125
    wasm_screenshot target=ra waitMs=2000 buildFirst=false || exit 125
    parity_compare imageA=e2e/screenshots/wine-ra-menu.png \
                   imageB=e2e/screenshots/tim710-wasm-menu.png \
@@ -427,7 +427,7 @@ See the [skills index](../README.md#companion-scripts) for the full list of
 | Tool | Purpose |
 |------|---------|
 | `data_verify` | MIX checksum + INI verification |
-| `wine_capture` | Wine OG title + menu screenshots |
+| `capture_wine` | Wine OG title + menu screenshots |
 | `wasm_screenshot` | Capture a WASM game screenshot |
 | `parity_compare` | SSIM + fill% + p99 diff between two PNGs |
 | `vqa_pixel_diff` | VQA frame-by-frame pixel diff (synthetic or cinematic) |

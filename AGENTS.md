@@ -78,7 +78,7 @@ python3 scripts/lint-lp64.py
 | `nix develop --command git commit ...` (unnecessary wrapper) | `git commit ...` |
 | Running outside dev shell — tools missing from PATH | Enter `nix develop` first |
 
-> The extension tools (e.g. `native_build`, `wasm_build`, `run_e2e_test`) also
+> The extension tools (e.g. `build_native`, `build_wasm`, `run_e2e_test`) also
 > expect to run inside the dev shell and do not wrap themselves.
 
 ## ⚠️ After every PR: always enable automerge
@@ -146,8 +146,8 @@ toolchain_check()
 ### Native Linux (GCC or Clang)
 
 ```
-native_build(target: "both", compiler: "gcc")
-native_build(target: "ra", compiler: "clang")
+build_native(target: "both", compiler: "gcc")
+build_native(target: "ra", compiler: "clang")
 ```
 
 Binaries land in `build/ra` and `build/td`
@@ -155,19 +155,19 @@ Binaries land in `build/ra` and `build/td`
 ### WASM (Emscripten)
 
 ```
-wasm_build(target: "both")
+build_wasm(target: "both")
 wasm_validate(target: "both")
 ```
 
 Outputs: `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`,
 `build-wasm/td.html`
 
-> ⚠️ **Stale CMake cache.** If `wasm_build` fails with `include could not find
+> ⚠️ **Stale CMake cache.** If `build_wasm` fails with `include could not find
 > requested file: /nix/store/.../Emscripten.cmake`, the `build-wasm/` directory
 > has a stale CMake cache from a previous Nix store path. Nix rebuilds Emscripten
 > at a new store path each time, but CMake caches the old path in
 > `build-wasm/CMakeFiles/.../CMakeSystem.cmake`. Fix: delete `build-wasm/` and
-> reconfigure (`wasm_build(target: "ra", clean: true)`).
+> reconfigure (`build_wasm(target: "ra", clean: true)`).
 
 ### GitHub Pages deploy (automatic)
 
@@ -237,7 +237,7 @@ The standard loop for an agent working on a fix:
 
 ```
 1. Edit source
-2. Build       → native_build(target: "ra")
+2. Build       → build_native(target: "ra")
 3. LP64 audit  → nix run .#lint-lp64
 4. Smoke test  → run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
 5. CI check    → ci_local()  # ⚠️ run full CI locally before pushing
@@ -273,7 +273,7 @@ native Linux and WASM, and runs a three-way SSIM comparison.
 
 ```
 # Build prerequisites
-native_build(target: "ra")
+build_native(target: "ra")
 # (build-cnc-ddraw.sh still manual)
 
 # Generate gameplay goldens from Wine (the reference)
@@ -387,13 +387,13 @@ Each skill lists which extension tools apply.
 
 | Domain | Skill | Extension tools | Trigger symptoms |
 |--------|-------|----------------|-----------------|
-| Native build | `skills/native-build/` | `toolchain_check`, `native_build` | CMake failure, missing SDL2, LP64 crashes |
-| WASM/Emscripten | `skills/emscripten/` | `wasm_build`, `wasm_validate`, `wasm_screenshot`, `run_e2e_test` | EM_ASM silent, black screen, garbled audio |
+| Native build | `skills/native-build/` | `toolchain_check`, `build_native` | CMake failure, missing SDL2, LP64 crashes |
+| WASM/Emscripten | `skills/emscripten/` | `build_wasm`, `wasm_validate`, `wasm_screenshot`, `run_e2e_test` | EM_ASM silent, black screen, garbled audio |
 | E2E testing | `skills/e2e-testing/` | `serve_wasm`, `serve_assets`, `run_e2e_test` | pageerror, `__wasmReady` timeout, blank Xvfb |
-| Wine testing | `skills/wine-testing/` | `wine_check`, `wine_capture` | Wine prefix failure, DirectDraw blank, EXE binary patching for auto-launch |
+| Wine testing | `skills/wine-testing/` | `wine_check`, `capture_wine` | Wine prefix failure, DirectDraw blank, EXE binary patching for auto-launch |
 | VQA codec | `skills/vqa-codec/` | `vqa_pixel_diff` | Block corruption, palette errors, CI failure |
-| Parity comparison | `skills/parity-comparison/` | `data_verify`, `wine_capture`, `parity_compare`, `vqa_pixel_diff` | SSIM regression, parity failure |
-| CI/CD | `skills/ci-cd/` | `wasm_build`, `wasm_validate`, `native_build`, `run_e2e_test` | CI failure, release broken, deploy stuck |
+| Parity comparison | `skills/parity-comparison/` | `data_verify`, `capture_wine`, `parity_compare`, `vqa_pixel_diff` | SSIM regression, parity failure |
+| CI/CD | `skills/ci-cd/` | `build_wasm`, `wasm_validate`, `build_native`, `run_e2e_test` | CI failure, release broken, deploy stuck |
 | GHA updater | `skills/gha-updater/` | — | Stale action versions, Node.js deprecation warnings |
 | Nix shell escaping | `skills/nix-shell-escaping/` | — | nix-shell quoting errors, variable expansion traps |
 
@@ -456,8 +456,8 @@ moved to `scripts/archive/`.
 
 | Script / Tool | Purpose |
 |---------------|---------|
-| `native_build` tool / `build-native.sh` | One-command native Linux build (ra + td) |
-| `wasm_build` + `wasm_validate` / `ci-wasm-smoke.sh` | Full WASM CI cycle |
+| `build_native` tool / `build-native.sh` | One-command native Linux build (ra + td) |
+| `build_wasm` + `wasm_validate` / `ci-wasm-smoke.sh` | Full WASM CI cycle |
 | `run_e2e_test` tool / `run-e2e.sh` | Xvfb + WASM server + Playwright test |
 | `serve_wasm` tool / `serve-wasm.sh` | WASM dev server with COOP/COEP |
 | `toolchain_check` tool / `toolchain-check.sh` | Toolchain prerequisite check |
@@ -465,7 +465,7 @@ moved to `scripts/archive/`.
 | `parity_compare` tool / `parity-compare.py` | SSIM + fill% + p99 pixel diff |
 | `data_verify` tool / `*-data-verify.py` | MIX checksum verification |
 | `wine_check` tool / `wine-check.sh` | Wine prerequisite check |
-| `wine_capture` tool / `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
+| `capture_wine` tool / `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
 | `xvfb-ensure.sh` | Idempotent Xvfb launcher (source it) |
 | `vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff |
 | `parity-report.sh` | Three-way parity report (vqa + gameplay modes) |

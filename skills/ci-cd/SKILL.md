@@ -6,8 +6,8 @@ version: 0.2.0
 
 # CI/CD Pipeline Skill
 
-> **Tools available via `pi-battlecontrol-dev` extension:** `wasm_build`, `wasm_validate`,
-> `native_build`, `toolchain_check`, `wine_capture`, `vqa_pixel_diff`, `run_e2e_test`.
+> **Tools available via `pi-battlecontrol-dev` extension:** `build_wasm`, `wasm_validate`,
+> `build_native`, `toolchain_check`, `capture_wine`, `vqa_pixel_diff`, `run_e2e_test`.
 > Ask the agent to run these instead of typing raw commands.
 
 You are working on the CI/CD pipeline for the C&C native Linux and WASM builds. The
@@ -127,13 +127,13 @@ Use the `pi-battlecontrol-dev` extension tools instead of typing raw commands:
 
 | CI Job | Tool | Notes |
 |--------|------|-------|
-| Native build | `native_build(target: "both")` | Builds RA + TD native Linux |
-| WASM build | `wasm_build(target: "both")` | Builds ra.wasm + td.wasm |
+| Native build | `build_native(target: "both")` | Builds RA + TD native Linux |
+| WASM build | `build_wasm(target: "both")` | Builds ra.wasm + td.wasm |
 | WASM validate | `wasm_validate(target: "both")` | Checks magic + size > 1 MB |
 | VQA pixel-diff | `vqa_pixel_diff(mode: "synthetic")` | Synthetic VQA gate, no data needed |
 | Cinematic VQA | `vqa_pixel_diff(mode: "cinematic")` | Full game VQA scan against ffmpeg |
-| Wine OG capture | `wine_capture(game: "ra")` | Title + menu baseline screenshots |
-| Wine + parity | `wine_capture` then `run_e2e_test` with `tim699` spec | Requires EXE + data |
+| Wine OG capture | `capture_wine(game: "ra")` | Title + menu baseline screenshots |
+| Wine + parity | `capture_wine` then `run_e2e_test` with `tim699` spec | Requires EXE + data |
 | WASM smoke test | `run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")` | T1 boot smoke |
 
 

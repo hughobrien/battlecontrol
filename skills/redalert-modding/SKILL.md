@@ -425,7 +425,7 @@ export RA_BASEDIR=/path/to/ra-data/
 cp RULES.INI "$RA_BASEDIR/"
 
 # Build and run
-native_build(target: "ra")
+build_native(target: "ra")
 ./build/ra/ra
 ```
 

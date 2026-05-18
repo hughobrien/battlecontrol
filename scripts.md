@@ -9,8 +9,8 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 
 | Action | Extension Tool | Nix App | Script(s) | CI Job | npm Script |
 |--------|---------------|---------|-----------|--------|------------|
-| Build native | `native_build` | `build-native` | `scripts/build-native.sh` | `ci.yml → build` | — |
-| Build WASM | `wasm_build` | `build-wasm` | inline (flake.nix) | `ci.yml → build-wasm` | — |
+| Build native | `build_native` | `build-native` | `scripts/build-native.sh` | `ci.yml → build` | — |
+| Build WASM | `build_wasm` | `build-wasm` | inline (flake.nix) | `ci.yml → build-wasm` | — |
 | Validate WASM | `wasm_validate` | `validate-wasm` | inline (flake.nix) | `ci.yml → build-wasm` | — |
 | Serve WASM | `serve_wasm` | `serve-wasm` | `wasm/serve-coop.py` | — | — |
 | Serve assets | `serve_assets` | `serve-assets` | `wasm/serve-assets.py` | — | — |
@@ -30,17 +30,17 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | CI cppcheck | — | `ci-cppcheck` | inline (flake.nix) | `ci.yml → cppcheck` | — |
 | Toolchain check | `toolchain_check` | `toolchain-check` | `scripts/toolchain-check.sh` | — | — |
 | Wine check | `wine_check` | — | `scripts/wine-check.sh` | — | — |
-| Wine capture | `wine_capture` | `capture-wine` | `scripts/wine-cnc-capture.sh` | `ci.yml → wine-comparison` | — |
-| Native capture | `native_capture` | `capture-native` | `scripts/capture-checkpoint.py` | — | — |
+| Wine capture | `capture_wine` | `capture-wine` | `scripts/wine-cnc-capture.sh` | `ci.yml → wine-comparison` | — |
+| Native capture | `capture_native` | `capture-native` | `scripts/capture-checkpoint.py` | — | — |
 | Capture orchestrator | — | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
 | Parity compare | `parity_compare` | `parity-compare` | `scripts/parity-compare.py` | — | — |
 | Parity report | `parity_report` | `parity-report` | `scripts/parity-report.sh` | — | — |
 | VQA pixel diff | `vqa_pixel_diff` | `vqa-check` | `scripts/vqa-pixel-diff.py` | — | — |
-| VQA golden frames | `gen_vqa_golden` | `vqa-golden` | `scripts/gen-vqa-golden.py` | — | — |
+| VQA golden frames | `vqa_golden` | `vqa-golden` | `scripts/gen-vqa-golden.py` | — | — |
 | VQA cinematic compare | — | `vqa-cinematic` | `scripts/cinematic-compare.py` | — | `cinematic-compare` |
 | LP64 lint | `lint_lp64` | `lint-lp64` | `scripts/lint-lp64.py` | — | — |
 | Full lint suite | — | `lint-all` | inline (flake.nix) | — | — |
-| Include shim | `generate_include_shim` | `include-shim` | `scripts/generate-include-shim.py` | — | — |
+| Include shim | `include_shim` | `include-shim` | `scripts/generate-include-shim.py` | — | — |
 | Data verify | `data_verify` | `data-verify` | `scripts/ra-data-verify.py` | — | — |
 | Edit loop (native) | `edit_loop` | `edit-loop` | inline (flake.nix) | — | — |
 | WASM loop | — | `wasm-loop` | inline (flake.nix) | — | — |
@@ -58,7 +58,7 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | E2E TD compare | — | — | — | — | `test:e2e:td-compare` |
 | E2E TIM-705 eq. | — | — | — | — | `test:e2e:tim705` |
 
-⚠️ `native_capture` tool calls `scripts/native-capture.sh` which has been archived. Should call `nix run .#capture-native` instead.
+✅ `capture_native` tool now delegates to `capture-checkpoint.py`.
 
 ## By Category
 
@@ -67,10 +67,10 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
 | Native build | `nix run .#build-native [ra\|td\|both] [clang]` | Configure + build RA and/or TD native Linux with cmake + ninja. Calls `scripts/build-native.sh`. |
-| | `native_build(target, compiler, clean)` | Same, via extension tool. |
+| | `build_native(target, compiler, clean)` | Same, via extension tool. |
 | | `scripts/ci-local.sh` | Also runs native build as G1. |
 | WASM build | `nix run .#build-wasm [ra\|td\|both]` | Build ra.wasm and/or td.wasm via emcmake + cmake + ninja. |
-| | `wasm_build(target, clean)` | Same, via extension tool. |
+| | `build_wasm(target, clean)` | Same, via extension tool. |
 | THIPX stub | `nix run .#build-stub-thipx` | Build stub THIPX32.DLL for Wine 11 wow64 compat. |
 | | `scripts/build-stub-thipx.sh` | Same, directly. |
 | RA release | `nix run .#release-build-ra` | Build + strip + tarball RA for release (`redalert-linux-x86_64.tar.gz`). |
@@ -115,7 +115,7 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
 | Wine capture | `nix run .#capture-wine -- <exe> <data> <out>` | Generic RA95.EXE capture via cnc-ddraw under Wine + Xvfb. |
-| | `wine_capture(game, dataDir, exePath)` | Same, via extension tool. Calls `scripts/wine-ra.sh` or `scripts/wine-td.sh`. |
+| | `capture_wine(game, dataDir, exePath)` | Same, via extension tool. Calls `scripts/wine-ra.sh` or `scripts/wine-td.sh`. |
 | | `scripts/wine-cnc-capture.sh` | Generic capture script. |
 | | `scripts/wine-ra.sh [exePath] [dataDir]` | RA title/menu capture under Wine + Xvfb. |
 | | `scripts/wine-td.sh [exePath] [dataDir]` | TD title/menu capture under Wine + Xvfb. |
@@ -127,7 +127,7 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | | `scripts/wine-nod-l1.sh` | C&C95.EXE → Nod Mission 1 gameplay. |
 | | `scripts/wine-nod-m1.sh` | C&C95.EXE → Nod Mission 1 (with side-select click). |
 | Native capture | `nix run .#capture-native -- <mission>` | Launch native RA under Xvfb + `RA_AUTOSTART`, capture gameplay. ⚠️ Uses `scripts/capture-checkpoint.py` |
-| | `native_capture(mission)` | ⚠️ **STALE** — calls archived `scripts/native-capture.sh`. Should use `capture-checkpoint.py`. |
+| | `capture_native(mission)` | Delegates to `scripts/capture-checkpoint.py`. |
 | Capture checkpoint | `nix run .#capture-checkpoint -- <mode> <id> --targets <t>` | Unified orchestrator: run any mission/VQA at any frame across Wine/native/WASM. |
 | | `scripts/capture-checkpoint.py` | Same, directly. |
 | | `scripts/drivers/wine.py` | Wine capture driver (class `WineCapture`). |
@@ -150,7 +150,7 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | | `vqa_pixel_diff(mode, mixPath, threshold)` | Same, via extension tool. |
 | | `scripts/vqa-pixel-diff.py` | Same, directly. |
 | VQA golden | `nix run .#vqa-golden -- <vqaFile> <numFrames> [outDir]` | Decode VQA into N evenly-spaced golden PNGs for reference. |
-| | `gen_vqa_golden(vqaPath, numFrames, outDir)` | Same, via extension tool. |
+| | `vqa_golden(vqaPath, numFrames, outDir)` | Same, via extension tool. |
 | | `scripts/gen-vqa-golden.py` | Same, directly. |
 | | `scripts/gen-all-vqa-goldens.sh` | Generate golden frames for all intro VQAs at once. |
 | VQA cinematic | `nix run .#vqa-cinematic -- <MIX> [--threshold N]` | Scan MAIN.MIX for embedded VQAs, decode and compare vs ffmpeg. |
@@ -167,7 +167,7 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | | `scripts/lint-lp64.py [--errors-only]` | Same, directly. |
 | Full lint | `nix run .#lint-all` | LP64 + clang-tidy + cppcheck + ruff + yamllint + shellcheck + shfmt + nixfmt. |
 | Include shim | `nix run .#include-shim` | Regenerate case-folding include shim after adding #include or headers. |
-| | `generate_include_shim()` | Same, via extension tool. |
+| | `include_shim()` | Same, via extension tool. |
 | | `scripts/generate-include-shim.py` | Same, directly. |
 | Data verify | `nix run .#data-verify -- [dir]` | Verify game data MIX files against SHA-256 checksums. |
 | | `data_verify(dir)` | Same, via extension tool. |
@@ -290,18 +290,18 @@ Every executable entry point, listed A–Z with its surface(s).
 | `first-run-pass-94.sh` | script | Test | RA native smoke test. |
 | `focus-skip-patch.py` | script | Patch (RA) | NOP GameInFocus spin loops. |
 | `game-in-focus-patch.py` | script | Patch (RA) | Pin GameInFocus=TRUE. |
-| `gen_vqa_golden` | extension tool | Parity | Generate golden VQA frames. |
+| `vqa_golden` | extension tool | Parity | Generate golden VQA frames. |
 | `gen-vqa-golden.py` | script | Parity | Generate golden VQA frames. |
 | `gen-all-vqa-goldens.sh` | script | Parity | Generate golden frames for all intro VQAs. |
 | `gen_test_vqa.py` | script | Utility | Generate synthetic test VQA. |
 | `generate-include-shim.py` | script | Lint | Regenerate case-folding include shim. |
-| `generate_include_shim` | extension tool | Lint | Regenerate include shim. |
+| `include_shim` | extension tool | Lint | Regenerate include shim. |
 | `lint-lp64` | nix app | Lint | LP64 hazard audit. |
 | `lint-all` | nix app | Lint | Full multi-tool lint suite. |
 | `lint_lp64` | extension tool | Lint | LP64 hazard audit. |
 | `lint-lp64.py` | script | Lint | LP64 static hazard scanner. |
-| `native_build` | extension tool | Build | Build RA + TD native Linux. |
-| `native_capture` | extension tool | Capture | Delegates to `capture-checkpoint.py` (was pointing to archived script). |
+| `build_native` | extension tool | Build | Build RA + TD native Linux. |
+| `capture_native` | extension tool | Capture | Delegates to `capture-checkpoint.py` (was pointing to archived script). |
 | `nocd-patch.py` | script | Patch (RA) | Skip CD error dialog. |
 | `parity_compare` | extension tool | Parity | SSIM compare two images. |
 | `parity-compare.py` | script | Parity | SSIM + fill% + p99 pixel diff. |
@@ -365,11 +365,11 @@ Every executable entry point, listed A–Z with its surface(s).
 | `vqa-pixel-diff.py` | script | Parity | VQA decoder vs ffmpeg comparison. |
 | `vqa_pixel_diff` | extension tool | Parity | VQA pixel-diff gate. |
 | `wasm-loop` | nix app | Loop | WASM build → validate → smoke. |
-| `wasm_build` | extension tool | Build | Build WASM targets. |
+| `build_wasm` | extension tool | Build | Build WASM targets. |
 | `wasm_screenshot` | extension tool | Test | WASM screenshot capture. |
 | `wasm_validate` | extension tool | Build | Validate WASM binaries. |
 | `wine_check` | extension tool | Lint | Wine toolchain check. |
-| `wine_capture` | extension tool | Capture | Wine OG baseline capture. |
+| `capture_wine` | extension tool | Capture | Wine OG baseline capture. |
 | `wine-cnc-capture.sh` | script | Capture | Generic RA95 Wine capture. |
 | `wine-exe-hashes.json` | data | — | SHA-256 hashes for patched EXEs. |
 | `wine-gdi-m1.sh` | script | Capture | GDI M1 gameplay capture. |
@@ -423,8 +423,8 @@ Actions that have multiple invocation paths (candidates for consolidation):
 
 | Action | Duplicate Paths | Recommendation |
 |--------|----------------|---------------|
-| Native build | `native_build` (tool) ↔ `build-native` (nix) ↔ `build-native.sh` (script) | ✅ Canonical |
-| WASM build | `wasm_build` (tool) ↔ `build-wasm` (nix) | Same — nix is primary. |
+| Native build | `build_native` (tool) ↔ `build-native` (nix) ↔ `build-native.sh` (script) | ✅ Canonical |
+| WASM build | `build_wasm` (tool) ↔ `build-wasm` (nix) | Same — nix is primary. |
 | CI gate | `ci_local` (tool) ↔ `ci` (nix) ↔ `ci-local.sh` (script) | Keep `ci` as canonical. |
 | Edit loop | `edit_loop` (tool) ↔ `edit-loop` (nix) | Minor — both inline. |
 | E2E test | `run_e2e_test` (tool) ↔ `test` (nix) ↔ `run-e2e.sh` (script) | Keep `test` as canonical. |
@@ -432,12 +432,12 @@ Actions that have multiple invocation paths (candidates for consolidation):
 | Parity report | `parity_report` (tool) ↔ `parity-report` (nix) ↔ `parity-report.sh` (script) | ✅ Canonical |
 | VQA pixel diff | `vqa_pixel_diff` (tool) ↔ `vqa-check` (nix) ↔ `vqa-pixel-diff.py` (script) | Keep `vqa-check` as canonical. |
 | LP64 lint | `lint_lp64` (tool) ↔ `lint-lp64` (nix) ↔ `lint-lp64.py` (script) | ✅ Canonical |
-| Gen VQA golden | `gen_vqa_golden` (tool) ↔ `vqa-golden` (nix) ↔ `gen-vqa-golden.py` (script) | Keep `vqa-golden` as canonical. |
+| Gen VQA golden | `vqa_golden` (tool) ↔ `vqa-golden` (nix) ↔ `gen-vqa-golden.py` (script) | Keep `vqa-golden` as canonical. |
 | Include shim | `include_shim` (tool) ↔ `include-shim` (nix) ↔ `generate-include-shim.py` (script) | ✅ Canonical |
 | Data verify | `data_verify` (tool) ↔ `data-verify` (nix) ↔ `ra-data-verify.py` (script) | ✅ Canonical |
 | Toolchain check | `toolchain_check` (tool) ↔ `toolchain-check` (nix) ↔ `toolchain-check.sh` (script) | ✅ Canonical |
-| Wine capture | `wine_capture` (tool) ↔ `capture-wine` (nix) | Keep `capture-wine` as canonical. |
-| Native capture | `native_capture` (tool) | ✅ Fixed — delegates to `capture-checkpoint.py`. |
+| Wine capture | `capture_wine` (tool) ↔ `capture-wine` (nix) | Keep `capture-wine` as canonical. |
+| Native capture | `capture_native` (tool) | ✅ Fixed — delegates to `capture-checkpoint.py`. |
 
 ### CI-specific duplicates (same implementation, CI-only wrappers)
 
@@ -454,7 +454,7 @@ Actions that have multiple invocation paths (candidates for consolidation):
 
 | Surface | Convention | Example |
 |---------|-----------|---------|
-| Extension tools | `snake_case` | `native_build`, `parity_compare` |
+| Extension tools | `snake_case` | `build_native`, `parity_compare` |
 | Nix apps | `kebab-case` | `build-native`, `parity-compare` |
 | Shell scripts | `kebab-case.sh` | `ci-local.sh`, `run-e2e.sh` |
 | Python scripts | `kebab-case.py` | `lint-lp64.py`, `parity-compare.py` |
@@ -470,7 +470,7 @@ CI Workflow ──→ Nix App ──→ Script
 ```
 
 The project has three independent call paths that converge at the script layer:
-1. **Extension tool → script**: Tools call scripts directly (e.g., `wine_capture` → `scripts/wine-ra.sh`)
+1. **Extension tool → script**: Tools call scripts directly (e.g., `capture_wine` → `scripts/wine-ra.sh`)
 2. **Extension tool → nix → script**: Some tools call `nix run .#<name>` internally
 3. **CI → nix → script**: CI workflows call `nix run .#<ci-*>` which call scripts
 

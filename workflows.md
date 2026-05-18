@@ -117,10 +117,10 @@ Developing locally, debugging with GDB/rr/ASAN, or running native smoke tests.
 nix run .#build-native
 
 # Build a single target:
-native_build(target: "ra", compiler: "clang")
+build_native(target: "ra", compiler: "clang")
 
 # Clean rebuild:
-native_build(target: "both", compiler: "clang", clean: true)
+build_native(target: "both", compiler: "clang", clean: true)
 ```
 
 **Output:** `build/ra/redalert` and `build/td/tiberiandawn`
@@ -135,10 +135,10 @@ Testing browser builds, running e2e tests, or preparing a deploy.
 nix run .#build-wasm
 
 # Build a single target:
-wasm_build(target: "ra")
+build_wasm(target: "ra")
 
 # Clean rebuild (fixes stale CMake cache):
-wasm_build(target: "ra", clean: true)
+build_wasm(target: "ra", clean: true)
 ```
 
 **Output:** `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`, `build-wasm/td.html`
@@ -150,7 +150,7 @@ nix run .#validate-wasm
 # Must show: td.wasm: OK (magic \x00asm, size >1MB)
 ```
 
-**⚠️ Stale CMake cache:** If `wasm_build` fails with `include could not find
+**⚠️ Stale CMake cache:** If `build_wasm` fails with `include could not find
 requested file: /nix/store/.../Emscripten.cmake`, delete `build-wasm/` first,
 then rebuild with `clean: true`.
 
@@ -272,7 +272,7 @@ Full workflow: Wine OG → Native Linux → WASM → SSIM compare.
 
 ```bash
 # 1. Generate golden frames from VQA:
-gen_vqa_golden(vqaPath: "/path/to/ENGLISH.VQA", numFrames: 4)
+vqa_golden(vqaPath: "/path/to/ENGLISH.VQA", numFrames: 4)
 
 # 2. Run full parity report:
 parity_report(scene: "allied-l1", mode: "gameplay", targets: "wine,wasm,native")
@@ -303,10 +303,10 @@ Generating reference screenshots for regression tests or parity comparison.
 
 ```bash
 # Wine OG capture (title + menu):
-wine_capture(game: "ra")
+capture_wine(game: "ra")
 
 # Native Linux gameplay capture (requires game data):
-native_capture(mission: "allied-l1")
+capture_native(mission: "allied-l1")
 
 # Unified capture (any mission, any target):
 nix run .#capture-checkpoint -- mission allied-l1 --targets wine,native,wasm
