@@ -136,15 +136,15 @@ fi
 echo ""
 echo "--- G6: /opt path audit ---"
 # Exclude self (ci-local.sh has the error message) and comments explaining the absence.
-HITS=$(rg -n '/opt/(redalert|tiberiandawn)' scripts/ \
-  | grep -v 'ci-local.sh' || true)
+HITS=$(rg -n '/opt/(redalert|tiberiandawn)' scripts/ |
+	grep -v 'ci-local.sh' || true)
 if [[ -n "$HITS" ]]; then
-  echo "FAIL: scripts/ still contains /opt/redalert or /opt/tiberiandawn"
-  echo "$HITS"
-  gate_fail "G6: /opt path audit"
+	echo "FAIL: scripts/ still contains /opt/redalert or /opt/tiberiandawn"
+	echo "$HITS"
+	gate_fail "G6: /opt path audit"
 else
-  echo "  OK: no /opt paths in scripts/"
-  gate_pass "G6: /opt path audit"
+	echo "  OK: no /opt paths in scripts/"
+	gate_pass "G6: /opt path audit"
 fi
 
 # ======================================================================

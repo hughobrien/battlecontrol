@@ -69,19 +69,19 @@ set -euo pipefail
 # Argument defaults: explicit arg → env var → Nix store → error
 RA_EXE_PATH="${1:-${RA_EXE_PATH:-}}"
 if [[ -z "$RA_EXE_PATH" ]]; then
-  RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
+	RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
 fi
 if [[ -z "$RA_EXE_PATH" ]] || [[ ! -f "$RA_EXE_PATH" ]]; then
-  echo "ERROR: RA95.EXE not found."
-  echo "  Pass as first argument, set RA_EXE_PATH, or run from nix develop."
-  exit 1
+	echo "ERROR: RA95.EXE not found."
+	echo "  Pass as first argument, set RA_EXE_PATH, or run from nix develop."
+	exit 1
 fi
 
 DATA_DIR="${2:-${RA_ASSETS:-}}"
 if [[ -z "$DATA_DIR" ]]; then
-  echo "ERROR: RA game data directory not found."
-  echo "  Pass as second argument or set RA_ASSETS."
-  exit 1
+	echo "ERROR: RA game data directory not found."
+	echo "  Pass as second argument or set RA_ASSETS."
+	exit 1
 fi
 
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
@@ -141,16 +141,16 @@ WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
 
 # Configure Wine GDI renderer + virtual desktop (needed under Xvfb for DirectDraw).
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-  'HKCU\Software\Wine\Explorer\Desktops' \
-  /v Default /t REG_SZ /d "640x480" /f >/dev/null 2>&1 || true
+	'HKCU\Software\Wine\Explorer\Desktops' \
+	/v Default /t REG_SZ /d "640x480" /f >/dev/null 2>&1 || true
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-  'HKCU\Software\Wine\Direct3D' \
-  /v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
+	'HKCU\Software\Wine\Direct3D' \
+	/v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
 
 # Link MIX data into staging
 echo "  Linking data: $DATA_DIR"
 for f in "$DATA_DIR"/*.MIX; do
-  [[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
+	[[ -e "$f" ]] && ln -sf "$f" "$RA_STAGE/$(basename "$f")"
 done
 
 # Write REDALERT.INI with intro skipping
@@ -177,7 +177,7 @@ cp "$RA_EXE_PATH" "$RA_STAGE/RA95.EXE"
 # for title/menu screenshots.
 STUB_DIR="$(cd "$(dirname "$0")/.." && pwd)/tools/stub-thipx"
 if [[ -f "$STUB_DIR/thipx32.dll" ]]; then
-  cp "$STUB_DIR/thipx32.dll" "$RA_STAGE/THIPX32.DLL"
+	cp "$STUB_DIR/thipx32.dll" "$RA_STAGE/THIPX32.DLL"
 fi
 
 echo "  Staging: $RA_STAGE"

@@ -22,7 +22,6 @@ import sys
 DATA_DIR_DEFAULT = "/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1"
 
 
-
 # SHA-256 of each file in the reference CD1 dataset (Remastered Collection).
 # Computed from the EA/GOG release shipped with the CnC Remastered Collection.
 REFERENCE_CHECKSUMS: dict[str, str] = {
@@ -102,9 +101,6 @@ def check_ini(data_dir: str) -> list[str]:
     return errors
 
 
-
-
-
 def main() -> int:
     data_dir = sys.argv[1] if len(sys.argv) > 1 else DATA_DIR_DEFAULT
     print("Red Alert reference data verification")
@@ -125,8 +121,6 @@ def main() -> int:
     print("=== REDALERT.INI values ===")
     all_errors += check_ini(data_dir)
     print()
-
-
 
     if all_errors:
         print(f"FAIL — {len(all_errors)} error(s):")

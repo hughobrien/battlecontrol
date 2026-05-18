@@ -16,8 +16,8 @@ WINE="${WINE:-/usr/bin/wine}"
 WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim869-nod-l1}"
 TD_EXE_PATH="${1:-${TD_EXE_PATH:-}}"
 if [[ -z "$TD_EXE_PATH" ]] || [[ ! -f "$TD_EXE_PATH" ]]; then
-  echo "ERROR: C&C95.EXE not found. Set TD_EXE_PATH or pass as first argument."
-  exit 1
+	echo "ERROR: C&C95.EXE not found. Set TD_EXE_PATH or pass as first argument."
+	exit 1
 fi
 TD_DLL_DIR="$(dirname "$TD_EXE_PATH")"
 CNC_DDRAW_DIR="${CNC_DDRAW_DIR:-/tmp/cnc-ddraw-master}"

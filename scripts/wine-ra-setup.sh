@@ -23,9 +23,9 @@ echo ""
 
 # Resolve ra-patched-exe from Nix store
 RA_EXE=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || {
-  echo "ERROR: Could not resolve ra-patched-exe from Nix store."
-  echo "  Run this script from inside 'nix develop'."
-  exit 1
+	echo "ERROR: Could not resolve ra-patched-exe from Nix store."
+	echo "  Run this script from inside 'nix develop'."
+	exit 1
 }
 
 # Resolve DLLs (optional — wine-ra.sh uses the stub at tools/stub-thipx/)

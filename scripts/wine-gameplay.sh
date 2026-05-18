@@ -52,17 +52,17 @@ set -euo pipefail
 
 RA_EXE_PATH="${1:-${RA_EXE_PATH:-}}"
 if [[ -z "$RA_EXE_PATH" ]]; then
-  RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
+	RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
 fi
 if [[ -z "$RA_EXE_PATH" ]] || [[ ! -f "$RA_EXE_PATH" ]]; then
-  echo "ERROR: RA95.EXE not found. Set RA_EXE_PATH or run from nix develop."
-  exit 1
+	echo "ERROR: RA95.EXE not found. Set RA_EXE_PATH or run from nix develop."
+	exit 1
 fi
 
 DATA_DIR="${2:-${RA_ASSETS:-}}"
 if [[ -z "$DATA_DIR" ]]; then
-  echo "ERROR: RA game data directory not found. Set RA_ASSETS."
-  exit 1
+	echo "ERROR: RA game data directory not found. Set RA_ASSETS."
+	exit 1
 fi
 
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
