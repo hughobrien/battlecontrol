@@ -84,7 +84,7 @@ if [[ ! -f "$MANIFEST" ]]; then
 	if [[ "$MODE" == "vqa" ]]; then
 		echo "  Run: bash scripts/gen-all-vqa-goldens.sh"
 	else
-		echo "  Run: bash scripts/gen-gameplay-goldens.sh $SCENE"
+		echo "  Run: python3 scripts/capture-checkpoint.py mission $SCENE --targets wine"
 	fi
 	exit 2
 fi
