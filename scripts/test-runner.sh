@@ -11,7 +11,7 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 1
 
 GAME="${1:-}"
 PLATFORM="${2:-}"
@@ -49,6 +49,7 @@ start_servers() {
   sleep 3
 }
 
+# shellcheck disable=SC2317
 cleanup_servers() {
   for p in "${PIDS[@]:-}"; do kill -9 "$p" 2>/dev/null || true; done
 }
