@@ -382,47 +382,7 @@
           fi
 
           echo "C&C Red Alert — dev shell"
-          echo ""
-          echo "Workflows (from repo root):"
-          echo "  nix run .#wine-check         Wine toolchain prerequisites"
-          echo "  nix run .#toolchain-check    toolchain prerequisites"
-          echo "  nix run .#build-native       native Linux build (ra/td/both)"
-          echo "  nix run .#release            release build: RA + TD native tarballs"
-          echo "  nix run .#lint-lp64          LP64 hazard audit"
-          echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
-          echo "  nix run .#build-wasm         WASM build (ra/td/both, with validation)"
-          echo "  nix run .#serve              WASM + asset dev servers"
-          echo "  nix run .#screenshot         capture WASM screenshot"
-          echo "  nix run .#test -- <spec>     run an e2e test"
-          echo "  nix run .#capture-wine       Wine OG baseline capture"
-
-
-          echo "  nix run .#vqa-check          VQA pixel-diff gate"
-          echo "  nix run .#vqa-golden         Generate golden frames from VQA"
-          echo "  nix run .#parity-compare -- a b   SSIM compare two screenshots"
-
-          echo "  nix run .#smoke-ra           RA native smoke test"
-          echo "  nix run .#smoke-td           TD native smoke test"
-          echo "  nix run .#regression          Run regression suite"
-          echo "  nix run .#parity-report -- <scene>  Three-way parity report"
-          echo "  nix run .#edit-loop   — include-shim→lint-lp64→build→smoke (native)"
-          echo "  nix run .#wasm-loop   — build→validate→smoke (WASM)"
-          echo "  nix run .#test         — T1 + T2 boot smokes (default), or with <spec>"
-          echo "  nix run .#test -- <spec>     run e2e test under Xvfb+WASM"
-          echo "  nix run .#ci                 all local CI gates"
-          echo "  nix run .#wasm-loop           WASM build → validate → smoke T1+T2"
-          echo "  nix run .#ci                  all local CI gates (incl. static analysis)"
-          echo ""
-          echo "  nix run .#redalert           run Red Alert (needs RA data)"
-          echo "  nix run .#tiberiandawn        run Tiberian Dawn (needs TD data)"
-          echo "  nix build path:./tools/wine-input#ra-sendinput   build Wine SendInput helpers"
-          echo "  nix build .#cnc-ddraw                         build cnc-ddraw ddraw.dll (upstream)"
-          echo "  nix run .#build-stub-thipx           build stub THIPX32.DLL (for Wine 11.0 wow64)"
-          echo ""
-          echo "  or use the pi agent: 19 extension tools"
-          echo ""
-          echo "Quick start:"
-          echo "  nix run .#toolchain-check && nix run .#build-native"
+          echo "  nix flake show   to list available apps and packages"
         '';
       };
 
@@ -432,9 +392,10 @@
       # Run from your game-data directory, or set RA_ASSETS:
       #   cd /path/to/red-alert-data && nix run github:hughobrien/battlecontrol
       #   RA_ASSETS=/path/to/data   nix run github:hughobrien/battlecontrol
+      # Default: .#ra (run Red Alert)
       # -----------------------------------------------------------------------
       apps.${system} = rec {
-        redalert = {
+        ra = {
           type = "app";
           program = toString (
             pkgs.writeShellScript "run-redalert" ''
@@ -442,7 +403,7 @@
               DATA_DIR="''${RA_ASSETS:-$PWD}"
               if [ ! -f "$DATA_DIR/MAIN.MIX" ] && [ ! -f "$DATA_DIR/main.mix" ]; then
                 echo "ERROR: MAIN.MIX not found in $DATA_DIR"
-                echo "  cd /path/to/red-alert-data && nix run"
+                echo "  cd /path/to/red-alert-data && nix run .#ra"
                 echo "  or set RA_ASSETS=/path/to/red-alert-data"
                 exit 1
               fi
@@ -452,7 +413,7 @@
           );
         };
 
-        tiberiandawn = {
+        td = {
           type = "app";
           program = toString (
             pkgs.writeShellScript "run-tiberiandawn" ''
@@ -460,7 +421,7 @@
               DATA_DIR="''${TD_ASSETS:-$PWD}"
               if [ ! -f "$DATA_DIR/CONQUER.MIX" ] && [ ! -f "$DATA_DIR/conquer.mix" ]; then
                 echo "ERROR: CONQUER.MIX not found in $DATA_DIR"
-                echo "  cd /path/to/tiberian-dawn-data && nix run .#tiberiandawn"
+                echo "  cd /path/to/tiberian-dawn-data && nix run .#td"
                 echo "  or set TD_ASSETS=/path/to/tiberian-dawn-data"
                 exit 1
               fi
@@ -470,46 +431,71 @@
           );
         };
 
-        default = toolchain-check;
+        default = ra;
 
         # ── Developer workflow apps ────────────────────────────────────────
         # nix run .#<name> [args...]  from the repo root.
 
-        toolchain-check = mkApp "toolchain-check" ''
-          exec bash scripts/toolchain-check.sh
+        # ── Build shortcuts (combinatorial: {game}-{platform}-build) ──────
+        ra-native-build = mkApp "ra-native-build" ''
+          exec nix build .#redalert -L --no-link
         '';
 
-        build-native = mkApp "build-native" ''
-          export CC=clang CXX=clang++
-          exec bash scripts/build-native.sh "$@"
+        td-native-build = mkApp "td-native-build" ''
+          exec nix build .#tiberiandawn -L --no-link
         '';
 
-        release = mkApp "release" ''
-          set -e
-          echo "=== Building RA native ==="
-          bash scripts/first-run-pass-94.sh
-          cp build/first-run-pass-94/redalert.elf redalert
-          strip redalert
-          tar czf redalert-linux-x86_64.tar.gz redalert
-          echo "  redalert-linux-x86_64.tar.gz: $(stat -c%s redalert-linux-x86_64.tar.gz) bytes"
-          echo ""
-          echo "=== Building TD native ==="
-          cmake --preset linux-native
-          cmake --build build --target td --parallel
-          strip build/td
-          cp build/td td
-          tar czf td-linux-x86_64.tar.gz td
-          echo "  td-linux-x86_64.tar.gz: $(stat -c%s td-linux-x86_64.tar.gz) bytes"
-          echo ""
-          echo "=== Release artifacts ==="
-          ls -lh redalert-linux-x86_64.tar.gz td-linux-x86_64.tar.gz
+        ra-wasm-build = mkApp "ra-wasm-build" ''
+            set -e
+            emcmake cmake --preset wasm
+            cmake --build build-wasm --target ra --parallel
+            python3 -c "
+          import os, struct
+          fn='build-wasm/ra.wasm'
+          with open(fn,'rb') as f:
+              assert f.read(4)==b'\\x00asm', f'{fn}: bad magic'
+          sz=os.path.getsize(fn)
+          assert sz>1_000_000, f'{fn}: too small ({sz} bytes)'
+          print(f'  ra.wasm: {sz//1024} KB OK')
+          "
         '';
 
-        lint-lp64 = mkApp "lint-lp64" ''
-          exec python3 scripts/lint-lp64.py --errors-only
+        td-wasm-build = mkApp "td-wasm-build" ''
+            set -e
+            emcmake cmake --preset wasm
+            cmake --build build-wasm --target td --parallel
+            python3 -c "
+          import os, struct
+          fn='build-wasm/td.wasm'
+          with open(fn,'rb') as f:
+              assert f.read(4)==b'\\x00asm', f'{fn}: bad magic'
+          sz=os.path.getsize(fn)
+          assert sz>1_000_000, f'{fn}: too small ({sz} bytes)'
+          print(f'  td.wasm: {sz//1024} KB OK')
+          "
         '';
 
-        lint-all = mkApp "lint-all" ''
+        # ── Test shortcuts (combinatorial: {game}-{platform}-test) ────────
+        ra-native-test = mkApp "ra-native-test" ''
+          exec bash scripts/first-run-pass-94.sh
+        '';
+
+        td-native-test = mkApp "td-native-test" ''
+          exec bash scripts/run-td-cheat.sh
+        '';
+
+        ra-wasm-test = mkApp "ra-wasm-test" ''
+          exec bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+        '';
+
+        td-wasm-test = mkApp "td-wasm-test" ''
+          exec bash scripts/run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
+        '';
+
+        # ── Generic e2e runner ────────────────────────────────────────────
+        # ── Lint ───────────────────────────────────────────────────────────
+        # nix run .#lint — runs all linters (LP64 + clang-tidy + cppcheck + ...)
+        lint = mkApp "lint" ''
           set -e
           echo "=== LP64 hazard audit ==="
           python3 scripts/lint-lp64.py --errors-only
@@ -519,7 +505,7 @@
           find REDALERT TIBERIANDAWN -type f \
             \! -path '*/WIN32LIB/*' \
             \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
-            | xargs -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
+            -print0 | xargs -0 -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
             | tee /tmp/clang-tidy-report.txt
           echo "$(grep -c 'warning:\|error:' /tmp/clang-tidy-report.txt 2>/dev/null || echo 0) clang-tidy finding(s)"
           echo ""
@@ -550,33 +536,30 @@
           find . -name '*.nix' -not -path './build/*' -exec nixfmt --check {} + 2>&1 || true
         '';
 
+        release = mkApp "release" ''
+          set -e
+          echo "=== Building RA native ==="
+          bash scripts/first-run-pass-94.sh
+          cp build/first-run-pass-94/redalert.elf redalert
+          strip redalert
+          tar czf redalert-linux-x86_64.tar.gz redalert
+          echo "  redalert-linux-x86_64.tar.gz: $(stat -c%s redalert-linux-x86_64.tar.gz) bytes"
+          echo ""
+          echo "=== Building TD native ==="
+          cmake --preset linux-native
+          cmake --build build --target td --parallel
+          strip build/td
+          cp build/td td
+          tar czf td-linux-x86_64.tar.gz td
+          echo "  td-linux-x86_64.tar.gz: $(stat -c%s td-linux-x86_64.tar.gz) bytes"
+          echo ""
+          echo "=== Release artifacts ==="
+          ls -lh redalert-linux-x86_64.tar.gz td-linux-x86_64.tar.gz
+        '';
+
         include-shim = mkApp "include-shim" ''
           exec python3 scripts/generate-include-shim.py \
             --repo-root . --shim-root build/include-shim --quiet
-        '';
-
-        build-wasm = mkApp "build-wasm" ''
-          set -e
-          TARGET="''${1:-both}"
-          emcmake cmake --preset wasm
-          for t in ra td; do
-            [ "$TARGET" != "$t" ] && [ "$TARGET" != "both" ] && continue
-            cmake --build build-wasm --target "$t" --parallel
-            fn="build-wasm/$t.wasm"
-            python3 -c "
-          import os, struct
-          with open('$fn','rb') as f:
-              magic = f.read(4)
-          assert magic == b'\\x00asm', '$fn: bad magic'
-          sz = os.path.getsize('$fn')
-          assert sz > 1_000_000, '$fn: too small (' + str(sz) + ' bytes)'
-          print('  $t.wasm: ' + str(sz//1024) + ' KB OK')
-          "
-          done
-        '';
-
-        wine-check = mkApp "wine-check" ''
-          exec bash scripts/wine-check.sh
         '';
 
         serve = mkApp "serve-both" ''
@@ -590,15 +573,6 @@
           echo "Assets: http://localhost:$ASSET_PORT"
           wait
           kill $WASM_PID $ASSET_PID 2>/dev/null || true
-        '';
-
-        test = mkApp "run-e2e" ''
-          if [ $# -eq 0 ]; then
-            # Default: T1 + T2 asset-free boot smokes
-            bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
-            exec bash scripts/run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
-          fi
-          exec bash scripts/run-e2e.sh "$@"
         '';
 
         screenshot = mkApp "screenshot" ''
@@ -656,14 +630,6 @@
           exec bash scripts/ci-local.sh $FLAG
         '';
 
-        smoke-ra = mkApp "smoke-ra" ''
-          exec bash scripts/first-run-pass-94.sh
-        '';
-
-        smoke-td = mkApp "smoke-td" ''
-          exec bash scripts/run-td-cheat.sh
-        '';
-
         capture-checkpoint = mkApp "capture-checkpoint" ''
           exec python3 scripts/capture-checkpoint.py "$@"
         '';
@@ -678,9 +644,20 @@
           exec python3 scripts/gen-vqa-golden.py "$VQA" "$N"
         '';
 
-        regression = mkApp "regression-suite" ''
-          TIER="''${1:-ci}"
-          exec env REGRESSION_TIER="$TIER" bash scripts/regression-suite.sh
+        ra-wasm-regression = mkApp "ra-wasm-regression" ''
+          exec bash scripts/regression/ra-wasm.sh
+        '';
+
+        td-wasm-regression = mkApp "td-wasm-regression" ''
+          exec bash scripts/regression/td-wasm.sh
+        '';
+
+        ra-native-regression = mkApp "ra-native-regression" ''
+          exec bash scripts/regression/ra-native.sh
+        '';
+
+        td-native-regression = mkApp "td-native-regression" ''
+          exec bash scripts/regression/td-native.sh
         '';
 
         parity-report = mkApp "parity-report" ''
@@ -693,24 +670,6 @@
           MODE="''${1:-vqa}"
           TARGETS="''${2:-wine,wasm,native}"
           exec bash scripts/parity-report.sh --mode "$MODE" --targets "$TARGETS" "$SCENE"
-        '';
-
-        # ── Iteration loop shorthands ──────────────────────────────────────
-
-        edit-loop = mkApp "edit-loop" ''
-          set -e
-          echo "=== edit loop: include-shim → lint-lp64 → build → smoke ==="
-          nix run .#include-shim 2>/dev/null || true
-          nix run .#lint-lp64 2>/dev/null || true
-          nix run .#build-native
-          nix run .#test -- e2e/regression/T1-ra-wasm-boot.spec.ts
-        '';
-
-        wasm-loop = mkApp "wasm-loop" ''
-          set -e
-          echo "=== WASM loop: build (with validation) → smoke ==="
-          nix run .#build-wasm
-          nix run .#test
         '';
 
         # ── CI Job Apps ────────────────────────────────────────────────────
