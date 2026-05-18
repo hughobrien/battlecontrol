@@ -1,5 +1,6 @@
-# CI — thin wrapper around flake apps.
-# Local equivalent: nix run .#ra-native-build && nix run .#td-native-build
+# CI — thin wrapper around nix run .#test.
+# Primary testing happens locally; this confirms the deploy artifact.
+# Local equivalent: nix run .#test
 
 name: CI
 
@@ -18,10 +19,10 @@ env:
   EM_CACHE_DIR: ${{ github.workspace }}/.emscripten-cache
 
 jobs:
-  build:
-    name: Compile and link (clang)
+  test:
+    name: Test (build + lint + full regression)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v6.0.2
@@ -31,6 +32,9 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+
+      - name: Install system deps
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends cppcheck ffmpeg
 
       - name: Cache ccache
         uses: actions/cache@v5.0.5
@@ -40,116 +44,7 @@ jobs:
           restore-keys: |
             ccache-
 
-      - name: Build native + smoke
-        run: |
-          nix develop --command bash -c "
-            export CCACHE_DIR=${{ env.CCACHE_DIR }}
-            ccache --zero-stats
-            ccache --max-size 500M
-            nix run .#ra-native-build && nix run .#td-native-build
-            echo '### ccache hit rate' >> \"$GITHUB_STEP_SUMMARY\"
-            ccache --show-stats >> \"$GITHUB_STEP_SUMMARY\"
-            ccache --show-stats
-          "
-
-  wine-comparison:
-    name: Wine OG comparison
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v6.0.2
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31.10.6
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Install Wine32 + system tools
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            wine32:i386 xvfb xdotool imagemagick
-
-      - name: Cache RA95.EXE
-        uses: actions/cache@v5.0.5
-        with:
-          path: ${{ runner.temp }}/ra95-cache
-          key: ra95-exe-a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55
-
-      - name: Prepare RA95.EXE
-        run: |
-          sudo mkdir -p /opt/redalert && sudo chmod 777 /opt/redalert
-          if [ -f "$RUNNER_TEMP/ra95-cache/RA95.EXE" ]; then
-            echo "::notice::RA95 cache hit — copying to /opt/redalert"
-            cp "$RUNNER_TEMP"/ra95-cache/* /opt/redalert/
-          else
-            echo "::notice::RA95 cache miss — downloading from archive.org"
-            bash scripts/wine-ra-setup.sh
-            mkdir -p "$RUNNER_TEMP/ra95-cache"
-            cp /opt/redalert/*.EXE /opt/redalert/*.DLL "$RUNNER_TEMP/ra95-cache/" 2>/dev/null || true
-          fi
-
-      - name: Run OG Red Alert under Wine
-        id: wine-run
-        run: |
-          bash scripts/wine-ra.sh \
-            && echo "wine_ok=true"  >> "$GITHUB_OUTPUT" \
-            || echo "wine_ok=false" >> "$GITHUB_OUTPUT"
-
-      - name: Set WINE_RA_READY when screenshots captured
-        if: steps.wine-run.outputs.wine_ok == 'true'
-        run: echo "WINE_RA_READY=1" >> "$GITHUB_ENV"
-
-      - name: Run Tier 1 + Tier 3 comparison tests
-        run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          XVFB_PID=$!
-          for i in $(seq 1 10); do
-            if xdpyinfo -display :99 >/dev/null 2>&1; then break; fi
-            sleep 0.5
-          done
-          nix develop --command playwright test e2e/tim699-ra-compare.spec.ts \
-            --grep "Tier 1|Tier 3" --reporter=line
-          PW_EXIT=$?
-          kill "$XVFB_PID" 2>/dev/null || true
-          exit $PW_EXIT
-
-      - name: Upload comparison screenshots
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: wine-comparison-screenshots
-          path: e2e/screenshots/
-          if-no-files-found: ignore
-
-      - name: Upload Playwright test results on failure
-        if: failure()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: wine-comparison-test-results
-          path: |
-            e2e/test-results/
-            e2e/report/
-          if-no-files-found: ignore
-
-  build-wasm:
-    name: Build WASM + regression
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-
-    steps:
-      - uses: actions/checkout@v6.0.2
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31.10.6
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Cache Emscripten system libraries
+      - name: Cache Emscripten
         uses: actions/cache@v5.0.5
         with:
           path: ${{ env.EM_CACHE_DIR }}
@@ -157,69 +52,29 @@ jobs:
           restore-keys: |
             emcc-cache-5.0.6-
 
-      - name: Build ra.wasm + td.wasm
-        env:
-          EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: |
-          nix develop --command nix run .#ra-wasm-build
-          nix develop --command nix run .#td-wasm-build
-
-      - name: WASM CI tier — RA (T1, T11)
-        run: nix develop --command nix run .#ra-wasm-regression
-
-      - name: WASM CI tier — TD (T2, T12)
-        run: nix develop --command nix run .#td-wasm-regression
-
-      - name: WASM full tier — RA (T3-ra, T4, T5, T8, T9, T10, asset-gated)
+      - name: Run test suite
         env:
           RA_ASSETS_URL: ${{ vars.RA_ASSETS_URL || secrets.RA_ASSETS_URL || '' }}
-          REGRESSION_TIER: full
+          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL || '' }}
+          EM_CACHE: ${{ env.EM_CACHE_DIR }}
         run: |
-          if [ -z "$RA_ASSETS_URL" ]; then
-            echo "::notice::RA full regression skipped — RA_ASSETS_URL not set"
-            exit 0
-          fi
-          nix develop --command nix run .#ra-wasm-regression
+          nix develop --command bash -c "
+            export CCACHE_DIR=${{ env.CCACHE_DIR }}
+            ccache --zero-stats
+            ccache --max-size 500M
+            nix run .#test -- --all
+            ccache --show-stats
+          "
 
-      - name: WASM full tier — TD (T3-td, T6, T7, asset-gated)
-        env:
-          TD_ASSETS_URL: ${{ secrets.TD_ASSETS_URL }}
-          REGRESSION_TIER: full
-        run: |
-          if [ -z "$TD_ASSETS_URL" ]; then
-            echo "::notice::TD full regression skipped — TD_ASSETS_URL not set"
-            exit 0
-          fi
-          nix develop --command nix run .#td-wasm-regression
-
-      - name: Upload regression artifacts on failure
+      - name: Upload artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: wasm-regression-results
+          name: test-results
           path: |
             e2e/screenshots/
             e2e/test-results/
             e2e/report/
+            /tmp/clang-tidy-report.txt
+            /tmp/cppcheck-report.txt
           if-no-files-found: ignore
-
-  ci:
-    name: Local CI gate (incl. static analysis)
-    runs-on: ubuntu-24.04
-    continue-on-error: true
-
-    steps:
-      - uses: actions/checkout@v6.0.2
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31.10.6
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Install deps
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends cppcheck ffmpeg
-
-      - name: Run CI gate (G1–G8)
-        continue-on-error: true
-        run: nix develop --command nix run .#ci
