@@ -350,52 +350,17 @@
 
 
 
-          # Install git pre-commit hook for linting all staged files
+          # Install git pre-commit hook calling the lint tier
           REPO_ROOT="''$(git rev-parse --show-toplevel 2>/dev/null || true)"
           if [ -n "$REPO_ROOT" ] && [ ! -f "$REPO_ROOT/.git/hooks/pre-commit" ]; then
             HOOK="$REPO_ROOT/.git/hooks/pre-commit"
             cat > "$HOOK" << 'PREHOOK'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          ERRORS=0
-
-          auto_fixer() { "$@" 2>/dev/null || true; }
-          checker() { if ! "$@" 2>/dev/null; then ERRORS=$((ERRORS + 1)); fi; }
-
-          # ── Phase 1: Auto-fixers (never block) ─────────────────────────
-          PY_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
-          for f in $PY_STAGED; do auto_fixer ruff check --fix "$f"; done
-          for f in $PY_STAGED; do auto_fixer ruff format "$f"; done
-
-          SH_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.sh$' || true)
-          for f in $SH_STAGED; do auto_fixer shfmt -w "$f"; done
-
-          # ── Phase 2: Checkers (block on failure) ────────────────────────
-          echo "" && echo "=== Pre-commit linting ==="
-
-          C_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|c|h|hpp)$' || true)
-          if [ -n "$C_STAGED" ]; then
-            checker python3 scripts/lint-lp64.py --files $C_STAGED
-          fi
-          for f in $C_STAGED; do checker clang-tidy -p build --quiet "$f"; done
-
-          for f in $PY_STAGED; do checker ruff check "$f"; done
-
-          YML_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.ya?ml$' || true)
-          for f in $YML_STAGED; do checker yamllint "$f"; done
-
-          for f in $SH_STAGED; do checker shellcheck "$f"; done
-
-          NIX_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.nix$' || true)
-          for f in $NIX_STAGED; do checker nixfmt --check "$f"; done
-
-          if [ "$ERRORS" -gt 0 ]; then
-            echo "" && echo "✗ $ERRORS lint error(s) — commit blocked. Re-stage auto-fixed files and retry."
-            exit 1
-          fi
-          PREHOOK
+#!/usr/bin/env bash
+set -euo pipefail
+nix run .#lint
+PREHOOK
             chmod +x "$HOOK"
-            echo "Installed git pre-commit hook for linting"
+            echo "Installed git pre-commit hook: nix run .#lint"
           fi
 
           echo "C&C Red Alert — dev shell"
@@ -493,64 +458,28 @@
         '';
 
         # ── Test shortcuts (combinatorial: {game}-{platform}-test) ────────
+        # Each forwards $@ so --full triggers the full regression tier.
         ra-native-test = mkApp "ra-native-test" ''
-          exec bash scripts/first-run-pass-94.sh
+          exec bash scripts/test-runner.sh ra native "$@"
         '';
 
         td-native-test = mkApp "td-native-test" ''
-          exec bash scripts/run-td-cheat.sh
+          exec bash scripts/test-runner.sh td native "$@"
         '';
 
         ra-wasm-test = mkApp "ra-wasm-test" ''
-          exec bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+          exec bash scripts/test-runner.sh ra wasm "$@"
         '';
 
         td-wasm-test = mkApp "td-wasm-test" ''
-          exec bash scripts/run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
+          exec bash scripts/test-runner.sh td wasm "$@"
         '';
 
         # ── Generic e2e runner ────────────────────────────────────────────
         # ── Lint ───────────────────────────────────────────────────────────
         # nix run .#lint — runs all linters (LP64 + clang-tidy + cppcheck + ...)
         lint = mkApp "lint" ''
-          set -e
-          echo "=== LP64 hazard audit ==="
-          python3 scripts/lint-lp64.py --errors-only
-          echo ""
-          echo "=== clang-tidy ==="
-          cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>/dev/null || true
-          find REDALERT TIBERIANDAWN -type f \
-            \! -path '*/WIN32LIB/*' \
-            \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
-            -print0 | xargs -0 -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
-            | tee /tmp/clang-tidy-report.txt
-          echo "$(grep -c 'warning:\|error:' /tmp/clang-tidy-report.txt 2>/dev/null || echo 0) clang-tidy finding(s)"
-          echo ""
-          echo "=== cppcheck ==="
-          cppcheck --enable=warning,performance,portability,information \
-            --suppress=missingIncludeSystem \
-            --suppress=unmatchedSuppression \
-            --inline-suppr --error-exitcode=0 \
-            -j "$(nproc)" --quiet \
-            -I REDALERT -I REDALERT/WIN32LIB \
-            -I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
-            -I linux/win32-stubs \
-            REDALERT TIBERIANDAWN 2>&1 | tee /tmp/cppcheck-report.txt
-          echo "$(grep -c 'error:\|warning:' /tmp/cppcheck-report.txt 2>/dev/null || echo 0) cppcheck finding(s)"
-          echo ""
-          echo "=== Python (ruff check + format) ==="
-          ruff check scripts/ e2e/ wasm/ 2>&1 || true
-          ruff format --check --diff scripts/ e2e/ wasm/ 2>&1 || true
-          echo ""
-          echo "=== YAML (yamllint) ==="
-          yamllint .github/workflows/ 2>&1 || true
-          echo ""
-          echo "=== Shell (shellcheck + shfmt) ==="
-          find scripts/ -name '*.sh' -exec shellcheck {} + 2>&1 || true
-          find scripts/ -name '*.sh' -exec shfmt -d {} + 2>&1 || true
-          echo ""
-          echo "=== Nix (nixfmt) ==="
-          find . -name '*.nix' -not -path './build/*' -exec nixfmt --check {} + 2>&1 || true
+          exec bash scripts/lint.sh
         '';
 
         release = mkApp "release" ''
@@ -585,6 +514,20 @@
           echo "Assets: http://localhost:$ASSET_PORT"
           wait
           kill $WASM_PID $ASSET_PID 2>/dev/null || true
+        '';
+
+        # ── Four-tier workflow: lint → build → smoke → test ──────────────
+        # Each tier calls the one before it. All support --all and --base REF.
+        build = mkApp "build" ''
+          exec bash scripts/build.sh "$@"
+        '';
+
+        smoke = mkApp "smoke" ''
+          exec bash scripts/smoke.sh "$@"
+        '';
+
+        test = mkApp "test" ''
+          exec bash scripts/test.sh "$@"
         '';
 
         screenshot = mkApp "screenshot" ''
@@ -644,32 +587,8 @@
           exec python3 scripts/vqa-compare.py "$@"
         '';
 
-        ci = mkApp "ci-local" ''
-          MODE="''${1:-all}"
-          FLAG=""
-          [ "$MODE" = "wasm-only" ] && FLAG="--wasm-only"
-          [ "$MODE" = "native-only" ] && FLAG="--native-only"
-          exec bash scripts/ci-local.sh $FLAG
-        '';
-
         capture-checkpoint = mkApp "capture-checkpoint" ''
           exec python3 scripts/capture-checkpoint.py "$@"
-        '';
-
-        ra-wasm-regression = mkApp "ra-wasm-regression" ''
-          exec bash scripts/regression/ra-wasm.sh
-        '';
-
-        td-wasm-regression = mkApp "td-wasm-regression" ''
-          exec bash scripts/regression/td-wasm.sh
-        '';
-
-        ra-native-regression = mkApp "ra-native-regression" ''
-          exec bash scripts/regression/ra-native.sh
-        '';
-
-        td-native-regression = mkApp "td-native-regression" ''
-          exec bash scripts/regression/td-native.sh
         '';
 
         parity-report = mkApp "parity-report" ''
