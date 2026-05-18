@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-wine10.url = "github:NixOS/nixpkgs/nixos-25.05";
+
     wine-input.url = "path:./tools/wine-input";
 
     # Upstream: cnc-ddraw — DirectDraw wrapper for old Win32 games under Wine.
@@ -47,7 +47,7 @@
     {
       self,
       nixpkgs,
-      nixpkgs-wine10,
+
       wine-input,
       cnc-ddraw,
       ra95-exe,
@@ -58,7 +58,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      pkgs-wine10 = nixpkgs-wine10.legacyPackages.${system};
+
       mkApp = name: script: rec {
         type = "app";
         program = toString (pkgs.writeShellScript name script);
@@ -356,7 +356,7 @@
           imagemagick
           mono
           curl
-          pkgs-wine10.winePackages.stableFull
+          pkgs.wineWow64Packages.stableFull
         ];
 
         shellHook = ''
