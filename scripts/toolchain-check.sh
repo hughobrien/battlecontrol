@@ -3,7 +3,7 @@
 # Used by: native-build skill Phase 0.
 #
 # Usage:
-#   bash scripts/skill-dev-check.sh
+#   bash scripts/toolchain-check.sh
 #
 # Exit code: 0 = all prerequisites met, 1 = one or more missing.
 # Output lists each tool and its status.

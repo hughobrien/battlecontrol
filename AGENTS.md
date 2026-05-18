@@ -456,18 +456,18 @@ moved to `scripts/archive/`.
 
 | Script / Tool | Purpose |
 |---------------|---------|
-| `native_build` tool / `skill-native-build.sh` | One-command native Linux build (ra + td) |
-| `wasm_build` + `wasm_validate` / `skill-ci-wasm-smoke.sh` | Full WASM CI cycle |
-| `run_e2e_test` tool / `skill-run-e2e.sh` | Xvfb + WASM server + Playwright test |
-| `serve_wasm` tool / `skill-wasm-serve.sh` | WASM dev server with COOP/COEP |
-| `toolchain_check` tool / `skill-dev-check.sh` | Toolchain prerequisite check |
+| `native_build` tool / `build-native.sh` | One-command native Linux build (ra + td) |
+| `wasm_build` + `wasm_validate` / `ci-wasm-smoke.sh` | Full WASM CI cycle |
+| `run_e2e_test` tool / `run-e2e.sh` | Xvfb + WASM server + Playwright test |
+| `serve_wasm` tool / `serve-wasm.sh` | WASM dev server with COOP/COEP |
+| `toolchain_check` tool / `toolchain-check.sh` | Toolchain prerequisite check |
 | `vqa_pixel_diff` tool / `vqa-pixel-diff.py` | VQA pixel diff against ffmpeg |
 | `parity_compare` tool / `parity-compare.py` | SSIM + fill% + p99 pixel diff |
 | `data_verify` tool / `*-data-verify.py` | MIX checksum verification |
-| `wine_check` tool / `skill-wine-check.sh` | Wine prerequisite check |
+| `wine_check` tool / `wine-check.sh` | Wine prerequisite check |
 | `wine_capture` tool / `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
-| `skill-xvfb-ensure.sh` | Idempotent Xvfb launcher (source it) |
-| `skill-vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff |
+| `xvfb-ensure.sh` | Idempotent Xvfb launcher (source it) |
+| `vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff |
 | `parity-report.sh` | Three-way parity report (vqa + gameplay modes) |
 | `lint-lp64.py` | LP64 static hazard audit |
 | `cinematic-compare.py` | Cinematic/VQA batch comparison |

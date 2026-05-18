@@ -688,12 +688,12 @@ export default function (pi: ExtensionAPI) {
     promptSnippet: "Check that Clang, CMake, Ninja, SDL2, and Python are all present for native builds",
     promptGuidelines: [
       "Use toolchain_check before attempting a native build to catch missing dependencies early",
-      "Runs scripts/skill-dev-check.sh which checks clang++, cmake >=3.20, ninja, python3, pkg-config, SDL2",
+      "Runs scripts/toolchain-check.sh which checks clang++, cmake >=3.20, ninja, python3, pkg-config, SDL2",
     ],
     parameters: Type.Object({}),
     async execute(_toolCallId: string, _params: any, _signal: AbortSignal | undefined, onUpdate: any, _ctx: any) {
       onUpdate?.({ content: [{ type: "text", text: "Checking native build toolchain..." }] });
-      const script = repoPath("scripts", "skill-dev-check.sh");
+      const script = repoPath("scripts", "toolchain-check.sh");
       if (!fs.existsSync(script)) {
         return { content: [{ type: "text", text: `❌ Helper script not found: ${script}` }], isError: true };
       }
@@ -885,7 +885,7 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
     parameters: Type.Object({}),
     async execute(_toolCallId: string, _params: any, _signal: AbortSignal | undefined, onUpdate: any, _ctx: any) {
       onUpdate?.({ content: [{ type: "text", text: "Checking Wine environment..." }] });
-      const script = repoPath("scripts", "skill-wine-check.sh");
+      const script = repoPath("scripts", "wine-check.sh");
       if (!fs.existsSync(script)) {
         return { content: [{ type: "text", text: `❌ Helper script not found: ${script}` }], isError: true };
       }
@@ -1369,11 +1369,11 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
         const lint = run("python3", ["scripts/lint-lp64.py", "--errors-only"], { timeout: 120_000 });
         if (lint.exitCode !== 0) return { content: [{ type: "text", text: `❌ LP64 lint failed:\n${lint.stderr || lint.stdout}` }], isError: true };
 
-        const build = run("bash", ["scripts/skill-native-build.sh"], { timeout: 600_000 });
+        const build = run("bash", ["scripts/build-native.sh"], { timeout: 600_000 });
         if (build.exitCode !== 0) return { content: [{ type: "text", text: `❌ Build failed:\n${build.stderr || build.stdout}` }], isError: true };
 
         onUpdate?.({ content: [{ type: "text", text: "Build OK. Running WASM smoke test..." }] });
-        const test = run("bash", ["scripts/skill-run-e2e.sh", "e2e/regression/T1-ra-wasm-boot.spec.ts"], { timeout: 300_000 });
+        const test = run("bash", ["scripts/run-e2e.sh", "e2e/regression/T1-ra-wasm-boot.spec.ts"], { timeout: 300_000 });
         return test.exitCode === 0
           ? { content: [{ type: "text", text: `✅ Native edit loop: all passed\n${build.stdout}` }] }
           : { content: [{ type: "text", text: `❌ Smoke test failed:\n${test.stderr || test.stdout}` }], isError: true };
@@ -1395,7 +1395,7 @@ ${cfg.stderr || cfg.stdout}` }], isError: true };
         }
 
         onUpdate?.({ content: [{ type: "text", text: "Running WASM smoke tests..." }] });
-        const test = run("bash", ["scripts/skill-run-e2e.sh", "e2e/regression/T1-ra-wasm-boot.spec.ts", "e2e/regression/T2-td-wasm-boot.spec.ts"], { timeout: 300_000 });
+        const test = run("bash", ["scripts/run-e2e.sh", "e2e/regression/T1-ra-wasm-boot.spec.ts", "e2e/regression/T2-td-wasm-boot.spec.ts"], { timeout: 300_000 });
         return test.exitCode === 0
           ? { content: [{ type: "text", text: "✅ WASM loop: all passed" }] }
           : { content: [{ type: "text", text: `❌ WASM smoke failed:\n${test.stderr || test.stdout}` }], isError: true };

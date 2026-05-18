@@ -3,8 +3,8 @@
 # Used by: e2e-testing, ci-cd, parity-comparison skills.
 #
 # Usage:
-#   source scripts/skill-wasm-serve.sh           # serve-coop.py on :8080
-#   source scripts/skill-wasm-serve.sh 8081      # custom port
+#   source scripts/serve-wasm.sh           # serve-coop.py on :8080
+#   source scripts/serve-wasm.sh 8081      # custom port
 #
 # After sourcing, WASM_SERVER_PID and WASM_SERVER_PORT are exported.
 # The script sets an EXIT trap to kill the server automatically.

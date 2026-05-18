@@ -995,7 +995,7 @@ Expected: zero hits in `scripts/`. If any remain, go back and fix them.
 
 - [ ] **Step 2: Add CI gate to `scripts/ci-local.sh`**
 
-Add a check at the end of `scripts/ci-local.sh` (or to `scripts/skill-ci-wasm-smoke.sh` if more appropriate):
+Add a check at the end of `scripts/ci-local.sh` (or to `scripts/ci-wasm-smoke.sh` if more appropriate):
 
 ```bash
 # ── Phase 6: /opt audit ──────────────────────────────────────────────────

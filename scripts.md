@@ -9,16 +9,16 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 
 | Action | Extension Tool | Nix App | Script(s) | CI Job | npm Script |
 |--------|---------------|---------|-----------|--------|------------|
-| Build native | `native_build` | `build-native` | `scripts/skill-native-build.sh` | `ci.yml → build` | — |
+| Build native | `native_build` | `build-native` | `scripts/build-native.sh` | `ci.yml → build` | — |
 | Build WASM | `wasm_build` | `build-wasm` | inline (flake.nix) | `ci.yml → build-wasm` | — |
 | Validate WASM | `wasm_validate` | `validate-wasm` | inline (flake.nix) | `ci.yml → build-wasm` | — |
 | Serve WASM | `serve_wasm` | `serve-wasm` | `wasm/serve-coop.py` | — | — |
 | Serve assets | `serve_assets` | `serve-assets` | `wasm/serve-assets.py` | — | — |
 | Serve both | — | `serve` | inline (flake.nix) | — | — |
 | WASM screenshot | `wasm_screenshot` | `screenshot` | inline (flake.nix) | — | — |
-| Run e2e test | `run_e2e_test` | `test` | `scripts/skill-run-e2e.sh` | — | `test:e2e` |
-| Run T1 (RA boot) | — | `test-t1` | `scripts/skill-run-e2e.sh` | `ci.yml → build-wasm` | — |
-| Run T2 (TD boot) | — | `test-t2` | `scripts/skill-run-e2e.sh` | `ci.yml → build-wasm` | — |
+| Run e2e test | `run_e2e_test` | `test` | `scripts/run-e2e.sh` | — | `test:e2e` |
+| Run T1 (RA boot) | — | `test-t1` | `scripts/run-e2e.sh` | `ci.yml → build-wasm` | — |
+| Run T2 (TD boot) | — | `test-t2` | `scripts/run-e2e.sh` | `ci.yml → build-wasm` | — |
 | CI gate (local) | `ci_local` | `ci` | `scripts/ci-local.sh` | — | — |
 | CI native build | — | `ci-build-native` | inline (flake.nix) | `ci.yml → build` | — |
 | CI WASM build+smoke | — | `ci-build-wasm` | inline (flake.nix) | `ci.yml → build-wasm` | — |
@@ -28,8 +28,8 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | CI ccache setup | — | `ci-cc-setup` | inline (flake.nix) | `gh-pages.yml` | — |
 | CI clang-tidy | — | `ci-clang-tidy` | inline (flake.nix) | `ci.yml → clang-tidy` | — |
 | CI cppcheck | — | `ci-cppcheck` | inline (flake.nix) | `ci.yml → cppcheck` | — |
-| Toolchain check | `toolchain_check` | `toolchain-check` | `scripts/skill-dev-check.sh` | — | — |
-| Wine check | `wine_check` | — | `scripts/skill-wine-check.sh` | — | — |
+| Toolchain check | `toolchain_check` | `toolchain-check` | `scripts/toolchain-check.sh` | — | — |
+| Wine check | `wine_check` | — | `scripts/wine-check.sh` | — | — |
 | Wine capture | `wine_capture` | `capture-wine` | `scripts/wine-cnc-capture.sh` | `ci.yml → wine-comparison` | — |
 | Native capture | `native_capture` ⚠️ | `capture-native` | `scripts/capture-checkpoint.py` | — | — |
 | Capture orchestrator | — | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
@@ -66,7 +66,7 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Native build | `nix run .#build-native [ra\|td\|both] [clang]` | Configure + build RA and/or TD native Linux with cmake + ninja. Calls `scripts/skill-native-build.sh`. |
+| Native build | `nix run .#build-native [ra\|td\|both] [clang]` | Configure + build RA and/or TD native Linux with cmake + ninja. Calls `scripts/build-native.sh`. |
 | | `native_build(target, compiler, clean)` | Same, via extension tool. |
 | | `scripts/ci-local.sh` | Also runs native build as G1. |
 | WASM build | `nix run .#build-wasm [ra\|td\|both]` | Build ra.wasm and/or td.wasm via emcmake + cmake + ninja. |
@@ -174,9 +174,9 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | | `scripts/ra-data-verify.py [dir]` | Same, directly. |
 | Toolchain check | `nix run .#toolchain-check` | Verify native build toolchain (clang++, cmake, ninja, SDL2, etc.). |
 | | `toolchain_check()` | Same, via extension tool. |
-| | `scripts/skill-dev-check.sh` | Same, directly. |
+| | `scripts/toolchain-check.sh` | Same, directly. |
 | Wine check | `wine_check()` | Check Wine + xdotool + ffmpeg + ImageMagick installed. |
-| | `scripts/skill-wine-check.sh` | Same, directly. |
+| | `scripts/wine-check.sh` | Same, directly. |
 | Layout probe | `scripts/probe-layout.cpp` | C++ layout probe: prints sizeof/offsetof for LP64 struct audit. |
 
 ### Serve / Dev Server
@@ -328,14 +328,14 @@ Every executable entry point, listed A–Z with its surface(s).
 | `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
 | `include-shim` | nix app | Lint | Regenerate include shim. |
-| `skill-ci-wasm-smoke.sh` | script | CI | Full local WASM CI smoke. |
-| `skill-dev-check.sh` | script | Lint | Toolchain prerequisite check. |
-| `skill-native-build.sh` | script | Build | Single-command native build. |
-| `skill-run-e2e.sh` | script | Test | Xvfb + WASM server + Playwright test. |
-| `skill-vqa-check.sh` | script | Parity | VQA codec CI gate. |
-| `skill-wasm-serve.sh` | script | Serve | WASM dev server helper. |
-| `skill-wine-check.sh` | script | Lint | Wine toolchain check. |
-| `skill-xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
+| `ci-wasm-smoke.sh` | script | CI | Full local WASM CI smoke. |
+| `build-native.sh` | script | Build | Single-command native build. |
+| `run-e2e.sh` | script | Test | Xvfb + WASM server + Playwright test. |
+| `serve-wasm.sh` | script | Serve | WASM dev server helper. |
+| `toolchain-check.sh` | script | Lint | Toolchain prerequisite check. |
+| `vqa-check.sh` | script | Parity | VQA codec CI gate. |
+| `wine-check.sh` | script | Lint | Wine toolchain check. |
+| `xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
 | `smoke-ra` | nix app | Test | RA native smoke test. |
 | `smoke-td` | nix app | Test | TD native smoke test. |
 | `soviet-cdlabel-patch.py` | script | Patch (RA) | Zero CD2 label for Soviet. |
@@ -423,11 +423,11 @@ Actions that have multiple invocation paths (candidates for consolidation):
 
 | Action | Duplicate Paths | Recommendation |
 |--------|----------------|---------------|
-| Native build | `native_build` (tool) ↔ `build-native` (nix) ↔ `skill-native-build.sh` (script) | Pick one canonical Nix app name. Make tool and script call it. |
+| Native build | `native_build` (tool) ↔ `build-native` (nix) ↔ `build-native.sh` (script) | ✅ Canonical |
 | WASM build | `wasm_build` (tool) ↔ `build-wasm` (nix) | Same — nix is primary. |
 | CI gate | `ci_local` (tool) ↔ `ci` (nix) ↔ `ci-local.sh` (script) | Keep `ci` as canonical. |
 | Edit loop | `edit_loop` (tool) ↔ `edit-loop` (nix) | Minor — both inline. |
-| E2E test | `run_e2e_test` (tool) ↔ `test` (nix) ↔ `skill-run-e2e.sh` (script) | Keep `test` as canonical. |
+| E2E test | `run_e2e_test` (tool) ↔ `test` (nix) ↔ `run-e2e.sh` (script) | Keep `test` as canonical. |
 | Parity compare | `parity_compare` (tool) ↔ `parity-compare` (nix) ↔ `parity-compare.py` (script) | ✅ Canonical |
 | Parity report | `parity_report` (tool) ↔ `parity-report` (nix) ↔ `parity-report.sh` (script) | ✅ Canonical |
 | VQA pixel diff | `vqa_pixel_diff` (tool) ↔ `vqa-check` (nix) ↔ `vqa-pixel-diff.py` (script) | Keep `vqa-check` as canonical. |
@@ -435,7 +435,7 @@ Actions that have multiple invocation paths (candidates for consolidation):
 | Gen VQA golden | `gen_vqa_golden` (tool) ↔ `vqa-golden` (nix) ↔ `gen-vqa-golden.py` (script) | Keep `vqa-golden` as canonical. |
 | Include shim | `include_shim` (tool) ↔ `include-shim` (nix) ↔ `generate-include-shim.py` (script) | ✅ Canonical |
 | Data verify | `data_verify` (tool) ↔ `data-verify` (nix) ↔ `ra-data-verify.py` (script) | ✅ Canonical |
-| Toolchain check | `toolchain_check` (tool) ↔ `toolchain-check` (nix) ↔ `skill-dev-check.sh` (script) | ✅ Canonical |
+| Toolchain check | `toolchain_check` (tool) ↔ `toolchain-check` (nix) ↔ `toolchain-check.sh` (script) | ✅ Canonical |
 | Wine capture | `wine_capture` (tool) ↔ `capture-wine` (nix) | Keep `capture-wine` as canonical. |
 | Native capture | `native_capture` (tool) ⚠️ | **STALE** — tool calls archived script. Fix to use `capture-native` / `capture-checkpoint.py`. |
 
@@ -458,7 +458,7 @@ Actions that have multiple invocation paths (candidates for consolidation):
 |---------|-----------|---------|
 | Extension tools | `snake_case` | `native_build`, `parity_compare` |
 | Nix apps | `kebab-case` | `build-native`, `parity-compare` |
-| Shell scripts | `kebab-case.sh` | `ci-local.sh`, `skill-run-e2e.sh` |
+| Shell scripts | `kebab-case.sh` | `ci-local.sh`, `run-e2e.sh` |
 | Python scripts | `kebab-case.py` | `lint-lp64.py`, `parity-compare.py` |
 | npm scripts | `:` delimited | `test:e2e:ra`, `test:e2e:td` |
 

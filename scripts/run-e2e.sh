@@ -3,9 +3,9 @@
 # Used by: e2e-testing, ci-cd skills.
 #
 # Usage:
-#   bash scripts/skill-run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
-#   bash scripts/skill-run-e2e.sh e2e/tim710-wasm-parity.spec.ts --grep "Tier 1"
-#   bash scripts/skill-run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
+#   bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+#   bash scripts/run-e2e.sh e2e/tim710-wasm-parity.spec.ts --grep "Tier 1"
+#   bash scripts/run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
 #
 # All arguments after the spec file are forwarded to playwright test.
 #
@@ -26,11 +26,11 @@ cd "$REPO_ROOT"
 
 # Start Xvfb
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/skill-xvfb-ensure.sh" :99 1280x1024x24
+source "$SCRIPT_DIR/xvfb-ensure.sh" :99 1280x1024x24
 
 # Start WASM server
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/skill-wasm-serve.sh" 8080
+source "$SCRIPT_DIR/serve-wasm.sh" 8080
 
 # Run Playwright test
 echo "[e2e] Running: playwright test $*"

@@ -83,14 +83,14 @@ multi-step command sequences. Each script handles setup, teardown, and error rec
 
 | Script | Purpose | Referenced by |
 |--------|---------|---------------|
-| `scripts/skill-dev-check.sh` | One-command toolchain prerequisite gate | native-build |
-| `scripts/skill-wine-check.sh` | One-command Wine prerequisite gate | wine-testing |
-| `scripts/skill-xvfb-ensure.sh` | Idempotent Xvfb start (kills stale, wait loop, EXIT trap) | native-build, e2e-testing, parity-comparison, ci-cd |
-| `scripts/skill-wasm-serve.sh` | Start serve-coop.py with auto-cleanup EXIT trap | e2e-testing, ci-cd |
-| `scripts/skill-run-e2e.sh` | Full E2E: Xvfb + server + Playwright test + cleanup | e2e-testing, ci-cd |
-| `scripts/skill-native-build.sh` | Single-cmd cmake configure + build RA + build TD | native-build, ci-cd |
-| `scripts/skill-vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff | ci-cd, vqa-codec |
-| `scripts/skill-ci-wasm-smoke.sh` | Full WASM CI: emcmake, build, validate, T1+T2 smoke | ci-cd |
+| `scripts/toolchain-check.sh` | One-command toolchain prerequisite gate | native-build |
+| `scripts/wine-check.sh` | One-command Wine prerequisite gate | wine-testing |
+| `scripts/xvfb-ensure.sh` | Idempotent Xvfb start (kills stale, wait loop, EXIT trap) | native-build, e2e-testing, parity-comparison, ci-cd |
+| `scripts/serve-wasm.sh` | Start serve-coop.py with auto-cleanup EXIT trap | e2e-testing, ci-cd |
+| `scripts/run-e2e.sh` | Full E2E: Xvfb + server + Playwright test + cleanup | e2e-testing, ci-cd |
+| `scripts/build-native.sh` | Single-cmd cmake configure + build RA + build TD | native-build, ci-cd |
+| `scripts/vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff | ci-cd, vqa-codec |
+| `scripts/ci-wasm-smoke.sh` | Full WASM CI: emcmake, build, validate, T1+T2 smoke | ci-cd |
 | `scripts/ci-local.sh` | Local CI: run all available gates with one command, auto-skip missing deps | all skills |
 | `scripts/check-gha-versions.sh` | Scan workflow files for stale action versions | gha-updater |
 | `scripts/generate-include-shim.py` | Case-folding include symlink generator | native-build |

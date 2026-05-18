@@ -122,13 +122,9 @@ CI runs headless under Xvfb. The renderer uses `SDL_RENDERER_SOFTWARE` (no GPU).
 
 ```bash
 # Idempotent Xvfb start (reuses existing, kills stale, sets DISPLAY + EXIT trap):
-source scripts/skill-xvfb-ensure.sh :99 640x480x24
+source scripts/xvfb-ensure.sh :99 640x480x24
 
-# Run game
-DISPLAY=:99 SDL_AUDIODRIVER=dummy RA_AUTOSTART=1 ./build/ra
-```
-
-Xvfb is auto-killed on shell exit via the EXIT trap set by `skill-xvfb-ensure.sh`.
+Xvfb is auto-killed on shell exit via the EXIT trap set by `xvfb-ensure.sh`.
 
 **Palette limitation:** `import -window root` returns blank images when the game uses
 8-bit indexed surfaces under Xvfb with some SDL2 backends. For screenshot capture under

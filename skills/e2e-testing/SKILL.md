@@ -22,7 +22,7 @@ The WASM build requires COOP + COEP headers for SharedArrayBuffer (used by pthre
 ### One-command serve (with auto-cleanup)
 
 ```bash
-source scripts/skill-wasm-serve.sh
+source scripts/serve-wasm.sh
 # Serves build-wasm/ on :8080 with COOP/COEP headers.
 # WASM_SERVER_PID and WASM_SERVER_PORT are exported.
 # Server is auto-killed on shell exit via EXIT trap.
@@ -217,7 +217,7 @@ Set in `playwright.config.ts`.
 
 ```bash
 # Idempotent Xvfb start (reuses existing, kills stale, wait loop + EXIT trap):
-source scripts/skill-xvfb-ensure.sh :99 1280x1024x24
+source scripts/xvfb-ensure.sh :99 1280x1024x24
 ```
 
 Multiple Xvfb instances can coexist (use different display numbers: :98, :99).

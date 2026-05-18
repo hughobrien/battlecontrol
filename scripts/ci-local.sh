@@ -66,7 +66,7 @@ echo ""
 # ======================================================================
 if [[ "$MODE" != "--wasm-only" ]] && check_native; then
 	echo "--- G1: Native build (ra + td) ---"
-	if bash scripts/skill-native-build.sh; then
+	if bash scripts/build-native.sh; then
 		gate_pass "G1: native build"
 	else
 		gate_fail "G1: native build"
@@ -100,7 +100,7 @@ fi
 if [[ "$MODE" != "--native-only" ]] && check_wasm; then
 	echo ""
 	echo "--- G3: WASM build ---"
-	if bash scripts/skill-ci-wasm-smoke.sh; then
+	if bash scripts/ci-wasm-smoke.sh; then
 		gate_pass "G3: WASM build + validate + smoke"
 	else
 		gate_fail "G3: WASM build + smoke"

@@ -17,7 +17,7 @@ screenshots in a headless Xvfb environment for automated pixel-level parity vali
 ## Phase 0 — Check prerequisites
 
 ```bash
-bash scripts/skill-wine-check.sh
+bash scripts/wine-check.sh
 ```
 
 One-command gate. Exits 0 if wine, wine32, xvfb-run, xdotool, ffmpeg, and

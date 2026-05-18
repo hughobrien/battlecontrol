@@ -157,7 +157,7 @@ Output screenshots:
 The native build has TIM-490 hooks that save BMP screenshots at game loop
 frames 10, 50, and 100. Run with:
 ```bash
-source scripts/skill-xvfb-ensure.sh :99 640x480x24
+source scripts/xvfb-ensure.sh :99 640x480x24
 DISPLAY=:99 SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
   RA_AUTOSTART=1 timeout 30 ./build/ra
 # BMPs saved to /tmp/redalert-gameplay-f{010,050,100}.bmp
@@ -165,7 +165,7 @@ DISPLAY=:99 SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
 
 **Native Linux (manual capture with ImageMagick):**
 ```bash
-source scripts/skill-xvfb-ensure.sh :99 640x480x24
+source scripts/xvfb-ensure.sh :99 640x480x24
 DISPLAY=:99 SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software \
   RA_AUTOSTART=1 ./build/ra &
 sleep 5

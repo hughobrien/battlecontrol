@@ -16,9 +16,9 @@ check, a Phase 1 symptom-classification table, root-cause sections with code
 examples, and a verification bar. An agent landing on a symptom can jump
 straight to the fix without re-deriving context.
 
-### 2. Skill companion scripts (`skill-*`) are idempotent and self-cleaning
-Scripts like `skill-xvfb-ensure.sh`, `skill-wasm-serve.sh`, and
-`skill-run-e2e.sh` register `EXIT` traps, kill stale services, and wait for
+### 2. Companion scripts are idempotent and self-cleaning
+Scripts like `xvfb-ensure.sh`, `serve-wasm.sh`, and
+`run-e2e.sh` register `EXIT` traps, kill stale services, and wait for
 readiness. They collapse multi-step manual sequences into single invocations
 and work correctly on repeat runs. This is the right design pattern.
 
@@ -65,11 +65,11 @@ are written for the agent's workflow — they're written for human engineers.
 ### 3. Skills reference scripts that don't exist (or may not)
 The skills README table lists companion scripts including:
 
-- `scripts/skill-wine-check.sh` — referenced by `wine-testing` Phase 0, but
+- `scripts/wine-check.sh` — referenced by `wine-testing` Phase 0, but
   could not be found in `scripts/`
 - `scripts/setup-run-td.sh` — referenced by `native-build` §2.6, not present
-- `scripts/skill-xvfb-ensure.sh` — present, good
-- `scripts/skill-wasm-serve.sh` — present, good
+- `scripts/xvfb-ensure.sh` — present, good
+- `scripts/serve-wasm.sh` — present, good
 
 ### 4. CLAUDE.md assumes Claude/Paperclip agent infrastructure
 `CLAUDE.md` describes agent roles (`FoundingEngineer`, `StaffEngineer`,
@@ -185,12 +185,12 @@ The `CLAUDE.md` file should remain for Paperclip-specific protocol, but
 #### R4. Consolidate skill references into each skill file
 
 Each skill should inline or clearly reference only scripts that actually exist.
-Remove references to `skill-wine-check.sh` and `setup-run-td.sh` if those
+Remove references to `wine-check.sh` and `setup-run-td.sh` if those
 scripts aren't committed. Instead, inline the prerequisite check commands
 directly into the skill body.
 
 When a skill references a companion script, it should use the canonical path
-from the repo root (e.g., `bash scripts/skill-xvfb-ensure.sh :99 640x480x24`).
+from the repo root (e.g., `bash scripts/xvfb-ensure.sh :99 640x480x24`).
 
 ---
 
@@ -214,8 +214,8 @@ name: e2e-testing
 version: 0.1.0
 depends_on:
   - skill: emscripten          # needs WASM build
-  - script: skill-xvfb-ensure.sh
-  - script: skill-wasm-serve.sh
+  - script: xvfb-ensure.sh
+  - script: serve-wasm.sh
 ---
 ```
 
@@ -270,8 +270,8 @@ done
 
 #### R11. Tag which scripts are CI-only vs local-safe
 
-Some scripts (`skill-ci-wasm-smoke.sh`) run the full CI build + smoke cycle
-and take 5–10 minutes. Others (`skill-dev-check.sh`) take under a second.
+Some scripts (`ci-wasm-smoke.sh`) run the full CI build + smoke cycle
+and take 5–10 minutes. Others (`toolchain-check.sh`) take under a second.
 Add a comment convention:
 
 ```bash
