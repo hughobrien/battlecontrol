@@ -23,6 +23,8 @@ instructions with symptom→diagnosis→fix tables and a verification bar.
 | **parity-comparison** | [`skills/parity-comparison/`](parity-comparison/SKILL.md) | WASM/Linux vs Wine/RA95 visual parity validation, SSIM comparison | [WineExpert](/TIM/agents/wineexpert), [PlaywrightEngineer](/TIM/agents/playwrightengineer) |
 | **nix-shell-escaping** | [`skills/nix-shell-escaping/`](nix-shell-escaping/SKILL.md) | Nix shell quoting, two-layer shell escaping, flake apps | [FoundingEngineer](/TIM/agents/foundingengineer) |
 | **gha-updater** | [`skills/gha-updater/`](gha-updater/SKILL.md) | GitHub Actions version pins, Node.js deprecation detection | [CICDExpert](/TIM/agents/cicdexpert) |
+| **ra-archive** | [`skills/ra-archive/`](ra-archive/SKILL.md) | RA version identification, patches, trainers, saved games, known bugs, compatibility fixes | [WineExpert](/TIM/agents/wineexpert) |
+| **redalert-modding** | [`skills/redalert-modding/`](redalert-modding/SKILL.md) | RA modding: RULES.INI, AFTRMATH.INI, CONQUER.ENG, scenario INI, MIX files, custom units/structures, map editing | [WineExpert](/TIM/agents/wineexpert) |
 
 ## Skill Format
 
