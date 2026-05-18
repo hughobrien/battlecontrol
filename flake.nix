@@ -387,8 +387,7 @@
           echo "  nix run .#wine-check         Wine toolchain prerequisites"
           echo "  nix run .#toolchain-check    toolchain prerequisites"
           echo "  nix run .#build-native       native Linux build (ra/td/both)"
-          echo "  nix run .#release-build-ra    release build: RA native + package"
-          echo "  nix run .#release-build-td    release build: TD native + package"
+          echo "  nix run .#release            release build: RA + TD native tarballs"
           echo "  nix run .#lint-lp64          LP64 hazard audit"
           echo "  nix run .#lint-all           LP64 + tidy + cppcheck + ruff + yamllint + shellcheck + nixfmt"
           echo "  nix run .#build-wasm         WASM build (ra/td/both)"
@@ -487,23 +486,25 @@
           exec bash scripts/build-native.sh "$@"
         '';
 
-        release-build-ra = mkApp "release-build-ra" ''
+        release = mkApp "release" ''
           set -e
+          echo "=== Building RA native ==="
           bash scripts/first-run-pass-94.sh
           cp build/first-run-pass-94/redalert.elf redalert
           strip redalert
           tar czf redalert-linux-x86_64.tar.gz redalert
-          echo "redalert-linux-x86_64.tar.gz: $(stat -c%s redalert-linux-x86_64.tar.gz) bytes"
-        '';
-
-        release-build-td = mkApp "release-build-td" ''
-          set -e
+          echo "  redalert-linux-x86_64.tar.gz: $(stat -c%s redalert-linux-x86_64.tar.gz) bytes"
+          echo ""
+          echo "=== Building TD native ==="
           cmake --preset linux-native
           cmake --build build --target td --parallel
           strip build/td
           cp build/td td
           tar czf td-linux-x86_64.tar.gz td
-          echo "td-linux-x86_64.tar.gz: $(stat -c%s td-linux-x86_64.tar.gz) bytes"
+          echo "  td-linux-x86_64.tar.gz: $(stat -c%s td-linux-x86_64.tar.gz) bytes"
+          echo ""
+          echo "=== Release artifacts ==="
+          ls -lh redalert-linux-x86_64.tar.gz td-linux-x86_64.tar.gz
         '';
 
         lint-lp64 = mkApp "lint-lp64" ''

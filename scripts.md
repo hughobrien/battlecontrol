@@ -39,8 +39,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |Include shim|`include-shim`|`scripts/generate-include-shim.py`|—|—|
 |Edit loop (native)|`edit-loop`|inline (flake.nix)|—|—|
 |WASM loop|`wasm-loop`|inline (flake.nix)|—|—|
-|Release build RA|`release-build-ra`|`scripts/first-run-pass-94.sh` + strip + tar|`release.yml`|—|
-|Release build TD|`release-build-td`|cmake + build + tar|`release.yml`|—|
+|Release (RA+TD native)|`release`|`scripts/first-run-pass-94.sh` + cmake + tar|`release.yml`|—|
 |Build stub THIPX|`build-stub-thipx`|`scripts/build-stub-thipx.sh`|—|—|
 |Regression suite|`regression`|`scripts/regression-suite.sh`|—|—|
 |Smoke test (RA)|`smoke-ra`|`scripts/first-run-pass-94.sh`|—|—|
@@ -63,8 +62,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | WASM build | `nix run .#build-wasm [ra\|td\|both]` | Build ra.wasm and/or td.wasm via emcmake + cmake + ninja. |
 | THIPX stub | `nix run .#build-stub-thipx` | Build stub THIPX32.DLL for Wine 11 wow64 compat. |
 | | `scripts/build-stub-thipx.sh` | Same, directly. |
-| RA release | `nix run .#release-build-ra` | Build + strip + tarball RA for release (`redalert-linux-x86_64.tar.gz`). |
-| TD release | `nix run .#release-build-td` | Build + strip + tarball TD for release (`td-linux-x86_64.tar.gz`). |
+| Release (RA+TD) | `nix run .#release` | Build + strip + tarball both binaries. |
 ### Test / QA
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -249,8 +247,8 @@ Every executable entry point, listed A–Z with its surface(s).
 | `redalert` | nix app | Run | Run native RA binary. |
 | `regression` | nix app | Test | Run regression suite (T1-T12). |
 | `regression-suite.sh` | script | Test | Orchestrate E2E regression tests. |
-| `release-build-ra` | nix app | Build | Build + package RA release tarball. |
-| `release-build-td` | nix app | Build | Build + package TD release tarball. |
+| `release-build-ra` | nix app | Build | Removed — merged into `release`. |
+| `release-build-td` | nix app | Build | Removed — merged into `release`. |
 | `parity-report` | nix app | Parity | Three-way parity report. |
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
 | `screenshot` | nix app | Test | WASM screenshot capture. |
