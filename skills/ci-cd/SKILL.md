@@ -59,7 +59,7 @@ limit output. Common causes:
 
 - New `#include` without regenerating include shim → run `generate-include-shim.py`
 - Missing `-DWIN32=1` on TD target → check CMakeLists.txt
-- SDL2 headers not found → `sudo apt-get install libsdl2-dev`
+- SDL2 headers missing — ensure Nix dev shell is active
 - Struct layout mismatch → run `lint-lp64.py`, fix E1–E4 errors
 
 ### §2.2 — VQA pixel-diff job: synthetic VQA mismatch

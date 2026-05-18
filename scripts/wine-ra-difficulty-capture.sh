@@ -3,12 +3,12 @@
 # Uses cnc-ddraw with GDI renderer for X11-capturable frames.
 #
 # Usage:
-#   bash scripts/wine-ra-difficulty-capture.sh [DATA_DIR] [ARTIFACT_DIR]
+#  bash scripts/wine-ra-difficulty-capture.sh [DATA_DIR] [ARTIFACT_DIR]
 #
 # Outputs (relative to ARTIFACT_DIR):
-#   wine-difficulty-menu.png       — main menu
-#   wine-difficulty-dialog.png     — difficulty selector
-#   wine-difficulty-faction.png    — faction selector
+#  wine-difficulty-menu.png    — main menu
+#  wine-difficulty-dialog.png   — difficulty selector
+#  wine-difficulty-faction.png  — faction selector
 set -euo pipefail
 
 DATA_DIR="${1:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
@@ -39,9 +39,9 @@ pick_display() {
 }
 
 echo "=== TIM-772 Wine difficulty capture ==="
-echo "  wine: $($WINE --version)"
-echo "  data: $DATA_DIR"
-echo "  cnc-ddraw: $CNC_DDRAW"
+echo " wine: $($WINE --version)"
+echo " data: $DATA_DIR"
+echo " cnc-ddraw: $CNC_DDRAW"
 
 STAGE=$(mktemp -d /tmp/tim772-wine-XXXX)
 for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
@@ -70,13 +70,13 @@ INI
 
 # Wine prefix
 if [[ ! -d "$WINEPREFIX" ]]; then
-	WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
+	WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
 mkdir -p "$WINEPREFIX/dosdevices"
 ln -sfT "$DATA_DIR" "$WINEPREFIX/dosdevices/d:"
 
 XDISP=$(pick_display)
-echo "  display=$XDISP"
+echo " display=$XDISP"
 
 Xvfb "$XDISP" -screen 0 800x600x24 -ac >"$ARTIFACT_DIR/xvfb.log" 2>&1 &
 XVFB_PID=$!
@@ -107,7 +107,7 @@ take_shot() {
 	local name="$1"
 	DISPLAY="$XDISP" ffmpeg -nostdin -loglevel error -f x11grab -video_size 800x600 \
 		-i "$XDISP" -frames:v 1 -y "$ARTIFACT_DIR/$name" 2>/dev/null
-	echo "  $name: $(stat -c%s "$ARTIFACT_DIR/$name" 2>/dev/null || echo 0) bytes"
+	echo " $name: $(stat -c%s "$ARTIFACT_DIR/$name" 2>/dev/null || echo 0) bytes"
 }
 
 send_input() {
@@ -120,7 +120,7 @@ send_input() {
 echo "Waiting for RA window..."
 for i in $(seq 1 30); do
 	if DISPLAY="$XDISP" xdotool search --name "Red Alert" >/dev/null 2>&1; then
-		echo "  window found at t=${i}s"
+		echo " window found at t=${i}s"
 		break
 	fi
 	sleep 1
@@ -156,10 +156,10 @@ PASS=0
 for shot in wine-difficulty-menu.png wine-difficulty-dialog.png wine-difficulty-faction.png; do
 	sz=$(stat -c%s "$ARTIFACT_DIR/$shot" 2>/dev/null || echo 0)
 	if [[ $sz -gt 5000 ]]; then
-		echo "  OK   $shot ($sz bytes)"
+		echo " OK  $shot ($sz bytes)"
 		PASS=$((PASS + 1))
 	else
-		echo "  FAIL $shot ($sz bytes — likely blank)"
+		echo " FAIL $shot ($sz bytes — likely blank)"
 	fi
 done
 echo "Captured $PASS/3 non-empty screenshots"

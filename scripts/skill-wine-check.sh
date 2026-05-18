@@ -34,7 +34,7 @@ check_cmd "wine" wine
 if command -v wine >/dev/null 2>&1; then
 	printf "  %-20s " "wine32"
 	if wine --version 2>&1 | grep -q "wine32 is missing"; then
-		echo "MISSING (run: sudo apt-get install wine32:i386)"
+		echo "MISSING — ensure wine32 is available (nix develop shell has it)"
 		errors=$((errors + 1))
 	else
 		echo "OK"

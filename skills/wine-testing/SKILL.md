@@ -1,7 +1,7 @@
 ---
 name: wine-testing
 description: Use when running original Win32 C&C Red Alert (RA95.EXE) or Tiberian Dawn (C&C95.EXE) under Wine for baseline comparison against native/WASM ports. Trigger on symptoms like Wine prefix failures, DirectDraw rendering blank, DirectSound dialog blocking automation, xdotool timing races, screenshot capture returning blank images, or CI Wine job skipping unexpectedly.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Wine Testing Skill
@@ -30,49 +30,44 @@ imagemagick are all present. Exits 1 with a list of what's missing.
 | Symptom | Lens | Go to |
 |---|---|---|
 | `wine32 is missing` from `wine --version` | 32-bit Wine architecture not installed | §2.1 |
-| Wine prefix creation fails or hangs | Corrupt or missing 32-bit prefix | §2.1 |
+| `WINEARCH=win32` rejected (wow64) | Wine 11.0+ wow64 doesn't support WINEARCH | §2.1 |
+| Wine prefix creation fails or hangs | Corrupt prefix or wow64 compatibility | §2.1 |
 | DirectSound warning dialog blocks automation | Dialog must be dismissed with xdotool | §2.2 |
-| Screenshot is blank (0 bytes or 1-bit PNG) | Capture method mismatch | §2.3 |
-| DirectDraw surface renders black on Xvfb | GDI renderer not configured | §2.4 |
-| Game exits immediately with no output | Missing DLLs or wrong EXE path | §2.5 |
+| Screenshot is blank (0 bytes or 1-bit PNG) | Capture method mismatch or GDI not configured | §2.3 |
+| Game renders dialog but blank after dismiss | GDI renderer not configured | §2.4 |
+| DirectDraw surface renders black on Xvfb | GDI renderer not configured or wrong color depth | §2.4 |
+| Game exits immediately with `THIPX16.DLL` error | 16-bit thunking unsupported in wow64 | §2.5 |
+| Title screen shows but menu crashes (video buffer) | No GL context on Xvfb — title only | §2.4 |
 | `wine-ra.sh` / `wine-td.sh` exit 2 (SKIP) | EXE or data not found — first-time setup needed | §3 |
 
 ---
 
-## §2.1 — Wine 32-bit setup
+## §2.1 — Wine setup (wow64 or classic)
 
-RA95.EXE and C&C95.EXE are 32-bit Windows executables. They require `wine32:i386`.
+RA95.EXE and C&C95.EXE are 32-bit Windows executables. Wine 11.0+ (wow64 from Nix)
+runs them without additional architecture setup. Classic Debian/Ubuntu Wine needs
+`wine32:i386`.
 
-```bash
-# On Debian/Ubuntu:
-sudo dpkg --add-architecture i386
-sudo apt-get update
-sudo apt-get install wine32:i386
+**Wine 11.0+ wow64** (Nix — in `nix develop` shell):
+- No `WINEARCH=win32` needed — wow64 handles both architectures natively.
+- **Do not use `WINEARCH=win32`** — it will fail with `not supported in wow64 mode`.
+- Prefix creation: `WINEPREFIX="$HOME/.wine-ra" WINEDEBUG=-all wineboot --init`
 
-# Verify:
-wine --version 2>&1 | grep -v "wine32 is missing"
-```
-
-**Prefix creation:** The scripts create a 32-bit Wine prefix automatically on first run:
-```bash
-WINEPREFIX="$HOME/.wine-ra" WINEARCH=win32 WINEDEBUG=-all wineboot --init
-```
-
-**Corrupted prefix recovery:** If the game launches but screenshots are blank,
-garbled, or the prefix creation hangs:
+**Prefix recovery:**
 
 ```bash
 # Inspect current prefix state
-WINEPREFIX="$HOME/.wine-ra" winecfg    # check DLL overrides
 WINEPREFIX="$HOME/.wine-ra" wine reg query 'HKCU\Software\Wine\Direct3D'  # check renderer
+WINEPREFIX="$HOME/.wine-ra" wine reg query 'HKCU\Software\Wine\Explorer\Desktops'  # check desktop
 
-# If corrupt: delete and recreate
+# If corrupt or wrong wine version: delete and recreate
 rm -rf "$HOME/.wine-ra"
-WINEPREFIX="$HOME/.wine-ra" WINEARCH=win32 WINEDEBUG=-all wineboot --init
+WINEPREFIX="$HOME/.wine-ra" WINEDEBUG=-all wineboot --init
 ```
 
-**CI note:** CI runners use a fresh prefix per job (ephemeral), so corruption
-is rarely an issue in CI. Local prefixes accumulate state across runs.
+**CI note:** CI runners use a fresh prefix per job (ephemeral). Local prefixes
+accumulate state across runs. If switching between wow64 and classic Wine, delete
+the old prefix first.
 
 ---
 
@@ -83,16 +78,16 @@ when no physical audio card is present. This must be dismissed for the game to p
 
 The scripts handle this with xdotool:
 ```bash
-# Wait for dialog to appear (~7s after launch), then dismiss
+# Wait for dialog to appear (~7s after launch), then dismiss ONCE
 sleep 7
 DISPLAY=:98 xdotool key Return
-sleep 1
-DISPLAY=:98 xdotool key Return   # Double-tap for safety
 ```
 
-**Timing:** On slower CI runners, the dialog may appear later. If the dismiss fires
-before the dialog exists, the game proceeds past the title screen without capturing
-the menu screenshot. Increase the initial sleep to 9s if menu screenshot is missing.
+**Single dismiss only.** A second Return press can accidentally close the game
+window (observed under Wine 11.0 wow64 — the game exits on the second keypress).
+
+**Timing:** On slower CI runners, the dialog may appear later. Increase the
+initial sleep to 9s if the dialog hasn't appeared yet.
 
 **Audio silencing:** The scripts set `AUDIODEV=null` and `WINEDLLOVERRIDES` to suppress
 ALSA/OSS audio driver errors that fill stderr. These are expected and not game failures.
@@ -101,8 +96,8 @@ ALSA/OSS audio driver errors that fill stderr. These are expected and not game f
 
 ## §2.3 — Screenshot capture method
 
-**Red Alert (RA):** Uses `import -window root` (ImageMagick). Works because RA renders
-at 640x480x24 and Wine's windowed DirectDraw path captures cleanly under Xvfb.
+**Red Alert (RA):** Uses `import -window root` (ImageMagick). RA renders at 640x480x24
+with the GDI renderer.
 
 ```bash
 DISPLAY=:98 import -window root screenshots/wine-ra-menu.png
@@ -115,28 +110,37 @@ DISPLAY=:98 import -window root screenshots/wine-ra-menu.png
 ffmpeg -f x11grab -video_size 640x400 -i :99 -frames:v 1 screenshots/wine-td-menu.png -y
 ```
 
-**Validation:** After capture, verify the file is >5KB. Screenshots under 5KB are
-likely blank (only the GDI dialog frame captured, not the game surface).
+**Validation:** After capture, verify the file is >1000 bytes (not >5000). The title
+screen under the GDI renderer is ~4266 bytes (TrueColor 8-bit sRGB). Screenshots under
+1000 bytes are blank (only the GDI dialog frame captured).
 
 ---
 
-## §2.4 — TD GDI renderer and Xvfb colour depth
+## §2.4 — GDI renderer and Xvfb colour depth
 
-TD's DirectDraw path renders black on headless Xvfb without hardware GL. The solution
-is to force Wine's GDI renderer and use 8-bit colour depth.
+Both RA and TD need the GDI renderer forced under Xvfb (no GPU, no GL context):
 
-Required registry settings (applied automatically by `wine-td.sh`):
-
+**RA (Red Alert):**
 ```bash
-WINEPREFIX="$HOME/.wine-td" WINEARCH=win32 wine reg add \
+WINEPREFIX="$HOME/.wine-ra" wine reg add \
     'HKCU\Software\Wine\Explorer\Desktops' \
-    /v Default /t REG_SZ /d "640x400" /f
-WINEPREFIX="$HOME/.wine-td" WINEARCH=win32 wine reg add \
+    /v Default /t REG_SZ /d "640x480" /f
+WINEPREFIX="$HOME/.wine-ra" wine reg add \
     'HKCU\Software\Wine\Direct3D' \
     /v DirectDrawRenderer /t REG_SZ /d gdi /f
 ```
 
-**CONQUER.INI** must disable hardware blits:
+**TD (Tiberian Dawn):**
+```bash
+WINEPREFIX="$HOME/.wine-td" wine reg add \
+    'HKCU\Software\Wine\Explorer\Desktops' \
+    /v Default /t REG_SZ /d "640x400" /f
+WINEPREFIX="$HOME/.wine-td" wine reg add \
+    'HKCU\Software\Wine\Direct3D' \
+    /v DirectDrawRenderer /t REG_SZ /d gdi /f
+```
+
+**CONQUER.INI** (TD only) must disable hardware blits:
 ```ini
 [Options]
 HardwareFills=0
@@ -145,35 +149,69 @@ AllowHardwareBlitFills=0
 ScreenHeight=400
 ```
 
-**Xvfb colour depth:** TD requires 8-bit (640x400x8), not 24-bit. Wrong depth causes
-blank game surface.
+**REDALERT.INI** (RA) must NOT be a symlink — write it locally with `PlayIntro=no`:
+```ini
+[Sound]
+Card=0
+Port=3F8h
+IRQ=4
+DMA=-1
+[Options]
+HardwareFills=no
+[Intro]
+PlayIntro=no
+```
 
+**Xvfb colour depth:**
 ```bash
-Xvfb :99 -screen 0 640x400x8 -ac &   # TD: 8-bit
+Xvfb :99 -screen 0 640x400x8 -ac &   # TD: 8-bit (required for GDI renderer)
 Xvfb :98 -screen 0 640x480x24 -ac &   # RA: 24-bit
 ```
 
+**Title→Menu limitation:** The game can show the title screen (~4266 bytes, ~277 colors)
+but crashes when transitioning to the main menu with "Error - Unable to allocate primary
+video buffer — aborting." This is because the menu transition requires allocating a new
+DirectDraw primary surface which fails without a hardware GL context. The menu screenshot
+will match the title screen. This affects RA only; TD may have the same limitation under
+Xvfb.
+
 ---
 
-## §2.5 — EXE and DLL prerequisites
+## §2.5 — EXE, DLL, and THIPX32 stub prerequisites
 
 **RA95.EXE** (Red Alert):
-- SHA-256: see `scripts/wine-exe-hashes.json` (stored in a standalone config file)
+- SHA-256 (original): `a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55`
+- SHA-256 (patched, cnc-ddraw): `c9e9be012953c2cd0db68f30861dbe29f9709332c832bf8483998200315a1af7`
 - Source: `redalert_allied.iso` from archive.org, LBA 45220, size 2,181,632 bytes
-- Required DLLs: `THIPX32.DLL`, `THIPX16.DLL` (from same ISO)
+- The patched EXE renders a better title screen (4266 vs 1507 bytes, more colors)
 
 **C&C95.EXE** (Tiberian Dawn — C&C Gold Win95 port):
 - Size: 1,161,216 bytes
-- Required DLL: `THIPX32.DLL`
 
-Use `scripts/wine-ra-setup.sh` and `scripts/wine-td-setup.sh` for first-time setup.
-These download, verify SHA-256, and stage everything needed.
-
-**Updating EXE hashes:** If the source ISO changes, update the hash config:
-```bash
-sha256sum /path/to/RA95.EXE
-# Edit scripts/wine-exe-hashes.json with the new hash
+**THIPX32.DLL — Stub requirement for Wine 11.0 wow64:**
+The original `THIPX32.DLL` uses 16-bit thunking to load `THIPX16.DLL` (a 16-bit NE format
+DLL). Wine 11.0 (wow64) does NOT support this thunking. The DLL initialization fails with:
 ```
+0044:err:thunk:_loadthunk (THIPX16.DLL, Thipx_ThunkData16, THIPX32.DLL): Unable to load 'THIPX16.DLL', error 2
+0044:err:module:loader_init "thipx32.dll" failed to initialize, aborting
+```
+
+A **stub THIPX32.DLL** is provided at `tools/stub-thipx/thipx32.dll`. It exports all
+functions that RA95.EXE imports (by name) but returns sensible defaults. No actual
+networking functionality is provided, which is fine for title/menu screenshots.
+
+Build from source:
+```bash
+cd tools/stub-thipx
+i686-w64-mingw32-gcc -shared -o thipx32.dll stub.c thipx32.def
+```
+
+**Exports provided:**
+`_IPX_Broadcast_Packet95`, `_IPX_Close_Socket95`, `_IPX_Get_Connection_Number95`,
+`_IPX_Get_Local_Target95`, `_IPX_Initialise`, `_IPX_Open_Socket95`,
+`_IPX_Send_Packet95`, `_IPX_Shut_Down95`, `_IPX_Start_Listening95`,
+`_IPX_Get_Outstanding_Buffer95`, `_IPX_Get_Version`, and `_Thipx_ThunkData32`.
+
 
 ---
 
@@ -230,9 +268,9 @@ for campaign-level screenshot comparison beyond the title/menu state.
 
 | Gate | Minimum proof |
 |---|---|
-| **Wine installed** | `wine --version` succeeds, no "wine32 is missing" |
-| **wine-ra.sh** | Title + menu screenshots >5KB each |
-| **wine-td.sh** | Title + menu screenshots >5KB each (may be GDI-only) |
+| **Wine installed** | `wine --version` succeeds, no "wine32 is missing" (may be irrelevant for wow64) |
+| **wine-ra.sh** | Title screenshot >1000 bytes (TrueColor 8-bit sRGB, ~4266 bytes typical) |
+| **wine-td.sh** | Title + menu screenshots >1000 bytes each (may be GDI-only) |
 | **CI gate** | Script exits 0 or 2 (never 1 on data-absent runner) |
 
 After successful capture, run Playwright parity tests:
@@ -245,12 +283,15 @@ WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts --grep "Tier 3"
 
 ## Reference
 
-- `scripts/wine-ra.sh` — RA Wine launcher (208 lines, documented)
-- `scripts/wine-td.sh` — TD Wine launcher (191 lines, documented)
+- `scripts/wine-ra.sh` — RA Wine launcher (~220 lines, documented)
+- `scripts/wine-td.sh` — TD Wine launcher (~200 lines, documented)
 - `scripts/wine-ra-setup.sh` — First-time RA setup
 - `scripts/wine-td-setup.sh` — First-time TD setup
-- `tools/wine-input/` — Synthetic input injectors
-- `nix build path:./tools/cnc-ddraw#cnc-ddraw  # produces result/bin/ddraw.dll` — cnc-ddraw wrapper builder
+- `tools/stub-thipx/` — Stub THIPX32.DLL (source + .def + prebuilt binary)
+- `tools/wine-input/` — Synthetic input injectors (ra-sendinput.exe etc.)
+- `nix build path:./tools/cnc-ddraw#cnc-ddraw` — cnc-ddraw wrapper builder
 - `scripts/wine-soviet-l1.sh`, `scripts/wine-allied-l1.sh` — Campaign-specific captures
+- `scripts/wine-vqa-capture.sh` — VQA cinematic capture under Wine
+- `scripts/wine-gameplay.sh` — Generic gameplay capture under Wine
 - `e2e/tim699-ra-compare.spec.ts` — RA comparison test (Tier 3 = Wine OG)
 - `e2e/tim711-td-compare.spec.ts` — TD comparison test (Tier 3 = Wine OG)

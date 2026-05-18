@@ -7,7 +7,7 @@
 # IsFromInstall=true + side-select Nod (right half) + VQA-skipped briefing.
 #
 # Outputs in $ARTIFACT_DIR (default: e2e/tim869/nod-l1/):
-#   mission-start.png, frame-500.png, wine.log, xvfb.log, openbox.log
+#  mission-start.png, frame-500.png, wine.log, xvfb.log, openbox.log
 #
 # Exit 0 if frame-500.png >=5 KB and >=64 unique colours.
 set -euo pipefail
@@ -44,7 +44,7 @@ done
 	echo "FAIL: cnc-ddraw missing at $CNC_DDRAW_DIR/ddraw.dll"
 	exit 1
 }
-echo "  wine: $($WINE --version)  scenario: $SCENARIO  cnc-ddraw: $CNC_DDRAW_DIR/ddraw.dll"
+echo " wine: $($WINE --version) scenario: $SCENARIO cnc-ddraw: $CNC_DDRAW_DIR/ddraw.dll"
 
 pick_display() {
 	for d in 86 87 88 89 90 92 93 94 96 97 98; do
@@ -57,7 +57,7 @@ pick_display() {
 	exit 1
 }
 XDISP="${XDISP:-$(pick_display)}"
-echo "  display: $XDISP  artifacts: $ARTIFACT_DIR"
+echo " display: $XDISP artifacts: $ARTIFACT_DIR"
 
 # Stage
 STAGE=$(mktemp -d "/tmp/tim869-nod-l1-XXXX")
@@ -77,9 +77,9 @@ python3 "$THIS_DIR/td-ddmode-patch.py" "$STAGE/C&C95.EXE"
 python3 "$THIS_DIR/td-setcoop-hwnd-patch.py" "$STAGE/C&C95.EXE"
 python3 "$THIS_DIR/td-ioport-patch.py" "$STAGE/C&C95.EXE"
 python3 "$THIS_DIR/td-side-preview-skip-patch.py" "$STAGE/C&C95.EXE"
-echo "  td-scenario-patch.py: $SCENARIO"
+echo " td-scenario-patch.py: $SCENARIO"
 python3 "$THIS_DIR/td-scenario-patch.py" "$STAGE/C&C95.EXE" "$SCENARIO"
-echo "  final sha256: $(sha256sum "$STAGE/C&C95.EXE" | cut -d' ' -f1)"
+echo " final sha256: $(sha256sum "$STAGE/C&C95.EXE" | cut -d' ' -f1)"
 
 printf 'NOD95' >"$STAGE/.windows-label"
 [[ -f "$TD_DLL_DIR/THIPX32.DLL" ]] && cp "$TD_DLL_DIR/THIPX32.DLL" "$STAGE/THIPX32.DLL"
@@ -99,16 +99,16 @@ EOF
 python3 - "$DATA_DIR/TEMPERAT.MIX" "$STAGE/TEMPERAT.PAL" <<'PYEOF'
 import struct, sys
 with open(sys.argv[1], 'rb') as f:
-    data = f.read()
+  data = f.read()
 num_files = struct.unpack_from('<H', data, 0)[0]
 body_offset = 6 + num_files * 12
 for i in range(num_files):
-    off = 6 + i * 12
-    _, foff, fsize = struct.unpack_from('<III', data, off)
-    if fsize == 768:
-        pal = data[body_offset + foff:body_offset + foff + 768]
-        with open(sys.argv[2], 'wb') as f: f.write(pal)
-        break
+  off = 6 + i * 12
+  _, foff, fsize = struct.unpack_from('<III', data, off)
+  if fsize == 768:
+    pal = data[body_offset + foff:body_offset + foff + 768]
+    with open(sys.argv[2], 'wb') as f: f.write(pal)
+    break
 PYEOF
 
 printf '[Options]\r\nIsFromInstall=true\r\nPlayIntro=No\r\n' >"$STAGE/CONQUER.INI"
@@ -118,7 +118,7 @@ for f in INTRO.VQP SCORE.VQP NODEND1.VQP NODEND2.VQP GDIFINAL.VQP; do touch "$ST
 
 # Wine prefix
 if [[ ! -d "$WINEPREFIX" ]]; then
-	WINEPREFIX="$WINEPREFIX" WINEARCH=win32 WINEDEBUG=-all "$WINE" wineboot --init 2>/dev/null
+	WINEPREFIX="$WINEPREFIX" WINEDEBUG=-all "$WINE" wineboot --init 2>/dev/null
 fi
 mkdir -p "$WINEPREFIX/dosdevices"
 ln -sfT "$STAGE" "$WINEPREFIX/dosdevices/d:"
@@ -151,18 +151,18 @@ echo "=== launching C&C95.EXE ==="
 (
 	cd "$STAGE"
 	DISPLAY="$XDISP" WAYLAND_DISPLAY="" \
-		WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+		WINEPREFIX="$WINEPREFIX" \
 		WINEDLLOVERRIDES="ddraw=n;mscoree=;mshtml=" \
 		WINEDEBUG=-all AUDIODEV=null \
 		timeout 180 "$WINE" 'C&C95.EXE'
 ) >"$ARTIFACT_DIR/wine.log" 2>&1 &
 TD_PID=$!
 
-echo "  waiting for C&C window..."
+echo " waiting for C&C window..."
 for i in $(seq 1 30); do
 	if WID=$(DISPLAY="$XDISP" xdotool search --name "Command & Conquer" 2>/dev/null | head -1); then
 		[[ -n "$WID" ]] && {
-			echo "  window after ${i}s (wid=$WID)"
+			echo " window after ${i}s (wid=$WID)"
 			break
 		}
 	fi
@@ -195,7 +195,7 @@ xdo_click() {
 
 inject_key() {
 	[[ -f "$TD_SENDINPUT" ]] || return
-	DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" WINEARCH=win32 \
+	DISPLAY="$XDISP" WINEPREFIX="$WINEPREFIX" \
 		WINEDEBUG=-all "$WINE" "$TD_SENDINPUT" key "$1" 2>/dev/null || true
 }
 
@@ -207,9 +207,9 @@ shoot() {
 		local sz nc
 		sz=$(stat -c%s "$png")
 		nc=$(python3 -c "from PIL import Image; print(len(set(Image.open('$png').convert('RGB').getdata())))" 2>/dev/null || echo "?")
-		echo "  $1: ${sz}B ${nc}colours"
+		echo " $1: ${sz}B ${nc}colours"
 	else
-		echo "  $1: FAILED"
+		echo " $1: FAILED"
 	fi
 }
 
@@ -261,7 +261,7 @@ TARGET="$ARTIFACT_DIR/t75-frame500.png"
 if [[ -f "$TARGET" ]]; then
 	sz=$(stat -c%s "$TARGET")
 	nc=$(python3 -c "from PIL import Image; print(len(set(Image.open('$TARGET').convert('RGB').getdata())))" 2>/dev/null || echo "0")
-	echo "  frame-500: ${sz}B ${nc}colours"
+	echo " frame-500: ${sz}B ${nc}colours"
 	if [[ "$sz" -ge 5000 && "$nc" -ge 64 ]]; then
 		echo "RESULT: PASS - Nod M1 ($SCENARIO)"
 		exit 0

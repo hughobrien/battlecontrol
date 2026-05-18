@@ -7,9 +7,15 @@
 #
 # ─── Verified environment ────────────────────────────────────────────────────
 # Host: Debian Bookworm (Debian 13), x86_64
-# Wine: 10.0 (Debian 10.0~repack-6), wine64 + wine32:i386
+# Wine: 11.0 (Nix wow64), wine-11.0
 # C&C95.EXE: 1,161,216 bytes (C&C Gold Win95 port, from command-aand-conquer-gold)
 # Data: /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1/ (23 MIX files)
+#
+# Notes:
+#   - Wine 11.0 (wow64) does NOT support WINEARCH=win32 — removed from all cmds.
+#   - Uses GDI renderer + virtual desktop + 8-bit Xvfb for TD's DirectDraw.
+#   - CONQUER.INI disables hardware blits for Wine compatibility.
+#   - Title→menu transition may require GL context (same as RA).
 #
 # ─── First-time setup ────────────────────────────────────────────────────────
 # Run this once to get all prerequisites:
@@ -45,7 +51,7 @@ mkdir -p "$SCREENSHOT_DIR"
 echo "=== Wine TD preflight ==="
 
 if ! command -v wine >/dev/null 2>&1; then
-	echo "FAIL: wine not found. Install with: sudo apt-get install wine"
+	echo "FAIL: wine not found. Run from nix develop shell."
 	exit 1
 fi
 WINE_VER=$(wine --version 2>/dev/null || echo "unknown")
@@ -53,7 +59,7 @@ echo "  wine: $WINE_VER"
 
 if wine --version 2>&1 | grep -q "wine32 is missing"; then
 	echo "FAIL: wine32 is missing."
-	echo "  Fix: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install wine32:i386"
+	echo "  Fix: run from nix develop shell."
 	exit 1
 fi
 
@@ -79,15 +85,20 @@ echo "=== Wine staging ==="
 TD_STAGE="$(mktemp -d)"
 trap 'rm -rf "$TD_STAGE"' EXIT
 
-# Link MIX data into a temporary staging directory.
-for f in "$DATA_DIR"/*.MIX "$DATA_DIR"/*.INI; do
+# Link MIX data into staging directory.
+for f in "$DATA_DIR"/*.MIX; do
 	[[ -e "$f" ]] && ln -sf "$f" "$TD_STAGE/$(basename "$f")"
 done
-# Symlink EXE into staging (avoids copying 1.2 MB on a space-constrained disk).
-ln -sf "$CC95_EXE_PATH" "$TD_STAGE/C&C95.EXE"
-# Stage THIPX32.DLL (required by C&C95.EXE; IPX network DLL).
-THIPX_SRC="$(dirname "$CC95_EXE_PATH")/THIPX32.DLL"
-[[ -f "$THIPX_SRC" ]] && ln -sf "$THIPX_SRC" "$TD_STAGE/THIPX32.DLL"
+# Copy EXE into staging (symlink broken by wine on some paths).
+cp "$CC95_EXE_PATH" "$TD_STAGE/C&C95.EXE"
+# Use stub THIPX32.DLL if available, else fall back to original.
+STUB_DIR="$(cd "$(dirname "$0")/.." && pwd)/tools/stub-thipx"
+if [[ -f "$STUB_DIR/thipx32.dll" ]]; then
+	cp "$STUB_DIR/thipx32.dll" "$TD_STAGE/THIPX32.DLL"
+else
+	THIPX_SRC="$(dirname "$CC95_EXE_PATH")/THIPX32.DLL"
+	[[ -f "$THIPX_SRC" ]] && cp "$THIPX_SRC" "$TD_STAGE/THIPX32.DLL"
+fi
 
 # CONQUER.INI: disable hardware blits so game stays alive under Wine's GDI path.
 cat >"$TD_STAGE/CONQUER.INI" <<'INIEOF'
@@ -101,16 +112,16 @@ ScreenHeight=400
 INIEOF
 
 if [[ ! -d "$WINE_PREFIX" ]]; then
-	echo "  Creating 32-bit Wine prefix at $WINE_PREFIX..."
-	WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wineboot --init 2>/dev/null
+	echo "  Creating Wine prefix at $WINE_PREFIX..."
+	WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
 fi
 
 # Configure Wine virtual desktop (640x400) and GDI renderer so the game
 # window is capturable via ffmpeg x11grab without needing DirectDraw.
-WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wine reg add \
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
 	'HKCU\Software\Wine\Explorer\Desktops' \
 	/v Default /t REG_SZ /d "640x400" /f >/dev/null 2>&1 || true
-WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 WINEDEBUG=-all wine reg add \
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
 	'HKCU\Software\Wine\Direct3D' \
 	/v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
 
@@ -134,7 +145,7 @@ echo "=== Launching C&C95.EXE ==="
 LOG="$(mktemp /tmp/wine-td-XXXXXX.log)"
 (
 	cd "$TD_STAGE"
-	DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" WINEARCH=win32 \
+	DISPLAY="$DISPLAY_NUM" WINEPREFIX="$WINE_PREFIX" \
 		WINEDEBUG=-all AUDIODEV=null \
 		WINEDLLOVERRIDES="winealsa.drv=,wineoss.drv=,winemac.drv=" \
 		timeout 45 wine "C&C95.EXE"
@@ -160,8 +171,6 @@ sleep 7
 # Capture title state — dialog is visible here (GDI-rendered, ~3-5 KB).
 take_screenshot "$SCREENSHOT_DIR/wine-td-title.png"
 echo "  Dismissing dialog..."
-DISPLAY="$DISPLAY_NUM" xdotool key Return 2>/dev/null || true
-sleep 1
 DISPLAY="$DISPLAY_NUM" xdotool key Return 2>/dev/null || true
 
 # Wait for game to initialize after dialog, then capture menu.
