@@ -432,8 +432,9 @@ See the [skills index](../README.md#companion-scripts) for the full list of
 | Script | Purpose |
 |--------|---------|
 | `scripts/parity-compare.py` | SSIM + fill% + p99 diff (supports `--no-align`, `--print-bbox`, `--crop-bottom`) |
-| `scripts/cinematic-compare.py` | VQA frame-by-frame pixel diff (RA) |
-| `scripts/td-cinematic-compare.py` | VQA frame-by-frame pixel diff (TD) |
+| `scripts/vqa-decode.py` | VQA decode from MIX (wraps tools/vqa_dump/vqa_dump.cpp + ffmpeg) |
+| `scripts/vqa-compare.py` | Compare two VQA decode output dirs (video + audio) |
+| `tools/vqa_dump/vqa_dump.cpp` | Standalone C++ VQA decoder, no external deps |
 | `scripts/ra-data-verify.py` | MIX checksum + INI verification |
 | `scripts/wine-ra.sh` / `wine-td.sh` | Wine OG launcher + screenshot capture |
 | `scripts/wine-allied-l1.sh` / `wine-soviet-l1.sh` | Campaign-specific captures |
@@ -449,7 +450,7 @@ See the [skills index](../README.md#companion-scripts) for the full list of
 |---|-------|----------------|----------|
 | 1 | Data integrity | `data_verify(dir: ...)` or `python3 scripts/ra-data-verify.py [DATA_DIR]` | exit 0 (or SKIP) |
 | 2 | Parity compare works | `parity_compare(imageA: "...", imageB: "...", thresholdSsim: 0.99)` | SSIM ≈ 1.0 (same image vs itself) |
-| 3 | Cinematic compare | `vqa_pixel_diff(mode: "cinematic", threshold: 8)` | all VQAs PASS, p99 ≤ 8 |
+| 3 | VQA compare | `nix run .#vqa-compare -- /tmp/ref /tmp/test` | exit 0, no video/audio differences |
 | 4 | WASM parity | `run_e2e_test(spec: "e2e/tim710-wasm-parity.spec.ts", args: ["--grep", "Tier 1"])` | all Tier 1 pass |
 
 ---
@@ -457,7 +458,9 @@ See the [skills index](../README.md#companion-scripts) for the full list of
 ## Reference
 
 - `scripts/parity-compare.py` — SSIM-based screenshot comparison (335 lines)
-- `scripts/cinematic-compare.py` — VQA frame-by-frame parity (718 lines)
+- `scripts/vqa-decode.py` — VQA decode from MIX (wraps tools/vqa_dump + ffmpeg)
+- `scripts/vqa-compare.py` — Compare two VQA decode output dirs (video + audio)
+- `tools/vqa_dump/vqa_dump.cpp` — Standalone C++ VQA decoder
 - `scripts/ra-data-verify.py` — MIX checksum + INI verification (168 lines)
 - `scripts/wine-ra.sh` — RA Wine OG launcher + screenshot capture (208 lines)
 - `scripts/wine-td.sh` — TD Wine OG launcher + screenshot capture (191 lines)

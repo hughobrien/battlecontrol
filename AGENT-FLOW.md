@@ -118,7 +118,7 @@ Move all `first-compile-pass*.sh`, `first-run-pass*.sh`,
 
 Keep ~25 reusable scripts at the top level: `skill-*`, `build-*.sh`,
 `wine-*.sh`, `parity-compare.py`, `lint-lp64.py`, `*-data-verify.py`,
-`cinematic-compare.py`, `generate-include-shim.py`, `nocd-patch.py`,
+`vqa-decode.py`, `vqa-compare.py`, `generate-include-shim.py`, `nocd-patch.py`,
 `ddscl-patch.py`, and the various scenario-patch scripts.
 
 **What this gives agents:**

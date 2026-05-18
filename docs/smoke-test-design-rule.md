@@ -10,7 +10,7 @@ For any test that covers rendering output, assertions must be visually verifiabl
 
 [TIM-635](https://github.com/hughobrien/battlecontrol/issues) (expert analysis item 6)
 identified the root cause of TIM-587: CI smoke tests were written as execution harnesses
-without explicit assertions. The `vqa-pixel-diff` job passed on fill% while frames
+without explicit assertions. The old `vqa-pixel-diff` job passed on fill% while frames
 showed block-aligned cyan corruption — quantitative metrics passed while the visual
 output was broken.
 
@@ -75,7 +75,7 @@ When reviewing a PR that adds or modifies a smoke test, verify:
 |------|-----------|---------|--------------|
 | `e2e/wasm-smoke.spec.ts` | no crash + status line | None | **TIM-645** — needs pixel assertion |
 | `scripts/first-run-pass-94.sh` (CI) | 1000 frames, 1 win, no crash, FPS | None | Visual rendering **not covered** by this test — rendering gap covered by WASM smoke test (`e2e/tim600-english-vqa-verify.spec.ts`, `e2e/tim590-ghpages-cyan-verify.spec.ts`). Adding a pixel gate here would require ffmpeg or ImageMagick (not in the CI image); the WASM path exercises the same C++ renderer compiled to a different target and already has fill%, cyan%, warm%, blockEdge, and colour-range assertions. |
-| `ci.yml: vqa-pixel-diff` | ffmpeg pixel diff `--threshold 5` | Yes | OK |
+| `ci.yml: vqa-decode/compare` | ffmpeg vs native decoder comparison | Yes | OK |
 | `e2e/tim590-ghpages-cyan-verify.spec.ts` | fill%, cyan%, warm% pixel ranges | Yes | OK |
 | `e2e/tim600-english-vqa-verify.spec.ts` | fill%, cyanCount, blockEdges, audio log | Yes | OK |
 
@@ -87,8 +87,8 @@ Good examples of assertion-first smoke tests in this repo:
 
 - **`e2e/tim600-english-vqa-verify.spec.ts`** — header lists 6 criteria; each maps to an
   `expect()` with a named regression comment; pixel stats checked at multiple timestamps.
-- **`scripts/vqa-pixel-diff.py`** — pixel-level diff against committed golden, explicit
-  `--threshold` parameter, fails hard on exceedance.
+- **`scripts/vqa-compare.py`** — compares two VQA decode output directories,
+  detects any video or audio frame differences.
 - **`e2e/tim590-ghpages-cyan-verify.spec.ts`** — introduced after TIM-587; colour-range
   checks explicitly named after the regression they guard.
 

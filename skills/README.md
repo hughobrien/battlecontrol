@@ -56,9 +56,9 @@ external context.
 1. Create `skills/<topic>/SKILL.md` following the format above.
 2. Include a smoke test that can be run to verify the skill works:
    ```bash
-   # Example: vqa codec smoke test
-   python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa --frames 0,1,2
-   ```
+    # Example: vqa codec smoke test
+    nix run .#vqa-compare -- /tmp/vqa-ref /tmp/vqa-test
+    ```
 3. Add the skill to this index with domain and responsible agent.
 4. Tag [SkillWritingExpert](/TIM/agents/skillwritingexpert) for review.
 
@@ -89,7 +89,8 @@ multi-step command sequences. Each script handles setup, teardown, and error rec
 | `scripts/serve-wasm.sh` | Start serve-coop.py with auto-cleanup EXIT trap | e2e-testing, ci-cd |
 | `scripts/run-e2e.sh` | Full E2E: Xvfb + server + Playwright test + cleanup | e2e-testing, ci-cd |
 | `scripts/build-native.sh` | Single-cmd cmake configure + build RA + build TD | native-build, ci-cd |
-| `scripts/vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff | ci-cd, vqa-codec |
+ | `scripts/vqa-decode.py` | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg) | vqa-codec |
+ | `scripts/vqa-compare.py` | Compare two VQA decode output dirs | vqa-codec |
 | `scripts/ci-wasm-smoke.sh` | Full WASM CI: emcmake, build, validate, T1+T2 smoke | ci-cd |
 | `scripts/ci-local.sh` | Local CI: run all available gates with one command, auto-skip missing deps | all skills |
 | `scripts/check-gha-versions.sh` | Scan workflow files for stale action versions | gha-updater |

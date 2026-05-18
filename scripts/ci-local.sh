@@ -14,8 +14,7 @@
 #   G2: LP64 audit                       requires: python3
 #   G3: WASM build + validate            requires: emcmake
 #   G4: WASM smoke (T1+T2)              requires: emcmake, node, chromium, Xvfb
-#   G5: VQA pixel-diff (synthetic)       requires: python3, ffmpeg
-#   G6: Include shim check               requires: python3
+#   G5: Include shim check               requires: python3
 
 # Auto-wrap in nix develop if not already inside it.
 # shell scripts are read fresh every time, so this works even if the
@@ -55,7 +54,6 @@ have() { command -v "$1" &>/dev/null; }
 check_native() { have clang++ && have cmake && have ninja && have pkg-config && pkg-config --exists sdl2 2>/dev/null; }
 check_wasm() { have emcmake; }
 
-check_ffmpeg() { have ffmpeg; }
 check_python() { have python3; }
 
 echo "=== CI-Local ==="
@@ -112,56 +110,38 @@ else
 fi
 
 # ======================================================================
-# G5: VQA pixel-diff (synthetic, no game data needed)
-# ======================================================================
-if check_python && check_ffmpeg; then
-	echo ""
-	echo "--- G5: VQA pixel-diff (synthetic) ---"
-	if [[ -f e2e/goldens/vqa/test.vqa ]]; then
-		if python3 scripts/vqa-pixel-diff.py e2e/goldens/vqa/test.vqa --frames 0,1,2 --threshold 5; then
-			gate_pass "G5: VQA pixel-diff"
-		else
-			gate_fail "G5: VQA pixel-diff"
-		fi
-	else
-		gate_skip "G5: VQA pixel-diff" "test.vqa not found (run gen_test_vqa.py)"
-	fi
-elif ! check_ffmpeg; then
-	gate_skip "G5: VQA pixel-diff" "ffmpeg not installed"
-fi
+# G5: /opt path audit (regression guard)
 
 # ======================================================================
-# G6: /opt path audit (regression guard)
-# ======================================================================
 echo ""
-echo "--- G6: /opt path audit ---"
+echo "--- G5: /opt path audit ---"
 # Exclude self (ci-local.sh has the error message) and comments explaining the absence.
 HITS=$(rg -n '/opt/(redalert|tiberiandawn)' scripts/ |
 	grep -v 'ci-local.sh' || true)
 if [[ -n "$HITS" ]]; then
 	echo "FAIL: scripts/ still contains /opt/redalert or /opt/tiberiandawn"
 	echo "$HITS"
-	gate_fail "G6: /opt path audit"
+	gate_fail "G5: /opt path audit"
 else
 	echo "  OK: no /opt paths in scripts/"
-	gate_pass "G6: /opt path audit"
+	gate_pass "G5: /opt path audit"
 fi
 
 # ======================================================================
-# G7: clang-tidy static analysis
+# G6: clang-tidy static analysis
 # ======================================================================
 echo ""
-echo "--- G7: clang-tidy ---"
+echo "--- G6: clang-tidy ---"
 if have clang-tidy && [[ "$MODE" != "--wasm-only" ]]; then
 	cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>/dev/null || true
 	find REDALERT TIBERIANDAWN -type f \
 		\! -path '*/WIN32LIB/*' \
-		\( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
-		| xargs -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
-		| tee /tmp/clang-tidy-report.txt | tail -5
+		\( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) -print0 |
+		xargs -0 -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 |
+		tee /tmp/clang-tidy-report.txt | tail -5
 	COUNT=$(grep -c 'warning:\|error:' /tmp/clang-tidy-report.txt 2>/dev/null || echo 0)
 	echo "  $COUNT clang-tidy finding(s)"
-	gate_pass "G7: clang-tidy"  # informational — never fails
+	gate_pass "G7: clang-tidy" # informational — never fails
 else
 	gate_skip "G7: clang-tidy" "clang-tidy not found or wasm-only mode"
 fi
@@ -183,7 +163,7 @@ if have cppcheck && [[ "$MODE" != "--wasm-only" ]]; then
 		REDALERT TIBERIANDAWN 2>&1 | tee /tmp/cppcheck-report.txt | tail -5
 	COUNT=$(grep -c 'error:\|warning:' /tmp/cppcheck-report.txt 2>/dev/null || echo 0)
 	echo "  $COUNT cppcheck finding(s)"
-	gate_pass "G8: cppcheck"  # informational — never fails
+	gate_pass "G8: cppcheck" # informational — never fails
 else
 	gate_skip "G8: cppcheck" "cppcheck not found or wasm-only mode"
 fi

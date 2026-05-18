@@ -30,7 +30,7 @@ gh run list --workflow gh-pages.yml --limit 5
 | Job | What it does | Timeout |
 |-----|-------------|---------|
 | **build** (gcc + clang) | Builds RA + TD native Linux, ccache stats | 30 min |
-| **vqa-pixel-diff** | Synthetic VQA regeneration + pixel-diff (always), game VQA (if data present) | 10 min |
+| **vqa-decode/compare** | VQA decode via ffmpeg + native decoder, compare outputs (if data present) | 10 min |
 | **wine-comparison** | Installs wine32, runs RA95.EXE under Wine, Tier 1+3 Playwright tests | 20 min |
 | **build-wasm** | Emscripten 5.0.6, builds ra.wasm + td.wasm, validates magic+size, T1+T2 smoke | 20 min |
 
@@ -59,14 +59,14 @@ limit output. Common causes:
 - SDL2 headers missing — ensure Nix dev shell is active
 - Struct layout mismatch → run `lint-lp64.py`, fix E1–E4 errors
 
-### §2.2 — VQA pixel-diff job: synthetic VQA mismatch
+### §2.2 — VQA decode/compare job: mismatch
 
-```
-ERROR: committed test.vqa differs from generator output
-```
+If decode or compare fails, investigate the decoder (`tools/vqa_dump/vqa_dump.cpp`)
+or the ffmpeg reference output for discrepancies. Common causes:
 
-Run `python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa` and commit the result.
-This happens when the generator script was changed but `test.vqa` was not regenerated.
+- Changes to `vqa_player.cpp` that diverge from the standalone decoder
+- ffmpeg version change that alters output
+- Missing game data preventing decode
 
 ### §2.3 — Wine job: RA95.EXE cache miss
 

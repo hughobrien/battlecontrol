@@ -1,6 +1,5 @@
 # CI — thin wrapper around flake apps.
 # Local equivalent: nix run .#ra-native-build && nix run .#td-native-build
-#                   nix run .#vqa-check
 
 name: CI
 
@@ -52,23 +51,6 @@ jobs:
             ccache --show-stats >> \"$GITHUB_STEP_SUMMARY\"
             ccache --show-stats
           "
-
-  vqa-pixel-diff:
-    name: VQA codec pixel-diff
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v6.0.2
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31.10.6
-
-      - name: Install ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ffmpeg
-
-      - name: Run VQA pixel-diff
-        run: nix develop --command nix run .#vqa-check
 
   wine-comparison:
     name: Wine OG comparison

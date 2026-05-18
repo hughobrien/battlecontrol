@@ -272,6 +272,23 @@
           };
 
           default = p.redalert;
+
+          # ── vqa-dump — standalone VQA decoder (C++) ─────────────────────
+          vqa-dump = pkgs.stdenv.mkDerivation {
+            pname = "vqa-dump";
+            version = "unstable-2026-05-18";
+            src = pkgs.runCommandLocal "vqa-dump-src" { } ''
+              mkdir -p $out/tools/vqa_dump
+              cp ${./tools/vqa_dump/vqa_dump.cpp} $out/tools/vqa_dump/vqa_dump.cpp
+            '';
+            buildPhase = ''
+              g++ -std=c++17 -O2 -o vqa_dump tools/vqa_dump/vqa_dump.cpp
+            '';
+            installPhase = ''
+              mkdir -p $out/bin
+              cp vqa_dump $out/bin/
+            '';
+          };
         };
 
       # -----------------------------------------------------------------------
@@ -606,15 +623,25 @@
             --label manual --threshold-ssim "$THRESH"
         '';
 
-        vqa-check = mkApp "vqa-check" ''
-          exec python3 scripts/vqa-pixel-diff.py \
-            e2e/goldens/vqa/test.vqa --frames 0,1,2 --threshold 5
+        vqa-decode = mkApp "vqa-decode" ''
+          set -e
+          # Add vqa-dump binary to PATH if native engine is requested
+          for arg in "$@"; do
+            if [ "$arg" = "native" ] || [ "$arg" = "--engine=native" ]; then
+              VQA_DUMP=${self.packages.${system}.vqa-dump}/bin/vqa_dump
+              if [ ! -x "$VQA_DUMP" ]; then
+                echo "ERROR: vqa_dump not found (try: nix build .#vqa-dump)" >&2
+                exit 1
+              fi
+              export PATH="$(dirname "$VQA_DUMP"):$PATH"
+              break
+            fi
+          done
+          exec python3 scripts/vqa-decode.py "$@"
         '';
 
-        vqa-cinematic = mkApp "vqa-cinematic" ''
-          MIX="''${1:-$RA_ASSETS/MAIN.MIX}"
-          THRESH="''${2:-8}"
-          exec python3 scripts/cinematic-compare.py "$MIX" --threshold "$THRESH"
+        vqa-compare = mkApp "vqa-compare" ''
+          exec python3 scripts/vqa-compare.py "$@"
         '';
 
         ci = mkApp "ci-local" ''
@@ -627,16 +654,6 @@
 
         capture-checkpoint = mkApp "capture-checkpoint" ''
           exec python3 scripts/capture-checkpoint.py "$@"
-        '';
-
-        vqa-golden = mkApp "vqa-golden" ''
-          if [ $# -lt 1 ]; then
-            echo "Usage: nix run .#vqa-golden -- <vqa-file> [num-frames]"
-            exit 1
-          fi
-          VQA="$1"; shift
-          N="''${1:-4}"
-          exec python3 scripts/gen-vqa-golden.py "$VQA" "$N"
         '';
 
         ra-wasm-regression = mkApp "ra-wasm-regression" ''

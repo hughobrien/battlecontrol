@@ -7,7 +7,7 @@ improvement against the pre-fix interlaced captures.
 
 ## Method
 
-1. Re-ran `scripts/cinematic-compare.py` (TIM-705 Part A) against the same
+1. Re-ran the VQA decode/compare pipeline (TIM-705 Part A) against the same
    `MAIN.MIX` to confirm the decoder vs ffmpeg parity spec is unchanged by
    TIM-740 — it should be, because TIM-740 modifies the Wine + cnc-ddraw
    render substrate, not the VQA decoder.
@@ -25,7 +25,7 @@ improvement against the pre-fix interlaced captures.
 
 ## Results
 
-### Parity spec (cinematic-compare.py) — unchanged
+### Parity spec (vqa-decode + vqa-compare) — unchanged
 
 Re-run 2026-05-15 against `MAIN.MIX` (Allied CD1), 8 cinematics including
 `AFTRMATH`, `ALLIES1`, `ALLIES2`, `SOVS1`, `ANTS`, `FLARE`, `NUKESTOK`:
@@ -86,8 +86,8 @@ visible interlace banding — the expected visual result of TIM-740.
   intro captures. These are kept *intentionally* as historical evidence
   for the TIM-740 motivation; the TIM-739 commit explicitly handed off
   the interlace artefact as the next ticket.
-- `e2e/cinematic-compare/` — generated per-run from the parity spec, not
-  committed.
+- `e2e/cinematic-compare/` — removed; `vqa-decode` output is generated
+  per-run and not committed.
 
 ## Reproducing
 
@@ -104,6 +104,8 @@ python3 scripts/tim754-wine-vqa-compare.py
 # → docs/tim740/post-fix-reference/
 
 # 4. confirm decoder-vs-ffmpeg parity is unchanged
-python3 scripts/cinematic-compare.py
-# → RESULT: PASS (8/8 cinematics pass)
+nix run .#vqa-decode -- --vqa ALLIES1 --mix /path/to/MAIN.MIX --out /tmp/vqa-ffmpeg --engine ffmpeg --duration 4
+nix run .#vqa-decode -- --vqa ALLIES1 --mix /path/to/MAIN.MIX --out /tmp/vqa-native --engine native --duration 4
+nix run .#vqa-compare -- /tmp/vqa-ffmpeg /tmp/vqa-native
+# → No differences found
 ```
