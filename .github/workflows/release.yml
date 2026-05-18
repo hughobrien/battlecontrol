@@ -10,10 +10,10 @@ on:
       - 'v*.*.*'
 
 jobs:
-  build-linux-x86_64:
-    name: Build RA Linux x86_64
+  build-linux:
+    name: Build Linux (RA + TD)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - uses: actions/checkout@v6.0.2
@@ -24,33 +24,16 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Build RA native + package
-        run: nix develop --command nix run .#release-build-ra
+      - name: Build RA + TD native + package
+        run: nix develop --command nix run .#release
 
-      - name: Upload artifact
+      - name: Upload RA artifact
         uses: actions/upload-artifact@v7.0.1
         with:
           name: redalert-linux-x86_64
           path: redalert-linux-x86_64.tar.gz
 
-  build-td-linux:
-    name: Build TD Linux x86_64
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-
-    steps:
-      - uses: actions/checkout@v6.0.2
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31.10.6
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Build TD native + package
-        run: nix develop --command nix run .#release-build-td
-
-      - name: Upload artifact
+      - name: Upload TD artifact
         uses: actions/upload-artifact@v7.0.1
         with:
           name: td-linux-x86_64
@@ -140,7 +123,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-linux-x86_64, build-td-linux, build-ra-wasm, build-td-wasm]
+    needs: [build-linux, build-ra-wasm, build-td-wasm]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
