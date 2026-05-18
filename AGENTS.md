@@ -108,7 +108,7 @@ ci_local()
 ```
 
 This runs every available gate: native build, WASM build, LP64 audit, VQA
-pixel-diff, include shim, WASM validate. It auto-skips gates with missing
+decode/compare, include shim, WASM validate. It auto-skips gates with missing
 dependencies (e.g., no emcmake = WASM skipped), so it's safe to run anywhere.
 
 > **Never push without running `ci_local` first.** A 30-second local check
@@ -203,10 +203,11 @@ run_e2e_test(spec: "e2e/regression/T2-td-wasm-boot.spec.ts")
 nix run .#lint-lp64                                 # gate: must exit 0
 ```
 
-### VQA pixel-diff
+### VQA decode/compare
 
 ```
-vqa_pixel_diff(mode: "synthetic", threshold: 5)
+nix run .#vqa-decode -- --vqa NAME --mix PATH --out DIR [--duration N] [--engine {ffmpeg,native}]
+nix run .#vqa-compare -- <dirA> <dirB>
 ```
 
 ### Parity comparison (Wine OG vs WASM/Linux)
@@ -327,17 +328,17 @@ going directly to Start_Scenario.  Mission terrain renders within 5-10s.
 The VQA pipeline (cinematic parity) uses `--mode vqa` (default) and the
 multi-frame `e2e/goldens/vqa/<stem>/` layout.
 
-**1. Generate golden reference frames** (decoder output, validated against ffmpeg):
+**1. Decode VQA frames** (using native decoder or ffmpeg):
 
 ```bash
-# Single VQA:
-python3 scripts/gen-vqa-golden.py /path/to/ENGLISH.VQA e2e/goldens/vqa/ENGLISH 4
+# Decode a VQA file with the native decoder:
+nix run .#vqa-decode -- --vqa ENGLISH.VQA --out /tmp/vqa-frames --duration 4 --engine native
 
-# All intro VQAs at once:
-bash scripts/gen-all-vqa-goldens.sh /path/to/RA/CD1 e2e/goldens/vqa 4
+# Or use ffmpeg:
+nix run .#vqa-decode -- --vqa ENGLISH.VQA --out /tmp/vqa-frames-ffmpeg --duration 4 --engine ffmpeg
 ```
 
-Goldens land as `e2e/goldens/vqa/<stem>/frame_0001.png` … `frame_0004.png`.
+Decoded frames land in the output directory as PNG files.
 
 **2. Capture the same scene from each target:**
 
@@ -458,18 +459,17 @@ moved to `scripts/archive/`.
 | `run-e2e.sh` | Xvfb + WASM server + Playwright test |
 | `serve-wasm.sh` | WASM dev server with COOP/COEP |
 | `toolchain-check.sh` | Toolchain prerequisite check |
-| `vqa-pixel-diff.py` | VQA pixel diff against ffmpeg |
+| `vqa-decode.py` | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg) |
+| `vqa-compare.py` | Compare two VQA decode output dirs (video + audio) |
+| `tools/vqa_dump/vqa_dump.cpp` | Standalone C++ VQA decoder, no external deps |
 | `parity-compare.py` | SSIM + fill% + p99 pixel diff |
 | `*-data-verify.py` | MIX checksum verification |
 | `wine-check.sh` | Wine prerequisite check |
 | `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
 | `xvfb-ensure.sh` | Idempotent Xvfb launcher (source it) |
-| `vqa-check.sh` | VQA CI gate: regenerate → diff → pixel-diff |
 | `parity-report.sh` | Three-way parity report (vqa + gameplay modes) |
 | `lint-lp64.py` | LP64 static hazard audit |
-| `cinematic-compare.py` | Cinematic/VQA batch comparison |
 | `generate-include-shim.py` | Case-folding include shim generator |
-| `gen-vqa-golden.py` / `gen-all-vqa-goldens.sh` | VQA golden frame generation |
 | `capture-checkpoint.py` | Unified capture orchestrator: run any mission/VQA at any frame across Wine/native/WASM targets |
 | `drivers/wine.py` | Wine capture driver (generalizes wine-allied-l1.sh, wine-vqa-capture.sh) |
 | `drivers/native.py` | Native capture driver (generalizes native-capture.sh) |

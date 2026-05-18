@@ -1,18 +1,18 @@
 ---
 name: vqa-codec
-description: Use when working on the VQA video codec — debugging palette corruption, codebook errors, ADPCM audio drift, LCW decompression bugs, or block-aligned visual artifacts. Trigger on symptoms like ffmpeg pixel-diff failures, synthetic test VQA regeneration mismatch, solid-marker regressions (blockH=4 0xFF / blockH=2 0x0F), CBFZ/CBPZ decoding errors, p99 pixel delta exceeding threshold, or CI vqa-pixel-diff job failing.
+description: Use when working on the VQA video codec — debugging palette corruption, codebook errors, ADPCM audio drift, LCW decompression bugs, or block-aligned visual artifacts. Trigger on symptoms like ffmpeg vs native decoder mismatches, solid-marker regressions (blockH=4 0xFF / blockH=2 0x0F), CBFZ/CBPZ decoding errors, or VQA decode/compare CI failures.
 version: 0.1.0
 ---
 
 # VQA Codec Skill
 
-> **Nix app:** `nix run .#vqa-check`.
-> Ask the agent to run this instead of typing raw commands.
+> **Nix apps:** `nix run .#vqa-decode` and `nix run .#vqa-compare`.
+> Ask the agent to run these instead of typing raw commands.
 
 You are working on the VQA (Westwood Vector Quantized Animation) codec used by C&C
-Red Alert and Tiberian Dawn for cinematic cutscenes. The project has a C++ reference
-decoder (`linux/win32-stubs/vqa_player.cpp`), a Python reference decoder
-(`scripts/vqa_decode_verify.py`), and a pixel-diff harness that validates both
+Red Alert and Tiberian Dawn for cinematic cutscenes. The project has a C++ runtime
+decoder (`linux/win32-stubs/vqa_player.cpp`), a standalone C++ decoder
+(`tools/vqa_dump/vqa_dump.cpp`), and a decode/compare harness that validates output
 against ffmpeg's independent decoder.
 
 Read `docs/codec-testing.md` for codec-testing context before starting.
@@ -21,14 +21,13 @@ Read `docs/codec-testing.md` for codec-testing context before starting.
 
 ## Phase 0 — Quick check
 
-Run the synthetic VQA gate (no game data needed):
+Decode and compare a known VQA file (requires game data):
 
+```bash
+nix run .#vqa-decode -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-ref --engine ffmpeg
+nix run .#vqa-decode -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-test --engine native
+nix run .#vqa-compare -- /tmp/vqa-ref /tmp/vqa-test
 ```
-vqa_pixel_diff(mode: "synthetic", threshold: 5)
-```
-
-
-Exit codes: **0** = pass, **1** = fail, **2** = skip (ffmpeg absent).
 
 ---
 
@@ -57,7 +56,7 @@ The codec uses high-byte markers in the codebook to indicate solid-colour blocks
 decoded as black (codebook index 0) instead of the correct colour. This produces
 block-aligned black squares — fill% may pass while visual output is broken.
 
-**Fix pattern:** In both `vqa_player.cpp` and `vqa_decode_verify.py`, the solid-colour
+**Fix pattern:** In `vqa_player.cpp`, the solid-colour
 marker pre-fill must be gated on blockH:
 
 ```cpp
@@ -91,38 +90,12 @@ formula. The formula `(v << 2) | (v >> 4)` matches ffmpeg's implementation.
 
 ## §2.3 — Codebook entry debugging
 
-When a specific block index produces wrong colours, extract the codebook for that frame:
-
-```bash
-# In vqa_decode_verify.py, add debug logging for codebook entries:
-# print(f"  codebook[{idx}] = 0x{entry:04x} → RGB({r},{g},{b})")
-```
-
-Compare against ffmpeg's output frame-by-frame. Codebook errors typically produce
-p99 deltas of 50–200 (visually obvious wrong colours).
+When a specific block index produces wrong colours, add debug logging to the C++
+decoder to dump codebook entries for that frame. Compare against ffmpeg's output
+frame-by-frame. Codebook errors typically produce p99 deltas of 50–200 (visually
+obvious wrong colours).
 
 ---
-
-## §2.4 — Synthetic test VQA regeneration
-
-`e2e/goldens/vqa/test.vqa` is a 2,640-byte committed file that exercises all codec
-paths. The CI regenerates it from the generator and diffs against the committed version.
-
-**When to regenerate:**
-1. After changing `scripts/gen_test_vqa.py`
-2. When CI reports "committed test.vqa differs from generator output"
-
-```bash
-python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa
-git add e2e/goldens/vqa/test.vqa
-```
-
-**What it exercises:**
-- CBFZ full-codebook decode (4-entry, 4×4 blocks)
-- VPTZ compressed frame-pointer array
-- Solid-colour markers for blockH=4
-- CBPZ single-part partial codebook
-- 6-bit VGA palette scaling
 
 ---
 
@@ -140,18 +113,15 @@ If LCW decompression is buggy, both CBFZ and CBPZ frames will be affected.
 
 ---
 
-## §2.6 — Python decoder vs ffmpeg divergence
+## §2.6 — Native decoder vs ffmpeg divergence
 
-When the Python decoder and ffmpeg disagree, determine which is correct:
+When `tools/vqa_dump/vqa_dump.cpp` and ffmpeg disagree, determine which is correct:
 
-1. Compare both against the C++ decoder (`vqa_player.cpp`) — this is the runtime
-   decoder in both native and WASM builds
-2. If ffmpeg and C++ agree but Python disagrees, fix Python
-3. If C++ and Python agree but ffmpeg disagrees, review ffmpeg's VQA source
+1. Compare against the runtime decoder (`vqa_player.cpp`) — this is the decoder
+   in both native and WASM builds
+2. If ffmpeg and runtime agree but standalone disagrees, fix `vqa_dump.cpp`
+3. If runtime and standalone agree but ffmpeg disagrees, review ffmpeg's VQA source
    (ffmpeg's decoder may have its own bugs for edge-case VQA files)
-
-The Python decoder MUST match the C++ decoder byte-for-byte. They share the same
-logic by design.
 
 ---
 
@@ -175,24 +145,11 @@ visual corruption.
 Golden frames are reference PNGs generated from known-correct VQA output. They are
 used for visual comparison but **must not be committed** (derived from game assets).
 
-> **What's committed:** `e2e/goldens/vqa/test.vqa` (the synthetic test input, 2.6 KB).  
 > **What's NOT committed:** Decoded PNG frames (derived from copyrighted game VQAs).  
-> **CI gate:** Regenerates `test.vqa` from the generator script and diffs against the  
-> committed version — any drift must be intentional and committed alongside generator changes.
 
 ```bash
-# Generate golden frames for a VQA file:
-python3 scripts/vqa-pixel-diff.py /path/to/file.vqa \
-    --generate-goldens \
-    --goldens-dir e2e/goldens/vqa/
-
-# Golden frames are written to:
-#   e2e/goldens/vqa/<stem>/golden_0000.png
-#   e2e/goldens/vqa/<stem>/golden_0029.png (if --frames specified)
-
-# Regenerate the committed synthetic test VQA after generator changes:
-python3 scripts/gen_test_vqa.py e2e/goldens/vqa/test.vqa
-git add e2e/goldens/vqa/test.vqa
+# Decode VQA frames for comparison:
+nix run .#vqa-decode -- --vqa file.vqa --out /tmp/vqa-frames --duration 4 --engine native
 ```
 
 ---
@@ -223,36 +180,37 @@ python3 scripts/vqa-audio-diff.py reference.raw decoder_output.raw
 
 ### Adding to CI gate
 
-When `vqa_player.cpp` changes in a way that affects audio output, add an audio
-step alongside the pixel-diff:
+When `vqa_player.cpp` changes in a way that affects audio output, use `vqa-compare`
+to compare audio alongside video:
 
 ```bash
-python3 scripts/vqa-audio-diff.py reference.raw decoder.raw --threshold 5
+nix run .#vqa-compare -- /tmp/vqa-ref /tmp/vqa-test
 ```
 
 ---
 
-## §6 — Adding the Python decoder to the CI gate
+## §6 — Verifying decoder changes in CI
 
 When `vqa_player.cpp` changes in a way that affects frame output:
 
-1. Update `vqa_decode_verify.py` to match the C++ logic
-2. Regenerate synthetic test VQA if needed
-3. Run the harness: `vqa_pixel_diff(mode: "synthetic", threshold: 5)`
-4. On real game data (if available): `vqa_pixel_diff(mode: "cinematic", threshold: 5)`
-5. Confirm p99 ≤ 5 for all frames
+1. Build the standalone decoder: `g++ -o vqa_dump tools/vqa_dump/vqa_dump.cpp`
+2. Decode with ffmpeg reference: `nix run .#vqa-decode -- --vqa file.vqa --out /tmp/ref --engine ffmpeg`
+3. Decode with native decoder: `nix run .#vqa-decode -- --vqa file.vqa --out /tmp/test --engine native`
+4. Compare: `nix run .#vqa-compare -- /tmp/ref /tmp/test`
+5. Confirm no video or audio differences
 
 ---
 
 ## §7 — CI integration
 
-The `vqa-pixel-diff` job in `.github/workflows/ci.yml` runs on every PR:
+The VQA gates in `.github/workflows/ci.yml` run on every PR using `vqa-decode` and
+`vqa-compare`:
 
 | Step | Gate | Always runs? |
 |------|------|-------------|
-| Regenerate synthetic VQA | Diff against committed `test.vqa` | Yes |
-| Synthetic VQA pixel-diff | Frames 0,1,2, threshold 5 | Yes |
-| Game VQA pixel-diff | Frames 0,29,59 from `MAIN.MIX` | Only if data present |
+| VQA decode (ffmpeg) | Extract frames from game VQAs via ffmpeg | Only if data present |
+| VQA decode (native) | Extract frames from game VQAs via native decoder | Only if data present |
+| VQA compare | Compare ffmpeg vs native decode output | Only if data present |
 
 If a step would normally fail because game data is absent, it exits 2 or 0 to avoid
 blocking PRs from contributors without data.
@@ -263,21 +221,16 @@ blocking PRs from contributors without data.
 
 | Gate | Tool / Command | Expected result |
 |------|----------------|----------------|
-| Synthetic VQA | `vqa_pixel_diff(mode: "synthetic", threshold: 5)` | Exit 0, p99 ≤ 5 |
-| Generator sync | `python3 scripts/gen_test_vqa.py /tmp/test.vqa.new && diff -q e2e/goldens/vqa/test.vqa /tmp/test.vqa.new` | Identical |
-| Audio diff (if available) | `python3 scripts/vqa-audio-diff.py reference.raw decoder.raw --threshold 5` | p99 ≤ 5 |
-| Game VQA (optional) | `vqa_pixel_diff(mode: "cinematic", threshold: 5)` or `python3 scripts/vqa-pixel-diff.py ...` | Exit 0, p99 ≤ 5 |
+| VQA decode (both engines) | `nix run .#vqa-decode -- --vqa file.vqa --out /tmp/out --engine native` | PNG frames in /tmp/out |
+| VQA compare | `nix run .#vqa-compare -- /tmp/ref /tmp/test` | Exit 0, no differences |
 
 ---
 
 ## Reference
 
-- `docs/codec-testing.md` — Codec testing guide (107 lines)
-- `scripts/vqa-pixel-diff.py` — Pixel-diff harness (Python reference vs ffmpeg)
-- `scripts/vqa_decode_verify.py` — Python reference decoder (mirrors vqa_player.cpp)
-- `scripts/gen_test_vqa.py` — Synthetic test VQA generator
-- `scripts/vqa-audio-diff.py` — Audio PCM diff harness (create if not yet existing)
+- `scripts/vqa-decode.py` — VQA decode from MIX (wraps tools/vqa_dump + ffmpeg)
+- `scripts/vqa-compare.py` — Compare two VQA decode output dirs (video + audio)
+- `tools/vqa_dump/vqa_dump.cpp` — Standalone C++ VQA decoder
 - `linux/win32-stubs/vqa_player.cpp` — C++ runtime decoder (native + WASM)
-- `e2e/goldens/vqa/test.vqa` — 2,640-byte committed synthetic VQA
 - `e2e/tim600-english-vqa-verify.spec.ts` — WASM VQA verification test
 - `e2e/tim677-vqa-underrun-probe.spec.ts` — VQA buffer underrun probe

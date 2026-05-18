@@ -21,9 +21,8 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Wine check | `wine-check` | `scripts/wine-check.sh` | — | — |
 | Parity compare | `parity-compare` | `scripts/parity-compare.py` | — | — |
 | Parity report | `parity-report` | `scripts/parity-report.sh` | — | — |
-| VQA check | `vqa-check` | `scripts/vqa-check.sh` | `ci.yml → vqa-pixel-diff` | — |
-| VQA cinematic | `vqa-cinematic` | `scripts/cinematic-compare.py` | — | `cinematic-compare` |
-| VQA golden | `vqa-golden` | `scripts/gen-vqa-golden.py` | — | — |
+| VQA decode | `vqa-decode` | `scripts/vqa-decode.py` + `tools/vqa_dump/vqa_dump.cpp` | — | — |
+| VQA compare | `vqa-compare` | `scripts/vqa-compare.py` | — | — |
 | Capture (Wine OG) | `capture-wine` | `scripts/wine-cnc-capture.sh` | `ci.yml → wine-comparison` | — |
 | Capture (checkpoint) | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
 | Release | `release` | `scripts/first-run-pass-94.sh` + cmake + tar | `release.yml` | — |
@@ -74,7 +73,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | WASM loop | `nix run .#wasm-loop` | Build → validate → smoke T1+T2. |
 | WASM loop smoke | `nix run .#test` | T1 + T2 Playwright smoke tests (via `wasm-loop`). |
 | CI test run | `nix run .#test -- <spec>` | Run one Playwright spec under Xvfb + WASM (for asset-gated tests). |
-| CI VQA | `nix run .#vqa-check` | Generate test VQA + pixel-diff (for CI). |
 ### Capture / Screenshot
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -103,14 +101,10 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | | `scripts/parity-compare.py` | Same, directly. |
 | Parity report | `nix run .#parity-report -- --mode <vqa\|gameplay> --targets <t> <scene>` | Three-way parity report: compare golden frames against wine/native/wasm captures. |
 | | `scripts/parity-report.sh` | Same, directly. |
-| VQA pixel diff | `nix run .#vqa-check [--threshold N]` | Compare our VQA decoder vs ffmpeg golden frames via p99 pixel-delta. |
-| | `scripts/vqa-pixel-diff.py` | Same, directly. |
-| VQA golden | `nix run .#vqa-golden -- <vqaFile> <numFrames> [outDir]` | Decode VQA into N evenly-spaced golden PNGs for reference. |
-| | `scripts/gen-vqa-golden.py` | Same, directly. |
-| | `scripts/gen-all-vqa-goldens.sh` | Generate golden frames for all intro VQAs at once. |
-| VQA cinematic | `nix run .#vqa-cinematic -- <MIX> [--threshold N]` | Scan MAIN.MIX for embedded VQAs, decode and compare vs ffmpeg. |
-| | `scripts/cinematic-compare.py` | Same, directly. |
-| TD cinematic | `scripts/td-cinematic-compare.py` | TD variant — extracts VQAs from MOVIES.MIX (no Blowfish). |
+| VQA decode | `nix run .#vqa-decode -- --vqa NAME --mix PATH --out DIR [--duration N] [--engine {ffmpeg,native}]` | Extract VQA from MIX and decode with selected engine. |
+| | `scripts/vqa-decode.py` + `tools/vqa_dump/vqa_dump.cpp` | Same, directly. |
+| VQA compare | `nix run .#vqa-compare -- <dirA> <dirB>` | Compare two VQA decode output dirs (video + audio). |
+| | `scripts/vqa-compare.py` | Same, directly. |
 | Golden gen (archived) | `scripts/archive/gen-gameplay-goldens.sh` | ⚠️ Subsumed by `capture-checkpoint.py` + `drivers/`. |
 ### Lint / Audit
 | Command | Invocation | What It Does |
@@ -143,8 +137,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
 | Extract MIX | `python3 scripts/extract_mix.py` | Westwood MIX file extractor (classic + extended headers). |
-| Generate test VQA | `python3 scripts/gen_test_vqa.py` | Generate minimal synthetic 8×8 3-frame VQA for decoder testing. |
-| VQA decode verify | `python3 scripts/vqa_decode_verify.py` | Python port of vqa_player.cpp decoding logic for cross-validation. |
 | Setup RA remastered | `scripts/setup-run-ra-remastered.sh` | Create RA run dir with symlinks to CD1 assets and binary. |
 | Setup TD run | `scripts/setup-run-td.sh` | Create TD smoke-test run dir with symlinks and CONQUER stubs. |
 ### Run
@@ -206,9 +198,8 @@ Every executable entry point, listed A–Z with its surface(s).
 | `ci-cppcheck` | nix app | CI | Removed — folded into `ci`. |
 | `ci-local.sh` | script | CI | Run all local CI gates. |
 | `ci-run-test` | nix app | CI | Removed — use `test` instead. |
-| `ci-vqa` | nix app | CI | Removed — use `vqa-check` instead. |
+| `ci-vqa` | nix app | CI | Removed — folded into `ci`. |
 | `ci-wasm-smoke` | nix app | CI | Removed — use `wasm-loop` instead. |
-| `cinematic-compare.py` | script | Parity | VQA batch comparison against ffmpeg. |
 | `parity-compare` | nix app | Parity | SSIM compare two images. |
 | `ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
 | `edit-loop` | nix app | Loop | shim → lint → build → smoke. |
@@ -216,9 +207,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `first-run-pass-94.sh` | script | Test | RA native smoke test. |
 | `focus-skip-patch.py` | script | Patch (RA) | NOP GameInFocus spin loops. |
 | `game-in-focus-patch.py` | script | Patch (RA) | Pin GameInFocus=TRUE. |
-| `gen-vqa-golden.py` | script | Parity | Generate golden VQA frames. |
-| `gen-all-vqa-goldens.sh` | script | Parity | Generate golden frames for all intro VQAs. |
-| `gen_test_vqa.py` | script | Utility | Generate synthetic test VQA. |
 | `generate-include-shim.py` | script | Build | Regenerate case-folding include shim (auto-run by CMake). |
 | `lint-lp64` | nix app | Lint | LP64 hazard audit. |
 | `lint-all` | nix app | Lint | Full multi-tool lint suite. |
@@ -249,7 +237,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `run-e2e.sh` | script | Test | Xvfb + WASM server + Playwright test. |
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
 | `toolchain-check.sh` | script | Lint | Toolchain prerequisite check. |
-| `vqa-check.sh` | script | Parity | VQA codec CI gate. |
+| `vqa-decode.py` | script | Parity | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg). |
 | `wine-check.sh` | script | Lint | Wine toolchain check. |
 | `xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
 | `smoke-ra` | nix app | Test | RA native smoke test. |
@@ -258,7 +246,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `soviet-m2-scenario-patch.py` | script | Patch (RA) | Override Soviet M2 scenario. |
 | `td-activateapp-patch.py` | script | Patch (TD) | Prevent WM_ACTIVATEAPP clearing focus. |
 | `td-cdlabel-patch.py` | script | Patch (TD) | Zero GDI95 label. |
-| `td-cinematic-compare.py` | script | Parity | TD VQA batch comparison. |
+| `vqa-compare.py` | script | Parity | Compare two VQA decode output dirs. |
 | `td-ddmode-patch.py` | script | Patch (TD) | Stub SetDisplayMode. |
 | `td-focus-skip-patch.py` | script | Patch (TD) | NOP GameInFocus spin loops. |
 | `td-game-in-focus-patch.py` | script | Patch (TD) | Pin GameInFocus=1. |
@@ -273,11 +261,8 @@ Every executable entry point, listed A–Z with its surface(s).
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
 | `validate-wasm` | nix app | Build | Removed — validation baked into `build-wasm`. |
 | `data-verify` | nix app | Lint | Removed — folded into `toolchain-check`. |
-| `vqa-check` | nix app | Parity | VQA pixel-diff gate. |
-| `vqa-cinematic` | nix app | Parity | Cinematic/VQA batch comparison. |
-| `vqa-golden` | nix app | Parity | Generate golden VQA frames. |
-| `vqa_decode_verify.py` | script | Utility | Python VQA decoder. |
-| `vqa-pixel-diff.py` | script | Parity | VQA decoder vs ffmpeg comparison. |
+| `vqa-compare` | nix app | Parity | Compare two VQA decode output dirs. |
+| `vqa-decode` | nix app | Parity | Extract VQA from MIX and decode with --engine. |
 | `wasm-loop` | nix app | Loop | build-wasm → smoke tests. |
 | `wine-cnc-capture.sh` | script | Capture | Generic RA95 Wine capture. |
 | `wine-exe-hashes.json` | data | — | SHA-256 hashes for patched EXEs. |
@@ -323,7 +308,7 @@ These live in `scripts/archive/` — subsumed by the Python `capture-checkpoint.
 | `test:e2e:td:ci` | Env-var-driven TD gameplay e2e for CI |
 | `test:e2e:ra-gameplay-audit` | RA gameplay audit |
 | `test:e2e:td-wasm-audit` | TD WASM audit |
-| `cinematic-compare` | `python3 scripts/cinematic-compare.py` |
+| `vqa-compare` | `python3 scripts/vqa-compare.py` |
 
 
 ## Naming Convention Summary

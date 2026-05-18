@@ -238,7 +238,7 @@ The CI pipeline (`.github/workflows/ci.yml`) runs on every push/PR to `master`:
 | Job | What It Does | Timeout |
 |-----|-------------|---------|
 | **build** | Native RA + TD, ccache stats | 30m |
-| **vqa-pixel-diff** | Synthetic VQA regeneration + pixel-diff | 10m |
+| **vqa-decode/compare** | VQA decode via ffmpeg + native decoder, compare outputs | 10m |
 | **wine-comparison** | Wine RA95.EXE + Playwright Tier 1/3 tests | 30m |
 | **build-wasm** | WASM build, validate, smoke T1/T2, asset-gated T3/T6/T7/T8/T9 | 45m |
 | **clang-tidy** | Static analysis (informational) | — |
@@ -267,10 +267,7 @@ vqa_pixel_diff(mode: "cinematic", mixPath: "/path/to/MAIN.MIX", threshold: 8)
 Full workflow: Wine OG → Native Linux → WASM → SSIM compare.
 
 ```bash
-# 1. Generate golden frames from VQA:
-vqa_golden(vqaPath: "/path/to/ENGLISH.VQA", numFrames: 4)
-
-# 2. Run full parity report:
+# 1. Run full parity report:
 parity_report(scene: "allied-l1", mode: "gameplay", targets: "wine,wasm,native")
 
 # 3. Or compare two specific images:
@@ -440,7 +437,8 @@ When hitting a specific problem, load the corresponding skill before debugging:
 | Serve (WASM + assets) | `nix run .#serve` |
 | Compare two images | `nix run .#parity-compare -- <imgA> <imgB>` |
 | Run parity report | `nix run .#parity-report -- --mode gameplay allied-l1` |
-| Run VQA check | `nix run .#vqa-check` |
+| Decode VQA frames | `nix run .#vqa-decode -- --vqa NAME --mix PATH --out DIR` |
+| Compare VQA outputs | `nix run .#vqa-compare -- <dirA> <dirB>` |
 | Run native smoke (RA) | `nix run .#smoke-ra` |
 | Run native smoke (TD) | `nix run .#smoke-td` |
 | Edit loop (native) | `nix run .#edit-loop` |

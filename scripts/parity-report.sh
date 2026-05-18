@@ -82,7 +82,7 @@ mkdir -p "$DIFF_DIR"
 if [[ ! -f "$MANIFEST" ]]; then
 	echo "FAIL: manifest not found at $MANIFEST"
 	if [[ "$MODE" == "vqa" ]]; then
-		echo "  Run: bash scripts/gen-all-vqa-goldens.sh"
+		echo "  Run: nix run .#vqa-decode -- --engine=ffmpeg --vqa=ENGLISH --mix=MAIN.MIX --out=<dir>"
 	else
 		echo "  Run: python3 scripts/capture-checkpoint.py mission $SCENE --targets wine"
 	fi
