@@ -6,14 +6,14 @@
 # in-game.
 #
 # ─── Prerequisites ───────────────────────────────────────────────────────────
-# Same as wine-ra.sh: wine32, RA95.EXE at /opt/redalert/RA95.EXE, MAIN.MIX
+# Same as wine-ra.sh: wine32, RA95.EXE from Nix store, MAIN.MIX
 # in DATA_DIR, xdotool, ImageMagick (import or scrot).
 #
 # ─── Usage ───────────────────────────────────────────────────────────────────
 #  bash scripts/wine-gameplay.sh [EXE_PATH] [DATA_DIR] [SCREENSHOT_DIR]
 #
-#  EXE_PATH    path to RA95.EXE   (default: /opt/redalert/RA95.EXE)
-#  DATA_DIR    CD1 data directory  (default: /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1)
+#  EXE_PATH    path to RA95.EXE   (default: Nix store ra-patched-exe)
+#  DATA_DIR    CD1 data directory  (default: RA_ASSETS env var)
 #  SCREENSHOT_DIR output dir      (default: e2e/screenshots)
 #
 # ─── Outputs ─────────────────────────────────────────────────────────────────
@@ -50,10 +50,23 @@
 
 set -euo pipefail
 
-RA_EXE_PATH="${1:-${RA_EXE_PATH:-/opt/redalert/game/RA95.EXE}}"
-DATA_DIR="${2:-/opt/redalert/game}"
+RA_EXE_PATH="${1:-${RA_EXE_PATH:-}}"
+if [[ -z "$RA_EXE_PATH" ]]; then
+	RA_EXE_PATH=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
+fi
+if [[ -z "$RA_EXE_PATH" ]] || [[ ! -f "$RA_EXE_PATH" ]]; then
+	echo "ERROR: RA95.EXE not found. Set RA_EXE_PATH or run from nix develop."
+	exit 1
+fi
+
+DATA_DIR="${2:-${RA_ASSETS:-}}"
+if [[ -z "$DATA_DIR" ]]; then
+	echo "ERROR: RA game data directory not found. Set RA_ASSETS."
+	exit 1
+fi
+
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
-WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-ra}"
+WINE_PREFIX="$(mktemp -d /tmp/wine-gameplay-XXXXXX)"
 DISPLAY_NUM="${WINE_DISPLAY:-:97}" # Use :97 to avoid collision with wine-ra.sh (:98)
 WINE_WM="${WINE_WM:-openbox}"      # Lightweight WM so Wine gets a managed window for input
 
@@ -100,7 +113,7 @@ done
 
 # If a secondary REMASTERED_CD1 is set or autodiscovered, overlay its files for
 # any that are missing in DATA_DIR (e.g. HIRES1.MIX / LORES1.MIX which the OG
-# install at /opt/redalert/game lacks but the remastered CD1 ships).
+# install lacks but the remastered CD1 ships).
 REMASTERED_CD1="${REMASTERED_CD1:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
 if [[ -d "$REMASTERED_CD1" ]]; then
 	for f in "$REMASTERED_CD1"/*.MIX; do

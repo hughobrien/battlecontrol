@@ -14,8 +14,12 @@ set -euo pipefail
 
 WINE="${WINE:-/usr/bin/wine}"
 WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim869-gdi-m2}"
-TD_EXE_PATH="${TD_EXE_PATH:-/opt/tiberiandawn/C&C95.EXE}"
-TD_DLL_DIR="${TD_DLL_DIR:-/opt/tiberiandawn}"
+TD_EXE_PATH="${1:-${TD_EXE_PATH:-}}"
+if [[ -z "$TD_EXE_PATH" ]] || [[ ! -f "$TD_EXE_PATH" ]]; then
+	echo "ERROR: C&C95.EXE not found. Set TD_EXE_PATH or pass as first argument."
+	exit 1
+fi
+TD_DLL_DIR="$(dirname "$TD_EXE_PATH")"
 CNC_DDRAW_DIR="${CNC_DDRAW_DIR:-/tmp/cnc-ddraw-master}"
 DATA_DIR="${DATA_DIR:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-e2e/tim869/gdi-m2}"

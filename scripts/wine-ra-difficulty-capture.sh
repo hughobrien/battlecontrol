@@ -13,11 +13,19 @@ set -euo pipefail
 
 DATA_DIR="${1:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
 ARTIFACT_DIR="${2:-e2e/tim772/captures}"
-RA_EXE="${RA_EXE:-/opt/redalert/game/RA95.EXE}"
+RA_EXE="${1:-${RA_EXE_PATH:-}}"
+if [[ -z "$RA_EXE" ]]; then
+	RA_EXE=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null) || true
+fi
+if [[ -z "$RA_EXE" ]] || [[ ! -f "$RA_EXE" ]]; then
+	echo "ERROR: RA95.EXE not found. Set RA_EXE_PATH or run from nix develop."
+	exit 1
+fi
+
 WINE="${WINE:-wine}"
-WINEPREFIX="${WINEPREFIX:-$HOME/.wine-tim772}"
+WINEPREFIX="$(mktemp -d /tmp/wine-difficulty-XXXXXX)"
 CNC_DDRAW="${CNC_DDRAW:-/tmp/cnc-ddraw-master/ddraw.dll}"
-DLL_DIR="${DLL_DIR:-/opt/redalert/game}"
+DLL_DIR="$(dirname "$RA_EXE")"
 RUN_SECONDS="${RUN_SECONDS:-120}"
 
 THIS_DIR="$(cd "$(dirname "$0")" && pwd)"
