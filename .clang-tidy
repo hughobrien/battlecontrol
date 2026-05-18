@@ -31,5 +31,4 @@ CheckOptions:
   bugprone-argument-comment.StrictMode: false
 
 HeaderFilterRegex: ''
-AnalyzeTemporaryDtors: false
 FormatStyle: none
