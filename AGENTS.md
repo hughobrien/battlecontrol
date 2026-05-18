@@ -435,6 +435,14 @@ Things an agent must never break:
    specific files with explicit paths. Blind `-A` picks up unrelated changes and
    risks committing garbage (node_modules/ logs, build artifacts, generated files).
 
+9. **Wine builds are FPS-limited via cnc-ddraw.** All Wine capture scripts set
+   `maxfps=30` in `ddraw.ini` (under `[ddraw]`). This applies to both RA and TD.
+   Never remove or change this without updating all 11 scripts:
+   `wine-allied-l1.sh`, `wine-allied-m2.sh`, `wine-soviet-l1.sh`,
+   `wine-soviet-m2.sh`, `wine-nod-l1.sh`, `wine-nod-m1.sh`, `wine-gdi-m1.sh`,
+   `wine-gdi-m2.sh`, `wine-vqa-capture.sh`, `wine-cnc-capture.sh`,
+   `wine-ra-difficulty-capture.sh`.
+
 ---
 
 ## Key Scripts Reference

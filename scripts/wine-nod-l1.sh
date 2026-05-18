@@ -96,6 +96,7 @@ renderer=gdi
 windowed=true
 hook=0
 window_state=normal
+maxfps=30
 keytogglefullscreen=0x00
 EOF
 

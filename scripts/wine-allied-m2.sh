@@ -171,6 +171,7 @@ renderer=gdi
 windowed=true
 hook=0
 window_state=normal
+maxfps=30
 
 [ra95]
 scanline_double=true

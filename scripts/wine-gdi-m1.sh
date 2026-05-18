@@ -162,6 +162,7 @@ renderer=gdi
 windowed=true
 hook=0
 window_state=normal
+maxfps=30
 keytogglefullscreen=0x00
 DDRAWINI
 echo " cnc-ddraw installed: $CNC_DDRAW_DIR/ddraw.dll → $STAGE/ddraw.dll"
