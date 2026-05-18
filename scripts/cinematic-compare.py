@@ -148,28 +148,67 @@ def label_vqa(num_frames: int) -> str:
 
 
 def _read_png_rgb(path: str) -> tuple[int, int, bytearray]:
-    """Return (w, h, rgb_bytes) from a PNG file."""
+    """Return (w, h, rgb_bytes) from a PNG file.
+
+    Properly applies PNG reconstruction filters (None/Sub/Up/Average/Paeth).
+    Without this step, filter types 1-4 produce corrupted pixel data — the
+    bytes stored in IDAT are delta-encoded relative to adjacent pixels/rows.
+    """
     with open(path, "rb") as fh:
         data = fh.read()
     pos = 8
     w = h = 0
+    bit_depth = 8
     idat = b""
     while pos < len(data):
         sz = struct.unpack_from(">I", data, pos)[0]
         tag = data[pos + 4 : pos + 8]
         body = data[pos + 8 : pos + 8 + sz]
         if tag == b"IHDR":
-            w, h = struct.unpack_from(">II", body, 0)
+            w, h, bit_depth = struct.unpack_from(">IIB", body, 0)
         elif tag == b"IDAT":
             idat += body
         elif tag == b"IEND":
             break
         pos += 12 + sz
     raw = zlib.decompress(idat)
-    row_sz = 1 + w * 3
+    bpp = (bit_depth * 3 + 7) // 8  # bytes per pixel (RGB 8-bit = 3)
+    row_sz = 1 + w * bpp
     pixels = bytearray()
+    prev_row = bytearray(w * bpp)
     for y in range(h):
-        pixels += raw[1 + y * row_sz : (y + 1) * row_sz]
+        filt = raw[y * row_sz]
+        row = bytearray(raw[y * row_sz + 1 : (y + 1) * row_sz])
+        if filt == 0:
+            pass  # None — row is literal
+        elif filt == 1:
+            # Sub: recon(x) = transmitted(x) + recon(x-bpp)
+            for i in range(bpp, len(row)):
+                row[i] = (row[i] + row[i - bpp]) & 0xFF
+        elif filt == 2:
+            # Up: recon(x) = transmitted(x) + recon_prev(x)
+            for i in range(len(row)):
+                row[i] = (row[i] + prev_row[i]) & 0xFF
+        elif filt == 3:
+            # Average: recon(x) = transmitted(x) + floor((recon(x-bpp) + recon_prev(x)) / 2)
+            for i in range(len(row)):
+                left = row[i - bpp] if i >= bpp else 0
+                up = prev_row[i]
+                row[i] = (row[i] + ((left + up) // 2)) & 0xFF
+        elif filt == 4:
+            # Paeth: recon(x) = transmitted(x) + PaethPredictor(recon(x-bpp), recon_prev(x), recon_prev(x-bpp))
+            for i in range(len(row)):
+                left = row[i - bpp] if i >= bpp else 0
+                up = prev_row[i]
+                ul = prev_row[i - bpp] if i >= bpp else 0
+                p = left + up - ul
+                pa = abs(p - left)
+                pb = abs(p - up)
+                pc = abs(p - ul)
+                pr = left if pa <= pb and pa <= pc else (up if pb <= pc else ul)
+                row[i] = (row[i] + pr) & 0xFF
+        pixels += row
+        prev_row = row[:]
     return w, h, pixels
 
 
