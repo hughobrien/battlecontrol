@@ -87,8 +87,8 @@ WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --restart 2>/dev/null || true
 sleep 6
 # Verify D: drive is accessible
 WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine cmd /c 'dir /b D:\MAIN.MIX' 2>/dev/null | grep -q MAIN || {
-    echo "WARNING: D: drive not accessible, sleeping more..."
-    sleep 6
+	echo "WARNING: D: drive not accessible, sleeping more..."
+	sleep 6
 }
 
 # ─── Xvfb ────────────────────────────────────────────────────────────────────
