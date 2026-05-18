@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # _gating.sh — diff-gating helper.
 # Source this script to determine which targets are affected by current changes.
 #
@@ -8,9 +9,13 @@
 #
 # Default base: origin/master. Falls back to HEAD~1.
 
+# shellcheck disable=SC2034
 GATE_RA_NATIVE=false
+# shellcheck disable=SC2034
 GATE_TD_NATIVE=false
+# shellcheck disable=SC2034
 GATE_RA_WASM=false
+# shellcheck disable=SC2034
 GATE_TD_WASM=false
 
 _parse_gating_args() {

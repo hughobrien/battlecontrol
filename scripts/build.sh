@@ -13,6 +13,7 @@ bash "$SCRIPT_DIR/lint.sh"
 echo ""
 echo "=== Build ==="
 
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/_gating.sh" "$@"
 
 build_native() {
