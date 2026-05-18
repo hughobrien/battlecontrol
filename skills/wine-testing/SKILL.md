@@ -302,7 +302,9 @@ no_compat_warning=true
 fake_mode=640x400x8
 EOF
 
-cp /opt/redalert/RA95.EXE "$STAGE/RA95.EXE"  # Must have NoCD+DDSCL+cdlabel patches
+# Resolve from Nix store (NoCD+DDSCL+cdlabel patches pre-applied)
+RA_EXE=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null)
+cp "$RA_EXE" "$STAGE/RA95.EXE"
 cp tools/stub-thipx/thipx32.dll "$STAGE/THIPX32.DLL"
 cp "$(nix build .#cnc-ddraw --impure --print-out-paths)/bin/ddraw.dll" "$STAGE/DDRAW.DLL"
 ```
@@ -343,7 +345,7 @@ bash scripts/wine-td.sh                           # TD
 ### With explicit paths
 
 ```bash
-bash scripts/wine-ra.sh /opt/redalert/RA95.EXE \
+bash scripts/wine-ra.sh \
     /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1 \
     e2e/screenshots
 ```
