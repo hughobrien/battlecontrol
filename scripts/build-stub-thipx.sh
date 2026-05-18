@@ -9,8 +9,9 @@
 # sensible defaults without loading THIPX16.DLL.
 #
 # Usage:
-#   bash scripts/build-stub-thipx.sh          # build + verify
-#   bash scripts/build-stub-thipx.sh install  # build + deploy to game dirs
+#   bash scripts/build-stub-thipx.sh                # build
+#   bash scripts/build-stub-thipx.sh <exe-path>     # build + check THIPX32 import in exe
+#   bash scripts/build-stub-thipx.sh --help         # show usage
 
 set -euo pipefail
 
@@ -35,20 +36,21 @@ echo "=== Export verification ==="
 i686-w64-mingw32-objdump -p "$OUT" | grep -A 30 "Ordinal/Name" | head -25
 
 echo ""
-echo "=== RA95.EXE import check ==="
-RA_EXE="/opt/redalert/game/RA95.EXE.orig"
-if [[ -f "$RA_EXE" ]]; then
-	i686-w64-mingw32-objdump -p "$RA_EXE" 2>/dev/null | grep -A 20 "thipx32"
+# Optional: check an existing RA95.EXE for THIPX32 import (pass path as arg)
+if [[ -n "${1:-}" ]] && [[ -f "$1" ]]; then
+	echo "=== RA95.EXE import check: $1 ==="
+	i686-w64-mingw32-objdump -p "$1" 2>/dev/null | grep -A 20 "thipx32" || echo "  No THIPX32 import found"
+elif [[ "${1:-}" == "--help" ]]; then
+	echo "Usage: $0 [exe-path]"
+	echo "  Builds stub THIPX32.DLL to tools/stub-thipx/thipx32.dll"
+	echo "  Optionally pass a path to an EXE to verify THIPX32 import."
+	exit 0
 fi
 
-# Optional install
-if [[ "${1:-}" == "install" ]]; then
-	echo ""
-	echo "=== Installing to game directories ==="
-	install -m 644 "$OUT" /opt/redalert/game/THIPX32.DLL 2>/dev/null || true
-	echo "  /opt/redalert/game/THIPX32.DLL"
-	echo "Done."
-fi
+echo ""
+echo "  Stub built at: $OUT"
+echo "  Copy this to your Wine game staging dir, e.g.:"
+echo "    cp $OUT <stage-dir>/THIPX32.DLL"
 
 echo ""
 echo "=== Build complete ==="
