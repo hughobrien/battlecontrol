@@ -19,7 +19,7 @@ find REDALERT TIBERIANDAWN -type f \
   \! -path '*/WIN32LIB/*' \
   \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
   -print0 | xargs -0 -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
-  | tee /tmp/clang-tidy-report.txt
+  | tee /tmp/clang-tidy-report.txt || true
 echo "$(grep -c 'warning:\|error:' /tmp/clang-tidy-report.txt 2>/dev/null || echo 0) clang-tidy finding(s)"
 
 echo ""
