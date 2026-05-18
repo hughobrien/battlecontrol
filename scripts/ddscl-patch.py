@@ -139,15 +139,11 @@ def patch(path: str, dry_run: bool = False) -> int:
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not args:
+        print(f"Usage: {__file__} <exe-path> [exe-path ...]", file=sys.stderr)
+        sys.exit(1)
     dry = "--dry-run" in sys.argv
-    paths = (
-        args
-        if args
-        else [
-            "/opt/redalert/RA95.EXE",
-            "/opt/redalert/game/RA95.EXE",
-        ]
-    )
+    paths = args
     rc = 0
     for p in paths:
         try:
