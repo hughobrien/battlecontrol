@@ -162,6 +162,13 @@ wasm_validate(target: "both")
 Outputs: `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`,
 `build-wasm/td.html`
 
+> ⚠️ **Stale CMake cache.** If `wasm_build` fails with `include could not find
+> requested file: /nix/store/.../Emscripten.cmake`, the `build-wasm/` directory
+> has a stale CMake cache from a previous Nix store path. Nix rebuilds Emscripten
+> at a new store path each time, but CMake caches the old path in
+> `build-wasm/CMakeFiles/.../CMakeSystem.cmake`. Fix: delete `build-wasm/` and
+> reconfigure (`wasm_build(target: "ra", clean: true)`).
+
 ### GitHub Pages deploy (automatic)
 
 On every merge to `master`, the `gh-pages.yml` workflow:
