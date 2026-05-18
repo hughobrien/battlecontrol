@@ -408,8 +408,7 @@
           echo "  nix run .#parity-report -- <scene>  Three-way parity report"
           echo "  nix run .#edit-loop   — include-shim→lint-lp64→build→smoke (native)"
           echo "  nix run .#wasm-loop   — build→validate→smoke (WASM)"
-          echo "  nix run .#test-t1     — T1 RA boot smoke"
-          echo "  nix run .#test-t2     — T2 TD boot smoke"
+          echo "  nix run .#test         — T1 + T2 boot smokes (default), or with <spec>"
           echo "  nix run .#test -- <spec>     run e2e test under Xvfb+WASM"
           echo "  nix run .#ci                 all local CI gates"
           echo "  nix run .#wasm-loop           WASM build → validate → smoke T1+T2"
@@ -607,9 +606,9 @@
 
         test = mkApp "run-e2e" ''
           if [ $# -eq 0 ]; then
-            echo "Usage: nix run .#test -- <spec>"
-            echo "  e.g. nix run .#test -- e2e/regression/T1-ra-wasm-boot.spec.ts"
-            exit 1
+            # Default: T1 + T2 asset-free boot smokes
+            bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+            exec bash scripts/run-e2e.sh e2e/regression/T2-td-wasm-boot.spec.ts
           fi
           exec bash scripts/run-e2e.sh "$@"
         '';
@@ -724,8 +723,7 @@
           echo "=== WASM loop: build → validate → smoke ==="
           nix run .#build-wasm
           nix run .#validate-wasm
-          nix run .#test-t1
-          nix run .#test-t2
+          nix run .#test
         '';
 
         # ── CI Job Apps ────────────────────────────────────────────────────
