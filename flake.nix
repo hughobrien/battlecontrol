@@ -414,8 +414,7 @@
           echo "  nix run .#test -- <spec>     run e2e test under Xvfb+WASM"
           echo "  nix run .#ci                 all local CI gates"
           echo "  nix run .#wasm-loop           WASM build → validate → smoke T1+T2"
-          echo "  nix run .#ci-clang-tidy       CI: clang-tidy static analysis"
-          echo "  nix run .#ci-cppcheck         CI: cppcheck static analysis"
+          echo "  nix run .#ci                  all local CI gates (incl. static analysis)"
           echo ""
           echo "  nix run .#redalert           run Red Alert (needs RA data)"
           echo "  nix run .#tiberiandawn        run Tiberian Dawn (needs TD data)"
@@ -785,30 +784,6 @@
           ccache --zero-stats && ccache --max-size 500M
         '';
 
-        ci-clang-tidy = mkApp "ci-clang-tidy" ''
-          set -e
-          cmake --preset linux-native -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-          find REDALERT TIBERIANDAWN -type f \
-            \! -path '*/WIN32LIB/*' \
-            \( -name '*.cpp' -o -name '*.CPP' -o -name '*.c' -o -name '*.C' \) \
-            | xargs -P "$(nproc)" -I{} clang-tidy -p build --quiet {} 2>&1 \
-            | tee clang-tidy-report.txt
-          echo "$(grep -c 'warning:\|error:' clang-tidy-report.txt 2>/dev/null || echo 0) finding(s)"
-        '';
-
-        ci-cppcheck = mkApp "ci-cppcheck" ''
-          set -e
-          cppcheck --enable=warning,performance,portability,information \
-            --suppress=missingIncludeSystem \
-            --suppress=unmatchedSuppression \
-            --inline-suppr --error-exitcode=0 \
-            -j "$(nproc)" --quiet \
-            -I REDALERT -I REDALERT/WIN32LIB \
-            -I TIBERIANDAWN -I TIBERIANDAWN/WIN32LIB \
-            -I linux/win32-stubs \
-            REDALERT TIBERIANDAWN 2>&1 | tee cppcheck-report.txt
-          echo "$(grep -c 'error:\|warning:' cppcheck-report.txt 2>/dev/null || echo 0) finding(s)"
-        '';
       };
     };
 }
