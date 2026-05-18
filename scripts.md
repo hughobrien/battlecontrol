@@ -21,8 +21,8 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | Run T2 (TD boot) | — | `test-t2` | `scripts/run-e2e.sh` | `ci.yml → build-wasm` | — |
 | CI gate (local) | `ci_local` | `ci` | `scripts/ci-local.sh` | — | — |
 | CI native build | — | `build-native` | `scripts/build-native.sh` | `ci.yml → build` | — |
-| CI WASM build+smoke | — | `ci-build-wasm` | inline (flake.nix) | `ci.yml → build-wasm` | — |
-| CI WASM smoke | — | `ci-wasm-smoke` | inline (flake.nix) | called by ci-build-wasm | — |
+| WASM loop (CI) | — | `wasm-loop` | inline (flake.nix) | `ci.yml → build-wasm` | — |
+| CI WASM smoke | — | `ci-wasm-smoke` | inline (flake.nix) | called by wasm-loop | — |
 | CI test run | — | `test` | `scripts/run-e2e.sh` | `ci.yml → build-wasm` (T3/T6/T7/T8/T9) | — |
 | CI VQA pixel-diff | — | `vqa-check` | `scripts/vqa-check.sh` | `ci.yml → vqa-pixel-diff` | — |
 | CI ccache setup | — | `ci-cc-setup` | inline (flake.nix) | `gh-pages.yml` | — |
@@ -102,7 +102,7 @@ Comprehensive catalog of all commands across the three invocation surfaces:
 | | `ci_local(mode)` | Same, via extension tool. |
 | | `scripts/ci-local.sh [--wasm-only\|--native-only]` | Same, directly. |
 | CI native build | `nix run .#build-native` | Native build with integrated ELF 64-bit validation. |
-| CI WASM build | `nix run .#ci-build-wasm` | WASM build + validate + smoke T1+T2 (for CI). |
+| WASM loop | `nix run .#wasm-loop` | Build → validate → smoke T1+T2. |
 | CI WASM smoke | `nix run .#ci-wasm-smoke` | Xvfb + serve-coop + T1+T2 Playwright tests. |
 | CI test run | `nix run .#test -- <spec>` | Run one Playwright spec under Xvfb + WASM (for asset-gated tests). |
 | CI VQA | `nix run .#vqa-check` | Generate test VQA + pixel-diff (for CI). |
@@ -271,7 +271,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `toolchain-check` | nix app | Lint | Toolchain prerequisite check. |
 | `ci` | nix app | CI | Run all local CI gates. |
 | `ci-build-native` | nix app | CI | Removed — merged into `build-native`. |
-| `ci-build-wasm` | nix app | CI | CI WASM build + validate + smoke. |
+| `ci-build-wasm` | nix app | CI | Removed — use `wasm-loop` instead. |
 | `ci-cc-setup` | nix app | CI | Configure ccache for CI. |
 | `ci-clang-tidy` | nix app | CI | CI clang-tidy static analysis. |
 | `ci-cppcheck` | nix app | CI | CI cppcheck static analysis. |

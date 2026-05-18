@@ -180,7 +180,7 @@ jobs:
       - name: Build WASM + validate + smoke (T1/T2)
         env:
           EM_CACHE: ${{ env.EM_CACHE_DIR }}
-        run: nix develop --command nix run .#ci-build-wasm
+        run: nix develop --command nix run .#wasm-loop
 
       - name: WASM regression — T3 TD menu click (asset-gated)
         env:
