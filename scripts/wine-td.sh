@@ -17,15 +17,20 @@
 #   - CONQUER.INI disables hardware blits for Wine compatibility.
 #   - Title→menu transition may require GL context (same as RA).
 #
-# ─── First-time setup ────────────────────────────────────────────────────────
-# Run this once to get all prerequisites:
-#   bash scripts/wine-td-setup.sh
+# ─── Prerequisites ──────────────────────────────────────────────────────────
+# Requires:
+#   - Wine (provided by nix develop shell)
+#   - C&C95.EXE at TD_EXE_PATH or first argument
+#   - TD game data at TD_ASSETS (default: /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1)
+#   - Stub THIPX32.DLL at tools/stub-thipx/thipx32.dll
+#
+# See bash scripts/wine-td-setup.sh for C&C95.EXE download instructions.
 #
 # ─── Usage ───────────────────────────────────────────────────────────────────
 #    bash scripts/wine-td.sh [EXE_PATH] [DATA_DIR] [SCREENSHOT_DIR]
 #
-#    EXE_PATH        path to C&C95.EXE     (default: /opt/tiberiandawn/C&C95.EXE)
-#    DATA_DIR        CD1 data directory    (default: /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1)
+#    EXE_PATH        path to C&C95.EXE     (default: TD_EXE_PATH env var)
+#    DATA_DIR        CD1 data directory    (default: TD_ASSETS env var)
 #    SCREENSHOT_DIR  output dir            (default: e2e/screenshots)
 #
 # ─── Outputs ─────────────────────────────────────────────────────────────────
@@ -38,10 +43,23 @@
 
 set -euo pipefail
 
-CC95_EXE_PATH="${1:-${CC95_EXE_PATH:-/opt/tiberiandawn/C&C95.EXE}}"
-DATA_DIR="${2:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
+# Argument defaults: explicit arg → env var → error
+CC95_EXE_PATH="${1:-${CC95_EXE_PATH:-}}"
+if [[ -z "$CC95_EXE_PATH" ]] || [[ ! -f "$CC95_EXE_PATH" ]]; then
+  echo "ERROR: C&C95.EXE not found."
+  echo "  Pass as first argument, set TD_EXE_PATH, or download manually."
+  echo "  See: bash scripts/wine-td-setup.sh"
+  exit 1
+fi
+
+DATA_DIR="${2:-${TD_ASSETS:-}}"
+if [[ -z "$DATA_DIR" ]]; then
+  echo "ERROR: TD game data directory not found."
+  echo "  Pass as second argument or set TD_ASSETS."
+  exit 1
+fi
+
 SCREENSHOT_DIR="${3:-e2e/screenshots}"
-WINE_PREFIX="${WINE_PREFIX:-$HOME/.wine-td}"
 DISPLAY_NUM="${WINE_DISPLAY:-:99}"
 
 mkdir -p "$SCREENSHOT_DIR"
@@ -79,28 +97,45 @@ echo "  exe:  $CC95_EXE_PATH (sha256=$EXE_SHA)"
 echo "  data: $DATA_DIR"
 echo ""
 
-# ─── Wine prefix + staging ───────────────────────────────────────────────────
+# ─── Ephemeral WINEPREFIX + staging ──────────────────────────────────────────
 
 echo "=== Wine staging ==="
-TD_STAGE="$(mktemp -d)"
-trap 'rm -rf "$TD_STAGE"' EXIT
 
-# Link MIX data into staging directory.
+# Create ephemeral prefix under /tmp (no /opt, no $HOME/.wine-td)
+WINE_PREFIX="$(mktemp -d /tmp/wine-td-XXXXXX)"
+
+# Stage directory inside the prefix
+TD_STAGE="$WINE_PREFIX/drive_c/game"
+mkdir -p "$TD_STAGE"
+
+# Initialize the prefix
+echo "  Prefix: $WINE_PREFIX"
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
+
+# Configure Wine virtual desktop (640x400) and GDI renderer
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+  'HKCU\Software\Wine\Explorer\Desktops' \
+  /v Default /t REG_SZ /d "640x400" /f >/dev/null 2>&1 || true
+WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
+  'HKCU\Software\Wine\Direct3D' \
+  /v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
+
+# Link MIX data into staging
+echo "  Linking data: $DATA_DIR"
 for f in "$DATA_DIR"/*.MIX; do
-	[[ -e "$f" ]] && ln -sf "$f" "$TD_STAGE/$(basename "$f")"
+  [[ -e "$f" ]] && ln -sf "$f" "$TD_STAGE/$(basename "$f")"
 done
-# Copy EXE into staging (symlink broken by wine on some paths).
+
+# Copy EXE into staging
 cp "$CC95_EXE_PATH" "$TD_STAGE/C&C95.EXE"
-# Use stub THIPX32.DLL if available, else fall back to original.
+
+# Use stub THIPX32.DLL (no /opt/tiberiandawn fallback)
 STUB_DIR="$(cd "$(dirname "$0")/.." && pwd)/tools/stub-thipx"
 if [[ -f "$STUB_DIR/thipx32.dll" ]]; then
-	cp "$STUB_DIR/thipx32.dll" "$TD_STAGE/THIPX32.DLL"
-else
-	THIPX_SRC="$(dirname "$CC95_EXE_PATH")/THIPX32.DLL"
-	[[ -f "$THIPX_SRC" ]] && cp "$THIPX_SRC" "$TD_STAGE/THIPX32.DLL"
+  cp "$STUB_DIR/thipx32.dll" "$TD_STAGE/THIPX32.DLL"
 fi
 
-# CONQUER.INI: disable hardware blits so game stays alive under Wine's GDI path.
+# CONQUER.INI: disable hardware blits
 cat >"$TD_STAGE/CONQUER.INI" <<'INIEOF'
 [Options]
 HardwareFills=0
@@ -110,20 +145,6 @@ VideoBackBufferAllowed=0
 AllowHardwareBlitFills=0
 ScreenHeight=400
 INIEOF
-
-if [[ ! -d "$WINE_PREFIX" ]]; then
-	echo "  Creating Wine prefix at $WINE_PREFIX..."
-	WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wineboot --init 2>/dev/null
-fi
-
-# Configure Wine virtual desktop (640x400) and GDI renderer so the game
-# window is capturable via ffmpeg x11grab without needing DirectDraw.
-WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-	'HKCU\Software\Wine\Explorer\Desktops' \
-	/v Default /t REG_SZ /d "640x400" /f >/dev/null 2>&1 || true
-WINEPREFIX="$WINE_PREFIX" WINEDEBUG=-all wine reg add \
-	'HKCU\Software\Wine\Direct3D' \
-	/v DirectDrawRenderer /t REG_SZ /d gdi /f >/dev/null 2>&1 || true
 
 echo "  Staging: $TD_STAGE"
 echo ""
@@ -135,7 +156,7 @@ pkill -f "Xvfb $DISPLAY_NUM" 2>/dev/null || true
 Xvfb "$DISPLAY_NUM" -screen 0 640x400x8 -ac &
 XVFB_PID=$!
 cleanup_xvfb() { kill -9 "$XVFB_PID" 2>/dev/null || true; }
-trap 'rm -rf "$TD_STAGE"; cleanup_xvfb' EXIT
+trap 'rm -rf "$WINE_PREFIX"; cleanup_xvfb' EXIT
 sleep 1
 echo "  Xvfb pid=$XVFB_PID"
 
