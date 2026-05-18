@@ -390,7 +390,7 @@ Each skill lists which extension tools apply.
 | Native build | `skills/native-build/` | `toolchain_check`, `native_build` | CMake failure, missing SDL2, LP64 crashes |
 | WASM/Emscripten | `skills/emscripten/` | `wasm_build`, `wasm_validate`, `wasm_screenshot`, `run_e2e_test` | EM_ASM silent, black screen, garbled audio |
 | E2E testing | `skills/e2e-testing/` | `serve_wasm`, `serve_assets`, `run_e2e_test` | pageerror, `__wasmReady` timeout, blank Xvfb |
-| Wine testing | `skills/wine-testing/` | `wine_check`, `wine_capture` | Wine prefix failure, DirectDraw blank |
+| Wine testing | `skills/wine-testing/` | `wine_check`, `wine_capture` | Wine prefix failure, DirectDraw blank, EXE binary patching for auto-launch |
 | VQA codec | `skills/vqa-codec/` | `vqa_pixel_diff` | Block corruption, palette errors, CI failure |
 | Parity comparison | `skills/parity-comparison/` | `data_verify`, `wine_capture`, `parity_compare`, `vqa_pixel_diff` | SSIM regression, parity failure |
 | CI/CD | `skills/ci-cd/` | `wasm_build`, `wasm_validate`, `native_build`, `run_e2e_test` | CI failure, release broken, deploy stuck |
@@ -475,8 +475,69 @@ moved to `scripts/archive/`.
 | `wine-ra-setup.sh` / `wine-td-setup.sh` | First-time Wine prefix setup |
 | `wine-allied-l1.sh` / `wine-soviet-l1.sh` | Campaign-specific Wine captures |
 | `wine-vqa-capture.sh` | Wine VQA playback frame capture |
+| `ra-autostart-patch.py` | Binary patch for RA95.EXE: zero-click auto-boot into any Allied mission at Normal difficulty. See [Auto-launch patch](#auto-launch-patch-wine) below. |
+| `ra-scenario-patch.py` | Replace hardcoded mission name in RA95.EXE (e.g. SCG01EA→SCG02EA) |
 | `tools/wine-input/*` | SendInput injectors + BitBlt capture inside Wine |
 | `tools/cnc-ddraw/` flake | Build cnc-ddraw with scanline_double patch — `nix build path:./tools/cnc-ddraw#cnc-ddraw` |
+
+---
+
+## Auto-launch patch (Wine)
+
+The `ra-autostart-patch.py` + `ra-scenario-patch.py` chain applies binary patches
+to RA95.EXE so the game boots directly into any Allied mission at Normal difficulty
+with zero menu clicks — no SendInput automation needed.
+
+### Patch chain order
+
+Apply in this order (existing Wine scripts apply the first 5 at runtime):
+
+```bash
+python3 scripts/nocd-patch.py RA95.EXE
+python3 scripts/ddscl-patch.py RA95.EXE
+printf '\x00' | dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc  # cdlabel
+python3 scripts/focus-skip-patch.py RA95.EXE
+python3 scripts/game-in-focus-patch.py RA95.EXE
+python3 scripts/vqa-skip-patch.py RA95.EXE
+python3 scripts/ra-scenario-patch.py RA95.EXE SCG02EA   # target mission
+python3 scripts/ra-autostart-patch.py RA95.EXE           # auto-boot
+```
+
+### What it does
+
+Four patches to `Select_Game()` in the RA95.EXE binary:
+
+| Patch | Effect |
+|-------|--------|
+| `esi=4` → `esi=1` | Forces `selection=SEL_START_NEW_GAME` — enters new-game handler, skips Main_Menu |
+| NOP `je` to Fetch_Difficulty | Always sets DIFF_NORMAL — no difficulty dialog |
+| `jne` → `jmp` to Choose_Side | Skips faction dialog — Choose_Side just plays a movie (already NOPed by vqa-skip) |
+| NOP `jne` to Soviet string | Always picks SCG01EA.INI (already patched to target by ra-scenario-patch) |
+
+### Mission naming
+
+| Filename | Mission |
+|----------|---------|
+| `SCG01EA.INI` | Allied L1 |
+| `SCG02EA.INI` | Allied L2 |
+| `SCG03EA.INI` | Allied L3 |
+| `SCU01EA.INI` | Soviet L1 |
+
+Difficulty is baked into the game's handicap system, not the filename — Normal
+is the default for the `IsFromInstall` code path (which the patches activate).
+The scenario INI data lives inside `MAIN.MIX`.
+
+### Native/WASM equivalent
+
+For the Linux native or WASM builds, use environment variables instead of binary
+patches (already implemented in `INIT.CPP`):
+
+```bash
+RA_AUTOSTART=1 RA_AUTOSTART_SCENARIO=SCG02EA.INI ./build/ra/redalert
+```
+
+Difficulty defaults to Normal; an `RA_AUTOSTART_DIFFICULTY` env var is the
+next step.
 
 ---
 

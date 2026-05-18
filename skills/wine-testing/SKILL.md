@@ -382,7 +382,60 @@ for campaign-level screenshot comparison beyond the title/menu state.
 
 ---
 
-## §5 — Verification bar
+## §5 — Binary auto-launch patches (skip menus, any difficulty)
+
+For campaign/mission testing beyond title/menu, RA95.EXE can be patched to skip all
+interactive menus and boot directly into any Allied mission at Normal difficulty.
+
+### Full patch chain (apply in order)
+
+```bash
+python3 scripts/nocd-patch.py RA95.EXE
+python3 scripts/ddscl-patch.py RA95.EXE
+printf '\x00' | dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc  # cdlabel
+python3 scripts/focus-skip-patch.py RA95.EXE
+python3 scripts/game-in-focus-patch.py RA95.EXE
+python3 scripts/vqa-skip-patch.py RA95.EXE
+python3 scripts/ra-scenario-patch.py RA95.EXE SCG02EA    # target mission
+python3 scripts/ra-autostart-patch.py RA95.EXE            # auto-boot → Normal diff
+```
+
+### What each autostart patch does
+
+`scripts/ra-autostart-patch.py` modifies four sites in `Select_Game()`:
+
+| Patch | Assembly change | Effect |
+|-------|----------------|--------|
+| Selection | `esi=4` → `esi=1` | Forces `SEL_START_NEW_GAME`, skips Main_Menu |
+| Difficulty | NOP `je Fetch_Difficulty` | Always sets DIFF_NORMAL, no dialog |
+| Faction | `jne` → `jmp Choose_Side` | Skips faction dialog (Choose_Side plays a movie, already NOPed by vqa-skip) |
+| Allies/Soviets | NOP `jne` flag check | Always picks SCG01EA.INI (patched to target by ra-scenario-patch) |
+
+### Mission names
+
+| Name | Target |
+|------|--------|
+| Allied L1 | `SCG01EA.INI` |
+| Allied L2 | `SCG02EA.INI` |
+| Allied L3 | `SCG03EA.INI` |
+| Soviet L1 | `SCU01EA.INI` |
+
+The scenario INI data lives inside `MAIN.MIX`. Difficulty is encoded in gameplay
+handicap values (set to Normal by the patches), not in the scenario filename.
+
+### Native/WASM equivalent
+
+For the port builds, use environment variables (already implemented in INIT.CPP):
+
+```bash
+RA_AUTOSTART=1 RA_AUTOSTART_SCENARIO=SCG02EA.INI ./build/ra/redalert
+```
+
+Difficulty defaults to Normal. An `RA_AUTOSTART_DIFFICULTY` env var is the next step.
+
+---
+
+## §6 — Verification bar
 
 | Gate | Minimum proof |
 |---|---|
@@ -413,5 +466,7 @@ WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts --grep "Tier 3"
 - `scripts/wine-soviet-l1.sh`, `scripts/wine-allied-l1.sh` — Campaign-specific captures
 - `scripts/wine-vqa-capture.sh` — VQA cinematic capture under Wine
 - `scripts/wine-gameplay.sh` — Generic gameplay capture under Wine
+- `scripts/ra-autostart-patch.py` — Binary patch: skip menus, force Normal difficulty
+- `scripts/ra-scenario-patch.py` — Replace mission name in RA95.EXE (e.g. SCG01EA→SCG02EA)
 - `e2e/tim699-ra-compare.spec.ts` — RA comparison test (Tier 3 = Wine OG)
 - `e2e/tim711-td-compare.spec.ts` — TD comparison test (Tier 3 = Wine OG)
