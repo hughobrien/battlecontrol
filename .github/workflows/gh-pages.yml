@@ -1,6 +1,6 @@
 # GitHub Pages Deploy — manual trigger only.
 # Builds WASM targets, runs full regression suite, deploys to GitHub Pages.
-# Local equivalent: nix run .#ci-build-wasm && nix run .#ci-wasm-smoke
+# Local equivalent: nix run .#wasm-loop
 
 name: GitHub Pages Deploy
 

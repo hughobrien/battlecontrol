@@ -412,7 +412,7 @@
           echo "  nix run .#test-t2     — T2 TD boot smoke"
           echo "  nix run .#test -- <spec>     run e2e test under Xvfb+WASM"
           echo "  nix run .#ci                 all local CI gates"
-          echo "  nix run .#ci-build-wasm       CI: WASM build + validate + smoke"
+          echo "  nix run .#wasm-loop           WASM build → validate → smoke T1+T2"
           echo "  nix run .#ci-clang-tidy       CI: clang-tidy static analysis"
           echo "  nix run .#ci-cppcheck         CI: cppcheck static analysis"
           echo ""
@@ -774,25 +774,6 @@
           kill $SERVER_PID 2>/dev/null || true
           kill $XVFB_PID 2>/dev/null || true
           exit $SMOKE_EXIT
-        '';
-
-        ci-build-wasm = mkApp "ci-build-wasm" ''
-                    set -e
-                    emcmake cmake --preset wasm
-                    cmake --build build-wasm --target ra --parallel
-                    cmake --build build-wasm --target td --parallel
-                    python3 -c "
-          import os, struct
-          MIN_SIZE = 1_000_000
-          for name in ('build-wasm/ra.wasm', 'build-wasm/td.wasm'):
-              with open(name, 'rb') as f:
-                  magic = f.read(4)
-              assert magic == b'\\x00asm', name + ': bad magic'
-              size = os.path.getsize(name)
-              assert size > MIN_SIZE, name + ': too small (' + str(size) + ' bytes < ' + str(MIN_SIZE) + ')'
-              print(name + ': ' + str(size // 1024) + ' KB OK')
-          "
-                    nix run .#ci-wasm-smoke
         '';
 
         ci-cc-setup = mkApp "ci-cc-setup" ''
