@@ -62,7 +62,6 @@ scripts/
 ├── parity.sh                    (shared)
 ├── probe-layout.cpp             (shared)
 ├── regression.sh                (shared — orchestrator, calls test-runner.sh)
-├── run-e2e.sh                   (shared)
 ├── serve-wasm.sh                (shared)
 ├── test-runner.sh               (shared — dispatches by game+platform)
 ├── test.sh                      (shared)

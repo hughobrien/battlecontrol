@@ -228,7 +228,7 @@ playwright test --repeat-each 3 e2e/regression/T1-ra-wasm-boot.spec.ts
   with:
     timeout_minutes: 10
     max_attempts: 2
-    command: bash scripts/run-e2e.sh e2e/regression/T1-ra-wasm-boot.spec.ts
+    command: bash scripts/test-runner.sh ra wasm
 ```
 
 Before adding retries, try fixing the root cause. Retry should be a last resort.
@@ -278,11 +278,11 @@ For runner-level issues (disk space, Docker daemon):
 
 1. Write the test following `docs/smoke-test-design-rule.md`
 2. Add it to `gh-pages.yml` as a new step under the "Playwright tests" section.
-   Use the shared runner script so the full setup (Xvfb + server + test + cleanup)
+   Use the shared test-runner so the full setup (Xvfb + server + test + cleanup)
    is a single step:
    ```yaml
    - name: WASM — T{N} {description}
-     run: bash scripts/run-e2e.sh e2e/regression/T{N}-{name}.spec.ts
+     run: bash scripts/test-runner.sh ra wasm --full
    ```
 3. Upload screenshots on failure:
    ```yaml

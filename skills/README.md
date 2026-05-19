@@ -85,7 +85,6 @@ multi-step command sequences. Each script handles setup, teardown, and error rec
 |--------|---------|---------------|
 | `scripts/xvfb-ensure.sh` | Idempotent Xvfb start (kills stale, wait loop, EXIT trap) | native-build, e2e-testing, parity-comparison, ci-cd |
 | `scripts/serve-wasm.sh` | Start serve-coop.py with auto-cleanup EXIT trap | e2e-testing, ci-cd |
-| `scripts/run-e2e.sh` | Full E2E: Xvfb + server + Playwright test + cleanup | e2e-testing, ci-cd |
 | `scripts/build-native.sh` | Single-cmd cmake configure + build RA + build TD | native-build, ci-cd |
 | `scripts/lint.sh` | All linters (LP64, clang-tidy, cppcheck, ruff, shellcheck, yamllint, nixfmt, /opt audit) | all skills |
 | `scripts/build.sh` | Diff-gated build orchestrator (calls lint.sh first) | all skills |
