@@ -40,7 +40,7 @@ if [[ "$MODE" == "vqa" ]]; then
 	MANIFEST="e2e/goldens/vqa/$SCENE/manifest.json"
 	if [[ ! -f "$MANIFEST" ]]; then
 		echo "Missing golden frames for $SCENE."
-		echo "  Decode first: nix run .#vqa-decode -- --vqa $SCENE.VQA --mix MAIN.MIX --out e2e/goldens/vqa/$SCENE"
+		echo "  Decode first: python3 scripts/vqa-decode.py --vqa $SCENE.VQA --mix MAIN.MIX --out e2e/goldens/vqa/$SCENE"
 		echo "  Or:           python3 scripts/vqa-decode.py --vqa $SCENE.VQA --mix MAIN.MIX --out e2e/goldens/vqa/$SCENE"
 		echo ""
 	fi

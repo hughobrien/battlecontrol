@@ -479,10 +479,6 @@
           exec bash scripts/check.sh
         '';
 
-        capture-checkpoint = mkApp "capture-checkpoint" ''
-          exec python3 scripts/capture-checkpoint.py "$@"
-        '';
-
         parity = mkApp "parity" ''
           exec bash scripts/parity.sh "$@"
         '';

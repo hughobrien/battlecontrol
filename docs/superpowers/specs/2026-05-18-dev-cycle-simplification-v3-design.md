@@ -85,7 +85,7 @@ Remove references to the 8 removed apps. Update any stale messaging about flags 
 | Run | `ra`, `td` |
 | Tiers | `lint`, `build`, `test`, `regression` |
 | Heavy analysis | `check` |
-| Utility | `release`, `serve`, `capture-checkpoint`, `parity` |
+| Utility | `release`, `serve`, `parity` |
 
 ## Non-goals
 
