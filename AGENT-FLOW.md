@@ -108,36 +108,6 @@ referenced scripts, and validates they exist and exit 0 would catch drift.
 
 ### High Impact (implement first)
 
-#### R1. Move historical scripts to `scripts/archive/`
-
-Move all `first-compile-pass*.sh`, `first-run-pass*.sh`,
-`first-link-pass*.sh`, `first-link-survey*.sh`, `first-compile.sh`,
-`regression-suite.sh`, and individual TIM-verification scripts into a
-`scripts/archive/` directory.
-
-Keep ~25 reusable scripts at the top level: `skill-*`, `build-*.sh`,
-`wine-*.sh`, `parity-compare.py`, `lint-lp64.py`, `*-data-verify.py`,
-`vqa-decode.py`, `vqa-compare.py`, `generate-include-shim.py`, `nocd-patch.py`,
-`ddscl-patch.py`, and the various scenario-patch scripts.
-
-**What this gives agents:**
-A `scripts/` listing that maps 1-to-1 with actionable commands. No scanning
-200 entries to find the 20 that work. An agent can `list_dir(scripts)` and
-immediately identify everything it can run.
-
-**Migration:**
-```bash
-mkdir -p scripts/archive
-mv scripts/first-compile-pass*.sh scripts/first-run-pass*.sh \
-   scripts/first-link-pass*.sh scripts/first-link-survey*.sh \
-   scripts/first-compile.sh scripts/regression-suite.sh \
-   scripts/tim*-verify.sh scripts/tim*-5run-verify.sh \
-   scripts/verify-*.sh scripts/run-d*.sh \
-   scripts/archive/
-git add scripts/archive/
-git commit -m "Archive historical build-pass scripts out of the active scripts/ directory"
-```
-
 #### R2. Four-tier workflow — single-command local CI ✓ (implemented)
 
 Local CI is now a four-tier hierarchy, each exposed as a nix app:
