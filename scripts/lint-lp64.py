@@ -364,7 +364,6 @@ def print_report(findings: List[Finding], use_colour: bool, repo_root: Path):
     warnings = [f for f in findings if f.severity == "warning"]
 
     if not findings:
-        print("LP64 audit: CLEAN — no hazards found.")
         return
 
     def _rel(p: Path) -> str:

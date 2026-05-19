@@ -9,8 +9,11 @@ cd "$REPO_ROOT"
 
 FAIL=0
 
-echo "=== LP64 hazard audit ==="
-python3 scripts/lint-lp64.py --errors-only || FAIL=1
+LP64_OUT=$(python3 scripts/lint-lp64.py --errors-only 2>&1) || FAIL=1
+if [[ -n "$LP64_OUT" ]]; then
+    echo "=== LP64 hazard audit ==="
+    echo "$LP64_OUT"
+fi
 
 echo ""
 echo "=== Python (ruff check + format) ==="
