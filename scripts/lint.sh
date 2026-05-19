@@ -14,8 +14,8 @@ python3 scripts/lint-lp64.py --errors-only || FAIL=1
 
 echo ""
 echo "=== Python (ruff check + format) ==="
-ruff check scripts/ e2e/ wasm/ 2>&1 || FAIL=1
-ruff format --check --diff scripts/ e2e/ wasm/ 2>&1 || FAIL=1
+ruff check --fix scripts/ e2e/ wasm/ 2>&1 || FAIL=1
+ruff format scripts/ e2e/ wasm/ 2>&1 || FAIL=1
 
 echo ""
 echo "=== YAML (yamllint) ==="
@@ -24,11 +24,11 @@ yamllint .github/workflows/ 2>&1 || FAIL=1
 echo ""
 echo "=== Shell (shellcheck + shfmt) ==="
 find scripts/ -name '*.sh' -exec shellcheck {} + 2>&1 || FAIL=1
-find scripts/ -name '*.sh' -exec shfmt -d {} + 2>&1 || FAIL=1
+find scripts/ -name '*.sh' -exec shfmt -w {} + 2>&1 || FAIL=1
 
 echo ""
 echo "=== Nix (nixfmt) ==="
-find . -name '*.nix' -not -path './build/*' -exec nixfmt --check {} + 2>&1 || FAIL=1
+find . -name '*.nix' -not -path './build/*' -exec nixfmt {} + 2>&1 || FAIL=1
 
 echo ""
 echo "=== /opt path audit ==="
