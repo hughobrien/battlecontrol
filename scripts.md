@@ -55,8 +55,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |---------|-----------|-------------|
 | | `scripts/wine-ra.sh [exePath] [dataDir]` | RA title/menu capture under Wine + Xvfb. |
 | | `scripts/wine-td.sh [exePath] [dataDir]` | TD title/menu capture under Wine + Xvfb. |
-| | `scripts/wine-ra-setup.sh` | Resolve RA95.EXE + DLLs from Nix store. |
-| | `scripts/wine-td-setup.sh` | Resolve C&C95.EXE from explicit path. |
 | | `scripts/wine-gdi-m1.sh` | C&C95.EXE → GDI Mission 1 gameplay. |
 | | `scripts/wine-gdi-m2.sh` | C&C95.EXE → GDI Mission 2 gameplay. |
 | | `scripts/wine-nod-l1.sh` | C&C95.EXE → Nod Mission 1 gameplay. |
@@ -197,9 +195,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `wine-nod-l1.sh` | script | Capture | Nod L1 gameplay capture. |
 | `wine-nod-m1.sh` | script | Capture | Nod M1 gameplay capture. |
 | `wine-ra.sh` | script | Capture | RA title/menu capture. |
-| `wine-ra-setup.sh` | script | Setup | Resolve RA95.EXE + DLLs from Nix. |
 | `wine-td.sh` | script | Capture | TD title/menu capture. |
-| `wine-td-setup.sh` | script | Setup | Resolve C&C95.EXE. |
 
 
 ## Archived Scripts

@@ -24,7 +24,8 @@
 #   - TD game data at TD_ASSETS (default: /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1)
 #   - Stub THIPX32.DLL at tools/stub-thipx/thipx32.dll
 #
-# See bash scripts/wine-td-setup.sh for C&C95.EXE download instructions.
+# See the manual download instructions in wine-td-setup.sh (archived) if
+# running outside Nix.
 #
 # ─── Usage ───────────────────────────────────────────────────────────────────
 #    bash scripts/wine-td.sh [EXE_PATH] [DATA_DIR] [SCREENSHOT_DIR]
@@ -48,7 +49,7 @@ CC95_EXE_PATH="${1:-${CC95_EXE_PATH:-}}"
 if [[ -z "$CC95_EXE_PATH" ]] || [[ ! -f "$CC95_EXE_PATH" ]]; then
 	echo "ERROR: C&C95.EXE not found."
 	echo "  Pass as first argument, set TD_EXE_PATH, or download manually."
-	echo "  See: bash scripts/wine-td-setup.sh"
+	echo "  See header of this script for download instructions."
 	exit 1
 fi
 
@@ -83,7 +84,7 @@ fi
 
 if [[ ! -f "$CC95_EXE_PATH" ]]; then
 	echo "SKIP: C&C95.EXE not found at $CC95_EXE_PATH"
-	echo "  Run: bash scripts/wine-td-setup.sh"
+	echo "  See header of this script for download instructions."
 	exit 2
 fi
 
