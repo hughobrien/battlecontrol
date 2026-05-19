@@ -1,6 +1,6 @@
-# CI — thin wrapper around nix run .#regression.
+# CI — thin wrapper around nix run .#test.
 # Primary testing happens locally; this confirms the deploy artifact.
-# Local equivalent: nix run .#regression
+# Local equivalent: nix run .#test
 
 name: CI
 
@@ -20,7 +20,7 @@ env:
 
 jobs:
   test:
-    name: Test (build + lint + full regression)
+    name: Test (build + lint + boot tests)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
@@ -62,7 +62,7 @@ jobs:
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
             ccache --zero-stats
             ccache --max-size 500M
-            nix run .#regression -- --all
+            nix run .#test -- --all
             ccache --show-stats
           "
 
