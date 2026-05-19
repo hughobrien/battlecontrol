@@ -441,7 +441,7 @@ Things an agent must never break:
    `maxfps=30` in `ddraw.ini` (under `[ddraw]`). This applies to both RA and TD.
    Never remove or change this without updating all remaining scripts:
    `wine-nod-l1.sh`, `wine-nod-m1.sh`, `wine-gdi-m1.sh`,
-   `wine-gdi-m2.sh`, `wine-cnc-capture.sh`, `wine-ra-difficulty-capture.sh`.
+   `wine-gdi-m2.sh`, `wine-cnc-capture.sh`.
 
 ---
 
