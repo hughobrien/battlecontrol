@@ -155,7 +155,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `build` | nix app | CI | Diff-gated build orchestrator (calls lint first). |
 | `build-native.sh` | script | Build | Single-command native build (cmake + ninja RA/TD). |
 | `build.sh` | script | CI | Lint + diff-gated compile (sources _gating.sh). |
-| `build-td.sh` | script | Build | Configure CMake and build TD. |
 | `capture-checkpoint.py` | script | Capture | Unified capture orchestrator. |
 | `capture-native` | nix app | Capture | Removed — use `capture-checkpoint --targets native`. |
 | `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
