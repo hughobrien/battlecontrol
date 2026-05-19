@@ -1,7 +1,19 @@
 """Wine capture driver — capture screenshots from RA95.EXE under Wine."""
 
-import subprocess, os, time, pathlib, tempfile, shutil, json
-from .common import *
+import subprocess
+import os
+import time
+import pathlib
+import tempfile
+import shutil
+from .common import (
+    kill_process_tree,
+    pick_free_display,
+    start_xvfb,
+    start_openbox,
+    wait_for_window,
+    capture_ffmpeg,
+)
 
 
 class WineCapture:

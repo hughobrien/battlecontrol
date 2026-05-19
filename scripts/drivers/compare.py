@@ -1,6 +1,8 @@
 """Comparison wrapper — compares captured screenshots via parity-compare.py."""
 
-import subprocess, json, pathlib, shutil
+import subprocess
+import json
+import pathlib
 
 
 def compare_pair(
