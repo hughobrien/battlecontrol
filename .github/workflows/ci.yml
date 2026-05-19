@@ -1,6 +1,6 @@
-# CI — thin wrapper around nix run .#test.
+# CI — thin wrapper around nix run .#regression.
 # Primary testing happens locally; this confirms the deploy artifact.
-# Local equivalent: nix run .#test
+# Local equivalent: nix run .#regression
 
 name: CI
 
@@ -62,7 +62,7 @@ jobs:
             export CCACHE_DIR=${{ env.CCACHE_DIR }}
             ccache --zero-stats
             ccache --max-size 500M
-            nix run .#test -- --all
+            nix run .#regression -- --all
             ccache --show-stats
           "
 
