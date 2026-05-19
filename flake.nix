@@ -422,64 +422,6 @@
         # ── Developer workflow apps ────────────────────────────────────────
         # nix run .#<name> [args...]  from the repo root.
 
-        # ── Build shortcuts (combinatorial: {game}-{platform}-build) ──────
-        ra-native-build = mkApp "ra-native-build" ''
-          exec nix build .#redalert -L --no-link
-        '';
-
-        td-native-build = mkApp "td-native-build" ''
-          exec nix build .#tiberiandawn -L --no-link
-        '';
-
-        ra-wasm-build = mkApp "ra-wasm-build" ''
-            set -e
-            emcmake cmake --preset wasm
-            cmake --build build-wasm --target ra --parallel
-            python3 -c "
-          import os, struct
-          fn='build-wasm/ra.wasm'
-          with open(fn,'rb') as f:
-              assert f.read(4)==b'\\x00asm', f'{fn}: bad magic'
-          sz=os.path.getsize(fn)
-          assert sz>1_000_000, f'{fn}: too small ({sz} bytes)'
-          print(f'  ra.wasm: {sz//1024} KB OK')
-          "
-        '';
-
-        td-wasm-build = mkApp "td-wasm-build" ''
-            set -e
-            emcmake cmake --preset wasm
-            cmake --build build-wasm --target td --parallel
-            python3 -c "
-          import os, struct
-          fn='build-wasm/td.wasm'
-          with open(fn,'rb') as f:
-              assert f.read(4)==b'\\x00asm', f'{fn}: bad magic'
-          sz=os.path.getsize(fn)
-          assert sz>1_000_000, f'{fn}: too small ({sz} bytes)'
-          print(f'  td.wasm: {sz//1024} KB OK')
-          "
-        '';
-
-        # ── Test shortcuts (combinatorial: {game}-{platform}-test) ────────
-        # Each forwards $@ so --full triggers the full regression tier.
-        ra-native-test = mkApp "ra-native-test" ''
-          exec bash scripts/test-runner.sh ra native "$@"
-        '';
-
-        td-native-test = mkApp "td-native-test" ''
-          exec bash scripts/test-runner.sh td native "$@"
-        '';
-
-        ra-wasm-test = mkApp "ra-wasm-test" ''
-          exec bash scripts/test-runner.sh ra wasm "$@"
-        '';
-
-        td-wasm-test = mkApp "td-wasm-test" ''
-          exec bash scripts/test-runner.sh td wasm "$@"
-        '';
-
-        # ── Generic e2e runner ────────────────────────────────────────────
         # ── Lint ───────────────────────────────────────────────────────────
         # nix run .#lint — fast static analysis and format checks (<10s). Heavy: nix run .#check
         lint = mkApp "lint" ''
