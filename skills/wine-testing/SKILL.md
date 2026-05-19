@@ -221,7 +221,7 @@ WINEDLLOVERRIDES="ddraw=n" wine RA95.EXE
 **Required patches for the EXE** (apply in order):
 1. `scripts/nocd-patch.py` — NOP the GetDriveType CD check
 2. `scripts/ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
-3. `scripts/cdlabel-patch.py` — Zero the "CD1" volume label string (Wine doesn't return ISO volume labels on directory mounts)
+3. `printf '\x00' \| dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc` — Zero the "CD1" volume label string (Wine doesn't return ISO volume labels on directory mounts)
 
 With cnc-ddraw + all three patches, the game renders menu screens correctly:
 ~88 KB (loading) → ~47 KB (menu), 8-bit paletted, 177 unique colors.

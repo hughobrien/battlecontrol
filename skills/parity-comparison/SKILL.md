@@ -73,7 +73,7 @@ Apply patches in this exact order, or the game will crash immediately:
 ```bash
 cp RA95.EXE ./RA95_patched.EXE
 python3 scripts/nocd-patch.py ./RA95_patched.EXE
-python3 scripts/cdlabel-patch.py ./RA95_patched.EXE
+printf '\x00' | dd of=./RA95_patched.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc  # CD1 label zero
 python3 scripts/vqa-skip-patch.py ./RA95_patched.EXE
 ```
 (`focus-skip-patch.py` and `game-in-focus-patch.py` are for the AUTODEMO

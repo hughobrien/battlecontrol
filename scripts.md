@@ -59,7 +59,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | | `scripts/wine-td.sh [exePath] [dataDir]` | TD title/menu capture under Wine + Xvfb. |
 | | `scripts/wine-ra-setup.sh` | Resolve RA95.EXE + DLLs from Nix store. |
 | | `scripts/wine-td-setup.sh` | Resolve C&C95.EXE from explicit path. |
-| | `scripts/wine-ra-difficulty-capture.sh` | Capture difficulty dialog screenshots (menu, dialog, faction). |
 | | `scripts/wine-gdi-m1.sh` | C&C95.EXE → GDI Mission 1 gameplay. |
 | | `scripts/wine-gdi-m2.sh` | C&C95.EXE → GDI Mission 2 gameplay. |
 | | `scripts/wine-nod-l1.sh` | C&C95.EXE → Nod Mission 1 gameplay. |
@@ -119,7 +118,6 @@ These Python scripts apply binary patches to RA95.EXE:
 |-------|--------|-------------|-------|
 | No-CD | `scripts/nocd-patch.py` | NOPs GetDriveType check — skip CD error dialog. | 1 |
 | DDSCL | `scripts/ddscl-patch.py` | DDSCL_EXCLUSIVE → DDSCL_NORMAL + stub SetDisplayMode. | 2 |
-| CD label (Allied) | `scripts/cdlabel-patch.py` | Zero first byte of "CD1" label for Wine. | 3 |
 | Focus skip | `scripts/focus-skip-patch.py` | NOP three `while(!GameInFocus)` spin loops. | 4 |
 | Game in focus | `scripts/game-in-focus-patch.py` | Pin `GameInFocus=TRUE` via entry-point detour. | 5 |
 | VQA skip | `scripts/vqa-skip-patch.py` | Replace `Play_Movie` prologue with `RET`. | 6 |
@@ -134,7 +132,6 @@ These Python scripts apply binary patches to RA95.EXE:
 | ActivateApp | `scripts/td-activateapp-patch.py` | NOP `WM_ACTIVATEAPP` handler clearing focus. | 4 |
 | DD mode | `scripts/td-ddmode-patch.py` | Stub `SetDisplayMode` → `DD_OK`. | 5 |
 | SetCoop HWND | `scripts/td-setcoop-hwnd-patch.py` | Fix `SetCooperativeLevel(hwnd=0)` via code cave. | 6 |
-| CD label (TD) | `scripts/td-cdlabel-patch.py` | Zero first byte of "GDI95" label. | 7 |
 | IO port | `scripts/td-ioport-patch.py` | NOP VGA port-I/O polling loops. | 8 |
 | Scenario | `scripts/td-scenario-patch.py` | Replace format string with hardcoded scenario. | 9 |
 | Side preview skip | `scripts/td-side-preview-skip-patch.py` | NOP side-preview animation routine. | 10 |
@@ -148,7 +145,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `build.sh` | script | CI | Lint + diff-gated compile (sources _gating.sh). |
 | `capture-checkpoint.py` | script | Capture | Unified capture orchestrator. |
 | `capture-native` | nix app | Capture | Removed — use `capture-checkpoint --targets native`. |
-| `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
 | `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`test`/`regression` tiers. |
 | `ci-local.sh` | script | CI | Removed — replaced by `lint.sh`/`build.sh`/`test.sh`/`regression.sh`. |
 | `parity` | nix app | Parity | Capture + compare across targets in one command. |
@@ -186,7 +182,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `vqa-decode.py` | script | Parity | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg). |
 | `xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
 | `td-activateapp-patch.py` | script | Patch (TD) | Prevent WM_ACTIVATEAPP clearing focus. |
-| `td-cdlabel-patch.py` | script | Patch (TD) | Zero GDI95 label. |
 | `vqa-compare.py` | script | Parity | Compare two VQA decode output dirs. |
 | `td-ddmode-patch.py` | script | Patch (TD) | Stub SetDisplayMode. |
 | `td-focus-skip-patch.py` | script | Patch (TD) | NOP GameInFocus spin loops. |
@@ -206,7 +201,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `wine-nod-l1.sh` | script | Capture | Nod L1 gameplay capture. |
 | `wine-nod-m1.sh` | script | Capture | Nod M1 gameplay capture. |
 | `wine-ra.sh` | script | Capture | RA title/menu capture. |
-| `wine-ra-difficulty-capture.sh` | script | Capture | RA difficulty dialog capture. |
 | `wine-ra-setup.sh` | script | Setup | Resolve RA95.EXE + DLLs from Nix. |
 | `wine-td.sh` | script | Capture | TD title/menu capture. |
 | `wine-td-setup.sh` | script | Setup | Resolve C&C95.EXE. |
