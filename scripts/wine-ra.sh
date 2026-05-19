@@ -109,7 +109,7 @@ fi
 
 if [[ ! -f "$RA_EXE_PATH" ]]; then
 	echo "SKIP: RA95.EXE not found at $RA_EXE_PATH"
-	echo "  Run: bash scripts/wine-ra-setup.sh"
+	echo "  See header of this script for download instructions."
 	echo "  Or download manually — see header of this script for instructions."
 	exit 2
 fi
