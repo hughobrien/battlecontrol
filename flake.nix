@@ -479,53 +479,12 @@
           exec bash scripts/check.sh
         '';
 
-        parity-compare = mkApp "parity-compare" ''
-          if [ $# -lt 2 ]; then
-            echo "Usage: nix run .#parity-compare -- <imageA> <imageB> [threshold]"
-            exit 1
-          fi
-          A="$1"; shift
-          B="$1"; shift
-          THRESH="''${1:-0.90}"
-          exec python3 scripts/parity-compare.py "$A" "$B" \
-            --label manual --threshold-ssim "$THRESH"
-        '';
-
-        vqa-decode = mkApp "vqa-decode" ''
-          set -e
-          # Add vqa-dump binary to PATH if native engine is requested
-          for arg in "$@"; do
-            if [ "$arg" = "native" ] || [ "$arg" = "--engine=native" ]; then
-              VQA_DUMP=${self.packages.${system}.vqa-dump}/bin/vqa_dump
-              if [ ! -x "$VQA_DUMP" ]; then
-                echo "ERROR: vqa_dump not found (try: nix build .#vqa-dump)" >&2
-                exit 1
-              fi
-              export PATH="$(dirname "$VQA_DUMP"):$PATH"
-              break
-            fi
-          done
-          exec python3 scripts/vqa-decode.py "$@"
-        '';
-
-        vqa-compare = mkApp "vqa-compare" ''
-          exec python3 scripts/vqa-compare.py "$@"
-        '';
-
         capture-checkpoint = mkApp "capture-checkpoint" ''
           exec python3 scripts/capture-checkpoint.py "$@"
         '';
 
-        parity-report = mkApp "parity-report" ''
-          if [ $# -lt 1 ]; then
-            echo "Usage: nix run .#parity-report -- <scene> [mode] [targets]"
-            echo "  e.g. nix run .#parity-report -- ENGLISH --mode vqa --targets wine,wasm"
-            exit 1
-          fi
-          SCENE="$1"; shift
-          MODE="''${1:-vqa}"
-          TARGETS="''${2:-wine,wasm,native}"
-          exec bash scripts/parity-report.sh --mode "$MODE" --targets "$TARGETS" "$SCENE"
+        parity = mkApp "parity" ''
+          exec bash scripts/parity.sh "$@"
         '';
 
         # ── CI Job Apps ────────────────────────────────────────────────────
