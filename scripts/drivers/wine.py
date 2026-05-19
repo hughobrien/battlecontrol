@@ -149,9 +149,7 @@ class WineCapture:
             "[ra95]\nscanline_double=true\n"
         )
         (staging / "REDALERT.INI").write_text(
-            "[Sound]\nCard=-1\n\n"
-            "[Options]\nHardwareFills=no\n\n"
-            "[Intro]\nPlayIntro=no\n"
+            "[Sound]\nCard=-1\n\n[Options]\nHardwareFills=no\n\n[Intro]\nPlayIntro=no\n"
         )
         self._patch_chain(staging / "RA95.EXE", scenario, skip_vqa)
         return staging
@@ -172,20 +170,48 @@ class WineCapture:
             )
             # Configure GDI renderer + virtual desktop for headless Xvfb capture
             subprocess.run(
-                [str(self.wine), "reg", "add",
-                 r"HKCU\Software\Wine\Explorer\Desktops",
-                 "/v", "Default", "/t", "REG_SZ", "/d", "640x480", "/f"],
-                env={**os.environ, "WINEPREFIX": str(self.wineprefix),
-                     "WINEDEBUG": "-all"},
-                capture_output=True, timeout=30,
+                [
+                    str(self.wine),
+                    "reg",
+                    "add",
+                    r"HKCU\Software\Wine\Explorer\Desktops",
+                    "/v",
+                    "Default",
+                    "/t",
+                    "REG_SZ",
+                    "/d",
+                    "640x480",
+                    "/f",
+                ],
+                env={
+                    **os.environ,
+                    "WINEPREFIX": str(self.wineprefix),
+                    "WINEDEBUG": "-all",
+                },
+                capture_output=True,
+                timeout=30,
             )
             subprocess.run(
-                [str(self.wine), "reg", "add",
-                 r"HKCU\Software\Wine\Direct3D",
-                 "/v", "DirectDrawRenderer", "/t", "REG_SZ", "/d", "gdi", "/f"],
-                env={**os.environ, "WINEPREFIX": str(self.wineprefix),
-                     "WINEDEBUG": "-all"},
-                capture_output=True, timeout=30,
+                [
+                    str(self.wine),
+                    "reg",
+                    "add",
+                    r"HKCU\Software\Wine\Direct3D",
+                    "/v",
+                    "DirectDrawRenderer",
+                    "/t",
+                    "REG_SZ",
+                    "/d",
+                    "gdi",
+                    "/f",
+                ],
+                env={
+                    **os.environ,
+                    "WINEPREFIX": str(self.wineprefix),
+                    "WINEDEBUG": "-all",
+                },
+                capture_output=True,
+                timeout=30,
             )
         dos = self.wineprefix / "dosdevices"
         dos.mkdir(parents=True, exist_ok=True)
@@ -295,6 +321,59 @@ class WineCapture:
             output_dir.mkdir(parents=True, exist_ok=True)
             cap_path = output_dir / "capture.png"
             capture_ffmpeg(disp, str(cap_path))
+            return cap_path
+        finally:
+            self._cleanup(staging, wine_proc, xvfb, wm)
+
+    def capture_boot(
+        self, mode: str, output_dir: pathlib.Path, logfile=None
+    ) -> pathlib.Path:
+        """Capture title or menu screenshot from a vanilla RA95 boot.
+
+        Args:
+            mode: "title" (10s delay) or "menu" (22s delay)
+            output_dir: where to save the PNG
+
+        Returns:
+            Path to captured screenshot
+        """
+        delays = {"title": 10.0, "menu": 22.0}
+        if mode not in delays:
+            raise ValueError(
+                f"unknown boot mode: {mode} (choose from {list(delays.keys())})"
+            )
+        delay = delays[mode]
+        disp = pick_free_display()
+        logfile = logfile or subprocess.DEVNULL
+        xvfb = wm = wine_proc = None
+        staging = self._setup_staging(scenario=None, skip_vqa=True)
+        try:
+            xvfb = start_xvfb(disp, 640, 480, logfile=logfile)
+            wm = start_openbox(disp, logfile=logfile)
+            self._ensure_wineprefix(staging)
+            wine_proc = self._launch(staging, logfile)
+            # Dismiss DirectSound warning dialog
+            time.sleep(5)
+            subprocess.run(
+                ["xdotool", "key", "Return"],
+                env={**os.environ, "DISPLAY": disp},
+                capture_output=True,
+                timeout=5,
+            )
+            # Wait remaining time to reach target capture point
+            time.sleep(delay - 5)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            cap_path = output_dir / f"{mode}.png"
+            # RA95 renders at 640x480
+            subprocess.run(
+                [
+                    "ffmpeg", "-nostdin", "-loglevel", "error",
+                    "-f", "x11grab", "-video_size", "640x480",
+                    "-i", disp, "-frames:v", "1", "-y", str(cap_path),
+                ],
+                capture_output=True,
+                timeout=30,
+            )
             return cap_path
         finally:
             self._cleanup(staging, wine_proc, xvfb, wm)
