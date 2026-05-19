@@ -67,7 +67,7 @@ Once inside the dev shell, run commands directly — no `nix develop --command` 
 
 ```bash
 git commit -m "..."
-nix run .#lint-all
+nix run .#lint
 python3 scripts/lint-lp64.py
 ```
 
@@ -93,25 +93,19 @@ automerge will wait until it passes. If CI is green, the PR merges automatically
 
 ---
 
-## ⚠️ Before every push: run `ci_local` first
+## ⚠️ Before every push: run `nix run .#test`
 
-**GitHub CI is slow (5–15 min per job).** Always run the full CI gate locally
+**GitHub CI is slow (5–15 min per job).** Always run the test gate locally
 before pushing to catch failures instantly:
 
 ```bash
-nix run .#ci
+nix run .#test
 ```
 
+This runs lint → build → boot tests, diff-gated against origin/master.
+For the full regression suite (all targets, every test): `nix run .#regression`.
 
-```
-ci_local()
-```
-
-This runs every available gate: native build, WASM build, LP64 audit, VQA
-decode/compare, include shim, WASM validate. It auto-skips gates with missing
-dependencies (e.g., no emcmake = WASM skipped), so it's safe to run anywhere.
-
-> **Never push without running `ci_local` first.** A 30-second local check
+> **Never push without running `nix run .#test` first.** A quick local check
 > saves 15 minutes of CI wait-and-retry.
 
 ---
@@ -132,7 +126,7 @@ dependencies (e.g., no emcmake = WASM skipped), so it's safe to run anywhere.
 All workflows are available via `nix run .#<name>` commands. Run:
 
 ```
-nix run .#toolchain-check
+nix run .#test
 ```
 
 
@@ -140,31 +134,37 @@ nix run .#toolchain-check
 
 ## Canonical Build Commands
 
-### Native Linux (GCC or Clang)
+### Native Linux (CMake)
 
-```
-build_native(target: "both", compiler: "gcc")
-build_native(target: "ra", compiler: "clang")
+```bash
+# Build RA native
+cmake --preset linux-native && cmake --build build --target ra --parallel
+
+# Build TD native
+cmake --build build --target td --parallel
+
+# Or use the tier apps:
+nix run .#build
 ```
 
 Binaries land in `build/ra` and `build/td`
 
 ### WASM (Emscripten)
 
-```
-build_wasm(target: "both")
-wasm_validate(target: "both")
+```bash
+# Build RA WASM
+emcmake cmake --preset wasm && cmake --build build-wasm --target ra --parallel
+
+# Build TD WASM
+cmake --build build-wasm --target td --parallel
 ```
 
 Outputs: `build-wasm/ra.wasm`, `build-wasm/td.wasm`, `build-wasm/ra.html`,
 `build-wasm/td.html`
 
-> ⚠️ **Stale CMake cache.** If `build_wasm` fails with `include could not find
-> requested file: /nix/store/.../Emscripten.cmake`, the `build-wasm/` directory
-> has a stale CMake cache from a previous Nix store path. Nix rebuilds Emscripten
-> at a new store path each time, but CMake caches the old path in
-> `build-wasm/CMakeFiles/.../CMakeSystem.cmake`. Fix: delete `build-wasm/` and
-> reconfigure (`build_wasm(target: "ra", clean: true)`).
+> ⚠️ **Stale CMake cache.** If the build fails with `include could not find
+> requested file: /nix/store/.../Emscripten.cmake`, delete `build-wasm/` and
+> reconfigure.
 
 ### GitHub Pages deploy (automatic)
 
@@ -189,42 +189,41 @@ gh workflow run "GitHub Pages Deploy"
 
 ## Canonical Test Commands
 
-### Smoke tests (fast, always run)
+### Boot tests (CI tier, fast)
 
-```
-run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
-run_e2e_test(spec: "e2e/regression/T2-td-wasm-boot.spec.ts")
+```bash
+nix run .#test
 ```
 
+### Full regression (all targets)
+
+```bash
+nix run .#regression
+```
 
 ### LP64 audit
 
 ```bash
-nix run .#lint-lp64                                 # gate: must exit 0
+python3 scripts/lint-lp64.py --errors-only
 ```
 
 ### VQA decode/compare
 
-```
+```bash
 nix run .#vqa-decode -- --vqa NAME --mix PATH --out DIR [--duration N] [--engine {ffmpeg,native}]
 nix run .#vqa-compare -- <dirA> <dirB>
 ```
 
 ### Parity comparison (Wine OG vs WASM/Linux)
 
-```
-parity_compare(
-  imageA: "e2e/screenshots/wine-ra-menu.png",
-  imageB: "e2e/screenshots/tim710-wasm-menu.png",
-  label: "RA-menu",
-  thresholdSsim: 0.90
-)
+```bash
+nix run .#parity-compare -- <imageA> <imageB> [--label LABEL] [--threshold-ssim 0.90]
 ```
 
 ### Data integrity
 
-```
-data_verify(dir: "/path/to/data")
+```bash
+python3 scripts/ra-data-verify.py /path/to/data
 ```
 
 ---
@@ -235,20 +234,19 @@ The standard loop for an agent working on a fix:
 
 ```
 1. Edit source
-2. Build       → build_native(target: "ra")
-3. LP64 audit  → nix run .#lint-lp64
-4. Smoke test  → run_e2e_test(spec: "e2e/regression/T1-ra-wasm-boot.spec.ts")
-5. CI check    → ci_local()  # ⚠️ run full CI locally before pushing
+2. Build       → nix run .#build
+3. LP64 audit  → python3 scripts/lint-lp64.py --errors-only
+4. Test        → nix run .#test
+5. CI check    → nix run .#regression   (full suite before push)
 6. Commit      → git commit -m "short imperative subject"
 ```
 
-> **Step 5 is mandatory.** Never skip local CI. GitHub CI takes 5–15 minutes;
-> `ci_local()` catches the same failures in ~30 seconds.
+> **Step 5 is mandatory.** Never skip local regression before pushing.
 
 If the change touches rendering or palette paths, add a parity check:
 
-```
-parity_compare(imageA: "<wine-ref>", imageB: "<wasm-screenshot>", thresholdSsim: 0.90)
+```bash
+nix run .#parity-compare -- <wine-ref> <wasm-screenshot> --threshold-ssim 0.90
 ```
 
 See [Branch and PR Workflow](#branch-and-pr-workflow) below for the push, PR,
@@ -384,13 +382,13 @@ When an agent hits a symptom, read the corresponding skill for diagnostic guidan
 
 | Domain | Skill | Extension tools | Trigger symptoms |
 |--------|-------|----------------|-----------------|
-| Native build | `skills/native-build/` | `toolchain_check`, `build_native` | CMake failure, missing SDL2, LP64 crashes |
-| WASM/Emscripten | `skills/emscripten/` | `build_wasm`, `wasm_validate`, `wasm_screenshot`, `run_e2e_test` | EM_ASM silent, black screen, garbled audio |
-| E2E testing | `skills/e2e-testing/` | `serve_wasm`, `serve_assets`, `run_e2e_test` | pageerror, `__wasmReady` timeout, blank Xvfb |
-| Wine testing | `skills/wine-testing/` | `wine_check`, `capture_wine` | Wine prefix failure, DirectDraw blank, EXE binary patching for auto-launch |
-| VQA codec | `skills/vqa-codec/` | `vqa_pixel_diff` | Block corruption, palette errors, CI failure |
-| Parity comparison | `skills/parity-comparison/` | `data_verify`, `capture_wine`, `parity_compare`, `vqa_pixel_diff` | SSIM regression, parity failure |
-| CI/CD | `skills/ci-cd/` | `build_wasm`, `wasm_validate`, `build_native`, `run_e2e_test` | CI failure, release broken, deploy stuck |
+| Native build | `skills/native-build/` | `scripts/build-native.sh`, `nix run .#build` | CMake failure, missing SDL2, LP64 crashes |
+| WASM/Emscripten | `skills/emscripten/` | `emcmake cmake --preset wasm`, `nix run .#build` | EM_ASM silent, black screen, garbled audio |
+| E2E testing | `skills/e2e-testing/` | `scripts/serve-wasm.sh`, `bash scripts/run-e2e.sh` | pageerror, `__wasmReady` timeout, blank Xvfb |
+| Wine testing | `skills/wine-testing/` | `nix run .#capture-wine` | Wine prefix failure, DirectDraw blank, EXE binary patching for auto-launch |
+| VQA codec | `skills/vqa-codec/` | `nix run .#vqa-compare` | Block corruption, palette errors, CI failure |
+| Parity comparison | `skills/parity-comparison/` | `nix run .#parity-compare`, `nix run .#parity-report` | SSIM regression, parity failure |
+| CI/CD | `skills/ci-cd/` | `nix run .#build`, `nix run .#test` | CI failure, release broken, deploy stuck |
 | GHA updater | `skills/gha-updater/` | — | Stale action versions, Node.js deprecation warnings |
 | Nix shell escaping | `skills/nix-shell-escaping/` | — | nix-shell quoting errors, variable expansion traps |
 
@@ -410,8 +408,8 @@ Things an agent must never break:
    on success. If you modify one, verify with that script's own smoke test.
 
 3. **WASM binary validation.** `ra.wasm` and `td.wasm` must be >1MB and have
-   valid WASM magic (`\x00asm`). Run `wasm_validate(target: "both")` or
-   `nix run .#ci-wasm` to verify.
+   valid WASM magic (`\x00asm`). The WASM build scripts perform this check
+   automatically.
 
 4. **COOP/COEP headers.** WASM requires `Cross-Origin-Opener-Policy: same-origin`
    and `Cross-Origin-Embedder-Policy: require-corp` for SharedArrayBuffer. The
@@ -455,7 +453,7 @@ moved to `scripts/archive/`.
 | Script / Tool | Purpose |
 |---------------|---------|
 | `build-native.sh` | One-command native Linux build (ra + td) |
-| `build-wasm` / `ci-wasm-smoke.sh` | Full WASM CI cycle |
+| `build-wasm/` | WASM build output directory |
 | `run-e2e.sh` | Xvfb + WASM server + Playwright test |
 | `serve-wasm.sh` | WASM dev server with COOP/COEP |
 | `toolchain-check.sh` | Toolchain prerequisite check |
