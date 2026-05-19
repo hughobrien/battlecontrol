@@ -119,12 +119,12 @@ Same shape as T1 but loads `td.html`.
 ### (shell) T5-td-native-menu — TD native main menu (with TD assets, local)
 
 Runs `build/td/td` under Xvfb :99 for 5 s, asserts non-black fill ≥10 %.
-Shell: `scripts/regression/T5-td-native-menu.sh`.
+Shell: `scripts/td/regression/T5-td-native-menu.sh`.
 
 ### (shell) T6-ra-native-smoke — RA native short-run smoke (with RA assets, local)
 
 Runs `build/first-run-pass-94/redalert.elf` for 30 s, asserts ≥100 frames and
-no SIGSEGV / Aborted.  Shell: `scripts/regression/T6-ra-native-smoke.sh`.
+no SIGSEGV / Aborted.  Shell: `scripts/ra/regression/T6-ra-native-smoke.sh`.
 
 ## Implementation files
 
@@ -141,8 +141,8 @@ no SIGSEGV / Aborted.  Shell: `scripts/regression/T6-ra-native-smoke.sh`.
 | T8-ra-audio-pitch        | `e2e/regression/T8-ra-audio-pitch.spec.ts`              | Playwright |
 | T9-ra-wasm-mission-start | `e2e/regression/T9-ra-wasm-mission-start.spec.ts`       | Playwright |
 | T10-ra-wasm-post-game-menu | `e2e/regression/T10-ra-wasm-post-game-menu.spec.ts`    | Playwright |
-| (shell) T5-td-native-menu   | `scripts/regression/T5-td-native-menu.sh`            | Shell      |
-| (shell) T6-ra-native-smoke  | `scripts/regression/T6-ra-native-smoke.sh`           | Shell      |
+| (shell) T5-td-native-menu   | `scripts/td/regression/T5-td-native-menu.sh`            | Shell      |
+| (shell) T6-ra-native-smoke  | `scripts/ra/regression/T6-ra-native-smoke.sh`           | Shell      |
 
 ## Running
 
@@ -166,7 +166,7 @@ bash scripts/test-runner.sh ra wasm --full # full tier
 4. Keep the spec within its budget — audio probe specs at 600 s, boot/menu
    specs at 60–420 s.
 5. Drop Playwright specs under `e2e/regression/` and shell scripts under
-   `scripts/regression/`.
+   `scripts/{ra,td}/regression/`.
 6. Update this README's table and pass/fail section.
 7. If CI-runnable:
    - Asset-free tests (T1/T2 class): wired into `scripts/test-runner.sh` CI tier.

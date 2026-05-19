@@ -53,12 +53,12 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Capture / Screenshot
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| | `scripts/wine-ra.sh [exePath] [dataDir]` | RA title/menu capture under Wine + Xvfb. |
-| | `scripts/wine-td.sh [exePath] [dataDir]` | TD title/menu capture under Wine + Xvfb. |
-| | `scripts/wine-gdi-m1.sh` | C&C95.EXE → GDI Mission 1 gameplay. |
-| | `scripts/wine-gdi-m2.sh` | C&C95.EXE → GDI Mission 2 gameplay. |
-| | `scripts/wine-nod-l1.sh` | C&C95.EXE → Nod Mission 1 gameplay. |
-| | `scripts/wine-nod-m1.sh` | C&C95.EXE → Nod Mission 1 (with side-select click). |
+| | `scripts/ra/wine-ra.sh [exePath] [dataDir]` | RA title/menu capture under Wine + Xvfb. |
+| | `scripts/td/wine-td.sh [exePath] [dataDir]` | TD title/menu capture under Wine + Xvfb. |
+| | `scripts/td/wine-gdi-m1.sh` | C&C95.EXE → GDI Mission 1 gameplay. |
+| | `scripts/td/wine-gdi-m2.sh` | C&C95.EXE → GDI Mission 2 gameplay. |
+| | `scripts/td/wine-nod-l1.sh` | C&C95.EXE → Nod Mission 1 gameplay. |
+| | `scripts/td/wine-nod-m1.sh` | C&C95.EXE → Nod Mission 1 (with side-select click). |
 | Capture checkpoint | `python3 scripts/capture-checkpoint.py -- <mode> <id> --targets <t>` | Unified orchestrator: run any mission/VQA at any frame across Wine/native/WASM. |
 | | `scripts/capture-checkpoint.py` | Same, directly. |
 | | `scripts/drivers/wine.py` | Wine capture driver (class `WineCapture`). |
@@ -101,7 +101,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
 | Extract MIX | `python3 scripts/extract_mix.py` | Westwood MIX file extractor (classic + extended headers). |
-| Setup TD run | `scripts/setup-run-td.sh` | Create TD smoke-test run dir with symlinks and CONQUER stubs. |
+| Setup TD run | `scripts/td/setup-run-td.sh` | Create TD smoke-test run dir with symlinks and CONQUER stubs. |
 ### Run
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -116,20 +116,20 @@ These Python scripts apply binary patches to RA95.EXE:
 | Focus skip | `scripts/focus-skip-patch.py` | NOP three `while(!GameInFocus)` spin loops. | 4 |
 | Game in focus | `scripts/game-in-focus-patch.py` | Pin `GameInFocus=TRUE` via entry-point detour. | 5 |
 | VQA skip | `scripts/vqa-skip-patch.py` | Replace `Play_Movie` prologue with `RET`. | 6 |
-| Scenario | `scripts/ra-scenario-patch.py` | Replace hardcoded "SCG01EA.INI" with target mission. | 7 |
-| Auto-start | `scripts/ra-autostart-patch.py` | Four patches to `Select_Game()` for zero-click auto-boot. | 8 |
+| Scenario | `scripts/ra/ra-scenario-patch.py` | Replace hardcoded "SCG01EA.INI" with target mission. | 7 |
+| Auto-start | `scripts/ra/ra-autostart-patch.py` | Four patches to `Select_Game()` for zero-click auto-boot. | 8 |
 ### Wine Binary Patches (C&C95.EXE — Tiberian Dawn)
 | Patch | Script | What It Does | Order |
 |-------|--------|-------------|-------|
-| Focus skip | `scripts/td-focus-skip-patch.py` | NOP three `while(!GameInFocus)` spin loops. | 1 |
-| Game in focus | `scripts/td-game-in-focus-patch.py` | Pin `GameInFocus=1` via entry-point detour. | 2 |
-| VQA skip | `scripts/td-vqa-skip-patch.py` | Replace `Play_Movie` prologue with `RET`. | 3 |
-| ActivateApp | `scripts/td-activateapp-patch.py` | NOP `WM_ACTIVATEAPP` handler clearing focus. | 4 |
-| DD mode | `scripts/td-ddmode-patch.py` | Stub `SetDisplayMode` → `DD_OK`. | 5 |
-| SetCoop HWND | `scripts/td-setcoop-hwnd-patch.py` | Fix `SetCooperativeLevel(hwnd=0)` via code cave. | 6 |
-| IO port | `scripts/td-ioport-patch.py` | NOP VGA port-I/O polling loops. | 8 |
-| Scenario | `scripts/td-scenario-patch.py` | Replace format string with hardcoded scenario. | 9 |
-| Side preview skip | `scripts/td-side-preview-skip-patch.py` | NOP side-preview animation routine. | 10 |
+| Focus skip | `scripts/td/td-focus-skip-patch.py` | NOP three `while(!GameInFocus)` spin loops. | 1 |
+| Game in focus | `scripts/td/td-game-in-focus-patch.py` | Pin `GameInFocus=1` via entry-point detour. | 2 |
+| VQA skip | `scripts/td/td-vqa-skip-patch.py` | Replace `Play_Movie` prologue with `RET`. | 3 |
+| ActivateApp | `scripts/td/td-activateapp-patch.py` | NOP `WM_ACTIVATEAPP` handler clearing focus. | 4 |
+| DD mode | `scripts/td/td-ddmode-patch.py` | Stub `SetDisplayMode` → `DD_OK`. | 5 |
+| SetCoop HWND | `scripts/td/td-setcoop-hwnd-patch.py` | Fix `SetCooperativeLevel(hwnd=0)` via code cave. | 6 |
+| IO port | `scripts/td/td-ioport-patch.py` | NOP VGA port-I/O polling loops. | 8 |
+| Scenario | `scripts/td/td-scenario-patch.py` | Replace format string with hardcoded scenario. | 9 |
+| Side preview skip | `scripts/td/td-side-preview-skip-patch.py` | NOP side-preview animation routine. | 10 |
 
 ## Flat Alphabetical Index
 Every executable entry point, listed A–Z with its surface(s).

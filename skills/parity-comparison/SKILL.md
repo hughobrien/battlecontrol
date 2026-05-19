@@ -436,7 +436,7 @@ See the [skills index](../README.md#companion-scripts) for the full list of
 | `scripts/vqa-compare.py` | Compare two VQA decode output dirs (video + audio) |
 | `tools/vqa_dump/vqa_dump.cpp` | Standalone C++ VQA decoder, no external deps |
 | `scripts/ra-data-verify.py` | MIX checksum + INI verification |
-| `scripts/wine-ra.sh` / `wine-td.sh` | Wine OG launcher + screenshot capture |
+| `scripts/ra/wine-ra.sh` / `wine-td.sh` | Wine OG launcher + screenshot capture |
 | `scripts/wine-allied-l1.sh` / `wine-soviet-l1.sh` | Campaign-specific captures |
 | `e2e/tim710-wasm-parity.spec.ts` | WASM self-validation + Wine parity |
 | `e2e/tim699-ra-compare.spec.ts` | RA Wine OG comparison (Tier 1+3) |
@@ -462,8 +462,8 @@ See the [skills index](../README.md#companion-scripts) for the full list of
 - `scripts/vqa-compare.py` — Compare two VQA decode output dirs (video + audio)
 - `tools/vqa_dump/vqa_dump.cpp` — Standalone C++ VQA decoder
 - `scripts/ra-data-verify.py` — MIX checksum + INI verification (168 lines)
-- `scripts/wine-ra.sh` — RA Wine OG launcher + screenshot capture (208 lines)
-- `scripts/wine-td.sh` — TD Wine OG launcher + screenshot capture (191 lines)
+- `scripts/ra/wine-ra.sh` — RA Wine OG launcher + screenshot capture (208 lines)
+- `scripts/td/wine-td.sh` — TD Wine OG launcher + screenshot capture (191 lines)
 - `e2e/tim710-wasm-parity.spec.ts` — RA WASM vs Wine OG parity (550 lines)
 - `e2e/tim699-ra-compare.spec.ts` — RA Wine OG comparison (Tier 1 MIX + Tier 3 Wine OG)
 - `e2e/tim711-td-compare.spec.ts` — TD Wine OG comparison

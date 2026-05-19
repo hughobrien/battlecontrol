@@ -13,7 +13,7 @@
 #   - Xvfb, xdpyinfo
 #
 # Run from repo root:
-#   bash scripts/run-td-cheat.sh
+#   bash scripts/td/run-td-cheat.sh
 
 set -u
 

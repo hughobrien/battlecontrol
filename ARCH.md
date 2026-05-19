@@ -139,14 +139,14 @@ Both games target a 640x480 viewport:
    an 8-bit indexed `SDL_Surface` of the same size.
 3. Each frame: `HidPage` (system-memory surface) is blitted to the SDL primary
    surface, then presented via `SDL_RenderPresent`.
-4. Under Xvfb the window renders off-screen; the `scripts/run-td-cheat.sh` and
+4. Under Xvfb the window renders off-screen; the `scripts/td/run-td-cheat.sh` and
    harnesses start Xvfb on `:99`.
 
 ## Mix File / Asset Loading
 
 `.MIX` archives are located by `MixFileClass::Cache` using the POSIX file I/O
 shims above. On Linux the working directory must contain the mix files; the
-`scripts/setup-run-td.sh` symlinks the Steam install's `CNCDATA/TIBERIAN_DAWN/CD1/` files into
+`scripts/td/setup-run-td.sh` symlinks the Steam install's `CNCDATA/TIBERIAN_DAWN/CD1/` files into
 `build/run-td/`.
 
 `REDALERT/MIXFILE.H` and `TIBERIANDAWN/MIXFILE.H` use `int32_t` with
@@ -167,7 +167,7 @@ TD_AUTOSTART=1 TD_CHEAT=1 DISPLAY=:99 ./build/cmake-td/td
 reveal, and mission win at fixed frame counts.
 
 The frame-count gate (`[TD] Main_Loop frame N`) in `TIBERIANDAWN/CONQUER.CPP`
-is the smoke-test milestone. `scripts/run-td-cheat.sh` verifies all four cheat
+is the smoke-test milestone. `scripts/td/run-td-cheat.sh` verifies all four cheat
 milestones pass.
 
 ## Key Source Files
@@ -184,5 +184,5 @@ milestones pass.
 | `REDALERT/AUDIO.CPP` | SDL2 audio device, ADPCM mixer |
 | `linux/win32-stubs/` | POSIX shims for Win32 CRT, file I/O, GDI, DDE |
 | `linux/td-win32-stubs.cpp` | TD-specific link stubs (keyboard no-ops, WIN32LIB symbols) |
-| `scripts/setup-run-td.sh` | Set up `build/run-td/` with game data symlinks |
-| `scripts/run-td-cheat.sh` | Automated smoke test with cheat injection |
+| `scripts/td/setup-run-td.sh` | Set up `build/run-td/` with game data symlinks |
+| `scripts/td/run-td-cheat.sh` | Automated smoke test with cheat injection |
