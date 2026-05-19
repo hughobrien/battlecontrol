@@ -219,8 +219,8 @@ WINEDLLOVERRIDES="ddraw=n" wine RA95.EXE
 ```
 
 **Required patches for the EXE** (apply in order):
-1. `scripts/nocd-patch.py` — NOP the GetDriveType CD check
-2. `scripts/ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
+1. `scripts/ra/ra-nocd-patch.py` — NOP the GetDriveType CD check
+2. `scripts/ra/ra-ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
 3. `printf '\x00' \| dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc` — Zero the "CD1" volume label string (Wine doesn't return ISO volume labels on directory mounts)
 
 With cnc-ddraw + all three patches, the game renders menu screens correctly:
@@ -318,8 +318,8 @@ DISPLAY=:96 WINEPREFIX=$HOME/.wine-ra \
 ```
 
 **EXE patches required** (applied in order):
-1. `scripts/nocd-patch.py` — NOP the GetDriveType CD check
-2. `scripts/ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
+1. `scripts/ra/ra-nocd-patch.py` — NOP the GetDriveType CD check
+2. `scripts/ra/ra-ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
 3. Manual: zero byte at 0x1BFCB7 in RA95.EXE — cdlabel workaround
 
 **Screenshot diagnostics (file-size heuristics):**
@@ -390,12 +390,12 @@ interactive menus and boot directly into any Allied mission at Normal difficulty
 ### Full patch chain (apply in order)
 
 ```bash
-python3 scripts/nocd-patch.py RA95.EXE
-python3 scripts/ddscl-patch.py RA95.EXE
+python3 scripts/ra/ra-nocd-patch.py RA95.EXE
+python3 scripts/ra/ra-ddscl-patch.py RA95.EXE
 printf '\x00' | dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc  # cdlabel
-python3 scripts/focus-skip-patch.py RA95.EXE
-python3 scripts/game-in-focus-patch.py RA95.EXE
-python3 scripts/vqa-skip-patch.py RA95.EXE
+python3 scripts/ra/ra-focus-skip-patch.py RA95.EXE
+python3 scripts/ra/ra-game-in-focus-patch.py RA95.EXE
+python3 scripts/ra/ra-vqa-skip-patch.py RA95.EXE
 python3 scripts/ra/ra-scenario-patch.py RA95.EXE SCG02EA    # target mission
 python3 scripts/ra/ra-autostart-patch.py RA95.EXE            # auto-boot → Normal diff
 ```

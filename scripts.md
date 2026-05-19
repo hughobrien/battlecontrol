@@ -111,11 +111,11 @@ Comprehensive catalog of all commands across two invocation surfaces:
 These Python scripts apply binary patches to RA95.EXE:
 | Patch | Script | What It Does | Order |
 |-------|--------|-------------|-------|
-| No-CD | `scripts/nocd-patch.py` | NOPs GetDriveType check — skip CD error dialog. | 1 |
-| DDSCL | `scripts/ddscl-patch.py` | DDSCL_EXCLUSIVE → DDSCL_NORMAL + stub SetDisplayMode. | 2 |
-| Focus skip | `scripts/focus-skip-patch.py` | NOP three `while(!GameInFocus)` spin loops. | 4 |
-| Game in focus | `scripts/game-in-focus-patch.py` | Pin `GameInFocus=TRUE` via entry-point detour. | 5 |
-| VQA skip | `scripts/vqa-skip-patch.py` | Replace `Play_Movie` prologue with `RET`. | 6 |
+| No-CD | `scripts/ra/ra-nocd-patch.py` | NOPs GetDriveType check — skip CD error dialog. | 1 |
+| DDSCL | `scripts/ra/ra-ddscl-patch.py` | DDSCL_EXCLUSIVE → DDSCL_NORMAL + stub SetDisplayMode. | 2 |
+| Focus skip | `scripts/ra/ra-focus-skip-patch.py` | NOP three `while(!GameInFocus)` spin loops. | 4 |
+| Game in focus | `scripts/ra/ra-game-in-focus-patch.py` | Pin `GameInFocus=TRUE` via entry-point detour. | 5 |
+| VQA skip | `scripts/ra/ra-vqa-skip-patch.py` | Replace `Play_Movie` prologue with `RET`. | 6 |
 | Scenario | `scripts/ra/ra-scenario-patch.py` | Replace hardcoded "SCG01EA.INI" with target mission. | 7 |
 | Auto-start | `scripts/ra/ra-autostart-patch.py` | Four patches to `Select_Game()` for zero-click auto-boot. | 8 |
 ### Wine Binary Patches (C&C95.EXE — Tiberian Dawn)
@@ -143,14 +143,14 @@ Every executable entry point, listed A–Z with its surface(s).
 | `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`test`/`regression` tiers. |
 | `ci-local.sh` | script | CI | Removed — replaced by `lint.sh`/`build.sh`/`test.sh`/`regression.sh`. |
 | `parity` | nix app | Parity | Capture + compare across targets in one command. |
-| `ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
+| `ra-ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
 | `extract_mix.py` | script | Utility | Westwood MIX file extractor. |
 | `ra-native-smoke.sh` | script | Test | RA native smoke test (boot/release/m2 modes). |
-| `focus-skip-patch.py` | script | Patch (RA) | NOP GameInFocus spin loops. |
-| `game-in-focus-patch.py` | script | Patch (RA) | Pin GameInFocus=TRUE. |
+| `ra-focus-skip-patch.py` | script | Patch (RA) | NOP GameInFocus spin loops. |
+| `ra-game-in-focus-patch.py` | script | Patch (RA) | Pin GameInFocus=TRUE. |
 | `generate-include-shim.py` | script | Build | Regenerate case-folding include shim (auto-run by CMake). |
 | `lint-lp64.py` | script | Lint | LP64 static hazard scanner. |
-| `nocd-patch.py` | script | Patch (RA) | Skip CD error dialog. |
+| `ra-nocd-patch.py` | script | Patch (RA) | Skip CD error dialog. |
 | `parity-compare.py` | script | Parity | SSIM + fill% + p99 pixel diff. |
 | `parity-report.sh` | script | Parity | Three-way parity report shell. |
 | `probe-layout.cpp` | script | Lint | C++ struct layout probe. |

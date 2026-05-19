@@ -56,7 +56,7 @@ def patch(path: str, dry_run: bool = False) -> int:
     if digest != PROBE_SKIP_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected probe-skip binary: {PROBE_SKIP_SHA256}")
-        print("       Run nocd-patch.py, sdm-skip-patch.py, probe-skip-patch.py first.")
+        print("       Run ra-nocd-patch.py, sdm-skip-patch.py, probe-skip-patch.py first.")
         return 1
 
     # Verify each patch site

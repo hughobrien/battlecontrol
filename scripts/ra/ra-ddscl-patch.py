@@ -43,7 +43,7 @@ Patches:
   0x1a4a3f: 0x11 -> 0x08   (push DDSCL_NORMAL  — else branch)
   0x1a4a69-0x1a4a6b: FF 53 54 -> 31 C0 90   (xor eax,eax; nop  — fake DD_OK)
 
-Expected input SHA-256 (NoCD-patched RA95.EXE, see scripts/nocd-patch.py):
+Expected input SHA-256 (NoCD-patched RA95.EXE, see scripts/ra/ra-nocd-patch.py):
   292f858724dc215ea1db7ad36c9617fdd1acd808b4fb01593e0719ff87ee8edf
 
 Expected output SHA-256 (NoCD + windowed-DDraw patched):
@@ -92,7 +92,7 @@ def patch(path: str, dry_run: bool = False) -> int:
     if digest != INPUT_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
         print(f"       expected: {INPUT_SHA256}  (NoCD-patched RA95.EXE)")
-        print("       run scripts/nocd-patch.py first")
+        print("       run scripts/ra/ra-nocd-patch.py first")
         return 1
 
     if bytes(data[CALL_OFFSET : CALL_OFFSET + 3]) != CALL_BYTES:
