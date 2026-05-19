@@ -40,7 +40,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 |---------|-----------|-------------|
 | Lint | `nix run .#lint` | Fast linters (LP64, ruff, shellcheck, yamllint, nixfmt, /opt audit). <10s. |
 | Build | `nix run .#build [--all] [--base REF]` | Lint + diff-gated compile. |
-| Test | `nix run .#test [--all] [--base REF]` | Build + CI-tier boot tests (T1/T2, first-run-pass). |
+| Test | `nix run .#test [--all] [--base REF]` | Build + CI-tier boot tests (T1/T2, ra-native-smoke). |
 | Regression | `nix run .#regression` | Build + full regression (all targets, no flags). |
 | Test (single game) | `bash scripts/test-runner.sh <game> <platform> [--full]` | Run boot or full regression for a single game+platform. |
 ### CI / Gate
@@ -140,41 +140,37 @@ Every executable entry point, listed A–Z with its surface(s).
 | `build.sh` | script | CI | Lint + diff-gated compile (sources _gating.sh). |
 | `capture-checkpoint.py` | script | Capture | Unified capture orchestrator. |
 | `capture-native` | nix app | Capture | Removed — use `capture-checkpoint --targets native`. |
-| `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`test`/`regression` tiers. |
-| `ci-local.sh` | script | CI | Removed — replaced by `lint.sh`/`build.sh`/`test.sh`/`regression.sh`. |
-| `parity` | nix app | Parity | Capture + compare across targets in one command. |
-| `ra-ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
-| `extract_mix.py` | script | Utility | Westwood MIX file extractor. |
-| `ra-native-smoke.sh` | script | Test | RA native smoke test (boot/release/m2 modes). |
-| `ra-focus-skip-patch.py` | script | Patch (RA) | NOP GameInFocus spin loops. |
-| `ra-game-in-focus-patch.py` | script | Patch (RA) | Pin GameInFocus=TRUE. |
-| `generate-include-shim.py` | script | Build | Regenerate case-folding include shim (auto-run by CMake). |
-| `lint-lp64.py` | script | Lint | LP64 static hazard scanner. |
-| `ra-nocd-patch.py` | script | Patch (RA) | Skip CD error dialog. |
-| `parity-compare.py` | script | Parity | SSIM + fill% + p99 pixel diff. |
-| `parity-report.sh` | script | Parity | Three-way parity report shell. |
-| `probe-layout.cpp` | script | Lint | C++ struct layout probe. |
-| `ra-autostart-patch.py` | script | Patch (RA) | Zero-click auto-boot at Normal difficulty. |
-| `ra-scenario-patch.py` | script | Patch (RA) | Replace mission name in EXE. |
-| `redalert` | nix app | Run | Run native RA binary. |
-| `lint` | nix app | Lint | Fast linters: LP64, ruff, yamllint, shellcheck, shfmt, nixfmt, /opt audit. Pre-commit hook. |
-| `lint.sh` | script | Lint | Fast linters in one script (sourced by build/test/regression). |
 | `check` | nix app | Check | Heavy static analysis: clang-tidy + cppcheck (~5 min, on-demand). |
 | `check.sh` | script | Check | Same, directly. |
-| `test` | nix app | Test | Build + CI-tier boot tests. |
-| `test.sh` | script | Test | Diff-gated build + boot test orchestrator. |
+| `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`test`/`regression` tiers. |
+| `extract_mix.py` | script | Utility | Westwood MIX file extractor. |
+| `_gating.sh` | script | CI | Diff-analysis helper sourced by build/test/regression. |
+| `generate-include-shim.py` | script | Build | Regenerate case-folding include shim (auto-run by CMake). |
+| `lint` | nix app | Lint | Fast linters: LP64, ruff, yamllint, shellcheck, shfmt, nixfmt, /opt audit. Pre-commit hook. |
+| `lint-lp64.py` | script | Lint | LP64 static hazard scanner. |
+| `lint.sh` | script | Lint | Fast linters in one script (sourced by build/test/regression). |
+| `parity` | nix app | Parity | Capture + compare across targets in one command. |
+| `parity-compare.py` | script | Parity | SSIM + fill% + p99 pixel diff. |
+| `parity-report.sh` | script | Parity | Three-way parity report shell. |
+| `parity.sh` | script | Parity | Same as `nix run .#parity`, directly. |
+| `probe-layout.cpp` | script | Lint | C++ struct layout probe. |
+| `ra-autostart-patch.py` | script | Patch (RA) | Zero-click auto-boot at Normal difficulty. |
+| `ra-ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
+| `ra-focus-skip-patch.py` | script | Patch (RA) | NOP GameInFocus spin loops. |
+| `ra-game-in-focus-patch.py` | script | Patch (RA) | Pin GameInFocus=TRUE. |
+| `ra-native-smoke.sh` | script | Test | RA native smoke test (boot/release/m2 modes). |
+| `ra-nocd-patch.py` | script | Patch (RA) | Skip CD error dialog. |
+| `ra-scenario-patch.py` | script | Patch (RA) | Replace mission name in EXE. |
+| `ra-vqa-skip-patch.py` | script | Patch (RA) | Replace `Play_Movie` prologue with `RET`. |
+| `redalert` | nix app | Run | Run native RA binary. |
 | `regression` | nix app | Regression | Build + full regression. |
 | `regression.sh` | script | Regression | Full regression orchestrator (all targets, no gating). |
 | `release` | nix app | Build | Build + strip + tarball both RA and TD. |
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
 | `serve` | nix app | Serve | Start both WASM + asset servers. |
-| `setup-run-td.sh` | script | Utility | Create TD run directory. |
-| `_gating.sh` | script | CI | Diff-analysis helper sourced by build/test/regression. |
-| `build-native.sh` | script | Build | Single-command native build. |
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
-| `vqa-decode.py` | script | Parity | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg). |
+| `setup-run-td.sh` | script | Utility | Create TD run directory. |
 | `td-activateapp-patch.py` | script | Patch (TD) | Prevent WM_ACTIVATEAPP clearing focus. |
-| `vqa-compare.py` | script | Parity | Compare two VQA decode output dirs. |
 | `td-ddmode-patch.py` | script | Patch (TD) | Stub SetDisplayMode. |
 | `td-focus-skip-patch.py` | script | Patch (TD) | NOP GameInFocus spin loops. |
 | `td-game-in-focus-patch.py` | script | Patch (TD) | Pin GameInFocus=1. |
@@ -183,8 +179,11 @@ Every executable entry point, listed A–Z with its surface(s).
 | `td-setcoop-hwnd-patch.py` | script | Patch (TD) | Fix SetCooperativeLevel HWND. |
 | `td-side-preview-skip-patch.py` | script | Patch (TD) | NOP side-preview animation. |
 | `td-vqa-skip-patch.py` | script | Patch (TD) | Skip TD cutscenes. |
-| `test` | nix app | Test | Run e2e test spec. |
+| `test` | nix app | Test | Build + CI-tier boot tests. |
+| `test-runner.sh` | script | Test | Unified backend for all `{game}-{platform}-test` apps. |
+| `test.sh` | script | Test | Diff-gated build + boot test orchestrator. |
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
+| `vqa-compare.py` | script | Parity | Compare two VQA decode output dirs. |
 | `vqa-decode.py` | script | Parity | Extract VQA from MIX and decode with --engine. |
 | `wasm-loop` | nix app | Loop | Removed — use `test` or `regression`. |
 | `wine-gdi-m1.sh` | script | Capture | GDI M1 gameplay capture. |
