@@ -16,6 +16,13 @@ from .common import (
 )
 
 
+def _user_tmpdir(prefix="wine-capture-"):
+    """Return a temp dir under ~/.cache so Wine doesn't reject /tmp."""
+    base = pathlib.Path.home() / ".cache" / "battlecontrol"
+    base.mkdir(parents=True, exist_ok=True)
+    return pathlib.Path(tempfile.mkdtemp(prefix=prefix, dir=str(base)))
+
+
 class WineCapture:
     """Capture screenshots from RA95.EXE under Wine.
 
@@ -60,14 +67,12 @@ class WineCapture:
         wine="/usr/bin/wine",
         wineprefix=None,
         ra_exe=None,
-        cnc_ddraw_dir="/tmp/cnc-ddraw-master",
         data_dir="/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1",
         scripts_dir=None,
     ):
         self.wine = pathlib.Path(wine)
         self.wineprefix = pathlib.Path(wineprefix) if wineprefix else None
         self.ra_exe = pathlib.Path(ra_exe) if ra_exe else self._resolve_ra_exe()
-        self.cnc_ddraw_dir = pathlib.Path(cnc_ddraw_dir)
         self.data_dir = pathlib.Path(data_dir)
         if scripts_dir:
             self.scripts_dir = pathlib.Path(scripts_dir)
@@ -93,7 +98,9 @@ class WineCapture:
     def _ensure_build_inputs(self):
         """Compile ra-sendinput.exe if needed."""
         src = self.scripts_dir / ".." / "tools" / "wine-input" / "ra-sendinput.c"
-        self._sendinput_exe = pathlib.Path(tempfile.gettempdir()) / "ra-sendinput.exe"
+        self._sendinput_exe = (
+            pathlib.Path.home() / ".cache" / "battlecontrol" / "ra-sendinput.exe"
+        )
         if not self._sendinput_exe.exists() or (
             src.exists() and src.stat().st_mtime > self._sendinput_exe.stat().st_mtime
         ):
@@ -117,8 +124,8 @@ class WineCapture:
         if skip_vqa:
             patches.append("ra/ra-vqa-skip-patch.py")
         if scenario:
-            patches.append("ra-scenario-patch.py")
-        patches.append("ra-autostart-patch.py")
+            patches.append("ra/ra-scenario-patch.py")
+        patches.append("ra/ra-autostart-patch.py")
         for name in patches:
             script = self.scripts_dir / name
             if not script.exists():
@@ -129,20 +136,36 @@ class WineCapture:
             subprocess.run(cmd, capture_output=True, timeout=30)
 
     def _setup_staging(self, scenario=None, skip_vqa=True) -> pathlib.Path:
-        staging = pathlib.Path(tempfile.mkdtemp(prefix="wine-capture-"))
+        staging = _user_tmpdir()
         for f in self.data_dir.glob("*.MIX"):
             (staging / f.name).symlink_to(f)
         for f in self.data_dir.glob("*.INI"):
             (staging / f.name).symlink_to(f)
+        # Unlink existing INI symlinks so we can write fresh configs
+        for ini in list(staging.glob("*.INI")):
+            ini.unlink()
         shutil.copy2(self.ra_exe, staging / "RA95.EXE")
         (staging / "RA95.EXE").chmod(0o755)
-        dll_dir = self.ra_exe.parent
-        for dll in ["THIPX32.DLL", "THIPX16.DLL"]:
-            src = dll_dir / dll
-            if src.exists():
-                shutil.copy2(src, staging / dll)
-        # cnc-ddraw
-        shutil.copy2(self.cnc_ddraw_dir / "ddraw.dll", staging / "ddraw.dll")
+        # Use stub THIPX32.DLL (no 16-bit thunk dependency)
+        stub_src = self.scripts_dir / ".." / "tools" / "stub-thipx" / "thipx32.dll"
+        if stub_src.exists():
+            shutil.copy2(stub_src.resolve(), staging / "THIPX32.DLL")
+        # cnc-ddraw — the canonical Wine DirectDraw path. Built from the flake
+        # input (with the TIM-740 scanline_double patch applied) — nothing
+        # else in the pipeline works correctly under Xvfb.
+        ddraw_r = subprocess.run(
+            ["nix", "build", ".#cnc-ddraw", "--impure", "--print-out-paths"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if ddraw_r.returncode != 0:
+            raise RuntimeError(
+                "nix build .#cnc-ddraw failed; Wine capture requires the "
+                "patched cnc-ddraw DLL.\n" + ddraw_r.stderr
+            )
+        ddraw_src = pathlib.Path(ddraw_r.stdout.strip()) / "bin" / "ddraw.dll"
+        shutil.copy2(ddraw_src, staging / "ddraw.dll")
         (staging / "ddraw.ini").write_text(
             "[ddraw]\nrenderer=gdi\nwindowed=true\nhook=0\n"
             "window_state=normal\nmaxfps=30\n\n"
@@ -156,8 +179,8 @@ class WineCapture:
 
     def _ensure_wineprefix(self, staging: pathlib.Path):
         if self.wineprefix is None:
-            self.wineprefix = pathlib.Path(tempfile.mkdtemp(prefix="wine-capture-"))
-        if not self.wineprefix.exists():
+            self.wineprefix = _user_tmpdir()
+        if not (self.wineprefix / "drive_c").exists():
             subprocess.run(
                 [str(self.wine), "wineboot", "--init"],
                 env={
@@ -220,12 +243,14 @@ class WineCapture:
             d_link.unlink()
         d_link.symlink_to(staging)
 
-    def _launch(self, staging: pathlib.Path, logfile) -> subprocess.Popen:
+    def _launch(self, staging: pathlib.Path, logfile, disp: str) -> subprocess.Popen:
         return subprocess.Popen(
             [str(self.wine), str(staging / "RA95.EXE")],
             cwd=str(staging),
+            start_new_session=True,
             env={
                 **os.environ,
+                "DISPLAY": disp,
                 "WINEPREFIX": str(self.wineprefix),
                 "WINEDLLOVERRIDES": "ddraw=n;mscoree=;mshtml=",
                 "WINEDEBUG": "-all",
@@ -261,7 +286,7 @@ class WineCapture:
             xvfb = start_xvfb(disp, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             self._ensure_wineprefix(staging)
-            wine_proc = self._launch(staging, logfile)
+            wine_proc = self._launch(staging, logfile, disp)
             if not wait_for_window(disp, "Red Alert", timeout=30):
                 raise RuntimeError("Red Alert window never appeared")
             # Dismiss DirectSound dialog, skip VQAs
@@ -294,7 +319,7 @@ class WineCapture:
             xvfb = start_xvfb(disp, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             self._ensure_wineprefix(staging)
-            wine_proc = self._launch(staging, logfile)
+            wine_proc = self._launch(staging, logfile, disp)
             if not wait_for_window(disp, "Red Alert", timeout=30):
                 raise RuntimeError("Red Alert window never appeared")
             # Dismiss boot dialogs
@@ -351,7 +376,7 @@ class WineCapture:
             xvfb = start_xvfb(disp, 640, 480, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             self._ensure_wineprefix(staging)
-            wine_proc = self._launch(staging, logfile)
+            wine_proc = self._launch(staging, logfile, disp)
             # Dismiss DirectSound warning dialog
             time.sleep(5)
             subprocess.run(
@@ -364,16 +389,7 @@ class WineCapture:
             time.sleep(delay - 5)
             output_dir.mkdir(parents=True, exist_ok=True)
             cap_path = output_dir / f"{mode}.png"
-            # RA95 renders at 640x480
-            subprocess.run(
-                [
-                    "ffmpeg", "-nostdin", "-loglevel", "error",
-                    "-f", "x11grab", "-video_size", "640x480",
-                    "-i", disp, "-frames:v", "1", "-y", str(cap_path),
-                ],
-                capture_output=True,
-                timeout=30,
-            )
+            capture_ffmpeg(disp, str(cap_path), video_size="640x480")
             return cap_path
         finally:
             self._cleanup(staging, wine_proc, xvfb, wm)

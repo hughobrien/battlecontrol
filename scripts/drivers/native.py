@@ -22,14 +22,14 @@ class NativeCapture:
         self.data_dir = data_dir or os.environ.get("DATA_DIR")
 
     def _resolve_ra_bin(self) -> pathlib.Path:
-        candidates = ["build/ra/redalert", "build/ra/ra", "build/redalert"]
-        for c in candidates:
-            p = pathlib.Path(c)
-            if p.exists():
-                return p.resolve()
         env_bin = os.environ.get("RA_BIN")
         if env_bin:
             return pathlib.Path(env_bin)
+        candidates = ["build/ra", "build/ra/redalert", "build/ra/ra", "build/redalert"]
+        for c in candidates:
+            p = pathlib.Path(c)
+            if p.is_file():
+                return p.resolve()
         raise RuntimeError("native RA binary not found; set RA_BIN or build first")
 
     def capture_mission(
@@ -39,7 +39,9 @@ class NativeCapture:
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
         xvfb = wm = ra_proc = None
-        data_dir = str(self.data_dir) if self.data_dir else os.environ.get("DATA_DIR", ".")
+        data_dir = (
+            str(self.data_dir) if self.data_dir else os.environ.get("DATA_DIR", ".")
+        )
         try:
             xvfb = start_xvfb(disp, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
@@ -50,8 +52,11 @@ class NativeCapture:
                 "RA_AUTOSTART_SCENARIO": f"{scenario}.INI",
             }
             ra_proc = subprocess.Popen(
-                [str(self.ra_bin)], env=env, cwd=data_dir,
-                stdout=logfile, stderr=logfile
+                [str(self.ra_bin)],
+                env=env,
+                cwd=data_dir,
+                stdout=logfile,
+                stderr=logfile,
             )
             # Probe for non-black canvas (up to 45s)
             deadline = time.time() + 45

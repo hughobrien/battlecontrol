@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TIM-708 — Focus-skip patch for RA95.EXE (nocd + sdm-skip + probe-skip patched binary).
+TIM-708 — Focus-skip patch for RA95.EXE.
 
 RA95.EXE contains three `while (!GameInFocus)` spin loops that block progression
 until the game window receives a WM_ACTIVATEAPP(1) Windows message. Under Wine
@@ -18,15 +18,18 @@ Patch sites (JZ_near offsets = CMP_offset + 7):
   JZ at file=0x15f2f1  VA=0x56eef1  0f 84 7b ff ff ff  (JZ_near -133)
   JZ at file=0x15f583  VA=0x56f183  0f 84 7a ff ff ff  (JZ_near -134)
 
-Expected input SHA-256  (nocd + sdm-skip + probe-skip patched):
-  b00745c200f07551cea018c749cafd62c4ac58d7753f9710964ddbdab809ed90
+Accepted input SHA-256:
+  f55e92c706cb87e4e5972388f4b4c6cf6f7b282ff1fe15012d2584df07ca43a0
+    (nocd + ddscl + cdlabel — i.e. output of .#ra-patched-exe)
 """
 
 import sys
 import hashlib
 import shutil
 
-PROBE_SKIP_SHA256 = "b00745c200f07551cea018c749cafd62c4ac58d7753f9710964ddbdab809ed90"
+ACCEPTED_SHA256 = {
+    "f55e92c706cb87e4e5972388f4b4c6cf6f7b282ff1fe15012d2584df07ca43a0",  # .#ra-patched-exe
+}
 
 # (jz_file_offset, expected_6_bytes, description)
 PATCH_SITES = [
@@ -53,10 +56,11 @@ def patch(path: str, dry_run: bool = False) -> int:
         print(f"{path}: already patched (focus-skip)")
         return 0
 
-    if digest != PROBE_SKIP_SHA256:
+    if digest not in ACCEPTED_SHA256:
         print(f"ERROR: unexpected SHA-256 {digest}")
-        print(f"       expected probe-skip binary: {PROBE_SKIP_SHA256}")
-        print("       Run ra-nocd-patch.py, sdm-skip-patch.py, probe-skip-patch.py first.")
+        print("       accepted inputs (any of):")
+        for h in sorted(ACCEPTED_SHA256):
+            print(f"         {h}")
         return 1
 
     # Verify each patch site

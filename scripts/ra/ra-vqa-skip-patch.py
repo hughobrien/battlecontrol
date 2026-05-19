@@ -22,14 +22,20 @@ Patch site:
   0x0a53c8  3c ff                cmp $0xff,%al
 
 Expected input SHA-256 (all prior patches already applied):
-  08f89ab8c85d38650f981a6e1f998e2dacd164142bde5aa22146e5d57382d03c
+  1714053226390117a44770f2809aa409df9bef2d7d96c789d4ebdf0628ecffaf
+    (.#ra-patched-exe + focus-skip + game-in-focus)
+
+A mismatched SHA is downgraded to a warning — this patch verifies the
+PATCH_OFFSET site signature instead, so it works on slight variants of the
+chain. The hash above is the canonical pipeline; any other value prints a
+warning and proceeds.
 """
 
 import sys
 import hashlib
 import shutil
 
-ORIGINAL_SHA256 = "08f89ab8c85d38650f981a6e1f998e2dacd164142bde5aa22146e5d57382d03c"
+ORIGINAL_SHA256 = "1714053226390117a44770f2809aa409df9bef2d7d96c789d4ebdf0628ecffaf"
 
 PATCH_OFFSET = 0x0A53C4  # Play_Movie entry
 ORIGINAL_BYTE = 0x55  # push %ebp

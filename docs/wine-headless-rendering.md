@@ -3,6 +3,14 @@
 *How to get a 1996 DirectDraw game (RA95.EXE) to render visible frames under
 Wine + Xvfb without a physical GPU — and all the dead ends we stepped in.*
 
+> 📖 **New to this stack?** Read
+> [`wine-rendering-explainer.md`](./wine-rendering-explainer.md) first — it's a
+> primer that explains every layer (DirectDraw concepts, Wine internals,
+> cnc-ddraw, Xvfb, the binary patches) in plain English. This document is the
+> journey log: the approaches we tried before settling on cnc-ddraw, and why
+> each earlier one failed. Useful when something regresses and you're tempted
+> to revisit a path we already ruled out.
+
 ---
 
 ## The Problem
@@ -28,18 +36,25 @@ available: Xvfb, Xwayland+pixman, cage+headless, etc.
 
 ## Approaches Attempted
 
-### 1. Xvfb + DDSCL patches (TIM-727)
+### 1. Xvfb + DDSCL patch (TIM-727)
 
 **What:** Patch RA95.EXE's `SetCooperativeLevel` from `DDSCL_EXCLUSIVE|FULLSCREEN`
-(0x11) to `DDSCL_NORMAL` (0x08), and stub `SetDisplayMode` to return `DD_OK`
-without calling `NtUserChangeDisplaySettings` (which Xvfb refuses).
+(0x11) to `DDSCL_NORMAL` (0x08) so the game requests a windowed surface.
 
-**Result:** ❌ GLX not available on Xvfb. The DDSCL patches prevent the "display
-mode change rejected" crash, but wined3d's no3d fallback still produces NULL
-draw_textures. Same black output.
+Earlier revisions of this patch also stubbed `SetDisplayMode` to return `DD_OK`
+without invoking `NtUserChangeDisplaySettings` (which Xvfb refuses). That was
+needed under Wine's builtin ddraw. Once the pipeline standardised on cnc-ddraw
+(approach 7), the stub became actively harmful — cnc-ddraw must receive the
+`SetDisplayMode(640,480,8)` call to size its X11-backed surface; without it the
+framebuffer is half-width and the palette is mangled. The current
+`ra-ddscl-patch.py` therefore only changes the cooperative-level bytes.
 
-**Lesson:** DDSCL patches are necessary but not sufficient. Without GL, no3d
-mode can't create draw textures.
+**Result:** ❌ alone — GLX not available on Xvfb, so wined3d's no3d fallback
+still produces NULL draw_textures. The DDSCL_NORMAL change is a prerequisite for
+the cnc-ddraw pipeline (approach 7), not a fix on its own.
+
+**Lesson:** A DDSCL change is necessary to get a windowed X11 surface; cnc-ddraw
+provides the rest.
 
 ### 2. Xvfb + Mesa swrast DRI driver
 
@@ -126,14 +141,18 @@ screenshot pipeline becomes:
 
 Screenshots are 3496 bytes for mostly-uniform frames, growing to larger sizes
 as the game renders more complex content. All that's needed is:
-- `DDRAW.DLL` from cnc-ddraw in the game directory
+- `DDRAW.DLL` from cnc-ddraw in the game directory (built from the flake with
+  the TIM-740 `scanline_double` patch applied — see
+  `tools/cnc-ddraw/tim740-scanline-double.patch`; without it every other physical
+  row stays at the zero-fill background colour for RA95's VQA player output)
 - A working Xvfb display
 - The stub THIPX32.DLL (for Wine 11.0 wow64 compatibility)
-- The NoCD+DDSCL-patched RA95.EXE
+- The `.#ra-patched-exe` (NoCD + DDSCL_NORMAL coop + cdlabel) RA95.EXE
 
 **Lesson:** When wined3d can't work, bypass it entirely. cnc-ddraw is a complete
 DirectDraw implementation that uses GDI instead of 3D, rendering correctly on
-any X server — even Xvfb without a GPU.
+any X server — even Xvfb without a GPU. The Wine OG capture pipeline is now
+standardised on cnc-ddraw; the wined3d builtin path is unsupported.
 
 ---
 

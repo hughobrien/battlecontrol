@@ -220,7 +220,7 @@ WINEDLLOVERRIDES="ddraw=n" wine RA95.EXE
 
 **Required patches for the EXE** (apply in order):
 1. `scripts/ra/ra-nocd-patch.py` — NOP the GetDriveType CD check
-2. `scripts/ra/ra-ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
+2. `scripts/ra/ra-ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL). The SetDisplayMode call is left intact so cnc-ddraw's interceptor can size its X11 surface.
 3. `printf '\x00' \| dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc` — Zero the "CD1" volume label string (Wine doesn't return ISO volume labels on directory mounts)
 
 With cnc-ddraw + all three patches, the game renders menu screens correctly:
@@ -232,9 +232,8 @@ With cnc-ddraw + all three patches, the game renders menu screens correctly:
 
 **RA95.EXE** (Red Alert):
 - SHA-256 (original): `a95e2ac85c4cc3aaacb7795e3c07b8aec7c3e10efe679766fb2ee15b12aa2d55`
-- SHA-256 (patched, cnc-ddraw): `c9e9be012953c2cd0db68f30861dbe29f9709332c832bf8483998200315a1af7`
+- SHA-256 (`.#ra-patched-exe` = nocd + ddscl-coop + cdlabel): `f55e92c706cb87e4e5972388f4b4c6cf6f7b282ff1fe15012d2584df07ca43a0`
 - Source: `redalert_allied.iso` from archive.org, LBA 45220, size 2,181,632 bytes
-- The patched EXE renders a better title screen (4266 vs 1507 bytes, more colors)
 
 **C&C95.EXE** (Tiberian Dawn — C&C Gold Win95 port):
 - Size: 1,161,216 bytes
@@ -319,7 +318,7 @@ DISPLAY=:96 WINEPREFIX=$HOME/.wine-ra \
 
 **EXE patches required** (applied in order):
 1. `scripts/ra/ra-nocd-patch.py` — NOP the GetDriveType CD check
-2. `scripts/ra/ra-ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL) + stub SetDisplayMode
+2. `scripts/ra/ra-ddscl-patch.py` — SetCooperativeLevel(DDSCL_NORMAL). The SetDisplayMode call is left intact so cnc-ddraw's interceptor can size its X11 surface.
 3. Manual: zero byte at 0x1BFCB7 in RA95.EXE — cdlabel workaround
 
 **Screenshot diagnostics (file-size heuristics):**
