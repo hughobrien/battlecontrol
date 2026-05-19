@@ -34,8 +34,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | | `cmake --preset linux-native && cmake --build build --target ra --parallel` | Direct single-target native build. |
 | WASM build | `nix run .#build` | Build ra.wasm and/or td.wasm (diff-gated). |
 | | `emcmake cmake --preset wasm && cmake --build build-wasm --target ra --parallel` | Direct single-target WASM build. |
-| `build-stub-thipx` | nix app | Build | Build stub THIPX32.DLL for Wine 11 wow64 compat. |
-| | `scripts/build-stub-thipx.sh` | Same, directly. |
 | Release (RA+TD) | `nix run .#release` | Build + strip + tarball both binaries. |
 ### Test / QA
 | Command | Invocation | What It Does |
