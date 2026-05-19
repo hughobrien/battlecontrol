@@ -17,7 +17,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Parity report | `parity-report` | `scripts/parity-report.sh` | — | — |
 | VQA decode | `vqa-decode` | `scripts/vqa-decode.py` + `tools/vqa_dump/vqa_dump.cpp` | — | — |
 | VQA compare | `vqa-compare` | `scripts/vqa-compare.py` | — | — |
-| Capture (Wine OG) | `capture-wine` | `scripts/wine-cnc-capture.sh` | — | — |
 | Capture (checkpoint) | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
 | Release | `release` | `scripts/first-run-pass-94.sh` + cmake + tar | `release.yml` | — |
 | Run RA | `ra` | native binary (via flake app) | — | — |
@@ -59,7 +58,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Capture / Screenshot
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Wine capture | `nix run .#capture-wine -- <exe> <data> <out>` | Generic RA95.EXE capture via cnc-ddraw under Wine + Xvfb. |
+| Wine capture | `bash scripts/wine-cnc-capture.sh` | Generic RA95.EXE capture via cnc-ddraw under Wine + Xvfb. |
 | | `scripts/wine-cnc-capture.sh` | Generic capture script. |
 | | `scripts/wine-ra.sh [exePath] [dataDir]` | RA title/menu capture under Wine + Xvfb. |
 | | `scripts/wine-td.sh [exePath] [dataDir]` | TD title/menu capture under Wine + Xvfb. |
@@ -166,7 +165,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `build-td.sh` | script | Build | Configure CMake and build TD. |
 | `capture-checkpoint` | nix app | Capture | Unified capture orchestrator. |
 | `capture-native` | nix app | Capture | Removed — use `capture-checkpoint --targets native`. |
-| `capture-wine` | nix app | Capture | Wine OG baseline capture. |
 | `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
 | `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`test`/`regression` tiers. |
 | `ci-local.sh` | script | CI | Removed — replaced by `lint.sh`/`build.sh`/`test.sh`/`regression.sh`. |

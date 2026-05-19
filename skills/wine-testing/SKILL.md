@@ -6,7 +6,7 @@ version: 0.3.0
 
 # Wine Testing Skill
 
-> **Extension tools:** `wine_check`, `wine_capture`.  **Nix app:** `nix run .#capture-wine`.
+> **Extension tools:** `wine_check`, `wine_capture`.  **Script:** `bash scripts/wine-cnc-capture.sh`.
 
 You are running the original Win32 C&C Red Alert or Tiberian Dawn executable under Wine
 for baseline comparison against the native Linux and WASM ports. The workflow captures
