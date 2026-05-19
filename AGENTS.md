@@ -296,6 +296,37 @@ e2e/
     diffs/diff-<mission>-<target>.png       # Pixel diff visualisation
 ```
 
+**Where `capture-checkpoint.py` actually writes captures (canonical location):**
+
+Every invocation of `scripts/capture-checkpoint.py` creates a fresh
+timestamped session dir under `/tmp/battlecontrol/`:
+
+```
+/tmp/battlecontrol/
+  <UTC-TIMESTAMP>-<type>-<id>/      e.g. 2026-05-19T20-51-26-mission-allied-l1/
+    manifest.json                   # type, id, frame, targets, scenario, captures
+    report.json                     # SSIM + pass/fail per pair
+    wine.png        wine-driver.log
+    native.png      native-driver.log
+    wasm.png        wasm-driver.log
+    diff-wine-vs-native.png
+    diff-wine-vs-wasm.png
+    diff-native-vs-wasm.png
+```
+
+After each run the script (re)starts a `python3 -m http.server 1234
+--directory /tmp/battlecontrol` so every session is browsable at
+`http://localhost:1234/` (or `http://bigthink.wg:1234/` from another host
+on the LAN). The path the user pastes — e.g.
+`http://bigthink.wg:1234/2026-05-19T20-51-26-mission-allied-l1/wine.png` —
+maps 1:1 to the on-disk session dir above.
+
+`e2e/checkpoints/<type>-<id>/` only exists as a fallback when
+`/tmp/battlecontrol/` isn't writable (see `capture-checkpoint.py:103`).
+**It is not where fresh comparisons live** — when investigating "the
+latest comparison", look in `/tmp/battlecontrol/` (or follow the URL the
+user gave you), never `e2e/checkpoints/`.
+
 **Mechanism for capture (all three targets):**
 
 | Target | Mechanism |

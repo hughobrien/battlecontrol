@@ -182,13 +182,16 @@ unsigned short			Hard_Error_Occured = 0;
 WWMouseClass *			WWMouse = NULL;
 GraphicBufferClass	SysMemPage(DEFAULT_SCREEN_WIDTH, 200, (void*)NULL);
 WinTimerClass *		WindowsTimer=NULL;
-/* TIM-250: classic 640×480 mode. The Remastered build used 3072×3072 for
-   its high-resolution virtual canvas; the Linux classic port uses the
-   standard RA resolution. STARTUP.CPP's SeenBuff Attach is patched to
-   match (see #ifndef _MSC_VER guard there). */
+/* Canonical RA1 mode is 640×400 (320×200 doubled). 640×480 was opt-in via
+   the `-480` command-line flag (INIT.CPP:2222) and used letterboxing in
+   the Win32 path (SeenBuff Y-offset 40, STARTUP.CPP:1067-1073). The Linux
+   classic port matches Wine OG by defaulting to 640×400; SeenBuff in
+   STARTUP.CPP's `#ifndef _MSC_VER` branch attaches at the full surface
+   with no letterbox offset. The Remastered build used a 3072×3072
+   high-resolution virtual canvas, hence the divergent _MSC_VER default. */
 #ifndef _MSC_VER
 int						ScreenWidth=640;
-int						ScreenHeight=480;
+int						ScreenHeight=400;
 #else
 int						ScreenWidth=3072;
 int						ScreenHeight=3072;

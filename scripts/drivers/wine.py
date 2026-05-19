@@ -7,12 +7,12 @@ import pathlib
 import tempfile
 import shutil
 from .common import (
-    kill_process_tree,
     pick_free_display,
     start_xvfb,
     start_openbox,
     wait_for_window,
-    capture_ffmpeg,
+    capture_root,
+    teardown_display,
 )
 
 
@@ -62,58 +62,76 @@ class WineCapture:
         "SOVIET2": 12.0,
     }
 
-    def __init__(
-        self,
-        wine="/usr/bin/wine",
-        wineprefix=None,
-        ra_exe=None,
-        data_dir="/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1",
-        scripts_dir=None,
-    ):
+    def __init__(self):
+        wine = os.environ.get("WINE_BIN")
+        if not wine:
+            raise RuntimeError("WINE_BIN not set; export WINE_BIN=/abs/path/to/wine")
         self.wine = pathlib.Path(wine)
-        self.wineprefix = pathlib.Path(wineprefix) if wineprefix else None
-        self.ra_exe = pathlib.Path(ra_exe) if ra_exe else self._resolve_ra_exe()
-        self.data_dir = pathlib.Path(data_dir)
-        if scripts_dir:
-            self.scripts_dir = pathlib.Path(scripts_dir)
-        else:
-            self.scripts_dir = pathlib.Path(__file__).resolve().parent.parent
-        self._ensure_build_inputs()
+        if not self.wine.is_file():
+            raise RuntimeError(f"WINE_BIN={self.wine} is not a file")
 
-    def _resolve_ra_exe(self) -> pathlib.Path:
+        data_dir = os.environ.get("WINE_DATA_DIR")
+        if not data_dir:
+            raise RuntimeError(
+                "WINE_DATA_DIR not set; export WINE_DATA_DIR=/abs/path/to/CD1"
+            )
+        self.data_dir = pathlib.Path(data_dir)
+        if not self.data_dir.is_dir():
+            raise RuntimeError(f"WINE_DATA_DIR={self.data_dir} is not a directory")
+        if not list(self.data_dir.glob("*.MIX")):
+            raise RuntimeError(f"WINE_DATA_DIR={self.data_dir} contains no *.MIX files")
+
+        # wineprefix is per-run ephemeral — created in capture_*, destroyed in
+        # _cleanup. Never reused across runs, no inherited state.
+        self.wineprefix: pathlib.Path | None = None
+
+        self.scripts_dir = pathlib.Path(__file__).resolve().parent.parent
+        self.ra_exe = self._build_ra_exe()
+        self._build_sendinput()
+
+    def _build_ra_exe(self) -> pathlib.Path:
         r = subprocess.run(
             ["nix", "build", ".#ra-patched-exe", "--impure", "--print-out-paths"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if r.returncode != 0:
+            raise RuntimeError(
+                f"nix build .#ra-patched-exe failed (rc={r.returncode}): "
+                f"{r.stderr.strip()}"
+            )
+        return pathlib.Path(r.stdout.strip())
+
+    def _build_sendinput(self):
+        """Compile ra-sendinput.exe. Hard-fails if mingw missing or compile errors."""
+        src = (self.scripts_dir / ".." / "tools" / "wine-input" / "ra-sendinput.c").resolve()
+        if not src.is_file():
+            raise RuntimeError(f"ra-sendinput.c not found at {src}")
+        self._sendinput_exe = (
+            pathlib.Path.home() / ".cache" / "battlecontrol" / "ra-sendinput.exe"
+        )
+        self._sendinput_exe.parent.mkdir(parents=True, exist_ok=True)
+        if (
+            self._sendinput_exe.exists()
+            and src.stat().st_mtime <= self._sendinput_exe.stat().st_mtime
+        ):
+            return
+        r = subprocess.run(
+            [
+                "i686-w64-mingw32-gcc",
+                "-o",
+                str(self._sendinput_exe),
+                str(src),
+                "-luser32",
+            ],
             capture_output=True,
             text=True,
             timeout=60,
         )
         if r.returncode != 0:
-            # Fallback: check RA_EXE_PATH env var
-            env_path = os.environ.get("RA_EXE_PATH")
-            if env_path:
-                return pathlib.Path(env_path)
-            raise RuntimeError("RA95.EXE not found via nix. Set RA_EXE_PATH env var.")
-        return pathlib.Path(r.stdout.strip())
-
-    def _ensure_build_inputs(self):
-        """Compile ra-sendinput.exe if needed."""
-        src = self.scripts_dir / ".." / "tools" / "wine-input" / "ra-sendinput.c"
-        self._sendinput_exe = (
-            pathlib.Path.home() / ".cache" / "battlecontrol" / "ra-sendinput.exe"
-        )
-        if not self._sendinput_exe.exists() or (
-            src.exists() and src.stat().st_mtime > self._sendinput_exe.stat().st_mtime
-        ):
-            subprocess.run(
-                [
-                    "i686-w64-mingw32-gcc",
-                    "-o",
-                    str(self._sendinput_exe),
-                    str(src),
-                    "-luser32",
-                ],
-                capture_output=True,
-                timeout=60,
+            raise RuntimeError(
+                f"i686-w64-mingw32-gcc failed (rc={r.returncode}): {r.stderr.strip()}"
             )
 
     def _patch_chain(self, exe: pathlib.Path, scenario=None, skip_vqa=True):
@@ -177,71 +195,66 @@ class WineCapture:
         self._patch_chain(staging / "RA95.EXE", scenario, skip_vqa)
         return staging
 
-    def _ensure_wineprefix(self, staging: pathlib.Path):
-        if self.wineprefix is None:
-            self.wineprefix = _user_tmpdir()
-        if not (self.wineprefix / "drive_c").exists():
-            subprocess.run(
-                [str(self.wine), "wineboot", "--init"],
-                env={
-                    **os.environ,
-                    "WINEPREFIX": str(self.wineprefix),
-                    "WINEDEBUG": "-all",
-                },
-                capture_output=True,
-                timeout=120,
+    def _create_wineprefix(self, staging: pathlib.Path):
+        """Create a fresh wineprefix from scratch and configure it.
+
+        Per-run ephemeral: no reuse, no inherited state. Caller must call
+        _destroy_wineprefix in `finally`.
+        """
+        if self.wineprefix is not None:
+            raise RuntimeError(
+                f"wineprefix already set to {self.wineprefix}; "
+                "_destroy_wineprefix must run before another _create_wineprefix"
             )
-            # Configure GDI renderer + virtual desktop for headless Xvfb capture
-            subprocess.run(
-                [
-                    str(self.wine),
-                    "reg",
-                    "add",
-                    r"HKCU\Software\Wine\Explorer\Desktops",
-                    "/v",
-                    "Default",
-                    "/t",
-                    "REG_SZ",
-                    "/d",
-                    "640x480",
-                    "/f",
-                ],
-                env={
-                    **os.environ,
-                    "WINEPREFIX": str(self.wineprefix),
-                    "WINEDEBUG": "-all",
-                },
+        self.wineprefix = _user_tmpdir("wine-prefix-")
+        wenv = {
+            **os.environ,
+            "WINEPREFIX": str(self.wineprefix),
+            "WINEDEBUG": "-all",
+        }
+        r = subprocess.run(
+            [str(self.wine), "wineboot", "--init"],
+            env=wenv,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if r.returncode != 0:
+            raise RuntimeError(
+                f"wineboot --init failed (rc={r.returncode}): {r.stderr.strip()}"
+            )
+        for key, value, data in [
+            (r"HKCU\Software\Wine\Explorer\Desktops", "Default", "640x480"),
+            (r"HKCU\Software\Wine\Direct3D", "DirectDrawRenderer", "gdi"),
+        ]:
+            r = subprocess.run(
+                [str(self.wine), "reg", "add", key, "/v", value, "/t", "REG_SZ",
+                 "/d", data, "/f"],
+                env=wenv,
                 capture_output=True,
+                text=True,
                 timeout=30,
             )
-            subprocess.run(
-                [
-                    str(self.wine),
-                    "reg",
-                    "add",
-                    r"HKCU\Software\Wine\Direct3D",
-                    "/v",
-                    "DirectDrawRenderer",
-                    "/t",
-                    "REG_SZ",
-                    "/d",
-                    "gdi",
-                    "/f",
-                ],
-                env={
-                    **os.environ,
-                    "WINEPREFIX": str(self.wineprefix),
-                    "WINEDEBUG": "-all",
-                },
-                capture_output=True,
-                timeout=30,
-            )
+            if r.returncode != 0:
+                raise RuntimeError(
+                    f"wine reg add {key}\\{value}={data} failed "
+                    f"(rc={r.returncode}): {r.stderr.strip()}"
+                )
         dos = self.wineprefix / "dosdevices"
         dos.mkdir(parents=True, exist_ok=True)
-        d_link = dos / "d:"
-        if d_link.exists() or d_link.is_symlink():
-            d_link.unlink()
-        d_link.symlink_to(staging)
+        (dos / "d:").symlink_to(staging)
+
+    def _destroy_wineprefix(self):
+        if self.wineprefix is None:
+            return
+        subprocess.run(
+            ["wineserver", "-k"],
+            env={**os.environ, "WINEPREFIX": str(self.wineprefix)},
+            capture_output=True,
+            timeout=10,
+        )
+        shutil.rmtree(self.wineprefix, ignore_errors=False)
+        self.wineprefix = None
 
     def _launch(self, staging: pathlib.Path, logfile, disp: str) -> subprocess.Popen:
         return subprocess.Popen(
@@ -261,18 +274,10 @@ class WineCapture:
             stderr=logfile,
         )
 
-    def _cleanup(self, staging, wine_proc, xvfb, wm):
-        for p in [wine_proc, wm, xvfb]:
-            kill_process_tree(p)
-        subprocess.run(
-            ["wineserver", "-k"],
-            env={**os.environ, "WINEPREFIX": str(self.wineprefix)},
-            capture_output=True,
-            timeout=10,
-        )
+    def _cleanup(self, disp, staging, wine_proc, xvfb, wm):
+        teardown_display(disp, wine_proc, wm, xvfb)
+        self._destroy_wineprefix()
         shutil.rmtree(staging, ignore_errors=True)
-        if self.wineprefix and self.wineprefix.name.startswith("wine-capture-"):
-            shutil.rmtree(self.wineprefix, ignore_errors=True)
 
     def capture_mission(
         self, scenario: str, frame: int, output_dir: pathlib.Path, logfile=None
@@ -283,9 +288,9 @@ class WineCapture:
         xvfb = wm = wine_proc = None
         staging = self._setup_staging(scenario, skip_vqa=True)
         try:
-            xvfb = start_xvfb(disp, logfile=logfile)
+            xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
-            self._ensure_wineprefix(staging)
+            self._create_wineprefix(staging)
             wine_proc = self._launch(staging, logfile, disp)
             if not wait_for_window(disp, "Red Alert", timeout=30):
                 raise RuntimeError("Red Alert window never appeared")
@@ -302,10 +307,10 @@ class WineCapture:
             time.sleep(frame_wait)
             output_dir.mkdir(parents=True, exist_ok=True)
             cap_path = output_dir / "capture.png"
-            capture_ffmpeg(disp, str(cap_path))
+            capture_root(disp, str(cap_path))
             return cap_path
         finally:
-            self._cleanup(staging, wine_proc, xvfb, wm)
+            self._cleanup(disp, staging, wine_proc, xvfb, wm)
 
     def capture_vqa(
         self, vqa_stem: str, frame: int, output_dir: pathlib.Path, logfile=None
@@ -316,9 +321,10 @@ class WineCapture:
         xvfb = wm = wine_proc = None
         staging = self._setup_staging(None, skip_vqa=False)
         try:
-            xvfb = start_xvfb(disp, logfile=logfile)
+            # VQA cinematics render at 640x480 (the title/intro mode)
+            xvfb = start_xvfb(disp, 640, 480, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
-            self._ensure_wineprefix(staging)
+            self._create_wineprefix(staging)
             wine_proc = self._launch(staging, logfile, disp)
             if not wait_for_window(disp, "Red Alert", timeout=30):
                 raise RuntimeError("Red Alert window never appeared")
@@ -345,10 +351,10 @@ class WineCapture:
                 time.sleep(wait)
             output_dir.mkdir(parents=True, exist_ok=True)
             cap_path = output_dir / "capture.png"
-            capture_ffmpeg(disp, str(cap_path))
+            capture_root(disp, str(cap_path))
             return cap_path
         finally:
-            self._cleanup(staging, wine_proc, xvfb, wm)
+            self._cleanup(disp, staging, wine_proc, xvfb, wm)
 
     def capture_boot(
         self, mode: str, output_dir: pathlib.Path, logfile=None
@@ -375,7 +381,7 @@ class WineCapture:
         try:
             xvfb = start_xvfb(disp, 640, 480, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
-            self._ensure_wineprefix(staging)
+            self._create_wineprefix(staging)
             wine_proc = self._launch(staging, logfile, disp)
             # Dismiss DirectSound warning dialog
             time.sleep(5)
@@ -389,10 +395,10 @@ class WineCapture:
             time.sleep(delay - 5)
             output_dir.mkdir(parents=True, exist_ok=True)
             cap_path = output_dir / f"{mode}.png"
-            capture_ffmpeg(disp, str(cap_path), video_size="640x480")
+            capture_root(disp, str(cap_path))
             return cap_path
         finally:
-            self._cleanup(staging, wine_proc, xvfb, wm)
+            self._cleanup(disp, staging, wine_proc, xvfb, wm)
 
     def _get_vqa_offsets(self) -> dict:
         sequence = ["WESTWOOD", "RA_LOGO", "INTRO2", "ENGLISH", "PROLOG"]
