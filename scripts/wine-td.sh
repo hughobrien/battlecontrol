@@ -24,8 +24,7 @@
 #   - TD game data at TD_ASSETS (default: /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1)
 #   - Stub THIPX32.DLL at tools/stub-thipx/thipx32.dll
 #
-# See the manual download instructions in wine-td-setup.sh (archived) if
-# running outside Nix.
+# Resolve C&C95.EXE from Nix store or set TD_EXE_PATH.
 #
 # ─── Usage ───────────────────────────────────────────────────────────────────
 #    bash scripts/wine-td.sh [EXE_PATH] [DATA_DIR] [SCREENSHOT_DIR]
