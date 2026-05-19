@@ -2,6 +2,8 @@
 
 _battlecontrol — C&C Red Alert + Tiberian Dawn port to Linux/WASM_
 
+**Game naming note:** "C&C95" is the original Command & Conquer (1995), which is the same game as Tiberian Dawn (TD). Any script, reference, or data path mentioning C&C95/GDI/Nod belongs to TD, not Red Alert (RA).
+
 This is the file an AI coding agent should read first when landing in this repo.
 It covers the quickstart, canonical build/test commands, the change cycle, and the
 skill index. For deep architecture, see `ARCH.md`. For human-facing docs, see
@@ -490,8 +492,8 @@ printf '\x00' | dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc  # cdlabel
 python3 scripts/focus-skip-patch.py RA95.EXE
 python3 scripts/game-in-focus-patch.py RA95.EXE
 python3 scripts/vqa-skip-patch.py RA95.EXE
-python3 scripts/ra-scenario-patch.py RA95.EXE SCG02EA   # target mission
-python3 scripts/ra-autostart-patch.py RA95.EXE           # auto-boot
+python3 scripts/ra/ra-scenario-patch.py RA95.EXE SCG02EA   # target mission
+python3 scripts/ra/ra-autostart-patch.py RA95.EXE           # auto-boot
 ```
 
 ### What it does

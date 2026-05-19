@@ -338,14 +338,14 @@ DISPLAY=:96 WINEPREFIX=$HOME/.wine-ra \
 ### Quick run (may skip if EXE absent)
 
 ```bash
-bash scripts/wine-ra.sh                          # RA
-bash scripts/wine-td.sh                           # TD
+bash scripts/ra/wine-ra.sh                          # RA
+bash scripts/td/wine-td.sh                           # TD
 ```
 
 ### With explicit paths
 
 ```bash
-bash scripts/wine-ra.sh \
+bash scripts/ra/wine-ra.sh \
     /CnCRemastered/Data/CNCDATA/RED_ALERT/CD1 \
     e2e/screenshots
 ```
@@ -396,13 +396,13 @@ printf '\x00' | dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc  # cdlabel
 python3 scripts/focus-skip-patch.py RA95.EXE
 python3 scripts/game-in-focus-patch.py RA95.EXE
 python3 scripts/vqa-skip-patch.py RA95.EXE
-python3 scripts/ra-scenario-patch.py RA95.EXE SCG02EA    # target mission
-python3 scripts/ra-autostart-patch.py RA95.EXE            # auto-boot → Normal diff
+python3 scripts/ra/ra-scenario-patch.py RA95.EXE SCG02EA    # target mission
+python3 scripts/ra/ra-autostart-patch.py RA95.EXE            # auto-boot → Normal diff
 ```
 
 ### What each autostart patch does
 
-`scripts/ra-autostart-patch.py` modifies four sites in `Select_Game()`:
+`scripts/ra/ra-autostart-patch.py` modifies four sites in `Select_Game()`:
 
 | Patch | Assembly change | Effect |
 |-------|----------------|--------|
@@ -455,8 +455,8 @@ WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts --grep "Tier 3"
 
 ## Reference
 
-- `scripts/wine-ra.sh` — RA Wine launcher (~220 lines, documented)
-- `scripts/wine-td.sh` — TD Wine launcher (~200 lines, documented)
+- `scripts/ra/wine-ra.sh` — RA Wine launcher (~220 lines, documented)
+- `scripts/td/wine-td.sh` — TD Wine launcher (~200 lines, documented)
 - `scripts/wine-ra-setup.sh` — First-time RA setup
 - `scripts/wine-td-setup.sh` — First-time TD setup
 - `tools/stub-thipx/` — Stub THIPX32.DLL (source + .def + prebuilt binary)
@@ -466,7 +466,7 @@ WINE_TD_READY=1 playwright test e2e/tim711-td-compare.spec.ts --grep "Tier 3"
 - `scripts/wine-soviet-l1.sh`, `scripts/wine-allied-l1.sh` — Campaign-specific captures
 - `scripts/wine-vqa-capture.sh` — VQA cinematic capture under Wine
 - `scripts/wine-gameplay.sh` — Generic gameplay capture under Wine
-- `scripts/ra-autostart-patch.py` — Binary patch: skip menus, force Normal difficulty
-- `scripts/ra-scenario-patch.py` — Replace mission name in RA95.EXE (e.g. SCG01EA→SCG02EA)
+- `scripts/ra/ra-autostart-patch.py` — Binary patch: skip menus, force Normal difficulty
+- `scripts/ra/ra-scenario-patch.py` — Replace mission name in RA95.EXE (e.g. SCG01EA→SCG02EA)
 - `e2e/tim699-ra-compare.spec.ts` — RA comparison test (Tier 3 = Wine OG)
 - `e2e/tim711-td-compare.spec.ts` — TD comparison test (Tier 3 = Wine OG)

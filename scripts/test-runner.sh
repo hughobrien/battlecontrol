@@ -110,15 +110,15 @@ td-wasm)
 ra-native)
 	run_script scripts/first-run-pass-94.sh
 	if [ "$FULL" = true ]; then
-		run_script scripts/regression/T6-ra-native-smoke.sh
-		run_script scripts/regression/T11-ra-native-m2-smoke.sh
+		run_script scripts/ra/regression/T6-ra-native-smoke.sh
+		run_script scripts/ra/regression/T11-ra-native-m2-smoke.sh
 	fi
 	;;
 td-native)
-	run_script scripts/run-td-cheat.sh
+	run_script scripts/td/run-td-cheat.sh
 	if [ "$FULL" = true ]; then
-		run_script scripts/regression/T5-td-native-menu.sh
-		run_script scripts/regression/T12-td-native-m2-smoke.sh
+		run_script scripts/td/regression/T5-td-native-menu.sh
+		run_script scripts/td/regression/T12-td-native-m2-smoke.sh
 	fi
 	;;
 *)

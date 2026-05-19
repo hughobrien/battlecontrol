@@ -165,7 +165,7 @@ setup scripts to symlink from a game install:
 
 ```bash
 # For TD:
-bash scripts/setup-run-td.sh /path/to/TIBERIAN_DAWN/CD1
+bash scripts/td/setup-run-td.sh /path/to/TIBERIAN_DAWN/CD1
 
 # For RA (remastered):
 # Symlink CD1 MIX files into build/run-172/

@@ -315,4 +315,4 @@ For runner-level issues (disk space, Docker daemon):
 - `RELEASE.md` — Release checklist and artifact descriptions
 - `WASM-SERVE.md` — WASM serving guide (COOP/COEP headers)
 - `scripts/first-run-pass-94.sh` — Release-build smoke test (native RA)
-- `scripts/run-td-cheat.sh` — Cheat-mode smoke test (native TD)
+- `scripts/td/run-td-cheat.sh` — Cheat-mode smoke test (native TD)

@@ -67,7 +67,7 @@ The skills README table lists companion scripts including:
 
 - `scripts/wine-check.sh` — referenced by `wine-testing` Phase 0, but
   could not be found in `scripts/`
-- `scripts/setup-run-td.sh` — referenced by `native-build` §2.6, not present
+- `scripts/td/setup-run-td.sh` — referenced by `native-build` §2.6, not present
 - `scripts/xvfb-ensure.sh` — present, good
 - `scripts/serve-wasm.sh` — present, good
 

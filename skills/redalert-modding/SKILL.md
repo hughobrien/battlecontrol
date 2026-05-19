@@ -273,7 +273,7 @@ Use the project's scenario patching tool:
 python3 scripts/extract_mix.py --extract SCG02EA.INI /path/to/MAIN.MIX
 
 # Apply patches (if ra-scenario-patch.py supports your format)
-python3 scripts/ra-scenario-patch.py --ini SCG02EA.INI --patch my-changes.ini
+python3 scripts/ra/ra-scenario-patch.py --ini SCG02EA.INI --patch my-changes.ini
 ```
 
 ### Campaign downloads
@@ -552,7 +552,7 @@ RA_AUTOSTART=1 RA_AUTOSTART_SCENARIO=SCU01EA.INI ./build/ra/ra
 | `REDALERT/MIXFILE.H` / `MIXFILE.CPP` | MIX file format, cache, retrieval |
 | `REDALERT/CCFILE.H` | CCFileClass — MIX-aware file I/O |
 | `scripts/extract_mix.py` | Python MIX extractor |
-| `scripts/ra-scenario-patch.py` | Scenario patching tool |
+| `scripts/ra/ra-scenario-patch.py` | Scenario patching tool |
 | `skills/ra-archive/SKILL.md` | Related: RA versions, trainers, fixes |
 
 ### Related skills
