@@ -50,7 +50,21 @@ For the rare case of single-target testing, `bash scripts/test-runner.sh ra nati
 still works directly. The underlying scripts remain; only the thin nix app wrappers
 are removed.
 
-### 4. Update AGENTS.md
+### 4. `lint.sh` auto-fixes (no `--check`)
+
+`scripts/lint.sh` switches from check-only to auto-fix mode:
+
+| Linter | Before | After |
+|--------|--------|-------|
+| ruff check | `ruff check` (report only) | `ruff check --fix` (auto-fix, report unfixable) |
+| ruff format | `ruff format --check --diff` | `ruff format` (format in place) |
+| shfmt | `shfmt -d` (diff only) | `shfmt -w` (write changes) |
+| nixfmt | `nixfmt --check` | `nixfmt` (format in place) |
+
+This means the pre-commit hook (`nix run .#lint`) auto-formats all staged files.
+The LP64 audit and `/opt` path audit remain read-only (they are correctness checks).
+
+### 5. Update AGENTS.md
 
 - Remove `ci_local()`, `nix run .#ci`, `nix run .#lint-all`, `nix run .#toolchain-check`
 - "Before every push" → `nix run .#test`
@@ -58,7 +72,7 @@ are removed.
 - Edit-compile-test loop uses current tier commands
 - Reference `nix run .#regression` as the "full CI locally" check
 
-### 5. Update scripts.md
+### 6. Update scripts.md
 
 Remove references to the 8 removed apps. Update any stale messaging about flags on regression.
 
@@ -75,7 +89,7 @@ Remove references to the 8 removed apps. Update any stale messaging about flags 
 
 ## Non-goals
 
-- Not changing `lint.sh`, `build.sh`, `test.sh`, or their gating behavior
+- Not changing `build.sh`, `test.sh`, or their gating behavior
 - Not changing `_gating.sh` (still used by `build.sh` and `test.sh`)
 - Not changing `test-runner.sh` or the regression scripts in `scripts/regression/`
 - Not archiving historical scripts (separate concern)
@@ -83,6 +97,7 @@ Remove references to the 8 removed apps. Update any stale messaging about flags 
 
 ## Files to Modify
 
+- `scripts/lint.sh` — `ruff check --fix`, `ruff format`, `shfmt -w`, `nixfmt` (no `--check`)
 - `scripts/regression.sh` — remove `_gating.sh`, use `build.sh --all`, remove `--all`/`--base` handling
 - `flake.nix` — remove 8 app definitions, drop their comment blocks
 - `.github/workflows/ci.yml` — test → regression, update job name and comment
