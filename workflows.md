@@ -435,10 +435,9 @@ When hitting a specific problem, load the corresponding skill before debugging:
 | Run e2e test (custom spec) | `nix run .#test -- <spec>` |
 | Run CI gate | `nix run .#ci` |
 | Serve (WASM + assets) | `nix run .#serve` |
-| Compare two images | `nix run .#parity-compare -- <imgA> <imgB>` |
-| Run parity report | `nix run .#parity-report -- --mode gameplay allied-l1` |
-| Decode VQA frames | `nix run .#vqa-decode -- --vqa NAME --mix PATH --out DIR` |
-| Compare VQA outputs | `nix run .#vqa-compare -- <dirA> <dirB>` |
+| Parity check | `nix run .#parity -- check <scene>` |
+| Decode VQA frames | `python3 scripts/vqa-decode.py --vqa NAME --mix PATH --out DIR` |
+| Compare VQA outputs | `python3 scripts/vqa-compare.py -- <dirA> <dirB>` |
 | Run native smoke (RA) | `nix run .#smoke-ra` |
 | Run native smoke (TD) | `nix run .#smoke-td` |
 | Edit loop (native) | `nix run .#edit-loop` |

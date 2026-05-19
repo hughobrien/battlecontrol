@@ -147,21 +147,11 @@ no SIGSEGV / Aborted.  Shell: `scripts/regression/T6-ra-native-smoke.sh`.
 ## Running
 
 ```bash
-# Via nix (recommended):
-nix run .#ra-wasm-test              # RA WASM: CI tier (T1, T11)
-nix run .#ra-wasm-test -- --full    # RA WASM: full tier (+T3, T4, T5, T8–T10)
-nix run .#td-wasm-test              # TD WASM: CI tier (T2, T12)
-nix run .#td-wasm-test -- --full    # TD WASM: full tier (+T3, T6, T7)
-nix run .#ra-native-test            # RA native: CI tier
-nix run .#ra-native-test -- --full  # RA native: full tier (+T6, T11)
-nix run .#td-native-test            # TD native: CI tier
-nix run .#td-native-test -- --full  # TD native: full tier (+T5, T12)
+# Via tier orchestrators:
+nix run .#test                       # build + CI-tier boot tests (diff-gated)
+nix run .#regression                 # build + full regression for all targets
 
-# Or via tier orchestrators (diff-gated):
-nix run .#smoke                     # build + CI-tier boot tests
-nix run .#test -- --all             # build + full regression for all targets
-
-# Or directly:
+# Or directly (single game+platform):
 bash scripts/test-runner.sh ra wasm        # CI tier
 bash scripts/test-runner.sh ra wasm --full # full tier
 ```

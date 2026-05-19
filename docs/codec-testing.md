@@ -23,16 +23,16 @@ of two engines:
 
 ```bash
 # Decode intro VQA with ffmpeg (reference):
-nix run .#vqa-decode -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-ffmpeg --engine ffmpeg
+python3 scripts/vqa-decode.py -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-ffmpeg --engine ffmpeg
 
 # Decode same VQA with native decoder:
-nix run .#vqa-decode -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-native --engine native
+python3 scripts/vqa-decode.py -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-native --engine native
 
 # Compare the two outputs:
-nix run .#vqa-compare -- /tmp/vqa-ffmpeg /tmp/vqa-native
+python3 scripts/vqa-compare.py -- /tmp/vqa-ffmpeg /tmp/vqa-native
 
 # Limit to first N seconds:
-nix run .#vqa-decode -- --vqa PROLOG.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-prolog --duration 4 --engine native
+python3 scripts/vqa-decode.py -- --vqa PROLOG.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-prolog --duration 4 --engine native
 ```
 
 Exit codes: **0** = pass, **1** = fail (decoder mismatch), **2** = skip (data absent).

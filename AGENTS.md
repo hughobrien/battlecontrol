@@ -210,14 +210,14 @@ python3 scripts/lint-lp64.py --errors-only
 ### VQA decode/compare
 
 ```bash
-nix run .#vqa-decode -- --vqa NAME --mix PATH --out DIR [--duration N] [--engine {ffmpeg,native}]
-nix run .#vqa-compare -- <dirA> <dirB>
+python3 scripts/vqa-decode.py --vqa NAME --mix PATH --out DIR [--duration N] [--engine {ffmpeg,native}]
+python3 scripts/vqa-compare.py -- <dirA> <dirB>
 ```
 
 ### Parity comparison (Wine OG vs WASM/Linux)
 
 ```bash
-nix run .#parity-compare -- <imageA> <imageB> [--label LABEL] [--threshold-ssim 0.90]
+nix run .#parity -- check <scene> [--mode vqa|gameplay] [--targets <t>]
 ```
 
 ### Data integrity
@@ -246,7 +246,7 @@ The standard loop for an agent working on a fix:
 If the change touches rendering or palette paths, add a parity check:
 
 ```bash
-nix run .#parity-compare -- <wine-ref> <wasm-screenshot> --threshold-ssim 0.90
+nix run .#parity -- check <scene>
 ```
 
 See [Branch and PR Workflow](#branch-and-pr-workflow) below for the push, PR,
@@ -330,10 +330,10 @@ multi-frame `e2e/goldens/vqa/<stem>/` layout.
 
 ```bash
 # Decode a VQA file with the native decoder:
-nix run .#vqa-decode -- --vqa ENGLISH.VQA --out /tmp/vqa-frames --duration 4 --engine native
+python3 scripts/vqa-decode.py --vqa ENGLISH.VQA --out /tmp/vqa-frames --duration 4 --engine native
 
 # Or use ffmpeg:
-nix run .#vqa-decode -- --vqa ENGLISH.VQA --out /tmp/vqa-frames-ffmpeg --duration 4 --engine ffmpeg
+python3 scripts/vqa-decode.py --vqa ENGLISH.VQA --out /tmp/vqa-frames-ffmpeg --duration 4 --engine ffmpeg
 ```
 
 Decoded frames land in the output directory as PNG files.

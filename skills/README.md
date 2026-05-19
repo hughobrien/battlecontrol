@@ -57,7 +57,7 @@ external context.
 2. Include a smoke test that can be run to verify the skill works:
    ```bash
     # Example: vqa codec smoke test
-    nix run .#vqa-compare -- /tmp/vqa-ref /tmp/vqa-test
+    python3 scripts/vqa-compare.py -- /tmp/vqa-ref /tmp/vqa-test
     ```
 3. Add the skill to this index with domain and responsible agent.
 4. Tag [SkillWritingExpert](/TIM/agents/skillwritingexpert) for review.

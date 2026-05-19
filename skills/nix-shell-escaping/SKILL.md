@@ -377,7 +377,7 @@ This applies to:
 This skill is referenced by:
 - **ci-cd** — CI/CD pipeline commands use nix-shell extensively
 - **native-build** — `nix run .#lint-lp64` and `nix run .#smoke-*` commands
-- **vqa-codec** — `nix run .#vqa-decode` and `nix run .#vqa-compare` commands
+- **vqa-codec** — `python3 scripts/vqa-decode.py` and `python3 scripts/vqa-compare.py` commands
 
 For the project's canonical nix-shell usage patterns, see `flake.nix` and the
 `scripts/skill-*.sh` scripts (all use the temp-file approach for complex commands).
