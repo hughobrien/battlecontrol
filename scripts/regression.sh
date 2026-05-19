@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
-# Regression — build + full regression.
-# Usage: bash scripts/regression.sh [--all] [--base REF]
+# Regression — build + full regression (all targets, no diff-gating).
+# Usage: bash scripts/regression.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Build first (includes lint)
-bash "$SCRIPT_DIR/build.sh" "$@"
-
+echo "=== Build all ==="
+bash "$SCRIPT_DIR/build.sh" --all
 echo ""
-echo "=== Regression ==="
 
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/_gating.sh" "$@"
+echo "=== Regression ==="
 
 FAIL=0
 
@@ -24,29 +21,10 @@ run_regression() {
 	bash "$SCRIPT_DIR/test-runner.sh" "$game" "$platform" --full || FAIL=$((FAIL + 1))
 }
 
-if $GATE_RA_NATIVE; then
-	run_regression ra native
-else
-	echo "SKIP: ra-native-test --full (no RA changes)"
-fi
-
-if $GATE_TD_NATIVE; then
-	run_regression td native
-else
-	echo "SKIP: td-native-test --full (no TD changes)"
-fi
-
-if $GATE_RA_WASM; then
-	run_regression ra wasm
-else
-	echo "SKIP: ra-wasm-test --full (no RA/wasm changes)"
-fi
-
-if $GATE_TD_WASM; then
-	run_regression td wasm
-else
-	echo "SKIP: td-wasm-test --full (no TD/wasm changes)"
-fi
+run_regression ra native
+run_regression ra wasm
+run_regression td native
+run_regression td wasm
 
 echo ""
 if [ "$FAIL" -gt 0 ]; then
