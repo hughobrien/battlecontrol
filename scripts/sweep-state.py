@@ -12,6 +12,7 @@ What it does NOT touch:
   - /run/user/$UID/wine/server-*            (wineserver IPC dirs — tiny, harmless)
   - Live processes (Xvfb, wineserver, RA95.EXE) — caller's responsibility
 """
+
 import os
 import pathlib
 import shutil
