@@ -65,7 +65,9 @@ jobs:
       - name: Build ra.wasm
         env:
           EM_CACHE: ~/.emscripten_cache
-        run: nix develop --command bash -c "emcmake cmake --preset wasm && cmake --build build-wasm --target ra --parallel"
+        run: >
+          nix develop --command bash -c
+          "emcmake cmake --preset wasm && cmake --build build-wasm --target ra --parallel"
 
       - name: Package ra-wasm.zip
         run: |
@@ -106,7 +108,9 @@ jobs:
       - name: Build td.wasm
         env:
           EM_CACHE: ~/.emscripten_cache
-        run: nix develop --command bash -c "emcmake cmake --preset wasm && cmake --build build-wasm --target td --parallel"
+        run: >
+          nix develop --command bash -c
+          "emcmake cmake --preset wasm && cmake --build build-wasm --target td --parallel"
 
       - name: Package td-wasm.zip
         run: |
