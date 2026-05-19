@@ -42,7 +42,7 @@ def resolve_scenario(id: str) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("type", choices=["mission", "vqa"], help="capture type")
+    ap.add_argument("type", choices=["mission", "vqa", "title", "menu"], help="capture type")
     ap.add_argument("id", help="mission (allied-l1) or VQA stem (ENGLISH)")
     ap.add_argument(
         "--frame", type=int, default=0, help="frame number to capture (default: 0)"
@@ -87,6 +87,17 @@ def main():
 
     if args.dry_run:
         print(json.dumps(manifest, indent=2))
+        return
+
+    # Boot capture types (title/menu) — single target, no comparison
+    if args.type in ("title", "menu"):
+        for target in targets:
+            if target != "wine":
+                print(f"  SKIP {target}: title/menu only supports wine")
+                continue
+            driver = WineCapture()
+            path = driver.capture_boot(args.type, checkpoint_dir)
+            print(f"  OK wine: {path}")
         return
 
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
