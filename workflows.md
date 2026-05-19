@@ -302,7 +302,7 @@ capture_wine(game: "ra")
 capture_native(mission: "allied-l1")
 
 # Unified capture (any mission, any target):
-nix run .#capture-checkpoint -- mission allied-l1 --targets wine,native,wasm
+python3 scripts/capture-checkpoint.py mission allied-l1 --targets wine,native,wasm
 ```
 
 ---

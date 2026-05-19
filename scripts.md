@@ -14,7 +14,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Regression | `regression` | `scripts/regression.sh` | `ci.yml → regression` | — |
 | Serve | `serve` | `wasm/serve-coop.py` + `wasm/serve-assets.py` | — | — |
 | Parity | `parity` | `scripts/parity.sh` | — | — |
-| Capture (checkpoint) | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
+| Capture (checkpoint) | — | `scripts/capture-checkpoint.py` | — | — |
 | Release | `release` | `scripts/first-run-pass-94.sh` + cmake + tar | `release.yml` | — |
 | Run RA | `ra` | native binary (via flake app) | — | — |
 | Run TD | `td` | native binary (via flake app) | — | — |
@@ -66,7 +66,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | | `scripts/wine-gdi-m2.sh` | C&C95.EXE → GDI Mission 2 gameplay. |
 | | `scripts/wine-nod-l1.sh` | C&C95.EXE → Nod Mission 1 gameplay. |
 | | `scripts/wine-nod-m1.sh` | C&C95.EXE → Nod Mission 1 (with side-select click). |
-| Capture checkpoint | `nix run .#capture-checkpoint -- <mode> <id> --targets <t>` | Unified orchestrator: run any mission/VQA at any frame across Wine/native/WASM. |
+| Capture checkpoint | `python3 scripts/capture-checkpoint.py -- <mode> <id> --targets <t>` | Unified orchestrator: run any mission/VQA at any frame across Wine/native/WASM. |
 | | `scripts/capture-checkpoint.py` | Same, directly. |
 | | `scripts/drivers/wine.py` | Wine capture driver (class `WineCapture`). |
 | | `scripts/drivers/native.py` | Native capture driver (class `NativeCapture`). |
@@ -157,7 +157,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `build-native.sh` | script | Build | Single-command native build (cmake + ninja RA/TD). |
 | `build.sh` | script | CI | Lint + diff-gated compile (sources _gating.sh). |
 | `build-td.sh` | script | Build | Configure CMake and build TD. |
-| `capture-checkpoint` | nix app | Capture | Unified capture orchestrator. |
+| `capture-checkpoint.py` | script | Capture | Unified capture orchestrator. |
 | `capture-native` | nix app | Capture | Removed — use `capture-checkpoint --targets native`. |
 | `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
 | `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`test`/`regression` tiers. |
