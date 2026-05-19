@@ -450,7 +450,7 @@ See the [skills index](../README.md#companion-scripts) for the full list of
 |---|-------|----------------|----------|
 | 1 | Data integrity | `data_verify(dir: ...)` or `python3 scripts/ra-data-verify.py [DATA_DIR]` | exit 0 (or SKIP) |
 | 2 | Parity compare works | `parity_compare(imageA: "...", imageB: "...", thresholdSsim: 0.99)` | SSIM ≈ 1.0 (same image vs itself) |
-| 3 | VQA compare | `nix run .#vqa-compare -- /tmp/ref /tmp/test` | exit 0, no video/audio differences |
+| 3 | VQA compare | `python3 scripts/vqa-compare.py -- /tmp/ref /tmp/test` | exit 0, no video/audio differences |
 | 4 | WASM parity | `run_e2e_test(spec: "e2e/tim710-wasm-parity.spec.ts", args: ["--grep", "Tier 1"])` | all Tier 1 pass |
 
 ---

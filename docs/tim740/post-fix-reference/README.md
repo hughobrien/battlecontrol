@@ -104,8 +104,8 @@ python3 scripts/tim754-wine-vqa-compare.py
 # → docs/tim740/post-fix-reference/
 
 # 4. confirm decoder-vs-ffmpeg parity is unchanged
-nix run .#vqa-decode -- --vqa ALLIES1 --mix /path/to/MAIN.MIX --out /tmp/vqa-ffmpeg --engine ffmpeg --duration 4
-nix run .#vqa-decode -- --vqa ALLIES1 --mix /path/to/MAIN.MIX --out /tmp/vqa-native --engine native --duration 4
-nix run .#vqa-compare -- /tmp/vqa-ffmpeg /tmp/vqa-native
+python3 scripts/vqa-decode.py -- --vqa ALLIES1 --mix /path/to/MAIN.MIX --out /tmp/vqa-ffmpeg --engine ffmpeg --duration 4
+python3 scripts/vqa-decode.py -- --vqa ALLIES1 --mix /path/to/MAIN.MIX --out /tmp/vqa-native --engine native --duration 4
+python3 scripts/vqa-compare.py -- /tmp/vqa-ffmpeg /tmp/vqa-native
 # → No differences found
 ```

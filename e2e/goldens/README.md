@@ -13,7 +13,7 @@ Reference screenshots used by SSIM-based regression gates in the e2e suite.
 | `soviet-l1-wineog-f500.png` | Wine OG reference | Soviet L1 Wine capture |
 | `soviet-m2-wineog-f500.png` | Wine OG reference (TIM-905) | Soviet M2 Wine capture |
 | `nod-m1-wineog-f500.png` | Wine OG reference (TIM-905) | TD Nod M1 Wine capture (Xvfb+openbox) |
-| ~~`vqa/test.vqa`~~ | VQA test fixture (removed) | Use `nix run .#vqa-decode` instead |
+| ~~`vqa/test.vqa`~~ | VQA test fixture (removed) | Use `python3 scripts/vqa-decode.py` instead |
 
 ## Regenerating
 

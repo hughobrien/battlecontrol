@@ -6,7 +6,7 @@ version: 0.1.0
 
 # VQA Codec Skill
 
-> **Nix apps:** `nix run .#vqa-decode` and `nix run .#vqa-compare`.
+> **Scripts:** `python3 scripts/vqa-decode.py` and `python3 scripts/vqa-compare.py`.
 > Ask the agent to run these instead of typing raw commands.
 
 You are working on the VQA (Westwood Vector Quantized Animation) codec used by C&C
@@ -24,9 +24,9 @@ Read `docs/codec-testing.md` for codec-testing context before starting.
 Decode and compare a known VQA file (requires game data):
 
 ```bash
-nix run .#vqa-decode -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-ref --engine ffmpeg
-nix run .#vqa-decode -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-test --engine native
-nix run .#vqa-compare -- /tmp/vqa-ref /tmp/vqa-test
+python3 scripts/vqa-decode.py -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-ref --engine ffmpeg
+python3 scripts/vqa-decode.py -- --vqa ENGLISH.VQA --mix /path/to/MAIN.MIX --out /tmp/vqa-test --engine native
+python3 scripts/vqa-compare.py -- /tmp/vqa-ref /tmp/vqa-test
 ```
 
 ---
@@ -149,7 +149,7 @@ used for visual comparison but **must not be committed** (derived from game asse
 
 ```bash
 # Decode VQA frames for comparison:
-nix run .#vqa-decode -- --vqa file.vqa --out /tmp/vqa-frames --duration 4 --engine native
+python3 scripts/vqa-decode.py -- --vqa file.vqa --out /tmp/vqa-frames --duration 4 --engine native
 ```
 
 ---
@@ -184,7 +184,7 @@ When `vqa_player.cpp` changes in a way that affects audio output, use `vqa-compa
 to compare audio alongside video:
 
 ```bash
-nix run .#vqa-compare -- /tmp/vqa-ref /tmp/vqa-test
+python3 scripts/vqa-compare.py -- /tmp/vqa-ref /tmp/vqa-test
 ```
 
 ---
@@ -194,9 +194,9 @@ nix run .#vqa-compare -- /tmp/vqa-ref /tmp/vqa-test
 When `vqa_player.cpp` changes in a way that affects frame output:
 
 1. Build the standalone decoder: `g++ -o vqa_dump tools/vqa_dump/vqa_dump.cpp`
-2. Decode with ffmpeg reference: `nix run .#vqa-decode -- --vqa file.vqa --out /tmp/ref --engine ffmpeg`
-3. Decode with native decoder: `nix run .#vqa-decode -- --vqa file.vqa --out /tmp/test --engine native`
-4. Compare: `nix run .#vqa-compare -- /tmp/ref /tmp/test`
+2. Decode with ffmpeg reference: `python3 scripts/vqa-decode.py -- --vqa file.vqa --out /tmp/ref --engine ffmpeg`
+3. Decode with native decoder: `python3 scripts/vqa-decode.py -- --vqa file.vqa --out /tmp/test --engine native`
+4. Compare: `python3 scripts/vqa-compare.py -- /tmp/ref /tmp/test`
 5. Confirm no video or audio differences
 
 ---
@@ -221,8 +221,8 @@ blocking PRs from contributors without data.
 
 | Gate | Tool / Command | Expected result |
 |------|----------------|----------------|
-| VQA decode (both engines) | `nix run .#vqa-decode -- --vqa file.vqa --out /tmp/out --engine native` | PNG frames in /tmp/out |
-| VQA compare | `nix run .#vqa-compare -- /tmp/ref /tmp/test` | Exit 0, no differences |
+| VQA decode (both engines) | `python3 scripts/vqa-decode.py -- --vqa file.vqa --out /tmp/out --engine native` | PNG frames in /tmp/out |
+| VQA compare | `python3 scripts/vqa-compare.py -- /tmp/ref /tmp/test` | Exit 0, no differences |
 
 ---
 
