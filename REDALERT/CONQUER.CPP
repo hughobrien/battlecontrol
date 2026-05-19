@@ -2659,10 +2659,11 @@ Mono_Set_Cursor(0,0);
 	**	Check for player wins or loses according to global event flag.
 	*/
 #ifndef _MSC_VER
-	// TIM-310: pass-90 — per-cycle win trigger (smoke test only, gated on RA_AUTOSTART).
-	// Without this gate every user playing via `nix run` would get a forced win after ~13s (TIM-416).
-	// TIM-621: use _ra_autostart (flag-file aware) instead of getenv() which returns NULL in WASM.
-	if (_ra_autostart) {
+	// TIM-310: pass-90 — per-cycle win trigger. Originally gated on RA_AUTOSTART, now
+	// behind RA_SMOKE_TEST so parity captures longer than 200 frames don't end early.
+	// Tests that depend on `[TIM-310] forcing win` (tim621-pass74, tim649-parity-signoff,
+	// regression/T10-ra-menu-bleed) must now set RA_SMOKE_TEST=1 alongside RA_AUTOSTART.
+	if (_ra_autostart && _ra_smoke_test) {
 		extern long g_tim310_restart_frame;
 		if (g_tim310_restart_frame >= 0 && Frame >= g_tim310_restart_frame + 200
 				&& Session.Type == GAME_NORMAL && !PlayerWins && !PlayerLoses && PlayerPtr != NULL) {

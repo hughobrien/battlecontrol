@@ -742,9 +742,13 @@ bool Select_Game(bool fade)
 				return false;
 			}
 			_ra_autostart_completed = true;
-			fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI (EASY)\n"); fflush(stderr);
-			Scen.CDifficulty = DIFF_EASY;
-			Scen.Difficulty = DIFF_EASY;
+			/* Difficulty matches wine's `ra-autostart-patch.py`, which patches retail
+			 * RA95.EXE to always pick DIFF_NORMAL. If parity captures are running EASY
+			 * here and NORMAL under wine, combat plays out differently across the
+			 * capture window and the SSIM never converges. */
+			fprintf(stderr, "[RA] Select_Game: RA_AUTOSTART active → SCG01EA.INI (NORMAL)\n"); fflush(stderr);
+			Scen.CDifficulty = DIFF_NORMAL;
+			Scen.Difficulty = DIFF_NORMAL;
 			Scen.CarryOverMoney = 0;
 			BuildLevel = 10;
 			IsTanyaDead = false;
