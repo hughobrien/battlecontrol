@@ -19,7 +19,7 @@ audio / gameplay path for Red Alert and Tiberian Dawn WASM builds.
 | T9-ra-wasm-mission-start | RA WASM real-click Allied L1             | RA     | WASM    | yes (RA MIX) | yes\*\* | 600 s  |
 | T10-ra-wasm-post-game-menu | RA WASM post-game menu parity (TIM-810) | RA     | WASM    | yes (RA MIX) | yes\*\* | 600 s  |
 | (shell) T5-td-native-menu   | TD native main menu renders           | TD     | native  | yes          | no\*    | 30 s   |
-| (shell) T6-ra-native-smoke  | RA native short-run smoke             | RA     | native  | yes          | no\*    | 45 s   |
+| (shell) ra-native-smoke     | RA native smoke (boot/release/m2)     | RA     | native  | yes          | no\*    | 45-120 s |
 
 \* `no` = requires licensed CnC Remastered MIX files not available in upstream
 CI.  The same test passes on a developer machine with assets symlinked.
@@ -121,10 +121,11 @@ Same shape as T1 but loads `td.html`.
 Runs `build/td/td` under Xvfb :99 for 5 s, asserts non-black fill ≥10 %.
 Shell: `scripts/td/regression/T5-td-native-menu.sh`.
 
-### (shell) T6-ra-native-smoke — RA native short-run smoke (with RA assets, local)
+### (shell) ra-native-smoke — RA native smoke tests (with RA assets, local)
 
-Runs `build/first-run-pass-94/redalert.elf` for 30 s, asserts ≥100 frames and
-no SIGSEGV / Aborted.  Shell: `scripts/ra/regression/T6-ra-native-smoke.sh`.
+Consolidated script with three modes (`boot`, `release`, `m2`). CI gate runs
+`release` mode: 120 s, ≥1 win, ≥1000 frames, no crash. Script:
+`scripts/ra/ra-native-smoke.sh`.
 
 ## Implementation files
 
@@ -142,7 +143,7 @@ no SIGSEGV / Aborted.  Shell: `scripts/ra/regression/T6-ra-native-smoke.sh`.
 | T9-ra-wasm-mission-start | `e2e/regression/T9-ra-wasm-mission-start.spec.ts`       | Playwright |
 | T10-ra-wasm-post-game-menu | `e2e/regression/T10-ra-wasm-post-game-menu.spec.ts`    | Playwright |
 | (shell) T5-td-native-menu   | `scripts/td/regression/T5-td-native-menu.sh`            | Shell      |
-| (shell) T6-ra-native-smoke  | `scripts/ra/regression/T6-ra-native-smoke.sh`           | Shell      |
+| (shell) ra-native-smoke     | `scripts/ra/ra-native-smoke.sh`           | Shell      |
 
 ## Running
 

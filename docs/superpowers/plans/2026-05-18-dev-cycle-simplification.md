@@ -443,7 +443,7 @@ case "$GAME-$PLATFORM" in
     fi
     ;;
   ra-native)
-    run_script scripts/first-run-pass-94.sh
+    run_script scripts/ra/ra-native-smoke.sh
     if [ "$FULL" = true ]; then
       run_script scripts/regression/T6-ra-native-smoke.sh
       run_script scripts/regression/T11-ra-native-m2-smoke.sh
@@ -718,7 +718,7 @@ Replace:
 
 ```
         ra-native-test = mkApp "ra-native-test" ''
-          exec bash scripts/first-run-pass-94.sh
+          exec bash scripts/ra/ra-native-smoke.sh
         '';
 ```
 
