@@ -109,7 +109,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
 | Extract MIX | `python3 scripts/extract_mix.py` | Westwood MIX file extractor (classic + extended headers). |
-| Setup RA remastered | `scripts/setup-run-ra-remastered.sh` | Create RA run dir with symlinks to CD1 assets and binary. |
 | Setup TD run | `scripts/setup-run-td.sh` | Create TD smoke-test run dir with symlinks and CONQUER stubs. |
 ### Run
 | Command | Invocation | What It Does |
@@ -189,7 +188,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `release` | nix app | Build | Build + strip + tarball both RA and TD. |
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
 | `serve` | nix app | Serve | Start both WASM + asset servers. |
-| `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
 | `_gating.sh` | script | CI | Diff-analysis helper sourced by build/test/regression. |
 | `build-native.sh` | script | Build | Single-command native build. |
