@@ -142,11 +142,6 @@ These Python scripts apply binary patches to RA95.EXE:
 | IO port | `scripts/td-ioport-patch.py` | NOP VGA port-I/O polling loops. | 8 |
 | Scenario | `scripts/td-scenario-patch.py` | Replace format string with hardcoded scenario. | 9 |
 | Side preview skip | `scripts/td-side-preview-skip-patch.py` | NOP side-preview animation routine. | 10 |
-### Verification Data
-| File | What It Contains |
-|------|-----------------|
-| `scripts/wine-exe-hashes.json` | SHA-256 hashes for RA95.EXE and C&C95.EXE at various patch stages. |
-
 
 ## Flat Alphabetical Index
 Every executable entry point, listed A–Z with its surface(s).
@@ -212,7 +207,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `vqa-decode.py` | script | Parity | Extract VQA from MIX and decode with --engine. |
 | `wasm-loop` | nix app | Loop | Removed — use `test` or `regression`. |
 | `wine-cnc-capture.sh` | script | Capture | Generic RA95 Wine capture. |
-| `wine-exe-hashes.json` | data | — | SHA-256 hashes for patched EXEs. |
 | `wine-gdi-m1.sh` | script | Capture | GDI M1 gameplay capture. |
 | `wine-gdi-m2.sh` | script | Capture | GDI M2 gameplay capture. |
 | `wine-nod-l1.sh` | script | Capture | Nod L1 gameplay capture. |
