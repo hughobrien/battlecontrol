@@ -386,8 +386,8 @@ When an agent hits a symptom, read the corresponding skill for diagnostic guidan
 | WASM/Emscripten | `skills/emscripten/` | `emcmake cmake --preset wasm`, `nix run .#build` | EM_ASM silent, black screen, garbled audio |
 | E2E testing | `skills/e2e-testing/` | `scripts/serve-wasm.sh`, `bash scripts/run-e2e.sh` | pageerror, `__wasmReady` timeout, blank Xvfb |
 | Wine testing | `skills/wine-testing/` | `bash scripts/wine-cnc-capture.sh` | Wine prefix failure, DirectDraw blank, EXE binary patching for auto-launch |
-| VQA codec | `skills/vqa-codec/` | `nix run .#vqa-compare` | Block corruption, palette errors, CI failure |
-| Parity comparison | `skills/parity-comparison/` | `nix run .#parity-compare`, `nix run .#parity-report` | SSIM regression, parity failure |
+| VQA codec | `skills/vqa-codec/` | `python3 scripts/vqa-compare.py` | Block corruption, palette errors, CI failure |
+| Parity comparison | `skills/parity-comparison/` | `nix run .#parity` | SSIM regression, parity failure |
 | CI/CD | `skills/ci-cd/` | `nix run .#build`, `nix run .#test` | CI failure, release broken, deploy stuck |
 | GHA updater | `skills/gha-updater/` | — | Stale action versions, Node.js deprecation warnings |
 | Nix shell escaping | `skills/nix-shell-escaping/` | — | nix-shell quoting errors, variable expansion traps |

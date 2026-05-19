@@ -13,10 +13,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Test | `test` | `scripts/test.sh` | `ci.yml → regression` | — |
 | Regression | `regression` | `scripts/regression.sh` | `ci.yml → regression` | — |
 | Serve | `serve` | `wasm/serve-coop.py` + `wasm/serve-assets.py` | — | — |
-| Parity compare | `parity-compare` | `scripts/parity-compare.py` | — | — |
-| Parity report | `parity-report` | `scripts/parity-report.sh` | — | — |
-| VQA decode | `vqa-decode` | `scripts/vqa-decode.py` + `tools/vqa_dump/vqa_dump.cpp` | — | — |
-| VQA compare | `vqa-compare` | `scripts/vqa-compare.py` | — | — |
+| Parity | `parity` | `scripts/parity.sh` | — | — |
 | Capture (checkpoint) | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
 | Release | `release` | `scripts/first-run-pass-94.sh` + cmake + tar | `release.yml` | — |
 | Run RA | `ra` | native binary (via flake app) | — | — |
@@ -79,14 +76,11 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Parity / Comparison
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Parity compare | `nix run .#parity-compare -- <imgA> <imgB> [--label] [--threshold-ssim]` | SSIM + fill% + p99 pixel diff between two PNGs. |
-| | `scripts/parity-compare.py` | Same, directly. |
-| Parity report | `nix run .#parity-report -- --mode <vqa\|gameplay> --targets <t> <scene>` | Three-way parity report: compare golden frames against wine/native/wasm captures. |
-| | `scripts/parity-report.sh` | Same, directly. |
-| VQA decode | `nix run .#vqa-decode -- --vqa NAME --mix PATH --out DIR [--duration N] [--engine {ffmpeg,native}]` | Extract VQA from MIX and decode with selected engine. |
-| | `scripts/vqa-decode.py` + `tools/vqa_dump/vqa_dump.cpp` | Same, directly. |
-| VQA compare | `nix run .#vqa-compare -- <dirA> <dirB>` | Compare two VQA decode output dirs (video + audio). |
-| | `scripts/vqa-compare.py` | Same, directly. |
+| Parity | `nix run .#parity -- check <scene> [--mode vqa|gameplay] [--targets <t>]` | Capture + compare across targets in one command. |
+| | `bash scripts/parity.sh` | Same, directly. |
+| | `python3 scripts/parity-compare.py` | Low-level SSIM compare (used by parity.sh internally). |
+| | `python3 scripts/vqa-decode.py` | Decode VQA frames from MIX (used to generate goldens). |
+| | `bash scripts/parity-report.sh` | Low-level multi-target comparison report. |
 | Golden gen (archived) | `scripts/archive/gen-gameplay-goldens.sh` | ⚠️ Subsumed by `capture-checkpoint.py` + `drivers/`. |
 ### Lint / Audit
 | Command | Invocation | What It Does |
@@ -168,7 +162,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
 | `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`test`/`regression` tiers. |
 | `ci-local.sh` | script | CI | Removed — replaced by `lint.sh`/`build.sh`/`test.sh`/`regression.sh`. |
-| `parity-compare` | nix app | Parity | SSIM compare two images. |
+| `parity` | nix app | Parity | Capture + compare across targets in one command. |
 | `ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
 | `extract_mix.py` | script | Utility | Westwood MIX file extractor. |
 | `first-run-pass-94.sh` | script | Test | RA native smoke test. |
@@ -193,7 +187,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `regression` | nix app | Regression | Build + full regression. |
 | `regression.sh` | script | Regression | Full regression orchestrator (all targets, no gating). |
 | `release` | nix app | Build | Build + strip + tarball both RA and TD. |
-| `parity-report` | nix app | Parity | Three-way parity report. |
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
 | `serve` | nix app | Serve | Start both WASM + asset servers. |
 | `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
@@ -219,8 +212,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `td-vqa-skip-patch.py` | script | Patch (TD) | Skip TD cutscenes. |
 | `test` | nix app | Test | Run e2e test spec. |
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
-| `vqa-compare` | nix app | Parity | Compare two VQA decode output dirs. |
-| `vqa-decode` | nix app | Parity | Extract VQA from MIX and decode with --engine. |
+| `vqa-decode.py` | script | Parity | Extract VQA from MIX and decode with --engine. |
 | `wasm-loop` | nix app | Loop | Removed — use `test` or `regression`. |
 | `wine-cnc-capture.sh` | script | Capture | Generic RA95 Wine capture. |
 | `wine-exe-hashes.json` | data | — | SHA-256 hashes for patched EXEs. |
@@ -272,7 +264,7 @@ These live in `scripts/archive/` — subsumed by the Python `capture-checkpoint.
 ## Naming Convention Summary
 | Surface | Convention | Example |
 |---------|-----------|---------|
-| Nix apps | `kebab-case` | `build-native`, `parity-compare` |
+| Nix apps | `kebab-case` | `build-native`, `capture-checkpoint` |
 | Shell scripts | `kebab-case.sh` | `lint.sh`, `run-e2e.sh` |
 | Python scripts | `kebab-case.py` | `lint-lp64.py`, `parity-compare.py` |
 | npm scripts | `:` delimited | `test:e2e:ra`, `test:e2e:td` |
