@@ -53,7 +53,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Capture / Screenshot
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| | `scripts/ra/wine-ra.sh [exePath] [dataDir]` | RA title/menu capture under Wine + Xvfb. |
 | | `scripts/td/wine-td.sh [exePath] [dataDir]` | TD title/menu capture under Wine + Xvfb. |
 | | `scripts/td/wine-gdi-m1.sh` | C&C95.EXE → GDI Mission 1 gameplay. |
 | | `scripts/td/wine-gdi-m2.sh` | C&C95.EXE → GDI Mission 2 gameplay. |
@@ -190,7 +189,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `wine-gdi-m2.sh` | script | Capture | GDI M2 gameplay capture. |
 | `wine-nod-l1.sh` | script | Capture | Nod L1 gameplay capture. |
 | `wine-nod-m1.sh` | script | Capture | Nod M1 gameplay capture. |
-| `wine-ra.sh` | script | Capture | RA title/menu capture. |
 | `wine-td.sh` | script | Capture | TD title/menu capture. |
 
 ## npm Scripts

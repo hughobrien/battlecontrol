@@ -8,6 +8,8 @@ Usage:
   capture-checkpoint mission allied-l2 --frame 200 --targets wine,native
   capture-checkpoint vqa ENGLISH --frame 120 --targets wine
   capture-checkpoint mission allied-l1 --targets all
+  capture-checkpoint title --targets wine
+  capture-checkpoint menu --targets wine
 """
 
 import argparse
@@ -42,7 +44,9 @@ def resolve_scenario(id: str) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("type", choices=["mission", "vqa", "title", "menu"], help="capture type")
+    ap.add_argument(
+        "type", choices=["mission", "vqa", "title", "menu"], help="capture type"
+    )
     ap.add_argument("id", help="mission (allied-l1) or VQA stem (ENGLISH)")
     ap.add_argument(
         "--frame", type=int, default=0, help="frame number to capture (default: 0)"
