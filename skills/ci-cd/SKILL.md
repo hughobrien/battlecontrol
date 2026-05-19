@@ -217,7 +217,7 @@ playwright test --repeat-each 3 e2e/regression/T1-ra-wasm-boot.spec.ts
 | WASM JIT cold-start | T1/T2 pass 50% of time | Increase `waitForFunction` timeout to 300s |
 | Audio timing race | Audio pitch probe passes ~60% | Apply 5/5 cold-cache rule; add retry |
 | Asset server race | Game loads blank if assets not ready | Add `waitForResponse` before interaction |
-| Xvfb display collision | `xdpyinfo` fails intermittently | Use `xvfb-ensure.sh` (idempotent) |
+| Xvfb display collision | `xdpyinfo` fails intermittently | Kill stale Xvfb on startup |
 
 ### Mitigation techniques
 

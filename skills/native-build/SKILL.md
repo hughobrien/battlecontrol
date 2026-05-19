@@ -121,10 +121,11 @@ files on the link line. Verify `find_package(SDL2 REQUIRED)` succeeded during co
 CI runs headless under Xvfb. The renderer uses `SDL_RENDERER_SOFTWARE` (no GPU).
 
 ```bash
-# Idempotent Xvfb start (reuses existing, kills stale, sets DISPLAY + EXIT trap):
-source scripts/xvfb-ensure.sh :99 640x480x24
+# Start Xvfb (kill stale, start fresh):
+pkill -f "Xvfb :99" 2>/dev/null || true
+Xvfb :99 -screen 0 640x480x24 -ac &
+sleep 1
 
-Xvfb is auto-killed on shell exit via the EXIT trap set by `xvfb-ensure.sh`.
 
 **Palette limitation:** `import -window root` returns blank images when the game uses
 8-bit indexed surfaces under Xvfb with some SDL2 backends. For screenshot capture under

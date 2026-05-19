@@ -173,7 +173,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `build-native.sh` | script | Build | Single-command native build. |
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
 | `vqa-decode.py` | script | Parity | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg). |
-| `xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
 | `td-activateapp-patch.py` | script | Patch (TD) | Prevent WM_ACTIVATEAPP clearing focus. |
 | `vqa-compare.py` | script | Parity | Compare two VQA decode output dirs. |
 | `td-ddmode-patch.py` | script | Patch (TD) | Stub SetDisplayMode. |
@@ -219,7 +218,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | Surface | Convention | Example |
 |---------|-----------|---------|
 | Nix apps | `kebab-case` | `build-native`, `capture-checkpoint` |
-| Shell scripts | `kebab-case.sh` | `lint.sh`, `xvfb-ensure.sh` |
+| Shell scripts | `kebab-case.sh` | `lint.sh`, `serve-wasm.sh` |
 | Python scripts | `kebab-case.py` | `lint-lp64.py`, `parity-compare.py` |
 | npm scripts | `:` delimited | `test:e2e:ra`, `test:e2e:td` |
 
