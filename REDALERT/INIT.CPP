@@ -3411,21 +3411,23 @@ static void Init_Bootstrap_Mixfiles(void)
 
 	new MFCD("NCHIRES.MIX", &FastKey);		//Non-cached hires stuff incl VQ palettes
 #else
-	new MFCD("LORES.MIX", &FastKey);
-	ok = MFCD::Cache("LORES.MIX");
-#ifndef _MSC_VER
-	fprintf(stderr, "[RA] Bootstrap_Mix: LORES.MIX cache=%s\n", ok ? "OK" : "FAIL"); fflush(stderr);
-#endif
-	assert(ok);
-	/* TIM-172: WIN32 path (wwstd.h pre-defines WIN32) uses TITLE.PCX which lives in
-	 * HIRES.MIX (nested inside REDALERT.MIX). Must cache HIRES.MIX so Offset() can
-	 * find TITLE.PCX. NCHIRES.MIX (12MB, VQ palettes) registered without caching. */
+	/* TIM-PARITY: load HIRES.MIX *before* LORES.MIX so MFCD::Offset returns
+	 * the hi-res variants of radar/sidebar/etc. shapes (LORES.MIX also
+	 * carries 80x80 versions; MFCD::Offset iterates List.First()..Next() and
+	 * stops at the first hit, so insertion order is precedence order).
+	 * NCHIRES.MIX (12MB, VQ palettes) registered without caching. */
 #ifndef _MSC_VER
 	new MFCD("HIRES.MIX", &FastKey);
 	ok = MFCD::Cache("HIRES.MIX");
 	fprintf(stderr, "[RA] Bootstrap_Mix: HIRES.MIX cache=%s\n", ok ? "OK" : "FAIL"); fflush(stderr);
 	new MFCD("NCHIRES.MIX", &FastKey);
 #endif
+	new MFCD("LORES.MIX", &FastKey);
+	ok = MFCD::Cache("LORES.MIX");
+#ifndef _MSC_VER
+	fprintf(stderr, "[RA] Bootstrap_Mix: LORES.MIX cache=%s\n", ok ? "OK" : "FAIL"); fflush(stderr);
+#endif
+	assert(ok);
 #endif	//WIN32
 
 	RequiredCD = temp;
