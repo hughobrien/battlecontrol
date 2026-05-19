@@ -13,7 +13,7 @@ def pick_free_display() -> str:
 
 
 def start_xvfb(
-    disp: str, width=1024, height=768, depth=24, logfile=None
+    disp: str, width: int, height: int, depth: int = 24, logfile=None
 ) -> subprocess.Popen:
     p = subprocess.Popen(
         ["Xvfb", disp, "-screen", "0", f"{width}x{height}x{depth}", "-ac"],
@@ -47,41 +47,26 @@ def wait_for_window(disp: str, title: str, timeout=30) -> bool:
     return False
 
 
-def capture_ffmpeg(disp: str, output_path: str, video_size="1024x768"):
-    """Capture single frame via ffmpeg x11grab, falling back to ImageMagick import."""
+def capture_root(disp: str, output_path: str):
+    """Capture the X root window via ImageMagick `import`. Hard-fails on error.
+
+    The output PNG dimensions match the X screen size — no video_size param
+    needed. Use ImageMagick rather than ffmpeg x11grab because the headless
+    ffmpeg build on this system lacks xcb/xlib support.
+    """
     r = subprocess.run(
-        [
-            "ffmpeg",
-            "-nostdin",
-            "-loglevel",
-            "error",
-            "-f",
-            "x11grab",
-            "-video_size",
-            video_size,
-            "-i",
-            disp,
-            "-frames:v",
-            "1",
-            "-y",
-            output_path,
-        ],
-        capture_output=True,
-        timeout=30,
-    )
-    if (
-        r.returncode == 0
-        and os.path.exists(output_path)
-        and os.path.getsize(output_path) > 0
-    ):
-        return
-    # Fallback: ImageMagick import
-    subprocess.run(
         ["import", "-window", "root", output_path],
         env={**os.environ, "DISPLAY": disp},
         capture_output=True,
+        text=True,
         timeout=30,
     )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"`import -window root` failed (rc={r.returncode}): {r.stderr.strip()}"
+        )
+    if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+        raise RuntimeError(f"import produced no output at {output_path}")
 
 
 def screenshot_ok(path: str) -> bool:
@@ -123,3 +108,26 @@ def kill_process_tree(proc: subprocess.Popen):
         proc.kill()
     except Exception:
         pass
+
+
+def teardown_display(disp: str, *procs: subprocess.Popen):
+    """Kill the given procs and remove X lockfile + socket for `disp`.
+
+    Xvfb under SIGKILL does not clean up /tmp/.X{N}-lock or
+    /tmp/.X11-unix/X{N}. Without explicit removal, the slot stays
+    "occupied" from pick_free_display's perspective and accumulates
+    across runs. Every capture session must call this in a finally
+    block — no X display is allowed to outlive the script.
+    """
+    for p in procs:
+        kill_process_tree(p)
+    if not disp.startswith(":"):
+        raise ValueError(f"expected display like ':92', got {disp!r}")
+    n = disp[1:]
+    if not n.isdigit():
+        raise ValueError(f"expected numeric display, got {disp!r}")
+    for path in (f"/tmp/.X{n}-lock", f"/tmp/.X11-unix/X{n}"):
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass

@@ -97,11 +97,7 @@ def main():
             suffix += 1
         checkpoint_dir = output_root / f"{session_base}-{suffix}"
 
-    try:
-        checkpoint_dir.mkdir(parents=True, exist_ok=False)
-    except (OSError, PermissionError):
-        checkpoint_dir = pathlib.Path(f"e2e/checkpoints/{args.type}-{args.id}")
-        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_dir.mkdir(parents=True, exist_ok=False)
 
     # Boot capture types (title/menu) — single target, no comparison
     if args.type in ("title", "menu"):
@@ -119,6 +115,8 @@ def main():
 
     captures = {}
     for target in targets:
+        if target not in ("wine", "native", "wasm"):
+            raise ValueError(f"unknown target: {target} (allowed: wine, native, wasm)")
         target_dir = checkpoint_dir
         log_path = checkpoint_dir / f"{target}-driver.log"
         logfile = open(log_path, "w")
@@ -138,14 +136,11 @@ def main():
                 result = driver.capture_mission(
                     scenario, args.frame, target_dir, logfile
                 )
-            elif target == "wasm":
+            else:  # wasm
                 driver = WasmCapture()
                 result = driver.capture_mission(
                     scenario, args.frame, target_dir, logfile
                 )
-            else:
-                print(f"  SKIP unknown target: {target}")
-                continue
             captures[target] = str(result)
             sz = result.stat().st_size if result.exists() else 0
             if result and result.exists():
@@ -154,8 +149,6 @@ def main():
                 captures[target] = str(flat_path)
                 sz = flat_path.stat().st_size
             print(f"  OK {target}: {captures[target]} ({sz} bytes)")
-        except Exception as e:
-            print(f"  FAIL {target}: {e}")
         finally:
             logfile.close()
 

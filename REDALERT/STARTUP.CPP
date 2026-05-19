@@ -703,9 +703,10 @@ int main(int argc, char * argv[])
 			}
 
 #ifndef _MSC_VER
-			/* TIM-250: classic 640×480 Linux path — attach SeenBuff to the actual
-			   video surface dimensions rather than the Remastered 3072×3072 virtual
-			   canvas. ScreenWidth/ScreenHeight were set to 640/480 in GLOBALS.CPP. */
+			/* Linux classic path — attach SeenBuff to the actual video surface
+			   dimensions (640×400 by default; see GLOBALS.CPP) rather than the
+			   Remastered 3072×3072 virtual canvas. No letterbox Y-offset is needed
+			   because the surface matches the canonical RA1 render size. */
 			SeenBuff.Attach(&VisiblePage, 0, 0, ScreenWidth, ScreenHeight);
 			HidPage.Attach(&HiddenPage, 0, 0, ScreenWidth, ScreenHeight);
 #else
