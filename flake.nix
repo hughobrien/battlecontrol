@@ -55,7 +55,12 @@
 
             src = ./.;
 
-            nativeBuildInputs = with pkgs; [ python3 ];
+            nativeBuildInputs = with pkgs; [
+              cmake
+              ninja
+              python3
+              pkg-config
+            ];
             buildInputs = with pkgs; [
               SDL2
               SDL2.dev
@@ -63,66 +68,17 @@
 
             buildPhase = ''
               runHook preBuild
-
-              SHIM="$PWD/build/include-shim"
-              RA="$PWD/REDALERT"
-              STUBS="$PWD/linux/win32-stubs"
-              OBJS="$PWD/build/obj"
-              mkdir -p "$OBJS/RA" "$OBJS/W32" "$OBJS/STUBS"
-
-              python3 scripts/generate-include-shim.py \
-                --repo-root "$PWD" --shim-root "$SHIM" --quiet
-
-              CXXF="-std=c++17 -c -fno-strict-aliasing -w -O2 \
-                -I$SHIM/redalert -I$SHIM/win32lib \
-                -I$RA -I$RA/WIN32LIB -I$STUBS \
-                -include $STUBS/msvc-compat.h"
-
-              ok=0; fail=0
-              obj_list=$(mktemp)
-
-              compile() {
-                local src=$1 obj=$2
-                if g++ $CXXF "$src" -o "$obj"; then
-                  ok=$((ok+1)); echo "$obj" >> "$obj_list"
-                else
-                  fail=$((fail+1)); echo "FAIL: $src" >&2
-                fi
-              }
-
-              for src in "$RA"/*.CPP "$RA"/*.cpp; do
-                [ -f "$src" ] || continue
-                base=$(basename "$src")
-                upper=$(echo "$base" | tr '[:lower:]' '[:upper:]')
-                case "$upper" in DTABLE.CPP|ITABLE.CPP|LZWOTRAW.CPP|STUB.CPP) continue ;; esac
-                stem=$(basename "$src" .cpp); stem=$(basename "$stem" .CPP)
-                compile "$src" "$OBJS/RA/$stem.o"
-              done
-
-              for src in "$RA/WIN32LIB"/*.CPP "$RA/WIN32LIB"/*.cpp; do
-                [ -f "$src" ] || continue
-                stem=$(basename "$src" .cpp); stem=$(basename "$stem" .CPP)
-                compile "$src" "$OBJS/W32/$stem.o"
-              done
-
-              for src in "$STUBS"/*.cpp; do
-                [ -f "$src" ] || continue
-                stem=$(basename "$src" .cpp)
-                compile "$src" "$OBJS/STUBS/$stem.o"
-              done
-
-              echo "Compile: ok=$ok fail=$fail"
-              [ "$fail" -eq 0 ] || { echo "Build failed"; exit 1; }
-
-              g++ -no-pie $(cat "$obj_list" | tr '\n' ' ') -o redalert -lSDL2
-
+              cmake -S . -B build-ra -G Ninja \
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                -DCMAKE_CXX_FLAGS="-w"
+              cmake --build build-ra --target ra --parallel
               runHook postBuild
             '';
 
             installPhase = ''
               runHook preInstall
               mkdir -p "$out/bin"
-              install -m755 redalert "$out/bin/redalert"
+              install -m755 build-ra/ra "$out/bin/redalert"
               runHook postInstall
             '';
 

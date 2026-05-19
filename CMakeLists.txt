@@ -217,7 +217,7 @@ endif()
 # ---------------------------------------------------------------------------
 # TIM-376: ra executable — Red Alert main binary (native Linux + WASM)
 #
-# Source composition mirrors flake.nix / ra-native-smoke.sh:
+# Source composition — cmake is the single build description:
 #   REDALERT/*.CPP  + REDALERT/WIN32LIB/*.CPP  (upstream game sources)
 #   linux/win32-stubs/*.cpp                     (portable platform layer)
 #
