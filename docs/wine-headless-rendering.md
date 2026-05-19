@@ -140,14 +140,11 @@ any X server — even Xvfb without a GPU.
 ## Quick Start (the working approach)
 
 ```bash
-# Single command — builds everything from the ISO
-bash scripts/wine-cnc-capture.sh
+# Via capture-checkpoint (recommended):
+python3 scripts/capture-checkpoint.py mission allied-l1 --targets wine
 
-# Timed mode (every 5s for 30s):
-TIMED=1 bash scripts/wine-cnc-capture.sh
-
-# Custom output directory:
-bash scripts/wine-cnc-capture.sh "" "" /tmp/my-shots
+# Via parity orchestrator (capture + compare):
+nix run .#parity -- check allied-l1
 ```
 
 This downloads the Allied CD ISO from archive.org (653 MB, cached by Nix),
