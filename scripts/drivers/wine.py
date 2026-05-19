@@ -65,9 +65,7 @@ class WineCapture:
         scripts_dir=None,
     ):
         self.wine = pathlib.Path(wine)
-        self.wineprefix = pathlib.Path(
-            wineprefix or os.path.expanduser("~/.wine-checkpoint")
-        )
+        self.wineprefix = pathlib.Path(wineprefix) if wineprefix else None
         self.ra_exe = pathlib.Path(ra_exe) if ra_exe else self._resolve_ra_exe()
         self.cnc_ddraw_dir = pathlib.Path(cnc_ddraw_dir)
         self.data_dir = pathlib.Path(data_dir)
@@ -154,6 +152,8 @@ class WineCapture:
         return staging
 
     def _ensure_wineprefix(self, staging: pathlib.Path):
+        if self.wineprefix is None:
+            self.wineprefix = pathlib.Path(tempfile.mkdtemp(prefix="wine-capture-"))
         if not self.wineprefix.exists():
             subprocess.run(
                 [str(self.wine), "wineboot", "--init"],
@@ -198,6 +198,8 @@ class WineCapture:
             timeout=10,
         )
         shutil.rmtree(staging, ignore_errors=True)
+        if self.wineprefix and self.wineprefix.name.startswith("wine-capture-"):
+            shutil.rmtree(self.wineprefix, ignore_errors=True)
 
     def capture_mission(
         self, scenario: str, frame: int, output_dir: pathlib.Path, logfile=None
