@@ -756,6 +756,15 @@ bool Select_Game(bool fade)
 			process = false;
 		}
 
+			/* TIM-857: RA_AUTOSTART_SCENARIO env var â override autostart mission. */
+			{
+				const char* envScen = getenv("RA_AUTOSTART_SCENARIO");
+				if (envScen && envScen[0]) {
+					fprintf(stderr, "[RA] RA_AUTOSTART_SCENARIO=%s -> overriding scenario\n", envScen); fflush(stderr);
+					Scen.Set_Scenario_Name(envScen);
+				}
+			}
+
 		/* TIM-812: ?scenario=SCU02EA URL param — override the autostart mission.
 		 * preloader.js writes RA_AUTOSTART_SCENARIO.FLAG in MEMFS with the
 		 * scenario name (e.g. "SCU02EA.INI").  Read it and override Scen. */
