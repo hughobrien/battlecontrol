@@ -481,7 +481,7 @@
 
         # ── Generic e2e runner ────────────────────────────────────────────
         # ── Lint ───────────────────────────────────────────────────────────
-        # nix run .#lint — runs all linters (LP64 + clang-tidy + cppcheck + ...)
+        # nix run .#lint — fast static analysis and format checks (<10s). Heavy: nix run .#check
         lint = mkApp "lint" ''
           exec bash scripts/lint.sh
         '';
@@ -520,18 +520,23 @@
           kill $WASM_PID $ASSET_PID 2>/dev/null || true
         '';
 
-        # ── Four-tier workflow: lint → build → smoke → test ──────────────
+        # ── Four-tier workflow: lint → build → test → regression ──────────
         # Each tier calls the one before it. All support --all and --base REF.
         build = mkApp "build" ''
           exec bash scripts/build.sh "$@"
         '';
 
-        smoke = mkApp "smoke" ''
-          exec bash scripts/smoke.sh "$@"
-        '';
-
         test = mkApp "test" ''
           exec bash scripts/test.sh "$@"
+        '';
+
+        regression = mkApp "regression" ''
+          exec bash scripts/regression.sh "$@"
+        '';
+
+        # ── Heavy static analysis (on-demand). Fast lint: nix run .#lint ──
+        check = mkApp "check" ''
+          exec bash scripts/check.sh
         '';
 
         screenshot = mkApp "screenshot" ''
