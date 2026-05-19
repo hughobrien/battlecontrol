@@ -20,7 +20,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Capture (Wine OG) | `capture-wine` | `scripts/wine-cnc-capture.sh` | — | — |
 | Capture (checkpoint) | `capture-checkpoint` | `scripts/capture-checkpoint.py` | — | — |
 | Release | `release` | `scripts/first-run-pass-94.sh` + cmake + tar | `release.yml` | — |
-| Screenshot | `screenshot` | inline — serve + playwright | — | — |
 | Run RA | `ra` | native binary (via flake app) | — | — |
 | Run TD | `td` | native binary (via flake app) | — | — |
 | Default | `default` | → `ra` | — | — |
@@ -50,7 +49,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Test | `nix run .#test [--all] [--base REF]` | Build + CI-tier boot tests (T1/T2, first-run-pass). |
 | Regression | `nix run .#regression` | Build + full regression (all targets, no flags). |
 | Test (single game) | `bash scripts/test-runner.sh <game> <platform> [--full]` | Run boot or full regression for a single game+platform. |
-| WASM screenshot | `nix run .#screenshot` | Build WASM, serve, capture via Playwright. |
 ### CI / Gate
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -199,7 +197,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `release` | nix app | Build | Build + strip + tarball both RA and TD. |
 | `parity-report` | nix app | Parity | Three-way parity report. |
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
-| `screenshot` | nix app | Test | WASM screenshot capture. |
 | `serve` | nix app | Serve | Start both WASM + asset servers. |
 | `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
