@@ -431,24 +431,22 @@
         release = mkApp "release" ''
           set -e
           echo "=== Building RA native ==="
-          bash scripts/first-run-pass-94.sh
-          cp build/first-run-pass-94/redalert.elf redalert
+          RA_STORE=$(nix build .#redalert -L --no-link --print-out-paths 2>/dev/null)
+          cp "$RA_STORE/bin/redalert" redalert
           strip redalert
           tar czf redalert-linux-x86_64.tar.gz redalert
           echo "  redalert-linux-x86_64.tar.gz: $(stat -c%s redalert-linux-x86_64.tar.gz) bytes"
           echo ""
           echo "=== Building TD native ==="
-          cmake --preset linux-native
-          cmake --build build --target td --parallel
-          strip build/td
-          cp build/td td
+          TD_STORE=$(nix build .#tiberiandawn -L --no-link --print-out-paths 2>/dev/null)
+          cp "$TD_STORE/bin/tiberiandawn" td
+          strip td
           tar czf td-linux-x86_64.tar.gz td
           echo "  td-linux-x86_64.tar.gz: $(stat -c%s td-linux-x86_64.tar.gz) bytes"
           echo ""
           echo "=== Release artifacts ==="
           ls -lh redalert-linux-x86_64.tar.gz td-linux-x86_64.tar.gz
         '';
-
         serve = mkApp "serve-both" ''
           WASM_PORT="''${1:-8080}"
           ASSET_PORT="''${2:-9090}"
