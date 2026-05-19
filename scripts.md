@@ -12,8 +12,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Build | `build` | `scripts/build.sh` | `ci.yml → regression` | — |
 | Test | `test` | `scripts/test.sh` | `ci.yml → regression` | — |
 | Regression | `regression` | `scripts/regression.sh` | `ci.yml → regression` | — |
-| Build (single) | `ra-native-build` etc. | `scripts/build-native.sh`, inline WASM | — | — |
-| Test (single) | `ra-native-test` etc. | `scripts/test-runner.sh` (+ `--full` for regression) | — | — |
 | Serve | `serve` | `wasm/serve-coop.py` + `wasm/serve-assets.py` | — | — |
 | Parity compare | `parity-compare` | `scripts/parity-compare.py` | — | — |
 | Parity report | `parity-report` | `scripts/parity-report.sh` | — | — |
@@ -37,9 +35,10 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Build
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Native build | `nix run .#ra-native-build` / `.#td-native-build` | Build RA or TD native Linux with cmake + ninja. |
-| | `nix run .#build` | Diff-gated build orchestrator (lint + compile changed targets). |
-| WASM build | `nix run .#ra-wasm-build` / `.#td-wasm-build` | Build ra.wasm and/or td.wasm via emcmake + cmake + ninja. |
+| Native build | `nix run .#build` | Build RA and/or TD native Linux (diff-gated). |
+| | `cmake --preset linux-native && cmake --build build --target ra --parallel` | Direct single-target native build. |
+| WASM build | `nix run .#build` | Build ra.wasm and/or td.wasm (diff-gated). |
+| | `emcmake cmake --preset wasm && cmake --build build-wasm --target ra --parallel` | Direct single-target WASM build. |
 | `build-stub-thipx` | nix app | Build | Build stub THIPX32.DLL for Wine 11 wow64 compat. |
 | | `scripts/build-stub-thipx.sh` | Same, directly. |
 | Release (RA+TD) | `nix run .#release` | Build + strip + tarball both binaries. |
@@ -49,16 +48,13 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Lint | `nix run .#lint` | Fast linters (LP64, ruff, shellcheck, yamllint, nixfmt, /opt audit). <10s. |
 | Build | `nix run .#build [--all] [--base REF]` | Lint + diff-gated compile. |
 | Test | `nix run .#test [--all] [--base REF]` | Build + CI-tier boot tests (T1/T2, first-run-pass). |
-| Regression | `nix run .#regression [--all] [--base REF]` | Build + full regression. |
-| Test (single game) | `nix run .#ra-wasm-test [--full]` | Run WASM tests for RA. `--full` for regression tier. |
-| | `nix run .#td-native-test [--full]` | Run native tests for TD. `--full` adds T5+T12. |
-| | `nix run .#ra-native-test [--full]` | Run native tests for RA. `--full` adds T6+T11. |
-| | `nix run .#td-wasm-test [--full]` | Run WASM tests for TD. `--full` adds T3+T6+T7. |
+| Regression | `nix run .#regression` | Build + full regression (all targets, no flags). |
+| Test (single game) | `bash scripts/test-runner.sh <game> <platform> [--full]` | Run boot or full regression for a single game+platform. |
 | WASM screenshot | `nix run .#screenshot` | Build WASM, serve, capture via Playwright. |
 ### CI / Gate
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Full CI locally | `nix run .#regression -- --all` | Run every gate: lint → build → full regression. Same as GitHub CI. |
+| Full CI locally | `nix run .#regression` | Run every gate: lint → build → full regression for all targets. |
 | Pre-push check | `nix run .#test` | Diff-gated: build + boot tests for changed targets. |
 | Pre-commit check | `nix run .#lint` | Fast linters (<10s, installed as git hook). |
 | Deep static analysis | `nix run .#check` | clang-tidy + cppcheck (~5 min, on-demand). |
@@ -116,7 +112,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Iteration Loops
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Full regression | `nix run .#regression -- --all` | Lint → build → full regression for all targets. |
+| Full regression | `nix run .#regression` | Lint → build → full regression for all targets. |
 | Test | `nix run .#test` | Diff-gated: lint → build → boot tests for changed targets. |
 ### Utility
 | Command | Invocation | What It Does |
@@ -196,18 +192,10 @@ Every executable entry point, listed A–Z with its surface(s).
 | `lint.sh` | script | Lint | Fast linters in one script (sourced by build/test/regression). |
 | `check` | nix app | Check | Heavy static analysis: clang-tidy + cppcheck (~5 min, on-demand). |
 | `check.sh` | script | Check | Same, directly. |
-| `ra-native-build` | nix app | Build | Build RA native Linux. |
-| `ra-native-test` | nix app | Test | RA native tests. `--full` for regression tier. |
-| `ra-wasm-build` | nix app | Build | Build RA WASM. |
-| `ra-wasm-test` | nix app | Test | RA WASM tests (CI tier). `--full` for full regression. |
 | `test` | nix app | Test | Build + CI-tier boot tests. |
 | `test.sh` | script | Test | Diff-gated build + boot test orchestrator. |
-| `td-native-build` | nix app | Build | Build TD native Linux. |
-| `td-native-test` | nix app | Test | TD native tests. `--full` for regression tier. |
-| `td-wasm-build` | nix app | Build | Build TD WASM. |
-| `td-wasm-test` | nix app | Test | TD WASM tests (CI tier). `--full` for full regression. |
 | `regression` | nix app | Regression | Build + full regression. |
-| `regression.sh` | script | Regression | Diff-gated build + full regression orchestrator. |
+| `regression.sh` | script | Regression | Full regression orchestrator (all targets, no gating). |
 | `release` | nix app | Build | Build + strip + tarball both RA and TD. |
 | `parity-report` | nix app | Parity | Three-way parity report. |
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
@@ -221,8 +209,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
 | `vqa-decode.py` | script | Parity | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg). |
 | `xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
-| `ra-native-test` | nix app | Test | RA native smoke test. `--full` for T6+T11. |
-| `td-native-test` | nix app | Test | TD native smoke test. `--full` for T5+T12. |
 | `soviet-cdlabel-patch.py` | script | Patch (RA) | Zero CD2 label for Soviet. |
 | `soviet-m2-scenario-patch.py` | script | Patch (RA) | Override Soviet M2 scenario. |
 | `td-activateapp-patch.py` | script | Patch (TD) | Prevent WM_ACTIVATEAPP clearing focus. |
