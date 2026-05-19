@@ -63,14 +63,11 @@ Entry patch (file 0x1AD8CA, VA 0x005BD4CA):
     Patched:  E9 F0 F1 00 00                  jmp 0x005CC6BF  (cave)
               90 ×10
 
-Accepted input SHA-256
-----------------------
-  b00745c200f07551cea018c749cafd62c4ac58d7753f9710964ddbdab809ed90   probe-skip only
-  08f89ab8c85d38650f981a6e1f998e2dacd164142bde5aa22146e5d57382d03c   probe+focus-skip
-  5e7d3c38c367188516e967105693603f8714b4a8395c3cb56c26bfef9faa280a   probe+focus+vqa-skip
+Accepted input SHA-256:
+  9e34d336469e42b5a33499a37b34c0ab513e54ec0844f890873090a423be972b
+    (.#ra-patched-exe + focus-skip)
 
-(ra-focus-skip-patch.py must run first; this patch tolerates the un-flipped
-or already-flipped state of those three sites.)
+(ra-focus-skip-patch.py must run first.)
 """
 
 import sys
@@ -78,9 +75,7 @@ import hashlib
 import shutil
 
 ACCEPTED_INPUT_SHA256 = {
-    "b00745c200f07551cea018c749cafd62c4ac58d7753f9710964ddbdab809ed90",  # probe-skip only
-    "08f89ab8c85d38650f981a6e1f998e2dacd164142bde5aa22146e5d57382d03c",  # + focus-skip
-    "5e7d3c38c367188516e967105693603f8714b4a8395c3cb56c26bfef9faa280a",  # + vqa-skip
+    "9e34d336469e42b5a33499a37b34c0ab513e54ec0844f890873090a423be972b",  # .#ra-patched-exe + focus-skip
 }
 
 # (1) Entry detour

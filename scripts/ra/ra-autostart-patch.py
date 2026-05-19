@@ -12,7 +12,7 @@ Allies), and ra-scenario-patch (target scenario name), the game will:
 Four patches to Select_Game() in the RA95.EXE binary:
 
   1. selection=SEL_MULTIPLAYER(4) → selection=SEL_START_NEW_GAME(1)
-     With GameInFocus=1 (pinned by game-in-focus-patch) the code was
+     With GameInFocus=1 (pinned by ra-game-in-focus-patch) the code was
      picking SEL_MULTIPLAYER instead of SEL_NONE.  Redirect to
      SEL_START_NEW_GAME so the new-game handler fires.
 

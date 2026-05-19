@@ -341,6 +341,35 @@ If native capture produces blank/black frames with ffmpeg, try:
 4. Wait at least 4s for the first frame to render (the game loads MIX files first)
 5. The TIM-490 BMP hooks fire at frames 10, 50, 100 automatically in autostart mode
 
+**`capture-checkpoint.py mission --targets native` prerequisites:**
+- `RA_BIN` env var (or `build/ra` file present) — the driver only finds binaries
+  via these paths and `RA_BIN`.
+- `DATA_DIR` env var pointing at a directory with the RA MIX files (e.g.
+  `/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1`). Without this, the game launches
+  with `cwd="."` and fails to locate MAIN.MIX.
+
+### Wine capture troubleshooting
+
+The `WineCapture` driver uses `ffmpeg x11grab` for screenshots, with an
+ImageMagick `import` fallback inside `capture_ffmpeg`.
+
+**If the wine PNG comes back half-width (content fills only the left half of
+the Red Alert window, right half black) with palette-mangled colours:** that
+specific signature means cnc-ddraw never received `SetDisplayMode(640,480,8)`.
+This was the TIM-727 SDM-stub bug. The current `ra-ddscl-patch.py` leaves
+`SetDisplayMode` intact; if the symptom reappears, check that the staged
+`RA95.EXE` has the expected bytes at `0x1a4a69` (should be `ff 53 54`, *not*
+`31 c0 90`) — and verify the `.#ra-patched-exe` output SHA matches the one
+declared in `scripts/ra/ra-focus-skip-patch.py`.
+
+**If the wine PNG is blank/black:** the window hasn't rendered yet, or the
+flake's `cnc-ddraw` build doesn't have the TIM-740 `scanline_double` patch
+(check `tools/cnc-ddraw/tim740-scanline-double.patch` is referenced from
+`flake.nix` and that `nix build .#cnc-ddraw` produces a DLL whose md5 matches
+the patched build). The `tools/wine-input/ra-screenshot.exe` BitBlt helper
+captures from the in-process window DC and is a usable fallback for debugging
+the X11 ↔ cnc-ddraw transition itself.
+
 ### WASM capture troubleshooting
 
 - If the page shows a black canvas, ensure COOP/COEP headers are set (the WASM

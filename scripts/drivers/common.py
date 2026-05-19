@@ -48,8 +48,8 @@ def wait_for_window(disp: str, title: str, timeout=30) -> bool:
 
 
 def capture_ffmpeg(disp: str, output_path: str, video_size="1024x768"):
-    """Capture single frame via ffmpeg x11grab."""
-    subprocess.run(
+    """Capture single frame via ffmpeg x11grab, falling back to ImageMagick import."""
+    r = subprocess.run(
         [
             "ffmpeg",
             "-nostdin",
@@ -66,6 +66,19 @@ def capture_ffmpeg(disp: str, output_path: str, video_size="1024x768"):
             "-y",
             output_path,
         ],
+        capture_output=True,
+        timeout=30,
+    )
+    if (
+        r.returncode == 0
+        and os.path.exists(output_path)
+        and os.path.getsize(output_path) > 0
+    ):
+        return
+    # Fallback: ImageMagick import
+    subprocess.run(
+        ["import", "-window", "root", output_path],
+        env={**os.environ, "DISPLAY": disp},
         capture_output=True,
         timeout=30,
     )
@@ -94,9 +107,17 @@ def kill_process_tree(proc: subprocess.Popen):
     """Kill a process and its children."""
     if proc is None:
         return
+    pid = proc.pid
+    # Kill children first
     try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-    except (ProcessLookupError, PermissionError):
+        import subprocess as _sp
+
+        _sp.run(["pkill", "-P", str(pid)], capture_output=True, timeout=5)
+    except Exception:
+        pass
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
         pass
     try:
         proc.kill()

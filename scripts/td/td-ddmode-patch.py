@@ -5,7 +5,17 @@ TIM-747 — Stub SetDisplayMode in C&C95.EXE (CnCNet build).
 The CnCNet binary already uses DDSCL_NORMAL (windowed DDraw), so only the
 SetDisplayMode stub is needed — no SetCooperativeLevel patch required.
 
-Why:
+⚠️  TIM-1100 (2026-05-19): the analogous RA patch (`ra-ddscl-patch.py`) used to
+stub SetDisplayMode for the same Wine/Xvfb reason. Once the RA pipeline
+standardised on cnc-ddraw (loaded as native ddraw.dll via
+`WINEDLLOVERRIDES=ddraw=n`), the stub became actively harmful: cnc-ddraw's
+`IDirectDraw::SetDisplayMode` interceptor needs the call to reach it so it can
+size its X11-backed surface, otherwise the framebuffer comes back half-width
+with a mangled palette. The TD pipeline (`scripts/td/wine-gdi-m1.sh`) loads
+cnc-ddraw too, so this patch likely needs the same treatment — verify with a
+TD parity capture before relying on the rendering.
+
+Why (historical context, pre-cnc-ddraw):
   C&C95.EXE calls IDirectDraw::SetDisplayMode(640, 400, 8) during init.
   Wine routes that call to NtUserChangeDisplaySettings, which Xvfb refuses
   with DISP_CHANGE_FAILED (-2).  TD treats any non-DD_OK result as fatal:

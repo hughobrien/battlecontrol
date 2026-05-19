@@ -64,21 +64,23 @@
             buildInputs = with pkgs; [
               SDL2
               SDL2.dev
+              SDL2_ttf
             ];
 
+            cmakeFlags = [
+              "-DCMAKE_CXX_FLAGS=-w"
+              "-DSDL2_ttf_DIR=${pkgs.SDL2_ttf}/lib/cmake/SDL2_ttf"
+            ];
             buildPhase = ''
               runHook preBuild
-              cmake -S . -B build-ra -G Ninja \
-                -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                -DCMAKE_CXX_FLAGS="-w"
-              cmake --build build-ra --target ra --parallel
+              cmake --build . --target ra --parallel
               runHook postBuild
             '';
 
             installPhase = ''
               runHook preInstall
               mkdir -p "$out/bin"
-              install -m755 build-ra/ra "$out/bin/redalert"
+              install -m755 ra "$out/bin/redalert"
               runHook postInstall
             '';
 
@@ -202,12 +204,16 @@
               '';
 
           # cnc-ddraw — Win32 DirectDraw wrapper that replaces wined3d with GDI.
-          # Built from upstream GitHub source with MinGW.
+          # Built from upstream GitHub source with MinGW, plus the TIM-740
+          # scanline_double patch (fills odd rows when RA95's VQA player writes
+          # to a hardware-scanline-doubled surface). Without that patch, every
+          # other physical row stays at zero-fill background colour.
           # nix build .#cnc-ddraw  →  result/bin/ddraw.dll
           cnc-ddraw = pkgs.stdenv.mkDerivation {
             pname = "cnc-ddraw";
             version = "unstable-2026-05-16";
             src = cnc-ddraw;
+            patches = [ ./tools/cnc-ddraw/tim740-scanline-double.patch ];
             nativeBuildInputs = [ pkgs.pkgsCross.mingw32.buildPackages.gcc ];
             buildPhase = ''
               runHook preBuild

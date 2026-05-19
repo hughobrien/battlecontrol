@@ -469,7 +469,7 @@ All reusable scripts live in `scripts/`.
 | `ra-autostart-patch.py` | Binary patch for RA95.EXE: zero-click auto-boot into any Allied mission at Normal difficulty. See [Auto-launch patch](#auto-launch-patch-wine) below. |
 | `ra-scenario-patch.py` | Replace hardcoded mission name in RA95.EXE (e.g. SCG01EA→SCG02EA) |
 | `tools/wine-input/*` | SendInput injectors + BitBlt capture inside Wine |
-| `tools/cnc-ddraw/` flake | Build cnc-ddraw with scanline_double patch — `nix build path:./tools/cnc-ddraw#cnc-ddraw` |
+| `tools/cnc-ddraw/tim740-scanline-double.patch` | Vendored local patch applied to the upstream cnc-ddraw flake input (see `flake.nix`). Build with `nix build .#cnc-ddraw`. |
 
 ---
 
@@ -542,6 +542,8 @@ next step.
 | `docs/lp64-audit.md` | LP64 porting hazards and fixes |
 | `docs/smoke-test-design-rule.md` | Assertion design rules for smoke tests |
 | `docs/codec-testing.md` | VQA codec testing methodology |
+| `docs/wine-rendering-explainer.md` | Plain-English primer for the Wine OG capture pipeline — DirectDraw concepts, Wine internals, cnc-ddraw, Xvfb, what each binary patch does. Start here when investigating wine capture issues. |
+| `docs/wine-headless-rendering.md` | Journey log of approaches tried before settling on cnc-ddraw. Useful when something regresses to a previously-ruled-out path. |
 | *(below)* | [Branch and PR Workflow](#branch-and-pr-workflow) |
 
 ---

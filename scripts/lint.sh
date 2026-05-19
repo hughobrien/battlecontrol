@@ -11,8 +11,8 @@ FAIL=0
 
 LP64_OUT=$(python3 scripts/lint-lp64.py --errors-only 2>&1) || FAIL=1
 if [[ -n "$LP64_OUT" ]]; then
-    echo "=== LP64 hazard audit ==="
-    echo "$LP64_OUT"
+	echo "=== LP64 hazard audit ==="
+	echo "$LP64_OUT"
 fi
 
 echo ""
