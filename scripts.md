@@ -120,13 +120,11 @@ These Python scripts apply binary patches to RA95.EXE:
 | No-CD | `scripts/nocd-patch.py` | NOPs GetDriveType check — skip CD error dialog. | 1 |
 | DDSCL | `scripts/ddscl-patch.py` | DDSCL_EXCLUSIVE → DDSCL_NORMAL + stub SetDisplayMode. | 2 |
 | CD label (Allied) | `scripts/cdlabel-patch.py` | Zero first byte of "CD1" label for Wine. | 3 |
-| CD label (Soviet) | `scripts/soviet-cdlabel-patch.py` | Zero first byte of "CD2" label for Wine. | 3 (Soviet) |
 | Focus skip | `scripts/focus-skip-patch.py` | NOP three `while(!GameInFocus)` spin loops. | 4 |
 | Game in focus | `scripts/game-in-focus-patch.py` | Pin `GameInFocus=TRUE` via entry-point detour. | 5 |
 | VQA skip | `scripts/vqa-skip-patch.py` | Replace `Play_Movie` prologue with `RET`. | 6 |
 | Scenario | `scripts/ra-scenario-patch.py` | Replace hardcoded "SCG01EA.INI" with target mission. | 7 |
 | Auto-start | `scripts/ra-autostart-patch.py` | Four patches to `Select_Game()` for zero-click auto-boot. | 8 |
-| Soviet M2 | `scripts/soviet-m2-scenario-patch.py` | Override SCU01EA.INI → SCU02EA.INI. | 7 (Soviet M2) |
 ### Wine Binary Patches (C&C95.EXE — Tiberian Dawn)
 | Patch | Script | What It Does | Order |
 |-------|--------|-------------|-------|
@@ -187,8 +185,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
 | `vqa-decode.py` | script | Parity | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg). |
 | `xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
-| `soviet-cdlabel-patch.py` | script | Patch (RA) | Zero CD2 label for Soviet. |
-| `soviet-m2-scenario-patch.py` | script | Patch (RA) | Override Soviet M2 scenario. |
 | `td-activateapp-patch.py` | script | Patch (TD) | Prevent WM_ACTIVATEAPP clearing focus. |
 | `td-cdlabel-patch.py` | script | Patch (TD) | Zero GDI95 label. |
 | `vqa-compare.py` | script | Parity | Compare two VQA decode output dirs. |
@@ -226,7 +222,6 @@ These live in `scripts/archive/` — subsumed by the Python `capture-checkpoint.
 | `wine-allied-m2.sh` | `capture-checkpoint.py mission allied-m2 --targets wine` |
 | `wine-gameplay.sh` | `capture-checkpoint.py mission allied-l1 --targets wine --mode gameplay` |
 | `wine-soviet-l1.sh` | `capture-checkpoint.py mission soviet-l1 --targets wine` |
-| `wine-soviet-m2.sh` | `capture-checkpoint.py mission soviet-m2 --targets wine` |
 | `wine-vqa-capture.sh` | `capture-checkpoint.py vqa <stem> --targets wine` |
 
 
