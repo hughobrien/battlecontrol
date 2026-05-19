@@ -314,5 +314,5 @@ For runner-level issues (disk space, Docker daemon):
 - `.github/workflows/release.yml` — Semver-tagged release automation
 - `RELEASE.md` — Release checklist and artifact descriptions
 - `WASM-SERVE.md` — WASM serving guide (COOP/COEP headers)
-- `scripts/first-run-pass-94.sh` — Release-build smoke test (native RA)
+- `scripts/ra/ra-native-smoke.sh` — Release-build smoke test (native RA, release mode)
 - `scripts/td/run-td-cheat.sh` — Cheat-mode smoke test (native TD)

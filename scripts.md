@@ -15,7 +15,7 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | Serve | `serve` | `wasm/serve-coop.py` + `wasm/serve-assets.py` | — | — |
 | Parity | `parity` | `scripts/parity.sh` | — | — |
 | Capture (checkpoint) | — | `scripts/capture-checkpoint.py` | — | — |
-| Release | `release` | `scripts/first-run-pass-94.sh` + cmake + tar | `release.yml` | — |
+| Release | `release` | `scripts/ra/ra-native-smoke.sh release` + cmake + tar | `release.yml` | — |
 | Run RA | `ra` | native binary (via flake app) | — | — |
 | Run TD | `td` | native binary (via flake app) | — | — |
 | Default | `default` | → `ra` | — | — |
@@ -145,7 +145,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `parity` | nix app | Parity | Capture + compare across targets in one command. |
 | `ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
 | `extract_mix.py` | script | Utility | Westwood MIX file extractor. |
-| `first-run-pass-94.sh` | script | Test | RA native smoke test. |
+| `ra-native-smoke.sh` | script | Test | RA native smoke test (boot/release/m2 modes). |
 | `focus-skip-patch.py` | script | Patch (RA) | NOP GameInFocus spin loops. |
 | `game-in-focus-patch.py` | script | Patch (RA) | Pin GameInFocus=TRUE. |
 | `generate-include-shim.py` | script | Build | Regenerate case-folding include shim (auto-run by CMake). |

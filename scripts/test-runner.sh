@@ -108,10 +108,9 @@ td-wasm)
 	fi
 	;;
 ra-native)
-	run_script scripts/first-run-pass-94.sh
+	run_script scripts/ra/ra-native-smoke.sh release
 	if [ "$FULL" = true ]; then
-		run_script scripts/ra/regression/T6-ra-native-smoke.sh
-		run_script scripts/ra/regression/T11-ra-native-m2-smoke.sh
+		run_script scripts/ra/ra-native-smoke.sh m2
 	fi
 	;;
 td-native)

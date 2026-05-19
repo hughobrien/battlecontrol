@@ -6,7 +6,7 @@
 - [ ] All regression tests pass: T1–T10 WASM gates, parity comparisons, Wine OG diffs
 - [ ] README release-notes section updated with what's new for this version
 - [ ] WASM artifacts smoke-tested: ra.html + td.html load without pageerror
-- [ ] Native Linux binaries build and validate: `bash scripts/first-run-pass-94.sh`
+- [ ] Native Linux binaries build and validate: `bash scripts/ra/ra-native-smoke.sh release`
 
 ## Cutting a release
 

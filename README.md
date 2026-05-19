@@ -252,7 +252,7 @@ cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"
 cmake --build build-asan -j$(nproc)
 # Or run the full RA smoke-test script (sets RA_DATA_DIR internally):
-bash scripts/first-run-pass-94.sh
+bash scripts/ra/ra-native-smoke.sh release
 ```
 
 ### Build the testbed binary without entering the shell

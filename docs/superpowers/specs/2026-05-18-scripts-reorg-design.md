@@ -50,7 +50,7 @@ scripts/
 ├── check.sh                     (shared)
 ├── ddscl-patch.py               (shared — applied to both RA and TD builds)
 ├── extract_mix.py               (shared)
-├── first-run-pass-94.sh         (shared — release smoke test)
+├── ra/ra-native-smoke.sh        (ra — release smoke test)
 ├── focus-skip-patch.py          (shared)
 ├── game-in-focus-patch.py       (shared)
 ├── generate-include-shim.py     (shared)
