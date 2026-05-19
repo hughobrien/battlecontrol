@@ -19,7 +19,7 @@ class NativeCapture:
 
     def __init__(self, ra_bin=None, data_dir=None):
         self.ra_bin = pathlib.Path(ra_bin) if ra_bin else self._resolve_ra_bin()
-        self.data_dir = data_dir
+        self.data_dir = data_dir or os.environ.get("DATA_DIR")
 
     def _resolve_ra_bin(self) -> pathlib.Path:
         candidates = ["build/ra/redalert", "build/ra/ra", "build/redalert"]
@@ -39,6 +39,7 @@ class NativeCapture:
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
         xvfb = wm = ra_proc = None
+        data_dir = str(self.data_dir) if self.data_dir else os.environ.get("DATA_DIR", ".")
         try:
             xvfb = start_xvfb(disp, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
@@ -48,10 +49,9 @@ class NativeCapture:
                 "RA_AUTOSTART": "1",
                 "RA_AUTOSTART_SCENARIO": f"{scenario}.INI",
             }
-            if self.data_dir:
-                env["DATA_DIR"] = self.data_dir
             ra_proc = subprocess.Popen(
-                [str(self.ra_bin)], env=env, stdout=logfile, stderr=logfile
+                [str(self.ra_bin)], env=env, cwd=data_dir,
+                stdout=logfile, stderr=logfile
             )
             # Probe for non-black canvas (up to 45s)
             deadline = time.time() + 45
