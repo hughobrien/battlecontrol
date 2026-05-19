@@ -105,5 +105,4 @@ multi-step command sequences. Each script handles setup, teardown, and error rec
 - **One command per workflow** — collapses multi-step manual sequences into a single invocation
 - **Exits 0 on success** — works as a CI gate or a skill verification step
 
-Historical build-pass scripts and one-off diagnostics have been moved to
-`scripts/archive/`. Only reusable automation lives at the top level of `scripts/`.
+Only reusable automation lives at the top level of `scripts/`.

@@ -440,8 +440,7 @@ Things an agent must never break:
 
 ## Key Scripts Reference
 
-All reusable scripts live in `scripts/`. Historical build-pass scripts have been
-moved to `scripts/archive/`.
+All reusable scripts live in `scripts/`.
 
 | Script / Tool | Purpose |
 |---------------|---------|

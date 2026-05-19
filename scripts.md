@@ -74,7 +74,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 | | `python3 scripts/parity-compare.py` | Low-level SSIM compare (used by parity.sh internally). |
 | | `python3 scripts/vqa-decode.py` | Decode VQA frames from MIX (used to generate goldens). |
 | | `bash scripts/parity-report.sh` | Low-level multi-target comparison report. |
-| Golden gen (archived) | `scripts/archive/gen-gameplay-goldens.sh` | ⚠️ Subsumed by `capture-checkpoint.py` + `drivers/`. |
 ### Lint / Audit
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -196,20 +195,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `wine-nod-m1.sh` | script | Capture | Nod M1 gameplay capture. |
 | `wine-ra.sh` | script | Capture | RA title/menu capture. |
 | `wine-td.sh` | script | Capture | TD title/menu capture. |
-
-
-## Archived Scripts
-These live in `scripts/archive/` — subsumed by the Python `capture-checkpoint.py` orchestrator + `drivers/` modules:
-| Archived Script | Subsumed By |
-|----------------|-------------|
-| `gen-gameplay-goldens.sh` | `capture-checkpoint.py` + `drivers/compare.py` |
-| `native-capture.sh` | `capture-checkpoint.py mission --targets native` + `drivers/native.py` |
-| `wine-allied-l1.sh` | `capture-checkpoint.py mission allied-l1 --targets wine` + `drivers/wine.py` |
-| `wine-allied-m2.sh` | `capture-checkpoint.py mission allied-m2 --targets wine` |
-| `wine-gameplay.sh` | `capture-checkpoint.py mission allied-l1 --targets wine --mode gameplay` |
-| `wine-soviet-l1.sh` | `capture-checkpoint.py mission soviet-l1 --targets wine` |
-| `wine-vqa-capture.sh` | `capture-checkpoint.py vqa <stem> --targets wine` |
-
 
 ## npm Scripts
 | Script | Command |
