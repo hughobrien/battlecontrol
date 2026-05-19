@@ -2241,6 +2241,12 @@ Mono_Set_Cursor(0,0);
 	 * so non-autostart tests can observe frame progress without triggering autostart behavior. */
 	static bool _ra_autostart = getenv("RA_AUTOSTART") != nullptr
 	                             || RawFileClass("RA_AUTOSTART.FLAG").Is_Available();
+	/* RA_SMOKE_TEST: gates the game-state-modifying probes (synthetic mouse
+	 * clicks, tank reinforcements) that were originally bundled into the
+	 * RA_AUTOSTART switch but corrupt parity captures. Log-only probes
+	 * (TIM-310 win-at-Frame+200, TIM-316 FPS) still ride on RA_AUTOSTART. */
+	static bool _ra_smoke_test = getenv("RA_SMOKE_TEST") != nullptr
+	                              || RawFileClass("RA_SMOKE_TEST.FLAG").Is_Available();
 	static bool _ra_debug_frames = _ra_autostart
 	                               || RawFileClass("RA_DEBUG.FLAG").Is_Available();
 	static long _ra_frame_count = 0;
@@ -2309,7 +2315,7 @@ Mono_Set_Cursor(0,0);
 	 * Uses the same Selection_At_Mouse/Command_Object calls as DLLInterface.cpp
 	 * INPUT_REQUEST_SELECT_AT_POSITION / INPUT_REQUEST_COMMAND_AT_POSITION. */
 	static bool _tim529_done = false;
-	if (_ra_autostart && !_tim529_done) {
+	if (_ra_autostart && _ra_smoke_test && !_tim529_done) {
 		if (_ra_frame_count == 20) {
 			const int sel_x = 350, sel_y = 135;
 			Keyboard->MouseQX = sel_x;
@@ -2357,7 +2363,7 @@ Mono_Set_Cursor(0,0);
 	 *           → Command_Object fires at frame 41 → ACTION_MOVE
 	 * Frame 45: log "[RA] TIM-531: move order issued" (criterion 3 evidence) */
 	static bool _tim531_done = false;
-	if (_ra_autostart && !_tim531_done) {
+	if (_ra_autostart && _ra_smoke_test && !_tim531_done) {
 		if (_ra_frame_count == 30) {
 			SDL_Event ev;
 			memset(&ev, 0, sizeof(ev));

@@ -583,8 +583,12 @@ bool Read_Scenario(char * name)
 					fprintf(stderr, "[TIM-310] read_scenario_ok cycle=%d frame=%ld\n", s_cycle, (long)Frame);
 				}
 			}
-			// TIM-308: pass-89 — inject 5 Allied Mammoth tanks near player start (retained for combat coverage)
-			if (Session.Type == GAME_NORMAL && PlayerPtr != NULL) {
+			// TIM-308: pass-89 — inject 5 Allied Mammoth tanks near player start (retained for combat coverage).
+			// Gated on RA_SMOKE_TEST (not RA_AUTOSTART) so parity captures get the scenario's
+			// designed starting state. Set RA_SMOKE_TEST=1 alongside RA_AUTOSTART=1 to revive it.
+			bool _smoke_test = getenv("RA_SMOKE_TEST") != nullptr
+			                   || RawFileClass("RA_SMOKE_TEST.FLAG").Is_Available();
+			if (_smoke_test && Session.Type == GAME_NORMAL && PlayerPtr != NULL) {
 				CELL base_cell = 0;
 				for (int _ui = 0; _ui < Units.Count() && base_cell == 0; _ui++) {
 					UnitClass * _pu = Units.Ptr(_ui);
