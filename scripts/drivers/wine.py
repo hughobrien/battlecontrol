@@ -173,6 +173,16 @@ class WineCapture:
         # cnc-ddraw — the canonical Wine DirectDraw path. Built from the flake
         # input (with the TIM-740 scanline_double patch applied) — nothing
         # else in the pipeline works correctly under Xvfb.
+        #
+        # Don't switch to DDrawCompat (narzoul/DDrawCompat):
+        #   1. README says Wine is explicitly unsupported.
+        #   2. It wraps the real ddraw.dll, so under Wine it adds Wine's
+        #      DirectDraw impl as an extra variable in OG-vs-native parity.
+        #   3. No `windowed=true` equivalent — it would hit Xvfb's
+        #      no-exclusive-mode-set crash that we already observed when
+        #      flipping cnc-ddraw's `windowed=false` (see commit history).
+        # cnc-ddraw `renderer=gdi` bypasses DirectDraw entirely and is the
+        # CnCNet-community canonical shim for RA95/C&C95 specifically.
         ddraw_r = subprocess.run(
             ["nix", "build", ".#cnc-ddraw", "--impure", "--print-out-paths"],
             capture_output=True,
