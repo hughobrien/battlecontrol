@@ -1,50 +1,24 @@
 #!/usr/bin/env python3
-"""Sweep leftover capture state from a SIGKILLed or crashed run.
+"""Sweep leftover capture state. Manual CLI wrapper around drivers.common.sweep_state.
 
-What this removes:
-  - ~/.cache/battlecontrol/wine-prefix-*    (per-run wineprefix dirs)
-  - ~/.cache/battlecontrol/wine-capture-*   (per-run staging dirs)
-  - /tmp/.X{92..98}-lock                    (Xvfb lockfiles in our display range)
-  - /tmp/.X11-unix/X{92..98}                (matching X11 unix sockets)
+capture-checkpoint.py already invokes sweep_state() in its finally block, so
+under normal operation you never need to run this manually. Use it after a
+SIGKILLed or crashed run that didn't reach its cleanup.
 
-What it does NOT touch:
-  - ~/.cache/battlecontrol/ra-sendinput.exe (build cache, reusable)
-  - /run/user/$UID/wine/server-*            (wineserver IPC dirs — tiny, harmless)
-  - Live processes (Xvfb, wineserver, RA95.EXE) — caller's responsibility
+Removed: ~/.cache/battlecontrol/wine-prefix-*, wine-capture-*,
+         /tmp/.X{92..98}-lock, /tmp/.X11-unix/X{92..98}
 """
 
-import os
 import pathlib
-import shutil
 import sys
 
-CACHE = pathlib.Path.home() / ".cache" / "battlecontrol"
-PATTERNS = ("wine-prefix-*", "wine-capture-*")
-DISPLAY_RANGE = range(92, 99)
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from drivers.common import sweep_state
 
 
 def main() -> int:
-    removed_dirs: list[pathlib.Path] = []
-    for pat in PATTERNS:
-        for p in CACHE.glob(pat):
-            shutil.rmtree(p)
-            removed_dirs.append(p)
-            print(f"removed dir: {p}")
-
-    removed_locks: list[str] = []
-    for n in DISPLAY_RANGE:
-        for path in (f"/tmp/.X{n}-lock", f"/tmp/.X11-unix/X{n}"):
-            try:
-                os.unlink(path)
-            except FileNotFoundError:
-                continue
-            removed_locks.append(path)
-            print(f"removed lock: {path}")
-
-    print(
-        f"\nSwept {len(removed_dirs)} cache dir(s) and "
-        f"{len(removed_locks)} X lock/socket(s)."
-    )
+    dirs, locks = sweep_state(verbose=True)
+    print(f"\nSwept {dirs} cache dir(s) and {locks} X lock/socket(s).")
     return 0
 
 

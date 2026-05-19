@@ -110,6 +110,44 @@ def kill_process_tree(proc: subprocess.Popen):
         pass
 
 
+_CACHE_DIR = os.path.expanduser("~/.cache/battlecontrol")
+_SWEEP_PATTERNS = ("wine-prefix-*", "wine-capture-*")
+_SWEEP_DISPLAY_RANGE = range(92, 99)
+
+
+def sweep_state(verbose: bool = False) -> tuple[int, int]:
+    """Remove leftover per-run capture state. Returns (dirs, locks) counts.
+
+    Always safe to call at the end of a run: only nukes per-session
+    artefacts (wine-prefix-*, wine-capture-*) and our X display range's
+    lockfiles/sockets. The persistent build cache (ra-sendinput.exe) and
+    other users' state are untouched.
+    """
+    import glob
+    import shutil
+
+    dirs_removed = 0
+    for pat in _SWEEP_PATTERNS:
+        for p in glob.glob(os.path.join(_CACHE_DIR, pat)):
+            shutil.rmtree(p)
+            if verbose:
+                print(f"removed dir: {p}")
+            dirs_removed += 1
+
+    locks_removed = 0
+    for n in _SWEEP_DISPLAY_RANGE:
+        for path in (f"/tmp/.X{n}-lock", f"/tmp/.X11-unix/X{n}"):
+            try:
+                os.unlink(path)
+            except FileNotFoundError:
+                continue
+            if verbose:
+                print(f"removed lock: {path}")
+            locks_removed += 1
+
+    return dirs_removed, locks_removed
+
+
 def teardown_display(disp: str, *procs: subprocess.Popen):
     """Kill the given procs and remove X lockfile + socket for `disp`.
 

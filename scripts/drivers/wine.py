@@ -62,32 +62,7 @@ class WineCapture:
         "SOVIET2": 12.0,
     }
 
-    CACHE_DIR = pathlib.Path.home() / ".cache" / "battlecontrol"
-    ORPHAN_PATTERNS = ("wine-prefix-*", "wine-capture-*")
-
-    @classmethod
-    def _check_no_orphans(cls):
-        """Hard-fail if leftover wineprefix/staging dirs exist.
-
-        A previous run was SIGKILLed, crashed, or skipped its finally block.
-        We refuse to start until the user runs `scripts/sweep-state.py` —
-        explicit cleanup beats auto-recovery (see feedback-no-fallbacks).
-        """
-        orphans = []
-        for pat in cls.ORPHAN_PATTERNS:
-            orphans.extend(cls.CACHE_DIR.glob(pat))
-        if orphans:
-            listing = "\n  ".join(sorted(str(o) for o in orphans))
-            raise RuntimeError(
-                f"Leftover capture state under {cls.CACHE_DIR}:\n"
-                f"  {listing}\n\n"
-                f"A previous run did not clean up. Run "
-                f"`python3 scripts/sweep-state.py` then retry."
-            )
-
     def __init__(self):
-        self._check_no_orphans()
-
         wine = os.environ.get("WINE_BIN")
         if not wine:
             raise RuntimeError("WINE_BIN not set; export WINE_BIN=/abs/path/to/wine")

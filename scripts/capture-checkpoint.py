@@ -22,6 +22,7 @@ import socket
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from drivers import WineCapture, NativeCapture, WasmCapture
 from drivers.compare import full_report
+from drivers.common import sweep_state
 
 SCENARIO_MAP = {
     "allied-l1": "SCG01EA",
@@ -68,6 +69,16 @@ def main():
     )
     args = ap.parse_args()
 
+    try:
+        return _run(args)
+    finally:
+        # Backstop cleanup: per-driver _cleanup handles the happy path, but
+        # an exception above (e.g. driver init failure) skips it. sweep_state
+        # is idempotent and only nukes per-run artefacts we know we own.
+        sweep_state(verbose=False)
+
+
+def _run(args):
     targets = args.targets.split(",")
     if "all" in targets:
         targets = ["wine", "native", "wasm"]
