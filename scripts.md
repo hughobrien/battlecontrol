@@ -7,10 +7,11 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ## Cross-Reference Matrix
 | Action | Nix App | Script(s) | CI Job | npm Script |
 |--------|---------|-----------|--------|------------|
-| Lint | `lint` | `scripts/lint.sh` | `ci.yml → test` | — |
-| Build | `build` | `scripts/build.sh` | `ci.yml → test` | — |
-| Smoke | `smoke` | `scripts/smoke.sh` | `ci.yml → test` | — |
-| Test (full) | `test` | `scripts/test.sh` | `ci.yml → test` | — |
+| Lint | `lint` | `scripts/lint.sh` | pre-commit hook | — |
+| Check | `check` | `scripts/check.sh` | — | — |
+| Build | `build` | `scripts/build.sh` | `ci.yml → regression` | — |
+| Test | `test` | `scripts/test.sh` | `ci.yml → regression` | — |
+| Regression | `regression` | `scripts/regression.sh` | `ci.yml → regression` | — |
 | Build (single) | `ra-native-build` etc. | `scripts/build-native.sh`, inline WASM | — | — |
 | Test (single) | `ra-native-test` etc. | `scripts/test-runner.sh` (+ `--full` for regression) | — | — |
 | Serve | `serve` | `wasm/serve-coop.py` + `wasm/serve-assets.py` | — | — |
@@ -45,10 +46,10 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Test / QA
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Lint | `nix run .#lint` | All linters (LP64, clang-tidy, cppcheck, ruff, shellcheck, yamllint, nixfmt, /opt audit). |
+| Lint | `nix run .#lint` | Fast linters (LP64, ruff, shellcheck, yamllint, nixfmt, /opt audit). <10s. |
 | Build | `nix run .#build [--all] [--base REF]` | Lint + diff-gated compile. |
-| Smoke | `nix run .#smoke [--all] [--base REF]` | Build + CI-tier boot tests (T1/T2, first-run-pass). |
-| Test (full) | `nix run .#test [--all] [--base REF]` | Build + full regression. |
+| Test | `nix run .#test [--all] [--base REF]` | Build + CI-tier boot tests (T1/T2, first-run-pass). |
+| Regression | `nix run .#regression [--all] [--base REF]` | Build + full regression. |
 | Test (single game) | `nix run .#ra-wasm-test [--full]` | Run WASM tests for RA. `--full` for regression tier. |
 | | `nix run .#td-native-test [--full]` | Run native tests for TD. `--full` adds T5+T12. |
 | | `nix run .#ra-native-test [--full]` | Run native tests for RA. `--full` adds T6+T11. |
@@ -57,9 +58,10 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### CI / Gate
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Full CI locally | `nix run .#test -- --all` | Run every gate: lint → build → full regression. Same as GitHub CI. |
-| Pre-push check | `nix run .#smoke` | Diff-gated: build + boot tests for changed targets. |
-| Pre-commit check | `nix run .#lint` | All static analysis + format checks (installed as git hook). |
+| Full CI locally | `nix run .#regression -- --all` | Run every gate: lint → build → full regression. Same as GitHub CI. |
+| Pre-push check | `nix run .#test` | Diff-gated: build + boot tests for changed targets. |
+| Pre-commit check | `nix run .#lint` | Fast linters (<10s, installed as git hook). |
+| Deep static analysis | `nix run .#check` | clang-tidy + cppcheck (~5 min, on-demand). |
 ### Capture / Screenshot
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -96,8 +98,10 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Lint / Audit
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Full lint | `nix run .#lint` | All linters: LP64 + clang-tidy + cppcheck + ruff + yamllint + shellcheck + shfmt + nixfmt + /opt audit. |
+| Lint | `nix run .#lint` | Fast linters: LP64 + ruff + yamllint + shellcheck + shfmt + nixfmt + /opt audit. <10s. |
 | | `bash scripts/lint.sh` | Same, directly. |
+| Check | `nix run .#check` | Heavy static analysis: clang-tidy + cppcheck. ~5 min, on-demand. |
+| | `bash scripts/check.sh` | Same, directly. |
 | LP64 lint | `python3 scripts/lint-lp64.py [--errors-only]` | Scan C++ for LP64 hazards (also included in `lint`). |
 | Include shim | `scripts/generate-include-shim.py` | Regenerate case-folding include shim (auto-run by CMake). |
 | | `cmake --build <dir>` | Auto-regenerates as build dependency. |
@@ -112,8 +116,8 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Iteration Loops
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Full test | `nix run .#test -- --all` | Lint → build → full regression for all targets. |
-| Smoke check | `nix run .#smoke` | Diff-gated: lint → build → boot tests for changed targets. |
+| Full regression | `nix run .#regression -- --all` | Lint → build → full regression for all targets. |
+| Test | `nix run .#test` | Diff-gated: lint → build → boot tests for changed targets. |
 ### Utility
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
@@ -170,8 +174,8 @@ Every executable entry point, listed A–Z with its surface(s).
 | `capture-native` | nix app | Capture | Removed — use `capture-checkpoint --targets native`. |
 | `capture-wine` | nix app | Capture | Wine OG baseline capture. |
 | `cdlabel-patch.py` | script | Patch (RA) | Zero CD1 label for Wine. |
-| `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`smoke`/`test` tiers. |
-| `ci-local.sh` | script | CI | Removed — replaced by `lint.sh`/`build.sh`/`smoke.sh`/`test.sh`. |
+| `ci` | nix app | CI | Removed — replaced by `lint`/`build`/`test`/`regression` tiers. |
+| `ci-local.sh` | script | CI | Removed — replaced by `lint.sh`/`build.sh`/`test.sh`/`regression.sh`. |
 | `parity-compare` | nix app | Parity | SSIM compare two images. |
 | `ddscl-patch.py` | script | Patch (RA) | DDSCL_EXCLUSIVE → DDSCL_NORMAL. |
 | `extract_mix.py` | script | Utility | Westwood MIX file extractor. |
@@ -188,21 +192,22 @@ Every executable entry point, listed A–Z with its surface(s).
 | `ra-data-verify.py` | script | Lint | Verify RA MIX checksums. |
 | `ra-scenario-patch.py` | script | Patch (RA) | Replace mission name in EXE. |
 | `redalert` | nix app | Run | Run native RA binary. |
-| `lint` | nix app | Lint | All static analysis + format checks + /opt audit. |
-| `lint.sh` | script | Lint | All linters in one script (sourced by build/smoke/test). |
+| `lint` | nix app | Lint | Fast linters: LP64, ruff, yamllint, shellcheck, shfmt, nixfmt, /opt audit. Pre-commit hook. |
+| `lint.sh` | script | Lint | Fast linters in one script (sourced by build/test/regression). |
+| `check` | nix app | Check | Heavy static analysis: clang-tidy + cppcheck (~5 min, on-demand). |
+| `check.sh` | script | Check | Same, directly. |
 | `ra-native-build` | nix app | Build | Build RA native Linux. |
 | `ra-native-test` | nix app | Test | RA native tests. `--full` for regression tier. |
 | `ra-wasm-build` | nix app | Build | Build RA WASM. |
 | `ra-wasm-test` | nix app | Test | RA WASM tests (CI tier). `--full` for full regression. |
-| `smoke` | nix app | CI | Build + CI-tier boot tests. |
-| `smoke.sh` | script | CI | Diff-gated build + boot test orchestrator. |
+| `test` | nix app | Test | Build + CI-tier boot tests. |
+| `test.sh` | script | Test | Diff-gated build + boot test orchestrator. |
 | `td-native-build` | nix app | Build | Build TD native Linux. |
 | `td-native-test` | nix app | Test | TD native tests. `--full` for regression tier. |
 | `td-wasm-build` | nix app | Build | Build TD WASM. |
 | `td-wasm-test` | nix app | Test | TD WASM tests (CI tier). `--full` for full regression. |
-| `test` | nix app | CI | Build + full regression. |
-| `test-runner.sh` | script | Test | Unified backend for all `{game}-{platform}-test` apps. |
-| `test.sh` | script | CI | Diff-gated build + full regression orchestrator. |
+| `regression` | nix app | Regression | Build + full regression. |
+| `regression.sh` | script | Regression | Diff-gated build + full regression orchestrator. |
 | `release` | nix app | Build | Build + strip + tarball both RA and TD. |
 | `parity-report` | nix app | Parity | Three-way parity report. |
 | `run-td-cheat.sh` | script | Test | TD native smoke with TD_CHEAT=1. |
@@ -210,7 +215,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `serve` | nix app | Serve | Start both WASM + asset servers. |
 | `setup-run-ra-remastered.sh` | script | Utility | Create RA run directory. |
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
-| `_gating.sh` | script | CI | Diff-analysis helper sourced by build/smoke/test. |
+| `_gating.sh` | script | CI | Diff-analysis helper sourced by build/test/regression. |
 | `build-native.sh` | script | Build | Single-command native build. |
 | `run-e2e.sh` | script | Test | Xvfb + WASM server + Playwright test. |
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
@@ -235,7 +240,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
 | `vqa-compare` | nix app | Parity | Compare two VQA decode output dirs. |
 | `vqa-decode` | nix app | Parity | Extract VQA from MIX and decode with --engine. |
-| `wasm-loop` | nix app | Loop | Removed — use `smoke` or `test`. |
+| `wasm-loop` | nix app | Loop | Removed — use `test` or `regression`. |
 | `wine-cnc-capture.sh` | script | Capture | Generic RA95 Wine capture. |
 | `wine-exe-hashes.json` | data | — | SHA-256 hashes for patched EXEs. |
 | `wine-gdi-m1.sh` | script | Capture | GDI M1 gameplay capture. |
