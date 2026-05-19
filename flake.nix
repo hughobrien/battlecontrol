@@ -479,15 +479,6 @@
           exec bash scripts/check.sh
         '';
 
-        capture-wine = mkApp "capture-wine" ''
-          set -euo pipefail
-          SHOTS="''${1:-e2e/screenshots/wine}"
-          export TIMED=''${TIMED:-0}
-          PATCHEXE=$(nix build .#ra-patched-exe --impure --print-out-paths 2>/dev/null)
-          DATA=$(nix build .#ra-data --impure --print-out-paths 2>/dev/null)
-          exec bash scripts/wine-cnc-capture.sh "$PATCHEXE" "$DATA" "$SHOTS"
-        '';
-
         parity-compare = mkApp "parity-compare" ''
           if [ $# -lt 2 ]; then
             echo "Usage: nix run .#parity-compare -- <imageA> <imageB> [threshold]"

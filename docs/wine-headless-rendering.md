@@ -141,13 +141,13 @@ any X server — even Xvfb without a GPU.
 
 ```bash
 # Single command — builds everything from the ISO
-nix run .#capture-wine
+bash scripts/wine-cnc-capture.sh
 
 # Timed mode (every 5s for 30s):
-TIMED=1 nix run .#capture-wine
+TIMED=1 bash scripts/wine-cnc-capture.sh
 
 # Custom output directory:
-nix run .#capture-wine -- /tmp/my-shots
+bash scripts/wine-cnc-capture.sh "" "" /tmp/my-shots
 ```
 
 This downloads the Allied CD ISO from archive.org (653 MB, cached by Nix),
