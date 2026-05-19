@@ -53,8 +53,6 @@ Comprehensive catalog of all commands across two invocation surfaces:
 ### Capture / Screenshot
 | Command | Invocation | What It Does |
 |---------|-----------|-------------|
-| Wine capture | `bash scripts/wine-cnc-capture.sh` | Generic RA95.EXE capture via cnc-ddraw under Wine + Xvfb. |
-| | `scripts/wine-cnc-capture.sh` | Generic capture script. |
 | | `scripts/wine-ra.sh [exePath] [dataDir]` | RA title/menu capture under Wine + Xvfb. |
 | | `scripts/wine-td.sh [exePath] [dataDir]` | TD title/menu capture under Wine + Xvfb. |
 | | `scripts/wine-ra-setup.sh` | Resolve RA95.EXE + DLLs from Nix store. |
@@ -160,7 +158,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `parity-report.sh` | script | Parity | Three-way parity report shell. |
 | `probe-layout.cpp` | script | Lint | C++ struct layout probe. |
 | `ra-autostart-patch.py` | script | Patch (RA) | Zero-click auto-boot at Normal difficulty. |
-| `ra-data-verify.py` | script | Lint | Verify RA MIX checksums. |
 | `ra-scenario-patch.py` | script | Patch (RA) | Replace mission name in EXE. |
 | `redalert` | nix app | Run | Run native RA binary. |
 | `lint` | nix app | Lint | Fast linters: LP64, ruff, yamllint, shellcheck, shfmt, nixfmt, /opt audit. Pre-commit hook. |
@@ -195,7 +192,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `tiberiandawn` | nix app | Run | Run native TD binary. |
 | `vqa-decode.py` | script | Parity | Extract VQA from MIX and decode with --engine. |
 | `wasm-loop` | nix app | Loop | Removed — use `test` or `regression`. |
-| `wine-cnc-capture.sh` | script | Capture | Generic RA95 Wine capture. |
 | `wine-gdi-m1.sh` | script | Capture | GDI M1 gameplay capture. |
 | `wine-gdi-m2.sh` | script | Capture | GDI M2 gameplay capture. |
 | `wine-nod-l1.sh` | script | Capture | Nod L1 gameplay capture. |

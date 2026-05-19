@@ -220,11 +220,6 @@ python3 scripts/vqa-compare.py -- <dirA> <dirB>
 nix run .#parity -- check <scene> [--mode vqa|gameplay] [--targets <t>]
 ```
 
-### Data integrity
-
-```bash
-python3 scripts/ra-data-verify.py /path/to/data
-```
 
 ---
 
@@ -385,7 +380,6 @@ When an agent hits a symptom, read the corresponding skill for diagnostic guidan
 | Native build | `skills/native-build/` | `scripts/build-native.sh`, `nix run .#build` | CMake failure, missing SDL2, LP64 crashes |
 | WASM/Emscripten | `skills/emscripten/` | `emcmake cmake --preset wasm`, `nix run .#build` | EM_ASM silent, black screen, garbled audio |
 | E2E testing | `skills/e2e-testing/` | `scripts/serve-wasm.sh`, `bash scripts/run-e2e.sh` | pageerror, `__wasmReady` timeout, blank Xvfb |
-| Wine testing | `skills/wine-testing/` | `bash scripts/wine-cnc-capture.sh`, `python3 scripts/capture-checkpoint.py` | Wine prefix failure, DirectDraw blank, EXE binary patching for auto-launch |
 | VQA codec | `skills/vqa-codec/` | `python3 scripts/vqa-compare.py` | Block corruption, palette errors, CI failure |
 | Parity comparison | `skills/parity-comparison/` | `nix run .#parity` | SSIM regression, parity failure |
 | CI/CD | `skills/ci-cd/` | `nix run .#build`, `nix run .#test` | CI failure, release broken, deploy stuck |
@@ -441,7 +435,6 @@ Things an agent must never break:
    `maxfps=30` in `ddraw.ini` (under `[ddraw]`). This applies to both RA and TD.
    Never remove or change this without updating all remaining scripts:
    `wine-nod-l1.sh`, `wine-nod-m1.sh`, `wine-gdi-m1.sh`,
-   `wine-gdi-m2.sh`, `wine-cnc-capture.sh`.
 
 ---
 

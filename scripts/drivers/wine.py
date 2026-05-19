@@ -20,6 +20,28 @@ class WineCapture:
     """Capture screenshots from RA95.EXE under Wine.
 
     Generalized parameterization of wine-allied-l1.sh / wine-vqa-capture.sh.
+
+    Notes from the retired wine-cnc-capture.sh (kept for reference):
+
+      REDALERT.INI — the game's default config matters for headless capture.
+      The retired script wrote:
+        [Sound] Card=-1
+        [Options] HardwareFills=no
+        [Intro] PlayIntro=no
+      PlayIntro=no skips the intro logo sequence automatically.
+
+      ddraw.ini — cnc-ddraw config. The retired script additionally set:
+        fake_mode=640x400x8   — forces a specific resolution in GDI mode
+        no_compat_warning=true — suppresses the ddraw compat dialog
+      If capture produces wrong-sized or blank frames, try adding these.
+
+      TIMED=1 mode — the retired script had an alternative capture mode
+      that took screenshots every 5 seconds for 30 seconds (for investigating
+      game state transitions). The current driver captures a single frame.
+
+      ImageMagick alternative — the retired script used `import -window root`
+      instead of ffmpeg x11grab for screenshots. If ffmpeg capture produces
+      blank frames, `import` is a viable fallback.
     """
 
     VQA_TIMINGS = {
