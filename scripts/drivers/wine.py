@@ -105,7 +105,9 @@ class WineCapture:
 
     def _build_sendinput(self):
         """Compile ra-sendinput.exe. Hard-fails if mingw missing or compile errors."""
-        src = (self.scripts_dir / ".." / "tools" / "wine-input" / "ra-sendinput.c").resolve()
+        src = (
+            self.scripts_dir / ".." / "tools" / "wine-input" / "ra-sendinput.c"
+        ).resolve()
         if not src.is_file():
             raise RuntimeError(f"ra-sendinput.c not found at {src}")
         self._sendinput_exe = (
@@ -228,8 +230,19 @@ class WineCapture:
             (r"HKCU\Software\Wine\Direct3D", "DirectDrawRenderer", "gdi"),
         ]:
             r = subprocess.run(
-                [str(self.wine), "reg", "add", key, "/v", value, "/t", "REG_SZ",
-                 "/d", data, "/f"],
+                [
+                    str(self.wine),
+                    "reg",
+                    "add",
+                    key,
+                    "/v",
+                    value,
+                    "/t",
+                    "REG_SZ",
+                    "/d",
+                    data,
+                    "/f",
+                ],
                 env=wenv,
                 capture_output=True,
                 text=True,
