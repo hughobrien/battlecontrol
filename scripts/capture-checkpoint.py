@@ -181,22 +181,53 @@ def main():
         manifest["captures"] = captures
         json.dump(manifest, f, indent=2)
 
-    # Start HTTP server on port 1234 if not already running
+    # Start HTTP server on port 1234, restarting it if an existing instance
+    # is serving the wrong directory (so the index shows every session under
+    # output_root, not just one).
+    import subprocess
+
+    def _server_dir_on_port(port):
+        r = subprocess.run(
+            ["pgrep", "-af", f"http.server {port}"],
+            capture_output=True,
+            text=True,
+        )
+        for line in r.stdout.splitlines():
+            parts = line.split()
+            if "--directory" in parts:
+                return parts[parts.index("--directory") + 1]
+        return None
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    running = False
     try:
         sock.connect(("localhost", 1234))
-        sock.close()
-        print("  (HTTP server already running on port 1234)")
+        running = True
     except ConnectionRefusedError:
-        sock.close()
-        import subprocess
+        pass
+    sock.close()
 
+    want = str(output_root)
+    if running:
+        current = _server_dir_on_port(1234)
+        if current == want:
+            print(f"  HTTP server already serving {want} at http://localhost:1234/")
+        else:
+            print(
+                f"  HTTP server on :1234 is serving {current!r}; "
+                f"restarting to serve {want!r}"
+            )
+            subprocess.run(["pkill", "-f", "http.server 1234"], check=False)
+            time.sleep(0.5)
+            running = False
+
+    if not running:
         subprocess.Popen(
-            ["python3", "-m", "http.server", "1234", "--directory", str(output_root)],
+            ["python3", "-m", "http.server", "1234", "--directory", want],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        print("  HTTP server started at http://localhost:1234/")
+        print(f"  HTTP server started at http://localhost:1234/ (serving {want})")
 
     print(f"\nSession dir: {checkpoint_dir}")
 
