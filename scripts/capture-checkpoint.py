@@ -17,6 +17,7 @@ import sys
 import pathlib
 import json
 import time
+import socket
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from drivers import WineCapture, NativeCapture, WasmCapture
@@ -56,7 +57,7 @@ def main():
         default="wine,native",
         help="comma-separated targets: wine,native,wasm,all",
     )
-    ap.add_argument("--output", default="e2e/checkpoints", help="output root directory")
+    ap.add_argument("--output", default="/tmp/battlecontrol", help="output root directory")
     ap.add_argument(
         "--threshold-ssim",
         type=float,
@@ -73,7 +74,6 @@ def main():
         targets = ["wine", "native", "wasm"]
 
     output_root = pathlib.Path(args.output)
-    checkpoint_dir = output_root / f"{args.type}-{args.id}"
     manifest = {
         "type": args.type,
         "id": args.id,
@@ -93,6 +93,21 @@ def main():
         print(json.dumps(manifest, indent=2))
         return
 
+    timestamp = time.strftime("%Y-%m-%dT%H-%M-%S", time.gmtime())
+    session_base = f"{timestamp}-{args.type}-{args.id}"
+    checkpoint_dir = output_root / session_base
+    if checkpoint_dir.exists():
+        suffix = 1
+        while (output_root / f"{session_base}-{suffix}").exists():
+            suffix += 1
+        checkpoint_dir = output_root / f"{session_base}-{suffix}"
+
+    try:
+        checkpoint_dir.mkdir(parents=True, exist_ok=False)
+    except (OSError, PermissionError):
+        checkpoint_dir = pathlib.Path(f"e2e/checkpoints/{args.type}-{args.id}")
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
     # Boot capture types (title/menu) — single target, no comparison
     if args.type in ("title", "menu"):
         for target in targets:
@@ -104,15 +119,13 @@ def main():
             print(f"  OK wine: {path}")
         return
 
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
     with open(checkpoint_dir / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 
     captures = {}
     for target in targets:
-        target_dir = checkpoint_dir / target
-        target_dir.mkdir(parents=True, exist_ok=True)
-        log_path = target_dir / "driver.log"
+        target_dir = checkpoint_dir
+        log_path = checkpoint_dir / f"{target}-driver.log"
         logfile = open(log_path, "w")
         try:
             if target == "wine":
@@ -140,7 +153,12 @@ def main():
                 continue
             captures[target] = str(result)
             sz = result.stat().st_size if result.exists() else 0
-            print(f"  OK {target}: {result} ({sz} bytes)")
+            if result and result.exists():
+                flat_path = checkpoint_dir / f"{target}.png"
+                result.rename(flat_path)
+                captures[target] = str(flat_path)
+                sz = flat_path.stat().st_size
+            print(f"  OK {target}: {captures[target]} ({sz} bytes)")
         except Exception as e:
             print(f"  FAIL {target}: {e}")
         finally:
@@ -152,6 +170,12 @@ def main():
         for r in report["pairs"]:
             status = "PASS" if r["passed"] else "FAIL"
             print(f"  {r['pair']}: SSIM={r['ssim']:.4f} p99={r['p99']:.1f} [{status}]")
+        # Promote diffs from diff/ subdir to session dir
+        diff_dir = checkpoint_dir / "diff"
+        if diff_dir.exists():
+            for f in diff_dir.iterdir():
+                f.rename(checkpoint_dir / f.name)
+            diff_dir.rmdir()
     elif len(captures) == 1:
         print("\n(one target — no comparison)")
     else:
@@ -161,6 +185,24 @@ def main():
     with open(checkpoint_dir / "manifest.json", "w") as f:
         manifest["captures"] = captures
         json.dump(manifest, f, indent=2)
+
+    # Start HTTP server on port 1234 if not already running
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.connect(("localhost", 1234))
+        sock.close()
+        print("  (HTTP server already running on port 1234)")
+    except ConnectionRefusedError:
+        sock.close()
+        import subprocess
+        subprocess.Popen(
+            ["python3", "-m", "http.server", "1234", "--directory", str(output_root)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print("  HTTP server started at http://localhost:1234/")
+
+    print(f"\nSession dir: {checkpoint_dir}")
 
 
 if __name__ == "__main__":
