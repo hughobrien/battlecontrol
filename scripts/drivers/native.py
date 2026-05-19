@@ -1,7 +1,17 @@
 """Native capture driver — capture screenshots from native Linux RA build."""
 
-import subprocess, os, time, pathlib, json, tempfile
-from .common import *
+import subprocess
+import os
+import time
+import pathlib
+import tempfile
+from .common import (
+    pick_free_display,
+    start_xvfb,
+    start_openbox,
+    capture_ffmpeg,
+    kill_process_tree,
+)
 
 
 class NativeCapture:

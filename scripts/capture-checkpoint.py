@@ -10,7 +10,11 @@ Usage:
   capture-checkpoint mission allied-l1 --targets all
 """
 
-import argparse, sys, pathlib, json, time
+import argparse
+import sys
+import pathlib
+import json
+import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from drivers import WineCapture, NativeCapture, WasmCapture

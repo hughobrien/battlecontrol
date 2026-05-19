@@ -33,7 +33,6 @@ Usage (apply after vqa-skip + cdlabel + game-in-focus):
 Must run AFTER all other patches (vqa-skip, game-in-focus, cdlabel).
 """
 
-import struct
 import hashlib
 import os
 import shutil

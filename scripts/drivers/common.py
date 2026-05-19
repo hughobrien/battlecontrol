@@ -1,4 +1,7 @@
-import subprocess, time, os, signal, pathlib, tempfile, shutil
+import subprocess
+import time
+import os
+import signal
 
 
 def pick_free_display() -> str:

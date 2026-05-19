@@ -1,7 +1,10 @@
 """WASM capture driver — capture screenshots from WASM build via Playwright."""
 
-import subprocess, os, time, pathlib, sys
-from .common import *
+import subprocess
+import time
+import pathlib
+import sys
+from .common import kill_process_tree
 
 
 class WasmCapture:
