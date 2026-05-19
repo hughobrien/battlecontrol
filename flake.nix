@@ -154,8 +154,8 @@
                 unar -q -o "$(pwd)" -D "$src" INSTALL/RA95.EXE 2>/dev/null
                 cp INSTALL/RA95.EXE "$out"
                 chmod +w "$out"
-                python3 ${./scripts/nocd-patch.py} "$out"
-                python3 ${./scripts/ddscl-patch.py} "$out"
+                python3 ${./scripts/ra/ra-nocd-patch.py} "$out"
+                python3 ${./scripts/ra/ra-ddscl-patch.py} "$out"
                 # cdlabel: zero the first byte of the "CD1" volume label string
                 printf '\x00' | dd of="$out" bs=1 seek=$((0x1BFCB7)) conv=notrunc 2>/dev/null
               '';

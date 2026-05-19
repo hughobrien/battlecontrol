@@ -6,7 +6,7 @@ TIM-732 established the root cause for the perpetually-black DDraw surface
 under Wine 10 + cnc-ddraw + Xvfb+openbox: RA's main render branch is gated on
 `GameInFocus`, a global bool that the WM_ACTIVATEAPP window handler sets to
 wParam. Under Xvfb+openbox WM_ACTIVATEAPP is never delivered, so GameInFocus
-stays FALSE and the render path is skipped every frame. `focus-skip-patch.py`
+stays FALSE and the render path is skipped every frame. `ra-focus-skip-patch.py`
 only NOPs three `while (!GameInFocus)` spin loops; the render guards remain.
 
 Strategy
@@ -20,7 +20,7 @@ process start through every gated path:
      instruction, then jumps to the original second-instr target. Sets the
      byte in .bss before any user code runs.
 
-  2. Runtime re-writes at the focus-skip spin loops. Where focus-skip-patch
+  2. Runtime re-writes at the focus-skip spin loops. Where ra-focus-skip-patch
      replaced 6 bytes of the loop's JZ with NOPs, this patch replaces the
      preceding `cmp byte [GameInFocus], 0` (7 bytes) + the 6 NOPs with
      `mov byte [GameInFocus], 1` (7 bytes) + 6 NOPs. So the moment any of
@@ -41,7 +41,7 @@ preferred because they also cover access patterns like
 GameInFocus address
 -------------------
 Determined empirically from the cmp opcode used at the three known
-focus-skip sites in `focus-skip-patch.py`:
+ra-focus-skip sites in `ra-focus-skip-patch.py`:
 
     file 0x153FFE: 80 3D B8 B6 66 00 00   cmp byte ptr [0x0066B6B8], 0
                                           (and the same disp32 at 0x15F2EA and 0x15F57C)
@@ -69,7 +69,7 @@ Accepted input SHA-256
   08f89ab8c85d38650f981a6e1f998e2dacd164142bde5aa22146e5d57382d03c   probe+focus-skip
   5e7d3c38c367188516e967105693603f8714b4a8395c3cb56c26bfef9faa280a   probe+focus+vqa-skip
 
-(focus-skip-patch.py must run first; this patch tolerates the un-flipped
+(ra-focus-skip-patch.py must run first; this patch tolerates the un-flipped
 or already-flipped state of those three sites.)
 """
 
@@ -100,7 +100,7 @@ CAVE_PATCHED_BYTES = bytes.fromhex(
 assert len(CAVE_PATCHED_BYTES) == 22
 
 # (2) Spin-loop CMP+NOPs -> mov [GIF],1 + NOPs
-# focus-skip-patch leaves the cmp intact and NOPs the 6-byte JZ after it.
+# ra-focus-skip-patch leaves the cmp intact and NOPs the 6-byte JZ after it.
 # Each site is `80 3D B8 B6 66 00 00 90 90 90 90 90 90` (13 bytes) after
 # focus-skip. We rewrite to `c6 05 B8 B6 66 00 01 90 90 90 90 90 90`.
 SPIN_LOOP_CMP_OFFSETS = [0x153FFE, 0x15F2EA, 0x15F57C]
@@ -169,7 +169,7 @@ def patch(path: str, dry_run: bool = False) -> int:
             continue  # focus-skip applied, ready to overwrite
         if actual == SPIN_ORIG_PRE_FOCUS_SKIP[off]:
             print(
-                f"warn: focus-skip-patch.py not yet applied at 0x{off:x} — proceeding"
+                f"warn: ra-focus-skip-patch.py not yet applied at 0x{off:x} — proceeding"
             )
             continue
         print(f"ERROR: unexpected bytes at spin-loop site 0x{off:x}: {actual.hex()}")

@@ -485,12 +485,12 @@ with zero menu clicks — no SendInput automation needed.
 Apply in this order (existing Wine scripts apply the first 5 at runtime):
 
 ```bash
-python3 scripts/nocd-patch.py RA95.EXE
-python3 scripts/ddscl-patch.py RA95.EXE
+python3 scripts/ra/ra-nocd-patch.py RA95.EXE
+python3 scripts/ra/ra-ddscl-patch.py RA95.EXE
 printf '\x00' | dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc  # cdlabel
-python3 scripts/focus-skip-patch.py RA95.EXE
-python3 scripts/game-in-focus-patch.py RA95.EXE
-python3 scripts/vqa-skip-patch.py RA95.EXE
+python3 scripts/ra/ra-focus-skip-patch.py RA95.EXE
+python3 scripts/ra/ra-game-in-focus-patch.py RA95.EXE
+python3 scripts/ra/ra-vqa-skip-patch.py RA95.EXE
 python3 scripts/ra/ra-scenario-patch.py RA95.EXE SCG02EA   # target mission
 python3 scripts/ra/ra-autostart-patch.py RA95.EXE           # auto-boot
 ```

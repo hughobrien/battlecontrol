@@ -113,11 +113,11 @@ class WineCapture:
 
     def _patch_chain(self, exe: pathlib.Path, scenario=None, skip_vqa=True):
         patches = [
-            "focus-skip-patch.py",
-            "game-in-focus-patch.py",
+            "ra/ra-focus-skip-patch.py",
+            "ra/ra-game-in-focus-patch.py",
         ]
         if skip_vqa:
-            patches.append("vqa-skip-patch.py")
+            patches.append("ra/ra-vqa-skip-patch.py")
         if scenario:
             patches.append("ra-scenario-patch.py")
         patches.append("ra-autostart-patch.py")
