@@ -68,7 +68,6 @@ scripts/
 ├── vqa-compare.py               (shared)
 ├── vqa-decode.py                (shared)
 ├── vqa-skip-patch.py            (shared — applied to both RA and TD builds)
-├── xvfb-ensure.sh               (shared)
 ```
 
 ## References to Update

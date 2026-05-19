@@ -17,7 +17,7 @@ examples, and a verification bar. An agent landing on a symptom can jump
 straight to the fix without re-deriving context.
 
 ### 2. Companion scripts are idempotent and self-cleaning
-Scripts like `xvfb-ensure.sh` and `serve-wasm.sh` register `EXIT` traps, kill stale services, and wait for
+Scripts like `serve-wasm.sh` register `EXIT` traps, kill stale services, and wait for
 readiness. They collapse multi-step manual sequences into single invocations
 and work correctly on repeat runs. This is the right design pattern.
 
@@ -175,7 +175,6 @@ name: e2e-testing
 version: 0.1.0
 depends_on:
   - skill: emscripten          # needs WASM build
-  - script: xvfb-ensure.sh
   - script: serve-wasm.sh
 ---
 ```

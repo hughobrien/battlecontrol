@@ -457,7 +457,6 @@ All reusable scripts live in `scripts/`.
 | `*-data-verify.py` | MIX checksum verification |
 | `wine-check.sh` | Wine prerequisite check |
 | `wine-ra.sh` / `wine-td.sh` | Wine OG screenshot capture |
-| `xvfb-ensure.sh` | Idempotent Xvfb launcher (source it) |
 | `parity-report.sh` | Three-way parity report (vqa + gameplay modes) |
 | `lint-lp64.py` | LP64 static hazard audit |
 | `generate-include-shim.py` | Case-folding include shim generator |
