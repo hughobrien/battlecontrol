@@ -140,15 +140,14 @@ Both games target a 640x480 viewport:
 3. Each frame: `HidPage` (system-memory surface) is blitted to the SDL primary
    surface, then presented via `SDL_RenderPresent`.
 4. Under Xvfb the window renders off-screen; the `scripts/run-td-cheat.sh` and
-   `scripts/setup-run-ra-remastered.sh` harnesses start Xvfb on `:99`.
+   harnesses start Xvfb on `:99`.
 
 ## Mix File / Asset Loading
 
 `.MIX` archives are located by `MixFileClass::Cache` using the POSIX file I/O
 shims above. On Linux the working directory must contain the mix files; the
-setup scripts (`scripts/setup-run-td.sh`, `scripts/setup-run-ra-remastered.sh`)
-symlink the Steam install's `CNCDATA/{TIBERIAN_DAWN,RED_ALERT}/CD1/` files into
-`build/run-{td,ra-remastered}/`.
+`scripts/setup-run-td.sh` symlinks the Steam install's `CNCDATA/TIBERIAN_DAWN/CD1/` files into
+`build/run-td/`.
 
 `REDALERT/MIXFILE.H` and `TIBERIANDAWN/MIXFILE.H` use `int32_t` with
 `__attribute__((packed))` for `SubBlock` and `FileHeader` to match the on-disk
