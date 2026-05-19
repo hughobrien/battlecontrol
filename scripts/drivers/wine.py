@@ -148,6 +148,11 @@ class WineCapture:
             "window_state=normal\nmaxfps=30\n\n"
             "[ra95]\nscanline_double=true\n"
         )
+        (staging / "REDALERT.INI").write_text(
+            "[Sound]\nCard=-1\n\n"
+            "[Options]\nHardwareFills=no\n\n"
+            "[Intro]\nPlayIntro=no\n"
+        )
         self._patch_chain(staging / "RA95.EXE", scenario, skip_vqa)
         return staging
 
@@ -164,6 +169,23 @@ class WineCapture:
                 },
                 capture_output=True,
                 timeout=120,
+            )
+            # Configure GDI renderer + virtual desktop for headless Xvfb capture
+            subprocess.run(
+                [str(self.wine), "reg", "add",
+                 r"HKCU\Software\Wine\Explorer\Desktops",
+                 "/v", "Default", "/t", "REG_SZ", "/d", "640x480", "/f"],
+                env={**os.environ, "WINEPREFIX": str(self.wineprefix),
+                     "WINEDEBUG": "-all"},
+                capture_output=True, timeout=30,
+            )
+            subprocess.run(
+                [str(self.wine), "reg", "add",
+                 r"HKCU\Software\Wine\Direct3D",
+                 "/v", "DirectDrawRenderer", "/t", "REG_SZ", "/d", "gdi", "/f"],
+                env={**os.environ, "WINEPREFIX": str(self.wineprefix),
+                     "WINEDEBUG": "-all"},
+                capture_output=True, timeout=30,
             )
         dos = self.wineprefix / "dosdevices"
         dos.mkdir(parents=True, exist_ok=True)
