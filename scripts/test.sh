@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test — build + full regression.
+# Test — build + CI-tier boot tests.
 # Usage: bash scripts/test.sh [--all] [--base REF]
 set -euo pipefail
 
@@ -11,41 +11,41 @@ cd "$REPO_ROOT"
 bash "$SCRIPT_DIR/build.sh" "$@"
 
 echo ""
-echo "=== Test (full regression) ==="
+echo "=== Test ==="
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/_gating.sh" "$@"
 
 FAIL=0
 
-run_full() {
+run_smoke() {
 	local game="$1" platform="$2"
-	echo "--- $game-$platform-test --full ---"
-	bash "$SCRIPT_DIR/test-runner.sh" "$game" "$platform" --full || FAIL=$((FAIL + 1))
+	echo "--- $game-$platform-test ---"
+	bash "$SCRIPT_DIR/test-runner.sh" "$game" "$platform" || FAIL=$((FAIL + 1))
 }
 
 if $GATE_RA_NATIVE; then
-	run_full ra native
+	run_smoke ra native
 else
-	echo "SKIP: ra-native-test --full (no RA changes)"
+	echo "SKIP: ra-native-test (no RA changes)"
 fi
 
 if $GATE_TD_NATIVE; then
-	run_full td native
+	run_smoke td native
 else
-	echo "SKIP: td-native-test --full (no TD changes)"
+	echo "SKIP: td-native-test (no TD changes)"
 fi
 
 if $GATE_RA_WASM; then
-	run_full ra wasm
+	run_smoke ra wasm
 else
-	echo "SKIP: ra-wasm-test --full (no RA/wasm changes)"
+	echo "SKIP: ra-wasm-test (no RA/wasm changes)"
 fi
 
 if $GATE_TD_WASM; then
-	run_full td wasm
+	run_smoke td wasm
 else
-	echo "SKIP: td-wasm-test --full (no TD/wasm changes)"
+	echo "SKIP: td-wasm-test (no TD/wasm changes)"
 fi
 
 echo ""
