@@ -57,15 +57,14 @@ def main():
         default="wine,native",
         help="comma-separated targets: wine,native,wasm,all",
     )
-    ap.add_argument("--output", default="/tmp/battlecontrol", help="output root directory")
+    ap.add_argument(
+        "--output", default="/tmp/battlecontrol", help="output root directory"
+    )
     ap.add_argument(
         "--threshold-ssim",
         type=float,
         default=0.90,
         help="SSIM pass threshold (default: 0.90)",
-    )
-    ap.add_argument(
-        "--dry-run", action="store_true", help="print manifest without running"
     )
     args = ap.parse_args()
 
@@ -88,10 +87,6 @@ def main():
     else:
         scenario = None
         manifest["vqa_stem"] = args.id
-
-    if args.dry_run:
-        print(json.dumps(manifest, indent=2))
-        return
 
     timestamp = time.strftime("%Y-%m-%dT%H-%M-%S", time.gmtime())
     session_base = f"{timestamp}-{args.type}-{args.id}"
@@ -195,6 +190,7 @@ def main():
     except ConnectionRefusedError:
         sock.close()
         import subprocess
+
         subprocess.Popen(
             ["python3", "-m", "http.server", "1234", "--directory", str(output_root)],
             stdout=subprocess.DEVNULL,
