@@ -171,7 +171,6 @@ Every executable entry point, listed A–Z with its surface(s).
 | `setup-run-td.sh` | script | Utility | Create TD run directory. |
 | `_gating.sh` | script | CI | Diff-analysis helper sourced by build/test/regression. |
 | `build-native.sh` | script | Build | Single-command native build. |
-| `run-e2e.sh` | script | Test | Xvfb + WASM server + Playwright test. |
 | `serve-wasm.sh` | script | Serve | WASM dev server helper. |
 | `vqa-decode.py` | script | Parity | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg). |
 | `xvfb-ensure.sh` | script | Utility | Idempotent Xvfb launcher. |
@@ -220,7 +219,7 @@ Every executable entry point, listed A–Z with its surface(s).
 | Surface | Convention | Example |
 |---------|-----------|---------|
 | Nix apps | `kebab-case` | `build-native`, `capture-checkpoint` |
-| Shell scripts | `kebab-case.sh` | `lint.sh`, `run-e2e.sh` |
+| Shell scripts | `kebab-case.sh` | `lint.sh`, `xvfb-ensure.sh` |
 | Python scripts | `kebab-case.py` | `lint-lp64.py`, `parity-compare.py` |
 | npm scripts | `:` delimited | `test:e2e:ra`, `test:e2e:td` |
 

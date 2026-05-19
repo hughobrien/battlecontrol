@@ -381,7 +381,7 @@ When an agent hits a symptom, read the corresponding skill for diagnostic guidan
 |--------|-------|----------------|-----------------|
 | Native build | `skills/native-build/` | `scripts/build-native.sh`, `nix run .#build` | CMake failure, missing SDL2, LP64 crashes |
 | WASM/Emscripten | `skills/emscripten/` | `emcmake cmake --preset wasm`, `nix run .#build` | EM_ASM silent, black screen, garbled audio |
-| E2E testing | `skills/e2e-testing/` | `scripts/serve-wasm.sh`, `bash scripts/run-e2e.sh` | pageerror, `__wasmReady` timeout, blank Xvfb |
+| E2E testing | `skills/e2e-testing/` | `scripts/serve-wasm.sh`, `scripts/test-runner.sh` | pageerror, `__wasmReady` timeout, blank Xvfb |
 | VQA codec | `skills/vqa-codec/` | `python3 scripts/vqa-compare.py` | Block corruption, palette errors, CI failure |
 | Parity comparison | `skills/parity-comparison/` | `nix run .#parity` | SSIM regression, parity failure |
 | CI/CD | `skills/ci-cd/` | `nix run .#build`, `nix run .#test` | CI failure, release broken, deploy stuck |
@@ -448,7 +448,6 @@ All reusable scripts live in `scripts/`.
 |---------------|---------|
 | `build-native.sh` | One-command native Linux build (ra + td) |
 | `build-wasm/` | WASM build output directory |
-| `run-e2e.sh` | Xvfb + WASM server + Playwright test |
 | `serve-wasm.sh` | WASM dev server with COOP/COEP |
 | `toolchain-check.sh` | Toolchain prerequisite check |
 | `vqa-decode.py` | VQA decode from MIX (wraps tools/vqa_dump + ffmpeg) |
