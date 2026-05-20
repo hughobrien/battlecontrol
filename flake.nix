@@ -39,7 +39,19 @@
     }:
     let
       system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfreePredicate =
+          pkg:
+          builtins.elem (nixpkgs.lib.getName pkg) [
+            "open-watcom-v2"
+            "open-watcom-v2-full"
+            "open-watcom-v2-unwrapped"
+            "open-watcom-v2-full-unwrapped"
+            "open-watcom-bin"
+            "open-watcom-bin-unwrapped"
+          ];
+      };
 
       mkApp = name: script: rec {
         type = "app";
@@ -291,6 +303,8 @@
           cppcheck
           # Mingw-w64 cross-compiler (for stub THIPX32.DLL)
           pkgs.pkgsCross.mingw32.buildPackages.gcc
+          # OpenWatcom: diagnostic Win32 rebuild experiments for RA95 parity.
+          open-watcom-bin
           # Linting tools
           ruff
           shellcheck
