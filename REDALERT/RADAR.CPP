@@ -453,10 +453,6 @@ void RadarClass::Draw_It(bool forced)
 		RadarFrame = MFCD::Retrieve(_frames[PlayerPtr->ActLike]);
 		#endif
 		_house = PlayerPtr->ActLike;
-#ifndef _MSC_VER
-		fprintf(stderr, "[RADAR] shape load: RadarAnim=%p RadarPulse=%p RadarFrame=%p\n",
-			(void*)RadarAnim, (void*)RadarPulse, (void*)RadarFrame);
-#endif
 	}
 
 	/*
@@ -1738,7 +1734,7 @@ void RadarClass::AI(KeyNumType & input, int x, int y)
 	** Check here to see if radar is being jammed, so we can update the
 	** animation with snow.
 	*/
-	if (!IsRadarActivating && !IsRadarDeactivating) {
+	if (!IsRadarActivating && !IsRadarDeactivating && DoesRadarExist && Get_Jammed(PlayerPtr)) {
 		RadarAnimFrame++;
 		if (RadarAnimFrame < RADAR_ACTIVATED_FRAME) RadarAnimFrame = RADAR_ACTIVATED_FRAME;
 		if (RadarAnimFrame > (3 + RADAR_ACTIVATED_FRAME)) RadarAnimFrame = RADAR_ACTIVATED_FRAME;

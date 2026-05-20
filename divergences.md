@@ -91,7 +91,7 @@ the right state being drawn through the wrong dirty/redraw path.
 | D9 | Native tutorial message lifetime differs from Wine at later frames. | Fixed | `MessageListClass` now uses the gameplay frame clock while `GameActive`; trace showed the old native path added the message at `Frame=0` with `timeout=540` but expired it at `Frame=45` because it compared against `TickCount`. Frame-60 now has `messages=1`. |
 | D10 | Road/ground template art was fragmented or looked like the wrong subtile. | Fixed | The portable `Buffer_Draw_Stamp*` implementations skipped the original iconset logical-to-physical `Map` remap. Restoring that remap fixes Allied L1/L2 road fragmentation and the earlier “template rendering” issue. |
 | D11 | Native inactive radar panel shows static/noise where Wine shows the Allied cover plate. | Fixed | Porting regression from `84604ef`: `Get_Jammed(PlayerPtr)` was used as a replacement for disabled legacy `IsRadarJammed`, but it is true when no radar building exists. Native now only draws jam snow when a radar exists and is jammed; no-radar Allied L2 draws the cover plate like Wine. |
-| D12 | Wine has drop shadows to the right of the three control panel buttons (spanner, dollar, earth), native does not. | Active | Newly reported. This likely shares the `SHAPE_GHOST`/translucent draw path with shroud and clock/sidebar shape effects, but it has not yet been isolated to a specific shape call. |
+| D12 | Wine has drop shadows to the right of the three control panel buttons (spanner, dollar, earth), native does not. | Fixed | The dark pixels are ordinary `SIDE1NA.SHP` sidebar art, not button shadow effects. Native drew those pixels correctly, then `RadarClass::AI()` unconditionally flagged an inactive no-radar cover redraw and `RadarClass::Draw_It()` repainted `RadarAnim` frame 0 over the sidebar. Native now advances/flags the jammed-radar animation only when a radar exists and is actually jammed. |
 | D13 | Wine shroud/fog appears to have four grades between revealed and hidden, native closer to three. | Active | RA95 and native agree on the tested `ShadowTrans` entries, so the table formula is not the direct cause. The visible ore-speck part of this symptom was D14; remaining grade differences should be traced as selected shadow shape/coverage or active draw state. |
 | D14 | Native has native-only saturated green/purple/cyan/red pixels near the infantry cluster; Wine is clean. | Fixed | The saturated cluster was mapped ore (`OVERLAY_GOLD2`, `OverlayData=3`) in cell `5972`, which native drew even though the cell was mapped but not visible. The later shroud mask has transparent holes, so ore colors leaked through. Native now skips overlays for mapped-but-not-visible cells, matching Wine at the reported green/purple pixels. |
 
@@ -233,6 +233,36 @@ Follow-up probes:
   enough to explain the saturated native pixels. The next likely axes are the
   active palette values for those indices or whether Wine draws a different
   shadow source/destination at the same screen coordinate.
+
+### D12 Button-Shadow Probe
+
+The top-button shadow difference is not in the capture path. `WINE_SCREEN_SCAN=1`
+found two RA95 640-stride screen buffers at exact frame 60 where all nine sampled
+button-shadow pixels match Wine's dark palette indices:
+
+- `0x02a2ff00`, stride 640
+- `0x02a9ff00`, stride 640
+
+The early memory scan proved the final dark pixels were already present in RA95's
+8-bit screen buffers, but it did not identify a separate button-shadow primitive.
+The final native provenance trace showed the missing "button shadows" are not
+produced by the buttons at all. They are sidebar-top pixels from `SIDE1NA.SHP`.
+Native was drawing them correctly, then repeatedly overwriting them with the
+inactive radar cover:
+
+- `RadarClass::Draw_It` draws `RadarAnim` frame 0 at `(480,16)`,
+  `160x141`, producing the bright/native values.
+- `SidebarClass::Draw_It` then draws `SIDE1NA.SHP` at `(480,16)`,
+  `160x160`, producing the Wine-matching dark values.
+- Before the fix, `RadarClass::AI` unconditionally flagged the radar for redraw
+  even when `IsRadarActive=0` and `DoesRadarExist=0`, so the next render drew
+  `RadarAnim` frame 0 over the sidebar again.
+
+Gating that `RadarClass::AI` block to actual jammed-radar state
+(`DoesRadarExist && Get_Jammed(PlayerPtr)`) removes the repeated inactive-cover
+redraw. After the fix, all nine sampled D12 pixels match Wine exactly at frame
+60, and Allied L2 Wine-vs-native reports `SSIM=0.9974` for the local capture
+session `2026-05-20T18-55-32-mission-allied-l2`.
 
 ### Allied L3
 
