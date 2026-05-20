@@ -1446,16 +1446,42 @@ PROC	Apply_XOR_Delta C near
 	ARG	delta:DWORD		; pointers.
 */
 #ifndef _MSC_VER
-	// TIM-160: Westwood XOR-delta decoder (16-bit commands, 8-bit data bytes).
-	// +cmd: skip cmd target bytes unchanged; -cmd: XOR next |cmd| delta bytes into target.
 	unsigned char *t = (unsigned char*)target;
 	const unsigned char *d = (const unsigned char*)delta;
 	while (true) {
-		short cmd = (short)((unsigned short)d[0] | ((unsigned short)d[1] << 8));
-		d += 2;
-		if (cmd == 0) break;
-		if (cmd > 0) { t += cmd; }
-		else { int n = -cmd; while (n--) *t++ ^= *d++; }
+		unsigned int opcode = *d++;
+		if (opcode == 0) {
+			unsigned int count = *d++;
+			unsigned char value = *d++;
+			while (count--) *t++ ^= value;
+		} else if (opcode < 0x80) {
+			unsigned int count = opcode;
+			while (count--) *t++ ^= *d++;
+		} else {
+			unsigned int count = opcode - 0x80;
+			if (count != 0) {
+				t += count;
+				continue;
+			}
+
+			unsigned int code = (unsigned int)d[0] | ((unsigned int)d[1] << 8);
+			d += 2;
+			if (code == 0) break;
+			if ((code & 0x8000) == 0) {
+				t += code;
+				continue;
+			}
+
+			code -= 0x8000;
+			if (code & 0x4000) {
+				count = code - 0x4000;
+				unsigned char value = *d++;
+				while (count--) *t++ ^= value;
+			} else {
+				count = code;
+				while (count--) *t++ ^= *d++;
+			}
+		}
 	}
 	return (unsigned int)(uintptr_t)t;
 #else
@@ -1502,30 +1528,63 @@ void __cdecl Apply_XOR_Delta_To_Page_Or_Viewport(void *target, void *delta, int 
 	ARG	copy:DWORD		; should it be copied or xor'd?
 	*/
 #ifndef _MSC_VER
-	// TIM-160: row-aware XOR/copy delta decoder for viewport-bounded animations.
-	// 'nextrow' = buffer_stride - width (extra bytes to advance at each row wrap).
 	unsigned char *t = (unsigned char*)target;
 	const unsigned char *d = (const unsigned char*)delta;
 	int col = 0;
-	while (true) {
-		short cmd = (short)((unsigned short)d[0] | ((unsigned short)d[1] << 8));
-		d += 2;
-		if (cmd == 0) break;
-		if (cmd > 0) {
-			// skip cmd pixels, advancing past row boundaries
-			int remain = cmd;
-			while (remain > 0) {
-				int space = width - col;
-				int adv = remain < space ? remain : space;
-				t += adv; col += adv; remain -= adv;
-				if (col >= width) { col = 0; t += nextrow; }
+	auto advance = [&](unsigned int count) {
+		while (count > 0) {
+			int space = width - col;
+			unsigned int adv = count < (unsigned int)space ? count : (unsigned int)space;
+			t += adv;
+			col += (int)adv;
+			count -= adv;
+			if (col >= width) {
+				col = 0;
+				t += nextrow;
 			}
+		}
+	};
+	auto write_value = [&](unsigned char value) {
+		if (copy == DO_XOR) *t++ ^= value;
+		else                *t++ = value;
+		if (++col >= width) {
+			col = 0;
+			t += nextrow;
+		}
+	};
+
+	while (true) {
+		unsigned int opcode = *d++;
+		if (opcode == 0) {
+			unsigned int count = *d++;
+			unsigned char value = *d++;
+			while (count--) write_value(value);
+		} else if (opcode < 0x80) {
+			unsigned int count = opcode;
+			while (count--) write_value(*d++);
 		} else {
-			int n = -cmd;
-			while (n--) {
-				if (copy == DO_XOR) *t++ ^= *d++;
-				else                *t++ = *d++;
-				if (++col >= width) { col = 0; t += nextrow; }
+			unsigned int count = opcode - 0x80;
+			if (count != 0) {
+				advance(count);
+				continue;
+			}
+
+			unsigned int code = (unsigned int)d[0] | ((unsigned int)d[1] << 8);
+			d += 2;
+			if (code == 0) break;
+			if ((code & 0x8000) == 0) {
+				advance(code);
+				continue;
+			}
+
+			code -= 0x8000;
+			if (code & 0x4000) {
+				count = code - 0x4000;
+				unsigned char value = *d++;
+				while (count--) write_value(value);
+			} else {
+				count = code;
+				while (count--) write_value(*d++);
 			}
 		}
 	}

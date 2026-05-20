@@ -197,9 +197,6 @@ class WineCapture:
             cmd = ["python3", str(script), str(exe)]
             if name.endswith("ra-scenario-patch.py") and scenario:
                 cmd.append(scenario)
-            if name.endswith("ra-autostart-patch.py") and scenario:
-                side = "soviet" if scenario.upper().startswith("SCU") else "allied"
-                cmd.extend(["--side", side])
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if r.returncode != 0:
                 raise RuntimeError(
