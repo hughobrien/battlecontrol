@@ -3,11 +3,13 @@
   "configurePresets": [
     {
       "name": "linux-native",
-      "displayName": "Linux native (RelWithDebInfo, Ninja)",
+      "displayName": "Linux native (RelWithDebInfo, Ninja, clang)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
       }
     },
     {

@@ -6,8 +6,8 @@
 #   bash scripts/build-native.sh              # both targets
 #   bash scripts/build-native.sh ra           # RA only
 #   bash scripts/build-native.sh td           # TD only
-#   bash scripts/build-native.sh              # default: clang++
 #
+# Compiler is pinned to clang via CMakePresets.json (linux-native preset).
 # Exit code: 0 if all builds pass, 1 if any fails.
 
 set -euo pipefail
@@ -19,11 +19,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "=== Configuring native Linux build ==="
-if [[ -n "${CXX:-}" ]]; then
-	cmake --preset linux-native -DCMAKE_CXX_COMPILER="$CXX"
-else
-	cmake --preset linux-native
-fi
+cmake --preset linux-native
 
 if [[ "$TARGET" == "all" || "$TARGET" == "ra" ]]; then
 	echo "=== Building RA ==="
