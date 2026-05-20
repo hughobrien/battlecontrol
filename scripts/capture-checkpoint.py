@@ -17,6 +17,8 @@ import sys
 import pathlib
 import json
 import os
+import re
+import shutil
 import time
 import socket
 
@@ -38,6 +40,10 @@ SCENARIO_MAP = {
     "soviet-l5": "SCU05EA",
 }
 
+SESSION_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-(mission|vqa|title|menu)-"
+)
+
 
 def resolve_scenario(id: str) -> str:
     if id.upper().startswith("SC"):
@@ -47,6 +53,27 @@ def resolve_scenario(id: str) -> str:
     raise ValueError(
         f"unknown mission: {id} (try allied-l1..allied-l5 or soviet-l1..soviet-l5)"
     )
+
+
+def prune_old_sessions(
+    output_root: pathlib.Path, keep: int, current: pathlib.Path
+) -> int:
+    if keep <= 0:
+        return 0
+    sessions = [
+        path
+        for path in output_root.iterdir()
+        if path.is_dir() and SESSION_RE.match(path.name)
+    ]
+    sessions.sort(key=lambda path: (path.stat().st_mtime, path.name), reverse=True)
+
+    removed = 0
+    for path in sessions[keep:]:
+        if path == current:
+            continue
+        shutil.rmtree(path)
+        removed += 1
+    return removed
 
 
 def main():
@@ -342,6 +369,10 @@ def _run(args):
         print(f"  HTTP server started at http://localhost:1234/ (serving {want})")
 
     print(f"\nSession dir: {checkpoint_dir}")
+    keep_sessions = int(os.environ.get("RA_KEEP_CAPTURE_SESSIONS", "5"), 0)
+    removed = prune_old_sessions(output_root, keep_sessions, checkpoint_dir)
+    if removed:
+        print(f"  Pruned {removed} old capture session(s); kept newest {keep_sessions}")
 
 
 if __name__ == "__main__":

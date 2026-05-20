@@ -357,6 +357,40 @@ patch gained a `--side` switch so Soviet missions can take the Soviet scenario
 string path. That fixes the earlier wrong-level harness issue where Soviet
 captures loaded an Allied mission.
 
-Soviet visual sampling remains blocked by the same Wine stability problem:
-early native captures show similar mapped/fog edge cells, but Wine often crashes
-or lands in the debugger before a usable same-state gameplay reference.
+New user observations to preserve while debugging:
+
+- `2026-05-20T21-49-06-mission-soviet-l3/wine-invalid-1.png` is the mission
+  over / top-scores screen, not a blank gameplay frame. That implies the Wine
+  path has entered an endgame presentation path, probably with non-normal
+  session state, rather than rendering a valid campaign mission.
+- `2026-05-20T21-45-41-mission-soviet-l3/wine-invalid-3.png` has a fully black
+  gameplay area. This might still be a mission feature rather than a bad
+  capture, so later-frame captures should be used before rejecting it.
+- Later timed Wine captures for Soviet L3 were sampled with frame-probing off:
+  - frame 20: `/tmp/battlecontrol/2026-05-20T22-13-52-mission-soviet-l3`,
+    `tactical_nonblack=0.2051`, mostly black samples.
+  - frame 30: `/tmp/battlecontrol/2026-05-20T22-14-34-mission-soviet-l3`,
+    `tactical_nonblack=0.2051`, mostly black samples.
+  - frame 60: `/tmp/battlecontrol/2026-05-20T22-15-16-mission-soviet-l3`,
+    `tactical_nonblack=0.1449`, looks like the top-scores/endgame path.
+  - frame 100: `/tmp/battlecontrol/2026-05-20T22-15-59-mission-soviet-l3`,
+    `tactical_nonblack=0.1496`, also consistent with top-scores/endgame.
+- Purple pixels are present in
+  `/tmp/battlecontrol/2026-05-20T21-44-22-mission-soviet-l3/native.png`.
+  A pixel scan found 572 purple/magenta tactical pixels, mostly exact RGB
+  `(168,0,164)`, clustered around buckets `(4,2..13)`, `(8..9,16..17)`, and
+  `(28..29,16..17)`. This should be traced as a native rendering/provenance
+  issue independent of the invalid Wine reference.
+- `/tmp/battlecontrol/2026-05-20T21-41-20-mission-soviet-l5/{wine,native}.png`
+  are near-identical spatially but appear to have a gamma or palette-level
+  difference. Quick paired nonblack analysis shows native is usually brighter:
+  median luminance delta about `+5.33`, median ratio about `1.10`, and common
+  mappings like `(36,44,40)->(40,48,44)`, `(48,56,36)->(52,64,40)`, and
+  `(112,112,112)->(124,124,124)`. This looks more like palette/gamma/remap
+  intensity drift than geometry or draw-order drift.
+
+Soviet visual sampling remains partly blocked by Wine entry stability: some
+captures reach an apparently black initial mission view, while others fall into
+top-scores/endgame. The next useful assertion is to identify whether SCU03EA
+legitimately starts with a black tactical area and why the Wine autostart path
+can reach `Multi_Score_Presentation()` so early.
