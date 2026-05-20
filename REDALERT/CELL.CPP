@@ -1130,7 +1130,7 @@ void CellClass::Draw_It(int x, int y, bool objects) const
 			/*
 			**	Draw the overlay object.
 			*/
-			if (Overlay != OVERLAY_NONE) {
+			if (Overlay != OVERLAY_NONE && (Debug_Unshroud || !PlayerPtr || Is_Visible(PlayerPtr))) {
 				OverlayTypeClass const & otype = OverlayTypeClass::As_Reference(Overlay);
 				IsTheaterShape = (bool)otype.IsTheater;	//Tell Build_Frame if this overlay is theater specific
 				CC_Draw_Shape(otype.Get_Image_Data(), OverlayData, (x+(CELL_PIXEL_W>>1)), (y+(CELL_PIXEL_H>>1)), WINDOW_TACTICAL, SHAPE_CENTER|SHAPE_WIN_REL|SHAPE_GHOST, NULL, DisplayClass::UnitShadow);
