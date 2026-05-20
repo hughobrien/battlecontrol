@@ -480,7 +480,7 @@ void RadarClass::Draw_It(bool forced)
 		}
 	}
 
-	if (IsRadarActivating || IsRadarDeactivating || Get_Jammed(PlayerPtr)) {
+	if (IsRadarActivating || IsRadarDeactivating || (DoesRadarExist && Get_Jammed(PlayerPtr))) {
 		Radar_Anim();
 		Map.Repair.Draw_Me(true);
 		Map.Upgrade.Draw_Me(true);

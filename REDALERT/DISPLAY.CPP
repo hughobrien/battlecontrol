@@ -4258,8 +4258,8 @@ void DisplayClass::Set_Tactical_Position(COORDINATE coord)
 	/*
 	**	Bound the desired location to fit the legal map edges.
 	*/
-	int xx = 0;// (int)Coord_X(coord) - (int)Cell_To_Lepton(MapCellX);
-	int yy = 0;// (int)Coord_Y(coord) - (int)Cell_To_Lepton(MapCellY);
+	int xx = (int)Coord_X(coord) - (int)Cell_To_Lepton(MapCellX);
+	int yy = (int)Coord_Y(coord) - (int)Cell_To_Lepton(MapCellY);
 
 	Confine_Rect(&xx, &yy, TacLeptonWidth, TacLeptonHeight, Cell_To_Lepton(MapCellWidth) + GlyphXClientSidebarWidthInLeptons, Cell_To_Lepton(MapCellHeight));		// Needed to accomodate Glyphx client sidebar. ST - 4/12/2019 5:29PM
 //	Confine_Rect(&xx, &yy, TacLeptonWidth, TacLeptonHeight, Cell_To_Lepton(MapCellWidth), Cell_To_Lepton(MapCellHeight));

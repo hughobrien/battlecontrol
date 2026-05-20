@@ -14,10 +14,15 @@
       flake = false;
     };
 
-    # Allied CD ISO from archive.org — single source for all game assets.
+    # Original Red Alert CD ISOs from archive.org.
     # Files are extracted via unar at build time.
-    redalert-iso = {
+    redalert-allied-iso = {
       url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso";
+      flake = false;
+    };
+
+    redalert-soviet-iso = {
+      url = "https://archive.org/download/cnc-red-alert/redalert_soviets.iso";
       flake = false;
     };
   };
@@ -29,7 +34,8 @@
 
       wine-input,
       cnc-ddraw,
-      redalert-iso,
+      redalert-allied-iso,
+      redalert-soviet-iso,
     }:
     let
       system = "x86_64-linux";
@@ -47,6 +53,25 @@
       packages.${system} =
         let
           p = self.packages.${system};
+          mkRaData =
+            name: iso:
+            pkgs.runCommand name
+              {
+                src = iso;
+                nativeBuildInputs = [ pkgs.unar ];
+              }
+              ''
+                mkdir -p "$out"
+                unar -q -o "$out" -D "$src" MAIN.MIX 2>/dev/null
+                unar -q -o "$out" -D "$src" INSTALL/REDALERT.MIX 2>/dev/null
+                if [ -d "$out/INSTALL" ]; then
+                  mv "$out/INSTALL"/* "$out/"
+                  rmdir "$out/INSTALL"
+                fi
+                # Case-insensitive symlinks for the game's lowercase file lookups
+                ln -sf MAIN.MIX "$out/main.mix"
+                ln -sf REDALERT.MIX "$out/redalert.mix"
+              '';
         in
         {
           redalert = pkgs.clangStdenv.mkDerivation {
@@ -141,12 +166,11 @@
           };
 
           # ── ISO extraction packages ────────────────────────────────────────
-          # All extracted from the redalert-iso flake input via unar.
-
+          # Extracted from the original Red Alert CD flake inputs via unar.
           ra-patched-exe =
             pkgs.runCommand "ra-patched-exe"
               {
-                src = redalert-iso;
+                src = redalert-allied-iso;
                 nativeBuildInputs = [
                   pkgs.unar
                   pkgs.python3
@@ -162,29 +186,14 @@
                 printf '\x00' | dd of="$out" bs=1 seek=$((0x1BFCB7)) conv=notrunc 2>/dev/null
               '';
 
-          ra-data =
-            pkgs.runCommand "ra-data"
-              {
-                src = redalert-iso;
-                nativeBuildInputs = [ pkgs.unar ];
-              }
-              ''
-                mkdir -p "$out"
-                unar -q -o "$out" -D "$src" MAIN.MIX 2>/dev/null
-                unar -q -o "$out" -D "$src" INSTALL/REDALERT.MIX 2>/dev/null
-                if [ -d "$out/INSTALL" ]; then
-                  mv "$out/INSTALL"/* "$out/"
-                  rmdir "$out/INSTALL"
-                fi
-                # Case-insensitive symlinks for the game's lowercase file lookups
-                ln -sf MAIN.MIX "$out/main.mix"
-                ln -sf REDALERT.MIX "$out/redalert.mix"
-              '';
+          ra-data-allied = mkRaData "ra-data-allied" redalert-allied-iso;
+          ra-data-soviet = mkRaData "ra-data-soviet" redalert-soviet-iso;
+          ra-data = p.ra-data-allied;
 
           ra-thipx32-dll =
             pkgs.runCommand "ra-thipx32-dll"
               {
-                src = redalert-iso;
+                src = redalert-allied-iso;
                 nativeBuildInputs = [ pkgs.unar ];
               }
               ''
@@ -195,7 +204,7 @@
           ra-thipx16-dll =
             pkgs.runCommand "ra-thipx16-dll"
               {
-                src = redalert-iso;
+                src = redalert-allied-iso;
                 nativeBuildInputs = [ pkgs.unar ];
               }
               ''

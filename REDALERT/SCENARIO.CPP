@@ -684,7 +684,7 @@ void Fill_In_Data(void)
 	Map.Zone_Reset(MZONEF_ALL);
 
 
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 	/*
 	**	Since the sidebar starts up activated, adjust the home start position so that
 	**	the right edge of the map will still be visible.

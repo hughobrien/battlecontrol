@@ -1785,7 +1785,7 @@ bool Select_Game(bool fade)
 #endif	//WIN32
 	Show_Mouse();
 	Set_Logic_Page(SeenBuff);
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 	/*
 	** Sidebar is always active in hi-res.
 	*/

@@ -713,18 +713,19 @@ void __cdecl Buffer_Fill_Rect(void *thisptr, int sx, int sy, int dx, int dy, uns
 	(void)VPwidth; (void)VPheight; (void)VPxadd; (void)VPbpr; (void)local_ebp;
 
 #ifndef _MSC_VER
-	// TIM-160: fill rectangle (x1_pixel,y1_pixel)..(x2_pixel,y2_pixel) with color
+	// Original callers pass inclusive right/bottom coordinates.
 	{
 		GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
 		int stride = vp->Get_Width() + vp->Get_XAdd() + vp->Get_Pitch();
 		unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
 		int w = vp->Get_Width(), h = vp->Get_Height();
 		int r0 = y1_pixel < 0 ? 0 : y1_pixel;
-		int r1 = y2_pixel > h ? h : y2_pixel;
+		int r1 = y2_pixel >= h ? h - 1 : y2_pixel;
 		int c0 = x1_pixel < 0 ? 0 : x1_pixel;
-		int c1 = x2_pixel > w ? w : x2_pixel;
-		for (int r = r0; r < r1; r++)
-			memset(buf + r * stride + c0, color, c1 > c0 ? c1 - c0 : 0);
+		int c1 = x2_pixel >= w ? w - 1 : x2_pixel;
+		if (r1 < r0 || c1 < c0) return;
+		for (int r = r0; r <= r1; r++)
+			memset(buf + r * stride + c0, color, c1 - c0 + 1);
 	}
 #else
 	{ /* TIM-164: replaced */ }
@@ -1122,10 +1123,16 @@ void __cdecl Buffer_Draw_Stamp(void const *this_object, void const *icondata, in
 	(void)modulo; (void)iwidth; (void)doremap;
 	if (!icondata) return;
 	unsigned char *base = (unsigned char*)(uintptr_t)icondata;
-	short iw, ih; int iicons, itrans;
-	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2);
-	memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
+	short iw, ih, ic; int iicons, itrans, imap;
+	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2); memcpy(&ic, base+4, 2);
+	memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4); memcpy(&imap, base+36, 4);
 	int icon_w = (int)(unsigned short)iw, icon_h = (int)(unsigned short)ih;
+	int icon_count = (int)(unsigned short)ic;
+	if (icon < 0 || icon >= icon_count) return;
+	if (imap != 0) {
+		icon = base[(unsigned int)imap + icon];
+		if (icon < 0 || icon >= icon_count) return;
+	}
 	int icon_sz = icon_w * icon_h;
 	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
 	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
@@ -1133,6 +1140,7 @@ void __cdecl Buffer_Draw_Stamp(void const *this_object, void const *icondata, in
 	int vw = vp->Get_Width(), vh = vp->Get_Height();
 	unsigned char *icon_src = base + (unsigned int)iicons + icon * icon_sz;
 	unsigned char tf = (itrans != 0) ? base[(unsigned int)itrans + icon] : 0;
+	bool transparent = remap != NULL || tf != 0;
 	for (int row = 0; row < icon_h; row++) {
 		int py = y_pixel + row;
 		if (py < 0 || py >= vh) continue;
@@ -1141,7 +1149,7 @@ void __cdecl Buffer_Draw_Stamp(void const *this_object, void const *icondata, in
 			if (px < 0 || px >= vw) continue;
 			unsigned char pixel = icon_src[row * icon_w + col];
 			if (remap) pixel = ((const unsigned char*)remap)[pixel];
-			if (!tf || pixel) buf[py * stride + px] = pixel;
+			if (!transparent || pixel) buf[py * stride + px] = pixel;
 		}
 	}
 }
@@ -1195,16 +1203,23 @@ void __cdecl Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondat
 	(void)modulo; (void)iwidth; (void)skip; (void)doremap;
 	if (!icondata) return;
 	unsigned char *base = (unsigned char*)(uintptr_t)icondata;
-	short iw, ih; int iicons, itrans;
-	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2);
-	memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
+	short iw, ih, ic; int iicons, itrans, imap;
+	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2); memcpy(&ic, base+4, 2);
+	memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4); memcpy(&imap, base+36, 4);
 	int icon_w = (int)(unsigned short)iw, icon_h = (int)(unsigned short)ih;
+	int icon_count = (int)(unsigned short)ic;
+	if (icon < 0 || icon >= icon_count) return;
+	if (imap != 0) {
+		icon = base[(unsigned int)imap + icon];
+		if (icon < 0 || icon >= icon_count) return;
+	}
 	int icon_sz = icon_w * icon_h;
 	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
 	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
 	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
 	unsigned char *icon_src = base + (unsigned int)iicons + icon * icon_sz;
 	unsigned char tf = (itrans != 0) ? base[(unsigned int)itrans + icon] : 0;
+	bool transparent = remap != NULL || tf != 0;
 	// TIM-255: WINDOWHEIGHT = MapCellHeight * ICON_PIXEL_H can exceed vp height
 	// when RESFACTOR=2 and the map has >10 visible rows (each 48px). Clamp so no
 	// write escapes the pixel buffer.
@@ -1220,7 +1235,7 @@ void __cdecl Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondat
 			if (px < min_x || px >= max_x) continue;
 			unsigned char pixel = icon_src[row * icon_w + col];
 			if (remap) pixel = ((const unsigned char*)remap)[pixel];
-			if (!tf || pixel) buf[py * stride + px] = pixel;
+			if (!transparent || pixel) buf[py * stride + px] = pixel;
 		}
 	}
 }
@@ -2534,5 +2549,3 @@ extern "C" int __cdecl Buffer_Get_Pixel(void * this_object, int x_pixel, int y_p
 	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
 	return buf[y_pixel * stride + x_pixel];
 }
-
-
