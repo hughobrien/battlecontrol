@@ -49,7 +49,7 @@
           p = self.packages.${system};
         in
         {
-          redalert = pkgs.stdenv.mkDerivation {
+          redalert = pkgs.clangStdenv.mkDerivation {
             pname = "cnc-redalert";
             version = "unstable-2026-05-09";
 
@@ -97,7 +97,7 @@
             };
           };
 
-          tiberiandawn = pkgs.stdenv.mkDerivation {
+          tiberiandawn = pkgs.clangStdenv.mkDerivation {
             pname = "cnc-tiberiandawn";
             version = "unstable-2026-05-09";
 
@@ -236,7 +236,7 @@
           default = p.redalert;
 
           # ── vqa-dump — standalone VQA decoder (C++) ─────────────────────
-          vqa-dump = pkgs.stdenv.mkDerivation {
+          vqa-dump = pkgs.clangStdenv.mkDerivation {
             pname = "vqa-dump";
             version = "unstable-2026-05-18";
             src = pkgs.runCommandLocal "vqa-dump-src" { } ''
@@ -244,7 +244,7 @@
               cp ${./tools/vqa_dump/vqa_dump.cpp} $out/tools/vqa_dump/vqa_dump.cpp
             '';
             buildPhase = ''
-              g++ -std=c++17 -O2 -o vqa_dump tools/vqa_dump/vqa_dump.cpp
+              $CXX -std=c++17 -O2 -o vqa_dump tools/vqa_dump/vqa_dump.cpp
             '';
             installPhase = ''
               mkdir -p $out/bin
