@@ -18,6 +18,7 @@
 #include <cstring>
 #include "GBUFFER.H"
 #include "FONT.H"
+#include "blit-helpers.h"
 
 // Shape-buffer globals defined extern "C" in 2KEYFRAM.CPP.
 extern "C" char *BigShapeBufferStart;
@@ -226,8 +227,14 @@ void *Get_Font_Palette_Ptr(void)
 
 // FUNCTION.H — shape blit from BigShapeBuffer into a GraphicViewPort.
 // Replaces the original x86 KEYFBUFF.ASM routine with portable C++.
-// Supports: SHAPE_TRANS (0x0040) skip colour-0 pixels, SHAPE_CENTER (0x0020).
-// Other flags (fading, predator, ghost, remap) are left for a future pass.
+// Honoured flags:
+//   SHAPE_CENTER (0x0020) — anchor at shape centre.
+//   SHAPE_TRANS  (0x0040) — skip colour-0 pixels.
+//   SHAPE_FADING (0x0100) — apply 256-byte LUT (house remap or fade table).
+// Ignored (cosmetic, future pass):
+//   SHAPE_GHOST  (0x1000) — translucency blending.
+//   SHAPE_PREDATOR (0x0200) — warping/stealth effect.
+// Vararg order matches KEYFBUFF.ASM:1294-1411 (decoded in blit-helpers.h).
 long Buffer_Frame_To_Page(int x, int y, int w, int h,
                           void *src, GraphicViewPortClass &dest,
                           int flags, ...)
@@ -239,39 +246,37 @@ long Buffer_Frame_To_Page(int x, int y, int w, int h,
         ShapeHdr *hdr = (ShapeHdr*)src;
         const char *base = hdr->shape_buffer ? TheaterShapeBufferStart : BigShapeBufferStart;
         if (!base) return 0;
-        // shape_data holds the byte offset; adding (long)base converts to absolute ptr.
         pixels = (const unsigned char*)(hdr->shape_data + (long)base);
     } else {
         pixels = (const unsigned char*)src;
     }
     if (!pixels) return 0;
 
-    if (flags & 0x0020) { x -= w / 2; y -= h / 2; } // SHAPE_CENTER
+    if (flags & BFTP_SHAPE_CENTER) { x -= w / 2; y -= h / 2; }
 
     int vw     = dest.Get_Width();
     int vh     = dest.Get_Height();
-    int stride = vw + dest.Get_XAdd() + dest.Get_Pitch(); // row stride of the underlying buffer (includes Pitch for surface alignment)
+    int stride = vw + dest.Get_XAdd() + dest.Get_Pitch();  // row stride of the underlying buffer (includes Pitch for surface alignment)
 
-    // Clip source rect against viewport bounds.
     int sx0 = 0, sy0 = 0, dw = w, dh = h;
-    if (x < 0)        { sx0 = -x;      dw += x;      x = 0; }
-    if (y < 0)        { sy0 = -y;      dh += y;      y = 0; }
+    if (x < 0)        { sx0 = -x;    dw += x;    x = 0; }
+    if (y < 0)        { sy0 = -y;    dh += y;    y = 0; }
     if (x + dw > vw)  { dw = vw - x; }
     if (y + dh > vh)  { dh = vh - y; }
     if (dw <= 0 || dh <= 0) return 0;
 
+    va_list args;
+    va_start(args, flags);
+    BlitArgs ba = decode_shape_blit_args(flags, args);
+    va_end(args);
+
     unsigned char *dst_base = (unsigned char*)dest.Get_Offset();
-    const bool trans = (flags & 0x0040) != 0; // SHAPE_TRANS: skip colour-0
+    const bool trans = (flags & BFTP_SHAPE_TRANS) != 0;
 
     for (int row = 0; row < dh; row++) {
-        const unsigned char *srow = pixels + (sy0 + row) * w + sx0;
-        unsigned char       *drow = dst_base + (y + row) * stride + x;
-        if (trans) {
-            for (int col = 0; col < dw; col++)
-                if (srow[col]) drow[col] = srow[col];
-        } else {
-            memcpy(drow, srow, dw);
-        }
+        const unsigned char *srow = pixels   + static_cast<ptrdiff_t>(sy0 + row) * w      + sx0;
+        unsigned char       *drow = dst_base + static_cast<ptrdiff_t>(y   + row) * stride + x;
+        blit_row(drow, srow, dw, trans, ba.remap, ba.fade_count);
     }
     return 1;
 }

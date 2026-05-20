@@ -51,6 +51,7 @@
 #include "TILE.H"                // Get_Icon_Set_Map
 #include "WW_WIN.H"              // Window, Change_Window, Window_Hide_Mouse
 #include "CCDDE.H"               // DDEServerClass (TIBERIANDAWN/ level, safe cascade)
+#include "win32-stubs/blit-helpers.h"  // decode_shape_blit_args, blit_row, BlitArgs
 
 // main() is provided by TIBERIANDAWN/STARTUP.CPP (#ifndef _MSC_VER block,
 // TIM-343 pass-99). Removed stub from here to avoid duplicate-definition
@@ -1198,12 +1199,16 @@ long Buffer_To_Buffer(void *, int, int, int, int, void *, long) { return 0; }
 LONG Buffer_Print(void *, const char *, int, int, int, int)     { return 0; }
 
 // FUNCTION.H declares Buffer_Frame_To_Page in extern "C".
+// Linux port — see linux/win32-stubs/blit-helpers.h for the vararg
+// decoding and row-blit helpers shared with the RA stub.
 long Buffer_Frame_To_Page(int x, int y, int w, int h,
                           void *src, GraphicViewPortClass &dest, int flags, ...)
 {
     if (!src || w <= 0 || h <= 0) return 0;
+    // TD does not use BigShapeBuffer — src is always a raw pixel pointer
+    // (unlike the RA stub which has to indirect via ShapeHdr).
     const unsigned char *pixels = (const unsigned char*)src;
-    if (flags & 0x0020) { x -= w / 2; y -= h / 2; }
+    if (flags & BFTP_SHAPE_CENTER) { x -= w / 2; y -= h / 2; }
     int vw = dest.Get_Width(), vh = dest.Get_Height();
     int stride = vw + dest.Get_XAdd() + dest.Get_Pitch();
     int sx0 = 0, sy0 = 0, dw = w, dh = h;
@@ -1212,13 +1217,18 @@ long Buffer_Frame_To_Page(int x, int y, int w, int h,
     if (x + dw > vw) { dw = vw - x; }
     if (y + dh > vh) { dh = vh - y; }
     if (dw <= 0 || dh <= 0) return 0;
+
+    va_list args;
+    va_start(args, flags);
+    BlitArgs ba = decode_shape_blit_args(flags, args);
+    va_end(args);
+
     auto *dst_base = (unsigned char*)dest.Get_Offset();
-    const bool trans = (flags & 0x0040) != 0;
+    const bool trans = (flags & BFTP_SHAPE_TRANS) != 0;
     for (int row = 0; row < dh; row++) {
-        const unsigned char *srow = pixels + (sy0 + row) * w + sx0;
-        unsigned char       *drow = dst_base + (y + row) * stride + x;
-        if (trans) { for (int col = 0; col < dw; col++) if (srow[col]) drow[col] = srow[col]; }
-        else        std::memcpy(drow, srow, (size_t)dw);
+        const unsigned char *srow = pixels   + static_cast<ptrdiff_t>(sy0 + row) * w      + sx0;
+        unsigned char       *drow = dst_base + static_cast<ptrdiff_t>(y   + row) * stride + x;
+        blit_row(drow, srow, dw, trans, ba.remap, ba.fade_count);
     }
     return 1;
 }
