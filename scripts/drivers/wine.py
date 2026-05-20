@@ -6,12 +6,14 @@ import time
 import pathlib
 import tempfile
 import shutil
+import struct
 from .common import (
     pick_free_display,
     start_xvfb,
     start_openbox,
     wait_for_window,
     capture_root,
+    center_mouse,
     teardown_display,
 )
 
@@ -84,14 +86,17 @@ class WineCapture:
         # wineprefix is per-run ephemeral — created in capture_*, destroyed in
         # _cleanup. Never reused across runs, no inherited state.
         self.wineprefix: pathlib.Path | None = None
+        random_seed = os.environ.get("RA_RANDOM_SEED")
+        self.random_seed = int(random_seed, 0) if random_seed else None
 
         self.scripts_dir = pathlib.Path(__file__).resolve().parent.parent
+        self.nix = os.environ.get("NIX_BIN", "/nix/var/nix/profiles/default/bin/nix")
         self.ra_exe = self._build_ra_exe()
         self._build_sendinput()
 
     def _build_ra_exe(self) -> pathlib.Path:
         r = subprocess.run(
-            ["nix", "build", ".#ra-patched-exe", "--impure", "--print-out-paths"],
+            [self.nix, "build", ".#ra-patched-exe", "--impure", "--print-out-paths"],
             capture_output=True,
             text=True,
             timeout=120,
@@ -136,26 +141,87 @@ class WineCapture:
                 f"i686-w64-mingw32-gcc failed (rc={r.returncode}): {r.stderr.strip()}"
             )
 
-    def _patch_chain(self, exe: pathlib.Path, scenario=None, skip_vqa=True):
+    def _build_frameprobe(self):
+        """Compile the diagnostic RA frame-counter poller."""
+        src = (
+            self.scripts_dir / ".." / "tools" / "wine-input" / "ra-frameprobe.c"
+        ).resolve()
+        if not src.is_file():
+            raise RuntimeError(f"ra-frameprobe.c not found at {src}")
+        self._frameprobe_exe = (
+            pathlib.Path.home() / ".cache" / "battlecontrol" / "ra-frameprobe.exe"
+        )
+        self._frameprobe_exe.parent.mkdir(parents=True, exist_ok=True)
+        if (
+            self._frameprobe_exe.exists()
+            and src.stat().st_mtime <= self._frameprobe_exe.stat().st_mtime
+        ):
+            return
+        r = subprocess.run(
+            [
+                "i686-w64-mingw32-gcc",
+                "-o",
+                str(self._frameprobe_exe),
+                str(src),
+                "-luser32",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if r.returncode != 0:
+            raise RuntimeError(
+                f"i686-w64-mingw32-gcc frameprobe failed (rc={r.returncode}): {r.stderr.strip()}"
+            )
+
+    def _patch_chain(
+        self, exe: pathlib.Path, scenario=None, skip_vqa=True, autostart=True
+    ):
         patches = [
             "ra/ra-focus-skip-patch.py",
             "ra/ra-game-in-focus-patch.py",
         ]
         if skip_vqa:
             patches.append("ra/ra-vqa-skip-patch.py")
+            patches.append("ra/ra-briefing-skip-patch.py")
         if scenario:
             patches.append("ra/ra-scenario-patch.py")
-        patches.append("ra/ra-autostart-patch.py")
+        if autostart:
+            patches.append("ra/ra-autostart-patch.py")
+        if os.environ.get("WINE_FRAMEINFO_GUARD", "1") not in ("", "0"):
+            patches.append("ra/ra-frameinfo-send-guard-patch.py")
         for name in patches:
             script = self.scripts_dir / name
             if not script.exists():
                 continue
             cmd = ["python3", str(script), str(exe)]
-            if name == "ra-scenario-patch.py" and scenario:
+            if name.endswith("ra-scenario-patch.py") and scenario:
                 cmd.append(scenario)
-            subprocess.run(cmd, capture_output=True, timeout=30)
+            if name.endswith("ra-autostart-patch.py") and scenario:
+                side = "soviet" if scenario.upper().startswith("SCU") else "allied"
+                cmd.extend(["--side", side])
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if r.returncode != 0:
+                raise RuntimeError(
+                    f"{script.name} failed (rc={r.returncode}): {r.stderr or r.stdout}"
+                )
+        if self.random_seed is not None:
+            subprocess.run(
+                [
+                    "python3",
+                    str(self.scripts_dir / "ra" / "ra-random-seed-patch.py"),
+                    str(exe),
+                    str(self.random_seed),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=30,
+            )
+            (exe.parent / "RA_RANDOM_SEED.txt").write_text(f"{self.random_seed}\n")
 
-    def _setup_staging(self, scenario=None, skip_vqa=True) -> pathlib.Path:
+    def _setup_staging(
+        self, scenario=None, skip_vqa=True, autostart=True
+    ) -> pathlib.Path:
         staging = _user_tmpdir()
         for f in self.data_dir.glob("*.MIX"):
             (staging / f.name).symlink_to(f)
@@ -184,7 +250,7 @@ class WineCapture:
         # cnc-ddraw `renderer=gdi` bypasses DirectDraw entirely and is the
         # CnCNet-community canonical shim for RA95/C&C95 specifically.
         ddraw_r = subprocess.run(
-            ["nix", "build", ".#cnc-ddraw", "--impure", "--print-out-paths"],
+            [self.nix, "build", ".#cnc-ddraw", "--impure", "--print-out-paths"],
             capture_output=True,
             text=True,
             timeout=120,
@@ -196,15 +262,16 @@ class WineCapture:
             )
         ddraw_src = pathlib.Path(ddraw_r.stdout.strip()) / "bin" / "ddraw.dll"
         shutil.copy2(ddraw_src, staging / "ddraw.dll")
+        capture_fps = int(os.environ.get("RA_CAPTURE_FPS", "10"), 0)
         (staging / "ddraw.ini").write_text(
             "[ddraw]\nrenderer=gdi\nwindowed=true\nhook=0\n"
-            "window_state=normal\nmaxfps=30\n\n"
+            f"window_state=normal\nmaxfps={capture_fps}\n\n"
             "[ra95]\nscanline_double=true\n"
         )
         (staging / "REDALERT.INI").write_text(
             "[Sound]\nCard=-1\n\n[Options]\nHardwareFills=no\n\n[Intro]\nPlayIntro=no\n"
         )
-        self._patch_chain(staging / "RA95.EXE", scenario, skip_vqa)
+        self._patch_chain(staging / "RA95.EXE", scenario, skip_vqa, autostart)
         return staging
 
     def _create_wineprefix(self, staging: pathlib.Path):
@@ -297,6 +364,126 @@ class WineCapture:
             stderr=logfile,
         )
 
+    def _sendinput_seq(self, staging: pathlib.Path, disp: str, seq: str, logfile):
+        r = subprocess.run(
+            [str(self.wine), str(self._sendinput_exe), "seq", seq],
+            cwd=str(staging),
+            env={
+                **os.environ,
+                "DISPLAY": disp,
+                "WINEPREFIX": str(self.wineprefix),
+                "WINEDEBUG": "-all",
+                "RA_SENDINPUT_ABS": "1",
+                "WAYLAND_DISPLAY": "",
+            },
+            stdout=logfile,
+            stderr=logfile,
+            timeout=30,
+        )
+        if r.returncode != 0:
+            raise RuntimeError(f"ra-sendinput seq failed (rc={r.returncode})")
+
+    def _xtest_click(self, disp: str, x: int, y: int, logfile):
+        r = subprocess.run(
+            ["xdotool", "mousemove", str(x), str(y), "click", "1"],
+            env={**os.environ, "DISPLAY": disp},
+            stdout=logfile,
+            stderr=logfile,
+            timeout=5,
+        )
+        if r.returncode != 0:
+            logfile.write(f"wine-driver: xdotool click failed rc={r.returncode}\n")
+            logfile.flush()
+
+    def _find_ra_pid(self, staging: pathlib.Path, deadline: float) -> int:
+        exe_name = str(staging / "RA95.EXE").encode()
+        candidates = []
+        while time.time() < deadline:
+            for proc in pathlib.Path("/proc").iterdir():
+                if not proc.name.isdigit():
+                    continue
+                try:
+                    cmdline = (proc / "cmdline").read_bytes()
+                except OSError:
+                    continue
+                if b"RA95" in cmdline or str(staging).encode() in cmdline:
+                    candidates.append((proc.name, cmdline.replace(b"\0", b" ")[:240]))
+                if b"RA95.EXE" in cmdline and (
+                    exe_name in cmdline
+                    or str(staging).encode() in cmdline
+                    or b"D:\\RA95.EXE" in cmdline
+                ):
+                    return int(proc.name)
+            time.sleep(0.05)
+        sample = "; ".join(
+            f"{pid}:{cmd.decode('latin1', 'replace')}" for pid, cmd in candidates[-8:]
+        )
+        raise RuntimeError(
+            f"could not find RA95.EXE Linux process; candidates={sample}"
+        )
+
+    def _read_proc_dword(self, pid: int, addr: int) -> int:
+        with open(f"/proc/{pid}/mem", "rb", buffering=0) as mem:
+            mem.seek(addr)
+            data = mem.read(4)
+        if len(data) != 4:
+            raise RuntimeError(f"short read from /proc/{pid}/mem at 0x{addr:08x}")
+        return struct.unpack("<I", data)[0]
+
+    def _wait_proc_frame(
+        self, staging: pathlib.Path, frame: int, addr_text: str, logfile, pid_hint=None
+    ) -> tuple[bool, int, str]:
+        addr = int(addr_text, 0)
+        try:
+            pid = self._find_ra_pid(staging, time.time() + 2)
+        except RuntimeError as exc:
+            if pid_hint is None:
+                raise
+            pid = pid_hint
+            logfile.write(f"wine-driver: proc-frameprobe using pid hint {pid}: {exc}\n")
+            logfile.flush()
+        max_polls = int(os.environ.get("RA_FRAMEPROBE_MAX_POLLS", "1200"), 0)
+        relative = os.environ.get("RA_FRAMEPROBE_RELATIVE", "0") not in ("", "0")
+        stable_ok_polls = int(os.environ.get("RA_FRAMEPROBE_STABLE_OK_POLLS", "50"), 0)
+        value = self._read_proc_dword(pid, addr)
+        target = value + frame if relative else frame
+        logfile.write(
+            f"wine-driver: proc-frameprobe pid={pid} addr=0x{addr:08x} "
+            f"value={value} target={target} relative={int(relative)}\n"
+        )
+        logfile.flush()
+        last = value
+        stable_polls = 0
+        for _ in range(max_polls):
+            try:
+                value = self._read_proc_dword(pid, addr)
+            except OSError:
+                return (False, value, "read-failed")
+            if value != last:
+                logfile.write(
+                    f"wine-driver: proc-frameprobe value={value} target={target}\n"
+                )
+                logfile.flush()
+                last = value
+                stable_polls = 0
+            else:
+                stable_polls += 1
+            if value >= target:
+                return (True, value, "target")
+            if stable_ok_polls > 0 and value > 0 and stable_polls >= stable_ok_polls:
+                logfile.write(
+                    f"wine-driver: proc-frameprobe stable value={value}; "
+                    "capturing current gameplay state\n"
+                )
+                logfile.flush()
+                return (True, value, "stable")
+            time.sleep(0.01)
+        logfile.write(
+            f"wine-driver: proc-frameprobe timeout last={value} target={target}\n"
+        )
+        logfile.flush()
+        return (False, value, "timeout")
+
     def _cleanup(self, disp, staging, wine_proc, xvfb, wm):
         teardown_display(disp, wine_proc, wm, xvfb)
         self._destroy_wineprefix()
@@ -309,7 +496,8 @@ class WineCapture:
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
         xvfb = wm = wine_proc = None
-        staging = self._setup_staging(scenario, skip_vqa=True)
+        menu_drive = os.environ.get("WINE_MENU_DRIVE", "0") not in ("", "0")
+        staging = self._setup_staging(scenario, skip_vqa=True, autostart=not menu_drive)
         try:
             xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
@@ -317,17 +505,234 @@ class WineCapture:
             wine_proc = self._launch(staging, logfile, disp)
             if not wait_for_window(disp, "Red Alert", timeout=30):
                 raise RuntimeError("Red Alert window never appeared")
-            # Dismiss DirectSound dialog, skip VQAs
+            # Dismiss DirectSound dialog, skip VQAs. Use SendInput for anything
+            # RA95 itself may read through DirectInput; XTest/xdotool often only
+            # reaches the X/WM path under Wine.
             time.sleep(5)
-            subprocess.run(
-                ["xdotool", "key", "Return"],
-                env={**os.environ, "DISPLAY": disp},
-                capture_output=True,
-                timeout=5,
-            )
+            self._sendinput_seq(staging, disp, "k=0x0D@300;k=0x20@300", logfile)
+            if menu_drive:
+                side_click = (
+                    "380,228" if scenario.upper().startswith("SCU") else "258,228"
+                )
+                self._sendinput_seq(
+                    staging,
+                    disp,
+                    f"s=1000;c=322,183;s=2000;c=470,244;s=2000;c={side_click};s=5000;c=320,327",
+                    logfile,
+                )
+            # Older captures used synthetic input to dismiss the text mission
+            # briefing. The Wine executable is now patched to skip that dialog,
+            # so extra input is opt-in; otherwise it can leak into gameplay or
+            # score screens and corrupt frame-exact captures.
+            if not menu_drive and os.environ.get("WINE_BRIEFING_DISMISS", "0") not in (
+                "",
+                "0",
+            ):
+                time.sleep(float(os.environ.get("WINE_BRIEFING_WAIT", "3.0")))
+                self._sendinput_seq(
+                    staging,
+                    disp,
+                    os.environ.get(
+                        "WINE_BRIEFING_DISMISS_SEQ",
+                        "k=0x0D@300;k=0x20@300;c=320,327@800;k=0x0D@300;c=320,327@800",
+                    ),
+                    logfile,
+                )
+                self._xtest_click(disp, 320, 327, logfile)
+                time.sleep(1.0)
+            center_mouse(disp, 640, 400)
+            time.sleep(float(os.environ.get("WINE_GAMEPLAY_SETTLE", "1.0")))
             # Wait for target frame
-            frame_wait = max(frame / 15.0, 3.0)
-            time.sleep(frame_wait)
+            if os.environ.get("WINE_FRAMEPROBE", "0") not in ("", "0"):
+                addr = os.environ.get("WINE_FRAME_ADDR", "0x006544c8")
+                if os.environ.get("WINE_FRAMEPROBE_BACKEND", "proc") == "proc":
+                    try:
+                        probe_ok, actual_frame, frame_reason = self._wait_proc_frame(
+                            staging, frame, addr, logfile, wine_proc.pid
+                        )
+                    except Exception as exc:
+                        probe_ok = False
+                        actual_frame = -1
+                        frame_reason = "error"
+                        logfile.write(f"wine-driver: proc-frameprobe error: {exc}\n")
+                        logfile.flush()
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    (output_dir / "wine-frame.txt").write_text(
+                        f"requested={frame}\nactual={actual_frame}\nreason={frame_reason}\naddr={addr}\n"
+                    )
+                    if not probe_ok:
+                        if os.environ.get("WINE_FRAMEPROBE_STRICT", "0") not in (
+                            "",
+                            "0",
+                        ):
+                            try:
+                                capture_root(
+                                    disp, output_dir / "wine-frameprobe-failure.png"
+                                )
+                            except Exception as exc:
+                                logfile.write(
+                                    f"wine-driver: failure screenshot failed: {exc}\n"
+                                )
+                                logfile.flush()
+                            raise RuntimeError("proc frameprobe failed")
+                        frame_wait = float(
+                            os.environ.get("WINE_FRAMEPROBE_FALLBACK_WAIT", "0")
+                        )
+                        logfile.write(
+                            f"wine-driver: proc-frameprobe unavailable; "
+                            f"falling back to {frame_wait:.2f}s timed wait\n"
+                        )
+                        logfile.flush()
+                        time.sleep(frame_wait)
+                else:
+                    self._build_frameprobe()
+                    frameprobe_env = {
+                        **os.environ,
+                        "DISPLAY": disp,
+                        "WINEPREFIX": str(self.wineprefix),
+                        "WINEDEBUG": "-all",
+                        "WAYLAND_DISPLAY": "",
+                        "RA_FRAMEPROBE_MAX_POLLS": os.environ.get(
+                            "RA_FRAMEPROBE_MAX_POLLS", "1200"
+                        ),
+                        "RA_FRAMEPROBE_IDLE_POLLS": os.environ.get(
+                            "RA_FRAMEPROBE_IDLE_POLLS", "600"
+                        ),
+                        "RA_FRAMEPROBE_RELATIVE": os.environ.get(
+                            "RA_FRAMEPROBE_RELATIVE", "1"
+                        ),
+                    }
+                    r = subprocess.run(
+                        [str(self.wine), str(self._frameprobe_exe), str(frame), addr],
+                        cwd=str(staging),
+                        env=frameprobe_env,
+                        stdout=logfile,
+                        stderr=logfile,
+                        timeout=20,
+                    )
+                    if r.returncode != 0:
+                        logfile.write(
+                            "wine-driver: frameprobe failed; retrying without input\n"
+                        )
+                        logfile.flush()
+                        r = subprocess.run(
+                            [
+                                str(self.wine),
+                                str(self._frameprobe_exe),
+                                str(frame),
+                                addr,
+                            ],
+                            cwd=str(staging),
+                            env=frameprobe_env,
+                            stdout=logfile,
+                            stderr=logfile,
+                            timeout=20,
+                        )
+                    if r.returncode != 0:
+                        try:
+                            capture_root(
+                                disp, output_dir / "wine-frameprobe-failure.png"
+                            )
+                        except Exception as exc:
+                            logfile.write(
+                                f"wine-driver: failure screenshot failed: {exc}\n"
+                            )
+                            logfile.flush()
+                        raise RuntimeError(f"ra-frameprobe failed (rc={r.returncode})")
+                if os.environ.get("WINE_CELL_SCAN", "0") not in ("", "0"):
+                    subprocess.run(
+                        [str(self.wine), str(self._frameprobe_exe), "-2"],
+                        cwd=str(staging),
+                        env={
+                            **os.environ,
+                            "DISPLAY": disp,
+                            "WINEPREFIX": str(self.wineprefix),
+                            "WINEDEBUG": "-all",
+                            "WAYLAND_DISPLAY": "",
+                        },
+                        stdout=logfile,
+                        stderr=logfile,
+                        timeout=45,
+                    )
+                if os.environ.get("WINE_TEMPLATE_SCAN", "0") not in ("", "0"):
+                    subprocess.run(
+                        [str(self.wine), str(self._frameprobe_exe), "-3"],
+                        cwd=str(staging),
+                        env={
+                            **os.environ,
+                            "DISPLAY": disp,
+                            "WINEPREFIX": str(self.wineprefix),
+                            "WINEDEBUG": "-all",
+                            "WAYLAND_DISPLAY": "",
+                        },
+                        stdout=logfile,
+                        stderr=logfile,
+                        timeout=45,
+                    )
+                if os.environ.get("WINE_TRANS_SCAN", "0") not in ("", "0"):
+                    subprocess.run(
+                        [str(self.wine), str(self._frameprobe_exe), "-4"],
+                        cwd=str(staging),
+                        env={
+                            **os.environ,
+                            "DISPLAY": disp,
+                            "WINEPREFIX": str(self.wineprefix),
+                            "WINEDEBUG": "-all",
+                            "WAYLAND_DISPLAY": "",
+                        },
+                        stdout=logfile,
+                        stderr=logfile,
+                        timeout=45,
+                    )
+                if os.environ.get("WINE_PALETTE_SCAN", "0") not in ("", "0"):
+                    subprocess.run(
+                        [str(self.wine), str(self._frameprobe_exe), "-5"],
+                        cwd=str(staging),
+                        env={
+                            **os.environ,
+                            "DISPLAY": disp,
+                            "WINEPREFIX": str(self.wineprefix),
+                            "WINEDEBUG": "-all",
+                            "WAYLAND_DISPLAY": "",
+                        },
+                        stdout=logfile,
+                        stderr=logfile,
+                        timeout=45,
+                    )
+                if os.environ.get("WINE_SCREEN_SCAN", "0") not in ("", "0"):
+                    subprocess.run(
+                        [str(self.wine), str(self._frameprobe_exe), "-6"],
+                        cwd=str(staging),
+                        env={
+                            **os.environ,
+                            "DISPLAY": disp,
+                            "WINEPREFIX": str(self.wineprefix),
+                            "WINEDEBUG": "-all",
+                            "WAYLAND_DISPLAY": "",
+                        },
+                        stdout=logfile,
+                        stderr=logfile,
+                        timeout=45,
+                    )
+                if os.environ.get("WINE_SIDEBAR_SCAN", "0") not in ("", "0"):
+                    subprocess.run(
+                        [str(self.wine), str(self._frameprobe_exe), "-7"],
+                        cwd=str(staging),
+                        env={
+                            **os.environ,
+                            "DISPLAY": disp,
+                            "WINEPREFIX": str(self.wineprefix),
+                            "WINEDEBUG": "-all",
+                            "WAYLAND_DISPLAY": "",
+                        },
+                        stdout=logfile,
+                        stderr=logfile,
+                        timeout=45,
+                    )
+            else:
+                min_wait = float(os.environ.get("WINE_CAPTURE_MIN_WAIT", "3.0"))
+                frame_wait = max(frame / 15.0, min_wait)
+                time.sleep(frame_wait)
             output_dir.mkdir(parents=True, exist_ok=True)
             cap_path = output_dir / "capture.png"
             capture_root(disp, str(cap_path))

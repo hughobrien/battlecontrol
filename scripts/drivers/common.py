@@ -47,6 +47,16 @@ def wait_for_window(disp: str, title: str, timeout=30) -> bool:
     return False
 
 
+def center_mouse(disp: str, width: int, height: int):
+    """Move the X pointer away from scroll edges before timed captures."""
+    subprocess.run(
+        ["xdotool", "mousemove", str(width // 2), str(height // 2)],
+        env={**os.environ, "DISPLAY": disp},
+        capture_output=True,
+        timeout=5,
+    )
+
+
 def capture_root(disp: str, output_path: str):
     """Capture the X root window via ImageMagick `import`. Hard-fails on error.
 
@@ -86,6 +96,27 @@ def screenshot_ok(path: str) -> bool:
     except Exception:
         pass
     return sz >= 5000
+
+
+def tactical_nonblack_fraction(path: str) -> float:
+    """Return non-black fraction in the RA tactical viewport.
+
+    The top UI/sidebar can be populated while the gameplay viewport is still
+    black during mission entry.  Parity captures should not accept that as a
+    valid gameplay frame.
+    """
+    from PIL import Image
+
+    im = Image.open(path).convert("RGB")
+    crop = im.crop((0, 16, 480, 400))
+    pixels = crop.getdata()
+    total = 0
+    nonblack = 0
+    for pixel in pixels:
+        total += 1
+        if pixel != (0, 0, 0):
+            nonblack += 1
+    return nonblack / total if total else 0.0
 
 
 def kill_process_tree(proc: subprocess.Popen):

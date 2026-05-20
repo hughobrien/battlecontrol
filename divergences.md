@@ -33,6 +33,21 @@ Latest useful captures:
 - Allied L3 Wine FPS sweep:
   - wall-clock frame 10, 5/15/30 FPS: `/tmp/battlecontrol/2026-05-20T07-30-47-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-31-28-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-32-09-mission-allied-l3`
   - process-memory counter probe at `0x0068dea0` target 29/33: `/tmp/battlecontrol/2026-05-20T07-46-26-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-47-07-mission-allied-l3`
+- Multi-level synchronized rerun after Wine actual-frame reporting:
+  - Allied L1: `/tmp/battlecontrol/2026-05-20T21-34-18-mission-allied-l1`, `SSIM=0.9969`
+  - Allied L2: `/tmp/battlecontrol/2026-05-20T21-35-15-mission-allied-l2`, `SSIM=0.9984`
+  - Allied L3: `/tmp/battlecontrol/2026-05-20T21-36-13-mission-allied-l3`, Wine actual frame `1`, `SSIM=0.9443`
+  - Allied L4: `/tmp/battlecontrol/2026-05-20T21-36-56-mission-allied-l4`, Wine actual frame `1`, `SSIM=0.9805`
+  - Allied L5: `/tmp/battlecontrol/2026-05-20T21-37-41-mission-allied-l5`, Wine actual frame `1`, `SSIM=0.9432`
+  - Soviet L1: `/tmp/battlecontrol/2026-05-20T21-38-25-mission-soviet-l1`, Wine actual frame `1`, `SSIM=0.9826`
+  - Soviet L2: `/tmp/battlecontrol/2026-05-20T21-39-08-mission-soviet-l2`, Wine actual frame `1`, `SSIM=0.9509`
+  - Soviet L4: `/tmp/battlecontrol/2026-05-20T21-40-36-mission-soviet-l4`, Wine actual frame `1`, `SSIM=0.9743`
+  - Soviet L5: `/tmp/battlecontrol/2026-05-20T21-41-20-mission-soviet-l5`, Wine actual frame `1`, `SSIM=0.9862`
+
+Soviet L3 is currently excluded from the passing set because the Wine capture
+path often enters the top-scores screen instead of gameplay. The harness now
+rejects those captures by checking tactical-viewport fill, rather than allowing
+a black Wine frame and black native frame to pass as a false positive.
 
 ## Debug Execution Plan
 
@@ -95,6 +110,8 @@ the right state being drawn through the wrong dirty/redraw path.
 | D13 | Wine shroud/fog appears to have four grades between revealed and hidden, native closer to three. | Fixed | Porting regression in the portable `Build_Fading_Table()` replacement: it allowed fixed/control palette slots `0..15` as nearest fade targets, so shroud pixels from `SHADOW.SHP` source colors 13/14 over terrain color 79 collapsed to black index 0/12. RA95's table maps those cases to terrain-shadow index 16. Native now preserves transparent black and searches the game-art palette range starting at 16. |
 | D14 | Native has native-only saturated green/purple/cyan/red pixels near the infantry cluster; Wine is clean. | Fixed | The saturated cluster was mapped ore (`OVERLAY_GOLD2`, `OverlayData=3`) in cell `5972`, which native drew even though the cell was mapped but not visible. The later shroud mask has transparent holes, so ore colors leaked through. Native now skips overlays for mapped-but-not-visible cells, matching Wine at the reported green/purple pixels. |
 
+| D15 | Multi-level Soviet captures showed large native-only colored/noisy blocks and over-revealed terrain. | Mostly capture artifact | The bad Soviet L1/L2/L4/L5 samples compared Wine actual gameplay frame `1` to native frame `60` because the RA95 process-memory counter at `0x006544c8` stalls at `1` for those missions. When native is synced to Wine's reported actual frame, those missions pass. The remaining Soviet L3 issue is Wine capture entry falling into top scores, not a renderer diff. |
+
 Remaining saturated samples at `(360..361,109..114)` are a different issue:
 native traces them to a 50x39 `SHAPE_FADING|SHAPE_GHOST` remapped object draw,
 consistent with unit/animation-state drift rather than the mapped-ore leak.
@@ -120,6 +137,31 @@ consistent with unit/animation-state drift rather than the mapped-ore leak.
    layer. This was a clipped-stamp viewport-origin bug.
 
 ## Multi-Level Sampling Notes
+
+### Frame-Probe Capture Artifact
+
+The biggest new lead from sampling Allied/Soviet L1-L5 is that many of the
+reported "rendering" failures were bad pairings. The Wine frame probe originally
+had a stable-nonzero escape for missions where `0x006544c8` never reached the
+requested target frame. That let the driver capture a Wine image at actual
+counter value `1`, while the native driver still captured frame `60`.
+
+This mismatch exactly explains the noisy native-only blocks seen in failed
+Soviet samples: native units, shroud, hover text, and remapped/ghosted object
+draws had advanced dozens of frames while Wine had not. Soviet L2 proves the
+point directly:
+
+- Bad pair: `/tmp/battlecontrol/2026-05-20T21-17-34-mission-soviet-l2`,
+  Wine actual `1` vs native `60`, `SSIM=0.5504`.
+- Same Wine image against native frame `1`: `SSIM=0.9656`.
+- Harness-synced rerun after actual-frame reporting:
+  `/tmp/battlecontrol/2026-05-20T21-22-31-mission-soviet-l2`, `SSIM=0.9516`.
+
+The capture harness now writes `wine-frame.txt`, records `effective_frames` in
+the manifest, and can sync native to Wine's actual frame with
+`RA_SYNC_NATIVE_TO_WINE_FRAME=1`. It also rejects Wine captures whose tactical
+viewport is effectively blank; this catches the Soviet L3 top-scores/main-menu
+failure that previously looked like a black-but-passing screenshot.
 
 ### Allied L2 Exact Frame
 

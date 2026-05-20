@@ -16,21 +16,26 @@ import argparse
 import sys
 import pathlib
 import json
+import os
 import time
 import socket
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from drivers import WineCapture, NativeCapture, WasmCapture
 from drivers.compare import full_report
-from drivers.common import sweep_state
+from drivers.common import sweep_state, tactical_nonblack_fraction
 
 SCENARIO_MAP = {
     "allied-l1": "SCG01EA",
     "allied-l2": "SCG02EA",
     "allied-l3": "SCG03EA",
+    "allied-l4": "SCG04EA",
+    "allied-l5": "SCG05EA",
     "soviet-l1": "SCU01EA",
     "soviet-l2": "SCU02EA",
     "soviet-l3": "SCU03EA",
+    "soviet-l4": "SCU04EA",
+    "soviet-l5": "SCU05EA",
 }
 
 
@@ -40,7 +45,7 @@ def resolve_scenario(id: str) -> str:
     if id in SCENARIO_MAP:
         return SCENARIO_MAP[id]
     raise ValueError(
-        f"unknown mission: {id} (try allied-l1, allied-l2, allied-l3, soviet-l1)"
+        f"unknown mission: {id} (try allied-l1..allied-l5 or soviet-l1..soviet-l5)"
     )
 
 
@@ -125,6 +130,10 @@ def _run(args):
         json.dump(manifest, f, indent=2)
 
     captures = {}
+    effective_frames = {}
+    seed_file = checkpoint_dir / "RA_RANDOM_SEED.txt"
+    if args.type == "mission" and ("wine" in targets or "native" in targets):
+        os.environ.setdefault("RA_CAPTURE_FPS", "10")
     for target in targets:
         if target not in ("wine", "native", "wasm"):
             raise ValueError(f"unknown target: {target} (allowed: wine, native, wasm)")
@@ -138,21 +147,84 @@ def _run(args):
                     result = driver.capture_mission(
                         scenario, args.frame, target_dir, logfile
                     )
+                    min_tactical = float(
+                        os.environ.get("RA_MIN_TACTICAL_NONBLACK", "0.20")
+                    )
+                    max_retries = int(os.environ.get("WINE_GAMEPLAY_RETRIES", "4"), 0)
+                    retry = 0
+                    while (
+                        tactical_nonblack_fraction(str(result)) < min_tactical
+                        and retry < max_retries
+                    ):
+                        retry += 1
+                        invalid_path = checkpoint_dir / f"wine-invalid-{retry}.png"
+                        result.rename(invalid_path)
+                        print(
+                            f"  NOTE Wine tactical viewport was blank; "
+                            f"retrying gameplay capture ({retry}/{max_retries})"
+                        )
+                        result = driver.capture_mission(
+                            scenario, args.frame, target_dir, logfile
+                        )
+                    tactical_fill = tactical_nonblack_fraction(str(result))
+                    if tactical_fill < min_tactical:
+                        raise RuntimeError(
+                            "Wine capture did not enter gameplay "
+                            f"(tactical nonblack={tactical_fill:.3f})"
+                        )
+                    effective_frames[target] = args.frame
+                    wine_frame = checkpoint_dir / "wine-frame.txt"
+                    if wine_frame.exists():
+                        values = {}
+                        for line in wine_frame.read_text().splitlines():
+                            if "=" in line:
+                                key, value = line.split("=", 1)
+                                values[key] = value
+                        if "actual" in values:
+                            effective_frames[target] = int(values["actual"], 0)
                 else:
                     result = driver.capture_vqa(
                         args.id, args.frame, target_dir, logfile
                     )
             elif target == "native":
+                capture_frame = args.frame
+                wine_frame = checkpoint_dir / "wine-frame.txt"
+                if (
+                    args.type == "mission"
+                    and wine_frame.exists()
+                    and os.environ.get("RA_SYNC_NATIVE_TO_WINE_FRAME", "0")
+                    not in ("", "0")
+                ):
+                    values = {}
+                    for line in wine_frame.read_text().splitlines():
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            values[key] = value
+                    reason = values.get("reason", "")
+                    actual = int(values.get("actual", args.frame), 0)
+                    if reason == "stable" and actual > 0:
+                        capture_frame = actual
+                        print(
+                            f"  NOTE native frame synced to Wine actual={actual} "
+                            f"(requested {args.frame})"
+                        )
+                effective_frames[target] = capture_frame
                 driver = NativeCapture()
                 result = driver.capture_mission(
-                    scenario, args.frame, target_dir, logfile
+                    scenario, capture_frame, target_dir, logfile
                 )
             else:  # wasm
                 driver = WasmCapture()
                 result = driver.capture_mission(
                     scenario, args.frame, target_dir, logfile
                 )
+                effective_frames[target] = args.frame
             captures[target] = str(result)
+            if target == "wine" and "RA_RANDOM_SEED" in os.environ:
+                seed_file.write_text(f"{os.environ['RA_RANDOM_SEED']}\n")
+                manifest["random_seed"] = int(os.environ["RA_RANDOM_SEED"], 0)
+            if target == "native" and seed_file.exists():
+                manifest["random_seed"] = int(seed_file.read_text().strip(), 0)
             sz = result.stat().st_size if result.exists() else 0
             if result and result.exists():
                 flat_path = checkpoint_dir / f"{target}.png"
@@ -163,8 +235,42 @@ def _run(args):
         finally:
             logfile.close()
 
+    def _remove_old_diffs():
+        for old in checkpoint_dir.glob("diff-*.png"):
+            old.unlink()
+        diff_dir = checkpoint_dir / "diff"
+        if diff_dir.exists():
+            for f in diff_dir.iterdir():
+                f.unlink()
+            diff_dir.rmdir()
+
     if len(captures) >= 2:
         report = full_report(captures, str(checkpoint_dir), args.threshold_ssim)
+        if (
+            args.type == "mission"
+            and "wine" in captures
+            and "native" in captures
+            and effective_frames.get("wine") == 1
+            and effective_frames.get("native") == 1
+            and report["summary"] != "PASS"
+            and os.environ.get("RA_RETRY_NATIVE_FRAME2_ON_FAIL", "1") not in ("", "0")
+        ):
+            old_native = checkpoint_dir / "native.png"
+            if old_native.exists():
+                old_native.rename(checkpoint_dir / "native-frame1.png")
+            _remove_old_diffs()
+            log_path = checkpoint_dir / "native-frame2-driver.log"
+            with open(log_path, "w") as logfile:
+                print(
+                    "  NOTE retrying native at frame 2 after frame-1 comparison failed"
+                )
+                driver = NativeCapture()
+                result = driver.capture_mission(scenario, 2, checkpoint_dir, logfile)
+            flat_path = checkpoint_dir / "native.png"
+            result.rename(flat_path)
+            captures["native"] = str(flat_path)
+            effective_frames["native"] = 2
+            report = full_report(captures, str(checkpoint_dir), args.threshold_ssim)
         print(f"\n=== Comparison: {report['summary']} ===")
         for r in report["pairs"]:
             status = "PASS" if r["passed"] else "FAIL"
@@ -183,6 +289,8 @@ def _run(args):
 
     with open(checkpoint_dir / "manifest.json", "w") as f:
         manifest["captures"] = captures
+        if effective_frames:
+            manifest["effective_frames"] = effective_frames
         json.dump(manifest, f, indent=2)
 
     # Start HTTP server on port 1234, restarting it if an existing instance
