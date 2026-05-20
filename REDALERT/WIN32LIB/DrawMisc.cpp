@@ -1220,6 +1220,13 @@ void __cdecl Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondat
 	unsigned char *icon_src = base + (unsigned int)iicons + icon * icon_sz;
 	unsigned char tf = (itrans != 0) ? base[(unsigned int)itrans + icon] : 0;
 	bool transparent = remap != NULL || tf != 0;
+	// The clipped stamp entry point receives a window origin plus width/height.
+	// Match the shape path by drawing window-relative coordinates into the
+	// destination window's origin.
+	x_pixel += min_x;
+	y_pixel += min_y;
+	max_x += min_x;
+	max_y += min_y;
 	// TIM-255: WINDOWHEIGHT = MapCellHeight * ICON_PIXEL_H can exceed vp height
 	// when RESFACTOR=2 and the map has >10 visible rows (each 48px). Clamp so no
 	// write escapes the pixel buffer.
