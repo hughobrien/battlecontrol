@@ -35,17 +35,18 @@ enum : unsigned short {
 };
 
 struct BlitArgs {
-    const unsigned char *remap;   // 256-byte LUT, NULL if SHAPE_FADING not set
+    const unsigned char *remap;       // 256-byte LUT, NULL if SHAPE_FADING not set
     int                  fade_count;
+    const unsigned char *ghost;       // 256 + N*256 bytes, NULL if SHAPE_GHOST not set
 };
 
 // Pop the variadic args declared after `flags`. Caller already did va_start.
 // Caller is responsible for va_end.
 inline BlitArgs decode_shape_blit_args(int flags, va_list args)
 {
-    BlitArgs out{ nullptr, 0 };
+    BlitArgs out{ nullptr, 0, nullptr };
     if (flags & BFTP_SHAPE_GHOST) {
-        (void)va_arg(args, void *);  // ghost_table — unhandled this pass
+        out.ghost = static_cast<const unsigned char *>(va_arg(args, void *));
     }
     if (flags & BFTP_SHAPE_FADING) {
         out.remap      = static_cast<const unsigned char *>(va_arg(args, void *));
@@ -59,17 +60,31 @@ inline BlitArgs decode_shape_blit_args(int flags, va_list args)
 
 // Blit one row of `dw` bytes from `src` to `dst`.
 //   trans       — true means skip colour-0 (transparent palette index)
-//   remap       — optional 256-byte LUT; if non-null, each src pixel is
-//                 substituted via remap[p] (fade_count times)
-//   fade_count  — number of LUT applications; clamp to >= 0
+//   remap       — optional 256-byte LUT (house remap or fade table); if
+//                 non-null, the post-ghost pixel is substituted via
+//                 remap[p] (fade_count times)
+//   fade_count  — number of remap applications; clamp to [0, 63]
+//   ghost       — optional ghost/translucency table (256 + N*256 bytes).
+//                 First 256 bytes: IsTranslucent[src_pixel] — 0xFF means
+//                 opaque, any other value selects a translucent LUT.
+//                 Following N*256 bytes: blend tables indexed by dst pixel.
+//                 Matches REDALERT/KEYFBUFF.ASM:1834-1857.
 inline void blit_row(unsigned char       *dst,
                      const unsigned char *src,
                      int                  dw,
                      bool                 trans,
                      const unsigned char *remap,
-                     int                  fade_count)
+                     int                  fade_count,
+                     const unsigned char *ghost)
 {
-    if (remap == nullptr || fade_count <= 0) {
+    // Cap fade_count defensively — original ASM masks with 0x3f.
+    if (fade_count < 0)  fade_count = 0;
+    if (fade_count > 63) fade_count = 63;
+    const bool do_remap = (remap != nullptr) && (fade_count > 0);
+    const bool do_ghost = (ghost != nullptr);
+
+    // Fast path: no ghost, no remap — preserves the cheap memcpy/skip-0 case.
+    if (!do_ghost && !do_remap) {
         if (trans) {
             for (int col = 0; col < dw; col++) {
                 unsigned char p = src[col];
@@ -81,13 +96,30 @@ inline void blit_row(unsigned char       *dst,
         return;
     }
 
-    // Cap fade_count defensively — original ASM masks with 0x3f.
-    if (fade_count > 63) fade_count = 63;
+    const unsigned char *ghost_is_trans = ghost;             // [0..255]
+    const unsigned char *ghost_blend    = ghost ? ghost + 256 : nullptr;
 
     for (int col = 0; col < dw; col++) {
-        unsigned char p = src[col];
-        if (trans && p == 0) continue;
-        for (int i = 0; i < fade_count; i++) p = remap[p];
+        unsigned char src_p = src[col];
+        if (trans && src_p == 0) continue;
+
+        unsigned char p;
+        if (do_ghost) {
+            unsigned char shadow_idx = ghost_is_trans[src_p];
+            if (shadow_idx == 0xFF) {
+                p = src_p;                                   // opaque
+            } else {
+                // Translucent[shadow_idx * 256 + dst_pixel]
+                p = ghost_blend[(static_cast<int>(shadow_idx) << 8) + dst[col]];
+            }
+        } else {
+            p = src_p;
+        }
+
+        if (do_remap) {
+            for (int i = 0; i < fade_count; i++) p = remap[p];
+        }
+
         dst[col] = p;
     }
 }

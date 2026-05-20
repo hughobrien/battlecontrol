@@ -1228,7 +1228,7 @@ long Buffer_Frame_To_Page(int x, int y, int w, int h,
     for (int row = 0; row < dh; row++) {
         const unsigned char *srow = pixels   + static_cast<ptrdiff_t>(sy0 + row) * w      + sx0;
         unsigned char       *drow = dst_base + static_cast<ptrdiff_t>(y   + row) * stride + x;
-        blit_row(drow, srow, dw, trans, ba.remap, ba.fade_count);
+        blit_row(drow, srow, dw, trans, ba.remap, ba.fade_count, ba.ghost);
     }
     return 1;
 }
