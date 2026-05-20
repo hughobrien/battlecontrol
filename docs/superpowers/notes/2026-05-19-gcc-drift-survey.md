@@ -40,4 +40,26 @@ GCC is used in **three** places — `packages.redalert`, `packages.tiberiandawn`
 
 ---
 
-*Survey produced by background subagent during commit `19964fd`. No code changes were made.*
+## Update — fix shipped at 527b608
+
+Applied fix sketch items 1-4. Verified `nix build .#redalert` succeeds with `clangStdenv`. Confirmed clean dev-shell rebuild via `scripts/build-native.sh` resolves `CMAKE_CXX_COMPILER` to clang++ (via the preset's `cacheVariables`, not via `$CXX`).
+
+## Separate issue surfaced during validation
+
+`nix build .#tiberiandawn` was already broken before this commit (verified by reverting and re-running). The failure:
+
+```
+CMake Error at installer/CMakeLists.txt:4 (find_package):
+  By not providing "FindSDL2_ttf.cmake" in CMAKE_MODULE_PATH this project has
+  asked CMake to find a package configuration file provided by "SDL2_ttf"
+```
+
+The TD nix derivation doesn't include `SDL2_ttf` in `buildInputs` or pass `-DSDL2_ttf_DIR=...` to cmake, but the top-level CMakeLists requires SDL2_ttf via `installer/CMakeLists.txt`. RA's derivation has both the buildInput and the cmakeFlag; TD's is missing them.
+
+**Fix sketch (separate from clang standardisation):**
+- Add `SDL2_ttf` to `packages.tiberiandawn.buildInputs` (matching RA at `flake.nix:67`).
+- Add `-DSDL2_ttf_DIR=${pkgs.SDL2_ttf}/lib/cmake/SDL2_ttf` to the cmake invocation in `tiberiandawn.buildPhase`.
+
+Dev-shell builds (`scripts/build-native.sh td`) work fine because the dev shell has SDL2_ttf on the cmake search path automatically. Only the nix package build path is affected.
+
+*Pre-existing, not introduced by 527b608.*
