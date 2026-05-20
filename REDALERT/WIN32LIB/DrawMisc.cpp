@@ -1688,19 +1688,20 @@ void * __cdecl Build_Fading_Table(void const *palette, void const *dest, long in
 #ifndef _MSC_VER
 	// TIM-160: blend each palette entry toward 'color' by frac/256,
 	// find nearest match across the full 256-entry palette.
-	{
-		const unsigned char *pal = (const unsigned char*)palette;
-		unsigned char *out = const_cast<unsigned char*>((const unsigned char*)dest);
-		int tred = pal[color*3], tgrn = pal[color*3+1], tblu = pal[color*3+2];
-		for (int i = 0; i < 256; i++) {
-			int ired = pal[i*3]   + ((tred - pal[i*3])   * (int)frac >> 8);
-			int igrn = pal[i*3+1] + ((tgrn - pal[i*3+1]) * (int)frac >> 8);
-			int iblu = pal[i*3+2] + ((tblu - pal[i*3+2]) * (int)frac >> 8);
-			int best = 0x7FFFFFFF; matchcolor = (unsigned char)i;
-			for (int j = 0; j < 256; j++) {
-				int dr = pal[j*3]-ired, dg = pal[j*3+1]-igrn, db = pal[j*3+2]-iblu;
-				int d = dr*dr + dg*dg + db*db;
-				if (d < best) { best = d; matchcolor = (unsigned char)j; if (!d) break; }
+		{
+			const unsigned char *pal = (const unsigned char*)palette;
+			unsigned char *out = const_cast<unsigned char*>((const unsigned char*)dest);
+			int tred = pal[color*3], tgrn = pal[color*3+1], tblu = pal[color*3+2];
+			out[0] = 0;
+			for (int i = 1; i < 256; i++) {
+				int ired = pal[i*3]   + ((tred - pal[i*3])   * (int)frac >> 8);
+				int igrn = pal[i*3+1] + ((tgrn - pal[i*3+1]) * (int)frac >> 8);
+				int iblu = pal[i*3+2] + ((tblu - pal[i*3+2]) * (int)frac >> 8);
+				int best = 0x7FFFFFFF; matchcolor = (unsigned char)16;
+				for (int j = 16; j < 256; j++) {
+					int dr = pal[j*3]-ired, dg = pal[j*3+1]-igrn, db = pal[j*3+2]-iblu;
+					int d = dr*dr + dg*dg + db*db;
+					if (d < best) { best = d; matchcolor = (unsigned char)j; if (!d) break; }
 			}
 			out[i] = matchcolor;
 		}
