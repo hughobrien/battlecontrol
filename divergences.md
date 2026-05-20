@@ -89,6 +89,9 @@ the right state being drawn through the wrong dirty/redraw path.
 | D9 | Native tutorial message lifetime differs from Wine at later frames. | Fixed | `MessageListClass` now uses the gameplay frame clock while `GameActive`; trace showed the old native path added the message at `Frame=0` with `timeout=540` but expired it at `Frame=45` because it compared against `TickCount`. Frame-60 now has `messages=1`. |
 | D10 | Road/ground template art was fragmented or looked like the wrong subtile. | Fixed | The portable `Buffer_Draw_Stamp*` implementations skipped the original iconset logical-to-physical `Map` remap. Restoring that remap fixes Allied L1/L2 road fragmentation and the earlier “template rendering” issue. |
 | D11 | Native inactive radar panel shows static/noise where Wine shows the Allied cover plate. | Fixed | Porting regression from `84604ef`: `Get_Jammed(PlayerPtr)` was used as a replacement for disabled legacy `IsRadarJammed`, but it is true when no radar building exists. Native now only draws jam snow when a radar exists and is jammed; no-radar Allied L2 draws the cover plate like Wine. |
+| D12 | Wine has drop shadows to the right of the three control panel buttons (spanner, dollar, earth), native does not. | Active | Newly reported. This likely shares the `SHAPE_GHOST`/translucent draw path with shroud and clock/sidebar shape effects, but it has not yet been isolated to a specific shape call. |
+| D13 | Wine shroud/fog appears to have four grades between revealed and hidden, native closer to three. | Active | Newly reported. Native probe at the artifact cluster shows `SHADOW.SHP` shape 8 blending source colors 15/16 through `ShadowTrans`; RA95 memory scan found the same table mapping for the tested entries, so the next assertion is palette state or different shadow source/destination coverage. |
+| D14 | Native has native-only saturated green/purple/cyan/red pixels near the infantry cluster; Wine is clean. | Active | Confirmed in `/tmp/battlecontrol/2026-05-20T09-09-30-mission-allied-l2`: green pixels around `(279..285,79..86)` and one purple pixel at `(286,86)` with native `(168,0,164)` vs Wine `(228,216,228)`. A native shape probe shows nearby green pixels are written by `SHADOW.SHP` via `SHAPE_GHOST|SHAPE_TRANS`, not by infantry sprites. |
 
 ## Ruled Out
 
@@ -212,6 +215,18 @@ Follow-up probes:
   `TacPixelY=16`, so the native terrain layer was one top-tab offset above the
   shadow layer. A window-origin correction in `Buffer_Draw_Stamp_Clip()` raises
   the terrain layer into alignment and removes the D4 blocky fog artifact.
+- A later probe of the native-only saturated pixels found the writer is the
+  shroud shape path, not the infantry draw path. At `(279,79)`, native draws
+  `SHADOW.SHP` at `shape=264,72`, `flags=0x1040`, source pixel 16 over terrain
+  index 79, through translucent table index 0, producing palette index 137.
+  The same probe pattern covers the purple pixel at `(286,86)`, although the
+  exact final color varies between captures.
+- A Wine process-memory scan found a matching RA95 translucent-table candidate
+  at `0x00644a18`: `control[16]=0`, `control[15]=1`, and samples
+  `s16_d79=137`, `s15_d79=140`. This means the table mapping itself is not yet
+  enough to explain the saturated native pixels. The next likely axes are the
+  active palette values for those indices or whether Wine draws a different
+  shadow source/destination at the same screen coordinate.
 
 ### Allied L3
 
