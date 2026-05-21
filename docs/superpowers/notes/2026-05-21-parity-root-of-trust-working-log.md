@@ -144,8 +144,9 @@ Wine sequence experiments:
 
 ## Next Steps
 
-1. Add matching native sequence capture or a script around the existing native
-   frame trap, defaulting to 60 FPS and RA frames 50..149.
+1. Replace or supplement the native sequence wrapper with an in-process native
+   sequence dumper. The initial wrapper works but boots once per frame, so 100
+   frames would be unnecessarily slow.
 2. Run native sequence twice and verify every frame is byte-identical.
 3. Build an alignment/comparison report for Wine frame IDs `50..149` versus
    native frame IDs in the same range and nearby offsets.
@@ -184,3 +185,14 @@ Current Wine sequence root-of-trust invocation:
 python3 scripts/capture-wine-sequence.py allied-l1 \
   --clock ra --start 50 --count 100 --timeout 180
 ```
+
+Initial native sequence harness:
+
+- Script: `scripts/capture-native-sequence.py`
+- Default: Allied/native RA-clock frames start at 50, 60 FPS, fixed seed.
+- Implementation note: this first version wraps the existing native frame trap
+  and launches one native process per requested frame. It is good enough to
+  prove semantics, but too slow as the final 100-frame loop.
+- Smoke run A: `/tmp/battlecontrol/2026-05-21T23-55-09-native-sequence-allied-l1`
+- Smoke run B: `/tmp/battlecontrol/2026-05-21T23-55-39-native-sequence-allied-l1`
+- Result: frames `50..52` are complete and byte-identical across both runs.
