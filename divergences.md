@@ -175,8 +175,20 @@ Latest useful captures:
 
 Soviet L3 is currently excluded from the passing set because the Wine capture
 path often enters the top-scores screen instead of gameplay. The harness now
-rejects those captures by checking tactical-viewport fill, rather than allowing
-a black Wine frame and black native frame to pass as a false positive.
+  rejects those captures by checking tactical-viewport fill, rather than allowing
+  a black Wine frame and black native frame to pass as a false positive.
+- D15/Soviet L1 Wine harness root cause, 2026-05-21:
+  the Wine `ra-game-in-focus-patch.py` had misidentified `0x0066b6b8` as
+  `GameInFocus`, but RA95's own queue dispatch uses that byte as
+  `Session.Type`. The patch was repeatedly writing `1` there, turning campaign
+  captures into `GAME_MODEM`; that explains the frameinfo crash at
+  `0x00534273`, the top-scores screen, and `Frame` sticking at `0/1`.
+  Default Wine mission capture now skips that corrupt focus pin and relies on
+  the existing focus-spin-loop skip plus the autostart hardening. Clean
+  validation: `/tmp/battlecontrol/2026-05-21T18-10-22-mission-soviet-l1`
+  (`frame=120`, `SSIM=0.9812`) and
+  `/tmp/battlecontrol/2026-05-21T18-15-56-mission-soviet-l1` (`frame=500`,
+  `SSIM=0.9777`).
 
 ## Debug Execution Plan
 
