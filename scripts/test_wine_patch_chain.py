@@ -2,11 +2,12 @@
 """Tests for Wine RA95 unified patcher command selection."""
 
 import os
+import tempfile
 import unittest
 from unittest import mock
 
 from drivers import wine
-from drivers.wine import WineCapture, mission_patch_command
+from drivers.wine import WineCapture, base_patch_command, mission_patch_command
 
 
 class WinePatchCommandTest(unittest.TestCase):
@@ -40,10 +41,43 @@ class WinePatchCommandTest(unittest.TestCase):
         self.assertIn("--scenario", command)
         self.assertIn("SCU01EA.INI", command)
         self.assertIn("--manifest", command)
-        self.assertIn("wine-patches.json", command)
+        self.assertIn(str(wine.pathlib.Path("wine-patches.json").resolve()), command)
         self.assertIn("--no-seed", command)
         self.assertNotIn("--diagnostic", command)
         self.assertNotIn("--allow-diagnostic", command)
+
+    def test_mission_patch_command_resolves_relative_manifest_path(self):
+        command = mission_patch_command(
+            exe="RA95.EXE",
+            scenario="SCU01EA.INI",
+            manifest_path=wine.pathlib.Path("relative.json"),
+        )
+
+        manifest_index = command.index("--manifest") + 1
+        self.assertEqual(
+            command[manifest_index],
+            str(wine.pathlib.Path("relative.json").resolve()),
+        )
+
+    def test_base_patch_command_uses_unified_base_mode(self):
+        command = base_patch_command(
+            exe="RA95.EXE",
+            manifest_path=wine.pathlib.Path("relative.json"),
+        )
+
+        self.assertEqual(
+            command[:4],
+            ["python3", "scripts/ra/patch_ra95.py", "base", "RA95.EXE"],
+        )
+        self.assertNotIn("mission", command)
+        self.assertNotIn("--scenario", command)
+        self.assertNotIn("--seed", command)
+        self.assertNotIn("--no-seed", command)
+        manifest_index = command.index("--manifest") + 1
+        self.assertEqual(
+            command[manifest_index],
+            str(wine.pathlib.Path("relative.json").resolve()),
+        )
 
     def test_passes_random_seed_as_hex(self):
         command = mission_patch_command(
@@ -117,6 +151,37 @@ class WinePatchCommandTest(unittest.TestCase):
         message = str(raised.exception)
         self.assertIn("STDOUT:\nstdout details", message)
         self.assertIn("STDERR:\nstderr details", message)
+
+    def test_patch_chain_uses_base_mode_without_scenario(self):
+        capture = WineCapture.__new__(WineCapture)
+        capture.scripts_dir = wine.pathlib.Path("scripts")
+        capture.random_seed = 0x1EED5EED
+
+        result = mock.Mock()
+        result.returncode = 0
+        result.stdout = ""
+        result.stderr = ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = wine.pathlib.Path(tmp) / "RA95.EXE"
+            exe.write_bytes(b"")
+            with mock.patch.object(wine.subprocess, "run", return_value=result) as run:
+                capture._patch_chain(
+                    exe,
+                    scenario=None,
+                    manifest_path=wine.pathlib.Path("relative.json"),
+                )
+            self.assertFalse((exe.parent / "RA_RANDOM_SEED.txt").exists())
+
+        command = run.call_args.args[0]
+        self.assertEqual(
+            command[:4],
+            ["python3", "scripts/ra/patch_ra95.py", "base", str(exe)],
+        )
+        self.assertNotIn("mission", command)
+        self.assertNotIn("--scenario", command)
+        self.assertNotIn("--seed", command)
+        self.assertNotIn("--no-seed", command)
 
 
 if __name__ == "__main__":

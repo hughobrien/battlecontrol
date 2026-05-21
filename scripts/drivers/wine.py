@@ -96,16 +96,43 @@ def _cd_label_mode(scenario: str | None) -> str:
     return "cd2" if _scenario_side(scenario) == "soviet" else "cd1"
 
 
+def _manifest_arg(path: pathlib.Path | str | None) -> str | None:
+    if path is None:
+        return None
+    return str(pathlib.Path(path).resolve())
+
+
+def base_patch_command(
+    *,
+    exe: pathlib.Path | str,
+    manifest_path: pathlib.Path | str | None,
+) -> list[str]:
+    """Return the unified RA95 base patcher command, run from repo root."""
+    command = [
+        "python3",
+        "scripts/ra/patch_ra95.py",
+        "base",
+        str(exe),
+    ]
+    manifest = _manifest_arg(manifest_path)
+    if manifest is not None:
+        command.extend(["--manifest", manifest])
+    return command
+
+
 def mission_patch_command(
     *,
     exe: pathlib.Path | str,
     scenario: str | None,
-    manifest: pathlib.Path | str | None,
+    manifest: pathlib.Path | str | None = None,
+    manifest_path: pathlib.Path | str | None = None,
     skip_vqa: bool = True,
     autostart: bool = True,
     random_seed: int | None = None,
 ) -> list[str]:
     """Return the unified RA95 mission patcher command, run from repo root."""
+    if manifest is not None and manifest_path is not None:
+        raise ValueError("pass either manifest or manifest_path, not both")
     if not autostart:
         raise ValueError("Wine mission capture requires autostart")
     if not scenario:
@@ -119,8 +146,11 @@ def mission_patch_command(
         "--scenario",
         scenario,
     ]
-    if manifest is not None:
-        command.extend(["--manifest", str(manifest)])
+    manifest_arg = _manifest_arg(
+        manifest_path if manifest_path is not None else manifest
+    )
+    if manifest_arg is not None:
+        command.extend(["--manifest", manifest_arg])
     if random_seed is None:
         command.append("--no-seed")
     else:
@@ -563,14 +593,17 @@ class WineCapture:
         manifest_path: pathlib.Path | None = None,
     ):
         del manifest
-        command = mission_patch_command(
-            exe=exe,
-            scenario=scenario,
-            manifest=manifest_path,
-            skip_vqa=skip_vqa,
-            autostart=autostart,
-            random_seed=self.random_seed,
-        )
+        if scenario is None:
+            command = base_patch_command(exe=exe, manifest_path=manifest_path)
+        else:
+            command = mission_patch_command(
+                exe=exe,
+                scenario=scenario,
+                manifest_path=manifest_path,
+                skip_vqa=skip_vqa,
+                autostart=autostart,
+                random_seed=self.random_seed,
+            )
         r = subprocess.run(
             command,
             cwd=self.scripts_dir.parent,
@@ -583,7 +616,7 @@ class WineCapture:
                 "patch_ra95.py mission failed "
                 f"(rc={r.returncode})\nSTDOUT:\n{r.stdout}\nSTDERR:\n{r.stderr}"
             )
-        if self.random_seed is not None:
+        if scenario is not None and self.random_seed is not None:
             (exe.parent / "RA_RANDOM_SEED.txt").write_text(f"{self.random_seed}\n")
 
     def _patch_cd_label(
