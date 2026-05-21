@@ -96,25 +96,6 @@ def _cd_label_mode(scenario: str | None) -> str:
     return "cd2" if _scenario_side(scenario) == "soviet" else "cd1"
 
 
-def mission_patch_scripts(skip_vqa=True, scenario=None, autostart=True) -> list[str]:
-    """Return the RA95 patch scripts used for Wine mission capture."""
-    patches = [
-        "ra/ra-focus-skip-patch.py",
-        "ra/ra-game-in-focus-patch.py",
-    ]
-    if skip_vqa:
-        patches.append("ra/ra-vqa-skip-patch.py")
-        if os.environ.get("WINE_BRIEFING_SKIP_PATCH", "1") not in ("", "0"):
-            patches.append("ra/ra-briefing-skip-patch.py")
-    if scenario:
-        patches.append("ra/ra-scenario-patch.py")
-    if autostart:
-        patches.append("ra/ra-autostart-patch.py")
-    if os.environ.get("WINE_FRAMEINFO_GUARD", "0") not in ("", "0"):
-        patches.append("ra/ra-frameinfo-send-guard-patch.py")
-    return patches
-
-
 def mission_patch_command(
     *,
     exe: pathlib.Path | str,
@@ -600,7 +581,7 @@ class WineCapture:
         if r.returncode != 0:
             raise RuntimeError(
                 "patch_ra95.py mission failed "
-                f"(rc={r.returncode}): {r.stderr or r.stdout}"
+                f"(rc={r.returncode})\nSTDOUT:\n{r.stdout}\nSTDERR:\n{r.stderr}"
             )
         if self.random_seed is not None:
             (exe.parent / "RA_RANDOM_SEED.txt").write_text(f"{self.random_seed}\n")

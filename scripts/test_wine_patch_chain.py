@@ -3,8 +3,10 @@
 
 import os
 import unittest
+from unittest import mock
 
-from drivers.wine import mission_patch_command
+from drivers import wine
+from drivers.wine import WineCapture, mission_patch_command
 
 
 class WinePatchCommandTest(unittest.TestCase):
@@ -90,6 +92,31 @@ class WinePatchCommandTest(unittest.TestCase):
         self.assertIn("--diagnostic", command)
         self.assertIn("force-normal-queue", command)
         self.assertIn("--allow-diagnostic", command)
+
+    def test_old_patch_script_chain_helper_is_removed(self):
+        self.assertFalse(hasattr(wine, "mission_patch_scripts"))
+
+    def test_patch_failure_reports_stdout_and_stderr(self):
+        capture = WineCapture.__new__(WineCapture)
+        capture.scripts_dir = wine.pathlib.Path("scripts")
+        capture.random_seed = None
+
+        result = mock.Mock()
+        result.returncode = 1
+        result.stdout = "stdout details"
+        result.stderr = "stderr details"
+
+        with mock.patch.object(wine.subprocess, "run", return_value=result):
+            with self.assertRaises(RuntimeError) as raised:
+                capture._patch_chain(
+                    wine.pathlib.Path("RA95.EXE"),
+                    scenario="SCU01EA.INI",
+                    manifest_path=wine.pathlib.Path("wine-patches.json"),
+                )
+
+        message = str(raised.exception)
+        self.assertIn("STDOUT:\nstdout details", message)
+        self.assertIn("STDERR:\nstderr details", message)
 
 
 if __name__ == "__main__":
