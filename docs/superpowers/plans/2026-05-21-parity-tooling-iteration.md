@@ -426,7 +426,7 @@ investigation.
 **Files:**
 - Add: `scripts/port-history.py`
 
-- [ ] **Step 1: Show concise file history**
+- [x] **Step 1: Show concise file history**
 
 For each path:
 
@@ -437,7 +437,7 @@ python3 scripts/port-history.py REDALERT/MAP.CPP REDALERT/SCENARIO.CPP
 Run `git log --follow --stat -- <file>` and show commit subjects, dates, and
 changed function hints if available.
 
-- [ ] **Step 2: Highlight likely porting commits**
+- [x] **Step 2: Highlight likely porting commits**
 
 Flag commits whose subject/body includes:
 
@@ -452,7 +452,7 @@ render
 portable
 ```
 
-- [ ] **Step 3: Keep it read-only**
+- [x] **Step 3: Keep it read-only**
 
 This helper must not mutate the worktree.
 
