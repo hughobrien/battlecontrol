@@ -32,6 +32,12 @@ warning and proceeds.
 """
 
 import sys
+
+print(
+    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+    file=sys.stderr,
+)
+
 import hashlib
 import shutil
 

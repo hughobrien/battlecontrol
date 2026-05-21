@@ -13,6 +13,11 @@ import hashlib
 import shutil
 import sys
 
+print(
+    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+    file=sys.stderr,
+)
+
 
 CALL_VA = 0x00542E96
 EXPECTED = bytes.fromhex("e8a1110000")

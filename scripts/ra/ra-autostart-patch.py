@@ -49,6 +49,11 @@ import os
 import shutil
 import sys
 
+print(
+    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+    file=sys.stderr,
+)
+
 
 # Core patches: (VA, expected_bytes, replacement_bytes)
 # Each modifies one decision point in Select_Game().

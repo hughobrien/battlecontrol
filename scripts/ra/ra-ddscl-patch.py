@@ -29,6 +29,12 @@ Expected input SHA-256 (NoCD-patched RA95.EXE, see scripts/ra/ra-nocd-patch.py):
 """
 
 import sys
+
+print(
+    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+    file=sys.stderr,
+)
+
 import hashlib
 import shutil
 

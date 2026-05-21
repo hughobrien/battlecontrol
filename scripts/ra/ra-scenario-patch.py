@@ -28,6 +28,11 @@ import os
 import shutil
 import sys
 
+print(
+    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+    file=sys.stderr,
+)
+
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
