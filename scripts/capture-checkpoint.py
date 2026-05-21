@@ -26,7 +26,13 @@ import socket
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from drivers import WineCapture, NativeCapture, WasmCapture
 from drivers.compare import full_report
-from drivers.common import sweep_state, tactical_nonblack_fraction
+from drivers.common import (
+    check_tmp_free_space,
+    PreflightError,
+    remove_known_safe_artifacts,
+    require_capture_tools,
+    tactical_nonblack_fraction,
+)
 
 SCENARIO_MAP = {
     "allied-l1": "SCG01EA",
@@ -139,17 +145,22 @@ def main():
 
     try:
         return _run(args)
-    finally:
-        # Backstop cleanup: per-driver _cleanup handles the happy path, but
-        # an exception above (e.g. driver init failure) skips it. sweep_state
-        # is idempotent and only nukes per-run artefacts we know we own.
-        sweep_state(verbose=False)
+    except PreflightError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
 
 
 def _run(args):
     targets = args.targets.split(",")
     if "all" in targets:
         targets = ["wine", "native", "wasm"]
+    for target in targets:
+        if target not in ("wine", "native", "wasm"):
+            raise ValueError(f"unknown target: {target} (allowed: wine, native, wasm)")
+
+    remove_known_safe_artifacts()
+    check_tmp_free_space("/tmp")
+    require_capture_tools(targets)
 
     output_root = pathlib.Path(args.output)
     manifest = {
@@ -231,8 +242,6 @@ def _run(args):
     if args.type == "mission" and ("wine" in targets or "native" in targets):
         os.environ.setdefault("RA_CAPTURE_FPS", "10")
     for target in targets:
-        if target not in ("wine", "native", "wasm"):
-            raise ValueError(f"unknown target: {target} (allowed: wine, native, wasm)")
         target_dir = checkpoint_dir
         log_path = checkpoint_dir / f"{target}-driver.log"
         logfile = open(log_path, "w")
@@ -464,4 +473,4 @@ def _run(args):
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

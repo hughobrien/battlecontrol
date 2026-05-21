@@ -2,6 +2,7 @@ import subprocess
 import time
 import os
 import signal
+import shutil
 from pathlib import Path
 
 
@@ -25,6 +26,8 @@ def pick_free_display() -> str:
 def start_xvfb(
     disp: str, width: int, height: int, depth: int = 24, logfile=None
 ) -> subprocess.Popen:
+    if shutil.which("Xvfb") is None:
+        raise PreflightError(_missing_tool_message("Xvfb"))
     p = subprocess.Popen(
         ["Xvfb", disp, "-screen", "0", f"{width}x{height}x{depth}", "-ac"],
         stderr=logfile,
@@ -36,6 +39,8 @@ def start_xvfb(
 
 
 def start_openbox(disp: str, logfile=None) -> subprocess.Popen:
+    if shutil.which("openbox") is None:
+        raise PreflightError(_missing_tool_message("openbox"))
     p = subprocess.Popen(
         ["openbox"], env={**os.environ, "DISPLAY": disp}, stderr=logfile
     )
@@ -76,6 +81,9 @@ def capture_root(disp: str, output_path: str):
     needed. Use ImageMagick rather than ffmpeg x11grab because the headless
     ffmpeg build on this system lacks xcb/xlib support.
     """
+    check_tmp_free_space("/tmp")
+    if shutil.which("import") is None:
+        raise PreflightError(_missing_tool_message("import"))
     r = subprocess.run(
         ["import", "-window", "root", output_path],
         env={**os.environ, "DISPLAY": disp},
@@ -217,6 +225,102 @@ _CACHE_DIR = os.path.expanduser("~/.cache/battlecontrol")
 _SWEEP_PATTERNS = ("wine-prefix-*", "wine-capture-*")
 _SWEEP_DISPLAY_RANGE = range(92, 99)
 _WINE_AUDIO_CAPTURE = Path("/tmp/wine-audio.raw")
+_DEFAULT_MIN_TMP_FREE_MB = 1024
+
+
+class PreflightError(RuntimeError):
+    """Capture setup failed before launch."""
+
+
+def _nix_shell_status() -> str:
+    value = os.environ.get("IN_NIX_SHELL")
+    return value if value else "unset"
+
+
+def _parse_min_tmp_free_mb() -> int:
+    raw = os.environ.get("RA_MIN_TMP_FREE_MB")
+    if raw is None:
+        return _DEFAULT_MIN_TMP_FREE_MB
+    try:
+        value = int(raw, 10)
+    except ValueError as exc:
+        raise PreflightError(
+            f"RA_MIN_TMP_FREE_MB must be an integer, got {raw!r}"
+        ) from exc
+    if value < 0:
+        raise PreflightError(f"RA_MIN_TMP_FREE_MB must be non-negative, got {value}")
+    return value
+
+
+def check_tmp_free_space(path: str | os.PathLike = "/tmp") -> None:
+    """Fail early if the capture temp volume is below the configured floor."""
+    min_mb = _parse_min_tmp_free_mb()
+    usage = shutil.disk_usage(path)
+    free_mb = usage.free // (1024 * 1024)
+    if free_mb < min_mb:
+        raise PreflightError(
+            f"Preflight failed: {path} has {free_mb} MiB free; need at least "
+            f"{min_mb} MiB. Free space in /tmp before capturing or lower "
+            "RA_MIN_TMP_FREE_MB for a deliberate low-space run."
+        )
+
+
+def remove_known_safe_artifacts(
+    paths: tuple[Path | str, ...] = (_WINE_AUDIO_CAPTURE,), verbose: bool = False
+) -> int:
+    """Remove stale single-file artifacts known to be safe before a capture."""
+    removed = 0
+    for path in paths:
+        artifact = Path(path)
+        try:
+            artifact.unlink()
+        except FileNotFoundError:
+            continue
+        removed += 1
+        if verbose:
+            print(f"removed file: {artifact}")
+    return removed
+
+
+def _wine_bin_preflight_error() -> str | None:
+    wine_bin = os.environ.get("WINE_BIN")
+    if not wine_bin:
+        return "WINE_BIN is unset"
+    if not os.path.isfile(wine_bin):
+        return f"WINE_BIN={wine_bin} is not a file"
+    if not os.access(wine_bin, os.X_OK):
+        return f"WINE_BIN={wine_bin} is not executable"
+    return None
+
+
+def require_capture_tools(targets) -> None:
+    """Fail early when capture tools are missing from PATH/Nix env."""
+    target_set = set(targets)
+    tools = set()
+    if target_set.intersection({"wine", "native"}):
+        tools.update(("Xvfb", "openbox", "import", "xdpyinfo", "xdotool"))
+
+    missing = sorted(tool for tool in tools if shutil.which(tool) is None)
+    wine_error = _wine_bin_preflight_error() if "wine" in target_set else None
+
+    if not missing and wine_error is None:
+        return
+
+    nix_status = _nix_shell_status()
+    if wine_error:
+        missing.append(wine_error)
+    raise PreflightError(_missing_tool_message(", ".join(missing), nix_status))
+
+
+def _missing_tool_message(tool: str, nix_status: str | None = None) -> str:
+    if nix_status is None:
+        nix_status = _nix_shell_status()
+    return (
+        "Preflight failed: missing required capture tool(s): "
+        f"{tool}. IN_NIX_SHELL={nix_status}. "
+        "Run from the Nix dev shell (`nix develop`) so capture dependencies "
+        "are on PATH."
+    )
 
 
 def _read_proc_environ(pid: int) -> dict[str, str]:
@@ -263,25 +367,19 @@ def _kill_capture_orphans(verbose: bool = False) -> int:
     return killed
 
 
-def sweep_state(verbose: bool = False) -> tuple[int, int, int]:
-    """Remove leftover per-run capture state. Returns (dirs, locks, procs).
+def sweep_state(verbose: bool = False) -> tuple[int, int, int, int]:
+    """Remove leftover per-run capture state. Returns (dirs, locks, procs, files).
 
     Always safe to call at the end of a run: only nukes per-session
     artefacts (wine-prefix-*, wine-capture-*) and our X display range's
-    lockfiles/sockets. The persistent build cache (ra-sendinput.exe) and
+    lockfiles/sockets, plus known single-file capture artefacts like
+    /tmp/wine-audio.raw. The persistent build cache (ra-sendinput.exe) and
     other users' state are untouched.
     """
     import glob
-    import shutil
 
     procs_killed = _kill_capture_orphans(verbose=verbose)
-
-    try:
-        _WINE_AUDIO_CAPTURE.unlink()
-        if verbose:
-            print(f"removed file: {_WINE_AUDIO_CAPTURE}")
-    except FileNotFoundError:
-        pass
+    files_removed = remove_known_safe_artifacts(verbose=verbose)
 
     dirs_removed = 0
     for pat in _SWEEP_PATTERNS:
@@ -302,7 +400,7 @@ def sweep_state(verbose: bool = False) -> tuple[int, int, int]:
                 print(f"removed lock: {path}")
             locks_removed += 1
 
-    return dirs_removed, locks_removed, procs_killed
+    return dirs_removed, locks_removed, procs_killed, files_removed
 
 
 def teardown_display(disp: str, *procs: subprocess.Popen):

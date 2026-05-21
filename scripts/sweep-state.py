@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Sweep leftover capture state. Manual CLI wrapper around drivers.common.sweep_state.
 
-capture-checkpoint.py already invokes sweep_state() in its finally block, so
-under normal operation you never need to run this manually. Use it after a
-SIGKILLed or crashed run that didn't reach its cleanup.
+Use this manually after a SIGKILLed or crashed run that didn't reach its cleanup,
+or call it from batch tooling before long matrix/strip capture runs.
 
 Removed: ~/.cache/battlecontrol/wine-prefix-*, wine-capture-*,
          /tmp/.X{92..98}-lock, /tmp/.X11-unix/X{92..98},
+         /tmp/wine-audio.raw,
          orphan Xvfb/openbox processes on displays :92..:98
 """
 
@@ -18,9 +18,9 @@ from drivers.common import sweep_state
 
 
 def main() -> int:
-    dirs, locks, procs = sweep_state(verbose=True)
+    dirs, locks, procs, files = sweep_state(verbose=True)
     print(
-        f"\nSwept {dirs} cache dir(s), {locks} X lock/socket(s), "
+        f"\nSwept {dirs} cache dir(s), {locks} X lock/socket(s), {files} file(s), "
         f"and {procs} process(es)."
     )
     return 0
