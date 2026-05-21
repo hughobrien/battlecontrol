@@ -191,7 +191,7 @@ many commands.
 - Add: `scripts/capture-strip.py`
 - Modify only if needed: `scripts/capture-checkpoint.py`
 
-- [ ] **Step 1: Add wrapper command**
+- [x] **Step 1: Add wrapper command**
 
 Support:
 
@@ -202,7 +202,7 @@ python3 scripts/capture-strip.py mission allied-l2 --frames 1,2,5,10,20,30,60 --
 Each frame should call `capture-checkpoint.py` with `--keep` and collect child
 session paths.
 
-- [ ] **Step 2: Produce summary JSON**
+- [x] **Step 2: Produce summary JSON**
 
 Write `strip-report.json` containing:
 
@@ -215,7 +215,7 @@ Write `strip-report.json` containing:
 }
 ```
 
-- [ ] **Step 3: Produce contact sheet**
+- [x] **Step 3: Produce contact sheet**
 
 Create one PNG contact sheet per target and one diff contact sheet if image
 tools are available. If not, emit paths and keep JSON mandatory.
