@@ -41,6 +41,22 @@ Latest useful captures:
 - Allied L3 Wine FPS sweep:
   - wall-clock frame 10, 5/15/30 FPS: `/tmp/battlecontrol/2026-05-20T07-30-47-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-31-28-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-32-09-mission-allied-l3`
   - process-memory counter probe at `0x0068dea0` target 29/33: `/tmp/battlecontrol/2026-05-20T07-46-26-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-47-07-mission-allied-l3`
+- Allied L3/L5 top-scores capture root cause, 2026-05-21:
+  the Wine driver stopped its boot timeline when it first saw gameplay, but
+  then still slept the remainder of `WINE_BOOT_SETTLE` plus a one-second
+  gameplay settle before probing/capturing. For later missions that was enough
+  wall-clock time to drift into loading/top-scores screens. The driver now
+  skips the remaining boot-settle once gameplay has been observed and defaults
+  `WINE_GAMEPLAY_SETTLE=0`.
+- Mapped Allied matrix after that tooling fix:
+  `/tmp/battlecontrol/2026-05-21T05-30-18-matrix`.
+  `allied-l2`, `allied-l3`, and `allied-l5` all pass. The command used a
+  per-mission Wine frame-address map plus native sync only for Allied L2:
+  `allied-l2=0x006544c8`, `allied-l3=0x0069720c`,
+  `allied-l5=0x0069720c`, `--sync-native-to-wine allied-l2`.
+  The `0x0069720c` value behaves like a mission-ready/progress counter for
+  Allied L3/L5 rather than a gameplay frame counter, so native must not be
+  synced to it.
 - Multi-level synchronized rerun after Wine actual-frame reporting:
   - Allied L1: `/tmp/battlecontrol/2026-05-20T21-34-18-mission-allied-l1`, `SSIM=0.9969`
   - Allied L2: `/tmp/battlecontrol/2026-05-20T21-35-15-mission-allied-l2`, `SSIM=0.9984`

@@ -161,6 +161,10 @@ def first_non_loading_state(entries: list[dict]) -> dict | None:
     return None
 
 
+def _timeline_reached_gameplay(entries: list[dict]) -> bool:
+    return any(entry.get("state") == "gameplay" for entry in entries)
+
+
 FRAME_COUNTER_CANDIDATES = [
     0x00642080,
     0x0066B68C,
@@ -1233,7 +1237,9 @@ class WineCapture:
             # patched past dialogs/VQAs; unsolicited Enter/Space can race slower
             # CD2 starts and select Top Scores from the main menu.
             elapsed = timeline_entries[-1]["t"] if timeline_entries else 0.0
-            if elapsed < boot_settle:
+            if elapsed < boot_settle and not _timeline_reached_gameplay(
+                timeline_entries
+            ):
                 time.sleep(boot_settle - elapsed)
             boot_dismiss_default = "0"
             if os.environ.get("WINE_BOOT_DISMISS", boot_dismiss_default) not in (
@@ -1292,7 +1298,7 @@ class WineCapture:
                 self._xtest_click(disp, 320, 327, logfile)
                 time.sleep(1.0)
             center_mouse(disp, 640, 400)
-            time.sleep(float(os.environ.get("WINE_GAMEPLAY_SETTLE", "1.0")))
+            time.sleep(float(os.environ.get("WINE_GAMEPLAY_SETTLE", "0.0")))
             # Wait for target frame
             if os.environ.get("WINE_FRAMEPROBE", "0") not in ("", "0"):
                 addr = os.environ.get("WINE_FRAME_ADDR", "0x006544c8")

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -97,6 +98,37 @@ def parse_targets(value: str) -> list[str]:
     if not targets:
         raise argparse.ArgumentTypeError("at least one target is required")
     return targets
+
+
+def parse_wine_frame_addrs(value: str | None) -> dict[str, str]:
+    if not value:
+        return {}
+    mapping: dict[str, str] = {}
+    for raw in value.split(","):
+        item = raw.strip()
+        if not item:
+            continue
+        if "=" not in item:
+            raise argparse.ArgumentTypeError(
+                f"invalid frame address mapping {item!r}; use mission=0xaddr"
+            )
+        mission, addr = [part.strip() for part in item.split("=", 1)]
+        if not MISSION_RE.match(mission):
+            raise argparse.ArgumentTypeError(f"invalid mission in mapping: {mission!r}")
+        try:
+            int(addr, 0)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(
+                f"invalid frame address for {mission}: {addr!r}"
+            ) from exc
+        mapping[mission] = addr
+    return mapping
+
+
+def parse_mission_set(value: str | None) -> set[str]:
+    if not value:
+        return set()
+    return set(parse_missions(value))
 
 
 def load_json(path: pathlib.Path) -> dict[str, Any]:
@@ -358,11 +390,14 @@ def run_capture(
     output_dir: pathlib.Path,
     threshold_ssim: float,
     timeout: int | None,
+    env: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     cmd = command_for(mission, frame, targets, output_dir, threshold_ssim)
     child_start_time = time.time()
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, env=env
+        )
     except subprocess.TimeoutExpired as exc:
         stdout = exc.stdout or ""
         stderr = exc.stderr or ""
@@ -378,6 +413,11 @@ def run_capture(
     )
     record = build_record(mission, frame, targets, session, result)
     record["command"] = cmd
+    if env is not None:
+        child_addr = env.get("WINE_FRAME_ADDR")
+        parent_addr = os.environ.get("WINE_FRAME_ADDR")
+        if child_addr and child_addr != parent_addr:
+            record["wine_frame_addr"] = child_addr
     return record
 
 
@@ -422,17 +462,22 @@ def write_reports(output_dir: pathlib.Path, report: dict[str, Any]) -> None:
 
 
 def result_details(row: dict[str, Any]) -> str:
+    details_prefix = []
+    if row.get("wine_frame_addr"):
+        details_prefix.append(f"wine frame addr: {row['wine_frame_addr']}")
     if row.get("classification") == "pass":
         report = row.get("report")
         if isinstance(report, dict):
             summary = report.get("summary")
             if summary:
-                return f"comparison {summary}"
-        return "capture succeeded"
+                details_prefix.append(f"comparison {summary}")
+                return "; ".join(details_prefix)
+        details_prefix.append("capture succeeded")
+        return "; ".join(details_prefix)
     failures = row.get("failures")
     if isinstance(failures, dict) and failures:
         keys = ",".join(sorted(failures))
-        details = [f"failures: `{keys}`"]
+        details = [*details_prefix, f"failures: `{keys}`"]
         wine_state = wine_failure_screen_state(failures.get("wine"))
         if wine_state:
             details.append(f"wine screen: {wine_state}")
@@ -443,7 +488,8 @@ def result_details(row: dict[str, Any]) -> str:
     stderr = str(row.get("stderr") or "").splitlines()
     stdout = str(row.get("stdout") or "").splitlines()
     text = stderr[-1] if stderr else (stdout[-1] if stdout else "")
-    return text.replace("|", "\\|")[:160]
+    details_prefix.append(text.replace("|", "\\|")[:160])
+    return "; ".join(details_prefix)
 
 
 def wine_failure_screen_state(failure: Any) -> str | None:
@@ -505,6 +551,15 @@ def run_self_test() -> int:
     assert parse_missions("soviet-l3..l1") == ["soviet-l3", "soviet-l2", "soviet-l1"]
     assert parse_frames("1,10,60") == [1, 10, 60]
     assert parse_targets("wine,native") == ["wine", "native"]
+    assert parse_wine_frame_addrs("allied-l2=0x006544c8,allied-l3=0x0069720c") == {
+        "allied-l2": "0x006544c8",
+        "allied-l3": "0x0069720c",
+    }
+    assert parse_mission_set("allied-l2,soviet-l3..l4") == {
+        "allied-l2",
+        "soviet-l3",
+        "soviet-l4",
+    }
 
     records = [
         {"classification": "pass", "mission": "allied-l1", "frame": 1},
@@ -632,6 +687,7 @@ def run_self_test() -> int:
                         "mission": "allied-l5",
                         "frame": 1,
                         "classification": "wine-top-scores",
+                        "wine_frame_addr": "0x0069720c",
                         "manifest": failure_screen_record["manifest"],
                         "failures": failure_screen_record["manifest"]["failures"],
                     },
@@ -647,6 +703,7 @@ def run_self_test() -> int:
         assert "timer_credit_tab" in text
         assert "wine screen: top-scores" in text
         assert "frame candidate: 0x0068dea0 last=33 changes=0 reaches=0" in text
+        assert "wine frame addr: 0x0069720c" in text
     return 0
 
 
@@ -667,6 +724,21 @@ def main() -> int:
         type=int,
         default=None,
         help="per-capture timeout in seconds",
+    )
+    ap.add_argument(
+        "--wine-frame-addrs",
+        type=parse_wine_frame_addrs,
+        default={},
+        help=(
+            "comma-separated per-mission Wine frame probe addresses, "
+            "e.g. allied-l2=0x006544c8"
+        ),
+    )
+    ap.add_argument(
+        "--sync-native-to-wine",
+        type=parse_mission_set,
+        default=set(),
+        help="missions/ranges where native should capture Wine's reported actual frame",
     )
     ap.add_argument(
         "--dry-run",
@@ -716,7 +788,23 @@ def main() -> int:
                         args.threshold_ssim,
                     ),
                 }
+                if mission in args.wine_frame_addrs:
+                    record["wine_frame_addr"] = args.wine_frame_addrs[mission]
             else:
+                env = None
+                if mission in args.wine_frame_addrs:
+                    env = {
+                        **os.environ,
+                        "WINE_FRAME_ADDR": args.wine_frame_addrs[mission],
+                    }
+                if mission in args.sync_native_to_wine:
+                    env = {
+                        **(env or os.environ),
+                        "RA_SYNC_NATIVE_TO_WINE_FRAME": "1",
+                    }
+                elif env is not None or args.sync_native_to_wine:
+                    env = {**(env or os.environ)}
+                    env.pop("RA_SYNC_NATIVE_TO_WINE_FRAME", None)
                 record = run_capture(
                     mission,
                     frame,
@@ -724,6 +812,7 @@ def main() -> int:
                     output_dir,
                     args.threshold_ssim,
                     args.timeout,
+                    env=env,
                 )
                 if record.get("stdout"):
                     print(str(record["stdout"]).rstrip())
