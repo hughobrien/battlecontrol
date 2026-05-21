@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ra.ra95_patches import (
+from ra.patch_ra95 import (
     ByteEdit,
     DEFAULT_RANDOM_SEED,
     PatchError,
