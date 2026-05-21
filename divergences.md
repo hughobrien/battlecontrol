@@ -74,7 +74,7 @@ Latest useful captures:
   The remaining visible diff is tactical-only: `tactical_viewport SSIM=0.9977`,
   `p99=12`, with shroud-edge clusters around screen buckets near `(312,24)`,
   `(360,216)`, `(408,48)`, `(384,216)`, and `(336,216)`. Units can be ignored;
-  the shroud-edge pattern is tracked separately as D17.
+  the shroud-edge pattern is tracked as the residual D4 blending issue.
 - Seeded D2 review capture, 2026-05-21:
   `/tmp/battlecontrol/2026-05-21T06-37-39-mission-allied-l2` was launched with
   `RA_RANDOM_SEED` unset by the caller and confirms the harness defaulted it to
@@ -82,6 +82,86 @@ Latest useful captures:
   effective frame `84`; comparison passes with `SSIM=0.9984`, `p99=4`, and the
   remaining visible differences are still tactical shroud-edge clusters rather
   than UI/timer/credit text drift.
+- D2 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-48-25-mission-allied-l2` confirms the
+  mission countdown timer remains visually aligned at a later synced frame
+  (`effective_frames=109`, `SSIM=0.9993`, `p99=0`). Any ore visual differences
+  are expected scenario/setup RNG (`GOLD01..GOLD04`) rather than D2 timer drift.
+- D3 review capture, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-56-03-mission-allied-l2` confirms the
+  top-right credit balance is exact against Wine. The credit-balance region
+  `(540,0)-(640,14)`, timer/credit tab `(480,0)-(640,14)`, and full top bar
+  `(0,0)-(640,16)` all have `changed_gt0=0`, `max=0`, `p99=0`.
+- D3 review accepted, 2026-05-21: human review confirms the top-right credit
+  balance looks good in the D3 review capture above.
+- D4/D17 merge, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-59-03-mission-allied-l2` confirms the old
+  D4 terrain/stamp offset is fixed, but human review still sees different
+  shroud/fog blending at the revealed-area boundary. This is the same residual
+  tactical shroud-edge issue formerly tracked as D17, so D17 is merged into D4
+  and D4 remains open for the blending/state difference.
+- D5 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-02-21-mission-allied-l2` has exact top
+  message/top bar regions (`changed_gt0=0`, `p99=0`), and human review confirms
+  the stale one-pixel text/crosshair remnants look resolved.
+- D6 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-08-19-mission-allied-l2` confirms the
+  Wine/native tactical camera framing matches: same road segment, infantry
+  group location, snow/tree/cliff framing, with exact sidebar/top bar regions.
+- D7 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-10-44-mission-allied-l2` confirms the
+  capture harness syncs native to Wine's effective gameplay frame
+  (`wine=89`, `native=89`) with exact timer/credit, message, and sidebar
+  regions. Remaining tactical differences are not global simulation-time drift.
+- D8 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-13-57-mission-allied-l2` confirms the
+  credit balance and timer/credit tab are exact (`changed_gt0=0`, `p99=0`), with
+  no visible credit text smearing or overprint.
+- D9 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-19-27-mission-allied-l2` confirms the
+  mission/tutorial message remains visible and exact at a synced later frame
+  (`wine=85`, `native=85`, message crop `changed_gt0=0`, `p99=0`).
+- D10 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-26-05-mission-allied-l2` confirms the
+  road/ground template art no longer shows the old wrong-subtile or fragmented
+  road appearance; human review accepts the terrain tiles as good.
+- D11 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-32-24-mission-allied-l2` confirms the
+  inactive radar/Allied cover plate and full sidebar are exact
+  (`changed_gt0=0`, `p99=0`), with no native-only static/noise.
+- D12 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-39-28-mission-allied-l2` confirms the three
+  sidebar control buttons and adjacent shadow/art area are exact
+  (`changed_gt0=0`, `p99=0`).
+- D13 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-42-28-mission-allied-l2` confirms the shroud
+  fade grade count/tonal range is correct. Human review notes a slight lower
+  shroud difference, likely scene/unit movement related, and leaves any
+  remaining edge blending under open D4.
+- D14 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-47-13-mission-allied-l2` confirms the
+  infantry cluster/nearby snow no longer has native-only saturated green,
+  purple, cyan, or corrupt pixels; remaining local differences are animation,
+  shroud, or object-state noise.
+- D15 review note, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T15-08-46-mission-soviet-l1` captures both Wine
+  and native in real Soviet L1 gameplay after the earlier top-scores/invalid
+  capture path. Human review says rendering looks good apart from a
+  gamma/brightness difference and the captures being at different stages of the
+  scenario. Wine used `0x0069720c` and reported `1178` while native captured
+  frame `50`, so D15 remains a capture synchronization/gamma follow-up rather
+  than evidence of the old colored/noisy block renderer bug.
+- D15 gamma follow-up, 2026-05-21:
+  the brightness mismatch was a bad Wine reference state, not native gamma.
+  Repeated Wine-only Soviet L1 timeline sampling with the local
+  `ra-frameinfo-send-guard-patch.py` enabled showed gameplay fading/transitioning
+  to black/loading after roughly 3-4 seconds, with stable dim palette levels
+  such as snow `(208,200,208)` or `(196,184,196)` instead of the full-bright
+  `(228,216,228)`. Disabling that guard patch (`WINE_FRAMEINFO_GUARD=0`) keeps
+  Soviet L1 in gameplay through at least 5 seconds and the palette stays
+  full-bright: `/tmp/battlecontrol/2026-05-21T15-53-16-mission-soviet-l1`.
+  The capture driver now makes the frameinfo-send guard opt-in instead of
+  applying it by default.
 - Multi-level synchronized rerun after Wine actual-frame reporting:
   - Allied L1: `/tmp/battlecontrol/2026-05-20T21-34-18-mission-allied-l1`, `SSIM=0.9969`
   - Allied L2: `/tmp/battlecontrol/2026-05-20T21-35-15-mission-allied-l2`, `SSIM=0.9984`
@@ -147,7 +227,7 @@ the right state being drawn through the wrong dirty/redraw path.
 | D1 | Native misses mission instruction text: `Clear the way for the convoy` at top left. | Fixed | `MessageListClass::Add_Message()` was forwarding to the GlyphX callback while the in-engine label list was compiled out; native now keeps the callback and restores the label list for port builds. |
 | D2 | Native misses mission countdown timer in the top bar. | Fixed | Native/WASM port now uses the Win95 high-res tab path and re-enables timer text drawing in `CreditClass::Graphic_Logic()`. |
 | D3 | Native misses credit balance in the top right. | Fixed | Same high-res tab/credit draw restoration as D2; remaining credit-value mismatch was capture timing, not missing rendering. |
-| D4 | Native shroud/fog edge is abrupt/blocky compared with Wine. | Fixed | `Buffer_Draw_Stamp_Clip()` treated clipped stamp coordinates as full-page coordinates while shape drawing treated them as window-relative. Terrain stamps were drawn 16 pixels too high relative to shadows/objects in the Allied L2 Win95 layout (`TacPixelY=16`). Adding the clip window origin to stamp coordinates and interpreting the clip args as origin plus width/height aligns terrain with the shadow/shape path. |
+| D4 | Native shroud/fog edge blending differs from Wine at revealed-area boundaries. | Open | The original D4 terrain/stamp offset is fixed: `Buffer_Draw_Stamp_Clip()` treated clipped stamp coordinates as full-page coordinates while shape drawing treated them as window-relative, drawing terrain stamps 16 pixels too high in the Allied L2 Win95 layout (`TacPixelY=16`). The remaining visible issue is the same residual tactical shroud-edge/blending difference formerly tracked as D17; D4 review capture `/tmp/battlecontrol/2026-05-21T06-59-03-mission-allied-l2` still has concentrated edge deltas in the tactical viewport while top/UI regions match. |
 | D5 | Native had stale one-pixel text/crosshair remnants. | Fixed | `Buffer_Fill_Rect` used exclusive right/bottom; original callers pass inclusive coordinates. |
 | D6 | Native initially captured wrong viewport/camera. | Fixed | `Set_Tactical_Position()` ignored its requested coordinate; Linux also needed Win95 sidebar/start-view logic. |
 | D7 | Wine/native captures are at different simulation times. | Mostly fixed for native | Native now traps after the target gameplay frame is presented. Wine still uses FPS-limited wall-clock capture, but `RA_CAPTURE_FPS=10` and deterministic seed make Allied L2 frame-60 close enough to debug rendering. |
@@ -158,10 +238,9 @@ the right state being drawn through the wrong dirty/redraw path.
 | D12 | Wine has drop shadows to the right of the three control panel buttons (spanner, dollar, earth), native does not. | Fixed | The dark pixels are ordinary `SIDE1NA.SHP` sidebar art, not button shadow effects. Native drew those pixels correctly, then `RadarClass::AI()` unconditionally flagged an inactive no-radar cover redraw and `RadarClass::Draw_It()` repainted `RadarAnim` frame 0 over the sidebar. Native now advances/flags the jammed-radar animation only when a radar exists and is actually jammed. |
 | D13 | Wine shroud/fog appears to have four grades between revealed and hidden, native closer to three. | Fixed | Porting regression in the portable `Build_Fading_Table()` replacement: it allowed fixed/control palette slots `0..15` as nearest fade targets, so shroud pixels from `SHADOW.SHP` source colors 13/14 over terrain color 79 collapsed to black index 0/12. RA95's table maps those cases to terrain-shadow index 16. Native now preserves transparent black and searches the game-art palette range starting at 16. |
 | D14 | Native has native-only saturated green/purple/cyan/red pixels near the infantry cluster; Wine is clean. | Fixed | The saturated cluster was mapped ore (`OVERLAY_GOLD2`, `OverlayData=3`) in cell `5972`, which native drew even though the cell was mapped but not visible. The later shroud mask has transparent holes, so ore colors leaked through. Native now skips overlays for mapped-but-not-visible cells, matching Wine at the reported green/purple pixels. |
-| D16 | Soviet L3 shows native-only purple pixels in snow/overlay art. | Fixed | The bad pixels were not palette conversion or shroud blending. Shape probes showed the source shape data itself contained palette index `1` because native decoded non-LCW keyframe deltas as LCW. Git history points to porting commits `6c0e967` and `7037b77`, which changed RA shape deltas to blanket LCW after the portable XOR decoder crashed. The underlying decoder was incomplete: RA's XOR-delta stream uses byte opcodes plus extended `0x80` commands, not signed 16-bit commands. Native now decodes XOR streams with the original command format and uses LCW only when `KF_LCW` is set. |
+| D16 | Soviet L3 shows native-only purple pixels in snow/overlay art. | Blocked review | The underlying native decoder bug appears fixed: shape probes showed the source shape data itself contained palette index `1` because native decoded non-LCW keyframe deltas as LCW, and native now decodes XOR streams with the original command format. However, human review rejected native-only acceptance because Wine Soviet L3 is still entering game-over/top-scores/invalid frames. D16 needs a clean Wine Soviet L3 gameplay comparison before it can be accepted. |
 
 | D15 | Multi-level Soviet captures showed large native-only colored/noisy blocks and over-revealed terrain. | Mostly capture artifact | The bad Soviet L1/L2/L4/L5 samples compared Wine actual gameplay frame `1` to native frame `60` because the RA95 process-memory counter at `0x006544c8` stalls at `1` for those missions. When native is synced to Wine's reported actual frame, those missions pass. The remaining Soviet L3 issue is Wine capture entry falling into top scores, not a renderer diff. |
-| D17 | Residual tactical shroud-edge pixels differ while D1/D2/D3 UI regions match exactly. | Open | D1 review capture `/tmp/battlecontrol/2026-05-21T06-21-06-mission-allied-l2` has exact top message/timer/credit/sidebar/radar matches, but the diff still shows tactical shroud-edge clusters. This is distinct from the fixed D4 terrain-stamp Y-offset bug: current mismatch is small (`tactical_viewport SSIM=0.9977`, `p99=12`) and should be investigated as residual shroud shape/visibility/animation-state parity, ignoring moving units. |
 
 Remaining saturated samples at `(360..361,109..114)` are a different issue:
 native traces them to a 50x39 `SHAPE_FADING|SHAPE_GHOST` remapped object draw,

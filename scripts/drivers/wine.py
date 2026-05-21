@@ -96,6 +96,25 @@ def _cd_label_mode(scenario: str | None) -> str:
     return "cd2" if _scenario_side(scenario) == "soviet" else "cd1"
 
 
+def mission_patch_scripts(skip_vqa=True, scenario=None, autostart=True) -> list[str]:
+    """Return the RA95 patch scripts used for Wine mission capture."""
+    patches = [
+        "ra/ra-focus-skip-patch.py",
+        "ra/ra-game-in-focus-patch.py",
+    ]
+    if skip_vqa:
+        patches.append("ra/ra-vqa-skip-patch.py")
+        if os.environ.get("WINE_BRIEFING_SKIP_PATCH", "1") not in ("", "0"):
+            patches.append("ra/ra-briefing-skip-patch.py")
+    if scenario:
+        patches.append("ra/ra-scenario-patch.py")
+    if autostart:
+        patches.append("ra/ra-autostart-patch.py")
+    if os.environ.get("WINE_FRAMEINFO_GUARD", "0") not in ("", "0"):
+        patches.append("ra/ra-frameinfo-send-guard-patch.py")
+    return patches
+
+
 def _timeline_strict_failure(entries: list[dict]) -> str | None:
     """Return the strict-mode failure reason for a screen timeline."""
     for entry in entries:
@@ -519,20 +538,7 @@ class WineCapture:
         if manifest is None:
             manifest = self._new_patch_manifest(exe, scenario, skip_vqa, autostart)
             self._write_patch_manifest(manifest_path, manifest)
-        patches = [
-            "ra/ra-focus-skip-patch.py",
-            "ra/ra-game-in-focus-patch.py",
-        ]
-        if skip_vqa:
-            patches.append("ra/ra-vqa-skip-patch.py")
-            if os.environ.get("WINE_BRIEFING_SKIP_PATCH", "1") not in ("", "0"):
-                patches.append("ra/ra-briefing-skip-patch.py")
-        if scenario:
-            patches.append("ra/ra-scenario-patch.py")
-        if autostart:
-            patches.append("ra/ra-autostart-patch.py")
-        if os.environ.get("WINE_FRAMEINFO_GUARD", "1") not in ("", "0"):
-            patches.append("ra/ra-frameinfo-send-guard-patch.py")
+        patches = mission_patch_scripts(skip_vqa, scenario, autostart)
         for name in patches:
             script = self.scripts_dir / name
             if not script.exists():
@@ -1429,6 +1435,7 @@ class WineCapture:
                             f"ra-frameprobe failed ({frameprobe_failure})"
                         )
                 if os.environ.get("WINE_CELL_SCAN", "0") not in ("", "0"):
+                    self._build_frameprobe()
                     subprocess.run(
                         [str(self.wine), str(self._frameprobe_exe), "-2"],
                         cwd=str(staging),
@@ -1444,6 +1451,7 @@ class WineCapture:
                         timeout=45,
                     )
                 if os.environ.get("WINE_TEMPLATE_SCAN", "0") not in ("", "0"):
+                    self._build_frameprobe()
                     subprocess.run(
                         [str(self.wine), str(self._frameprobe_exe), "-3"],
                         cwd=str(staging),
@@ -1459,6 +1467,7 @@ class WineCapture:
                         timeout=45,
                     )
                 if os.environ.get("WINE_TRANS_SCAN", "0") not in ("", "0"):
+                    self._build_frameprobe()
                     subprocess.run(
                         [str(self.wine), str(self._frameprobe_exe), "-4"],
                         cwd=str(staging),
@@ -1474,6 +1483,7 @@ class WineCapture:
                         timeout=45,
                     )
                 if os.environ.get("WINE_PALETTE_SCAN", "0") not in ("", "0"):
+                    self._build_frameprobe()
                     subprocess.run(
                         [str(self.wine), str(self._frameprobe_exe), "-5"],
                         cwd=str(staging),
@@ -1489,6 +1499,7 @@ class WineCapture:
                         timeout=45,
                     )
                 if os.environ.get("WINE_SCREEN_SCAN", "0") not in ("", "0"):
+                    self._build_frameprobe()
                     subprocess.run(
                         [str(self.wine), str(self._frameprobe_exe), "-6"],
                         cwd=str(staging),
@@ -1504,6 +1515,7 @@ class WineCapture:
                         timeout=45,
                     )
                 if os.environ.get("WINE_SIDEBAR_SCAN", "0") not in ("", "0"):
+                    self._build_frameprobe()
                     subprocess.run(
                         [str(self.wine), str(self._frameprobe_exe), "-7"],
                         cwd=str(staging),
