@@ -383,6 +383,9 @@ def _run(args):
         screen_file = checkpoint_dir / f"{target}-screen.json"
         if screen_file.exists():
             failure["screen"] = json.loads(screen_file.read_text())
+        candidates_file = checkpoint_dir / f"{target}-frame-candidates.json"
+        if candidates_file.exists():
+            failure["frame_candidates"] = json.loads(candidates_file.read_text())
         timeline = summarize_timeline(checkpoint_dir / f"{target}-screen-timeline.json")
         failure["screen_timeline"] = timeline
         manifest.setdefault("failures", {})[target] = failure

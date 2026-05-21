@@ -178,10 +178,14 @@ def collect_wine_state(manifest: dict[str, Any]) -> str | None:
     if isinstance(failures, dict):
         wine_failure = failures.get("wine")
         if isinstance(wine_failure, dict):
+            screen = wine_failure.get("screen")
+            if isinstance(screen, dict) and isinstance(screen.get("state"), str):
+                state = str(screen["state"])
+                if state in WINE_STATE_GROUPS:
+                    return state
             state = timeline_last_state(wine_failure.get("screen_timeline"))
             if state:
                 return state
-            screen = wine_failure.get("screen")
             if isinstance(screen, dict) and isinstance(screen.get("state"), str):
                 return str(screen["state"])
     return None
@@ -428,11 +432,49 @@ def result_details(row: dict[str, Any]) -> str:
     failures = row.get("failures")
     if isinstance(failures, dict) and failures:
         keys = ",".join(sorted(failures))
-        return f"failures: `{keys}`"
+        details = [f"failures: `{keys}`"]
+        wine_state = wine_failure_screen_state(failures.get("wine"))
+        if wine_state:
+            details.append(f"wine screen: {wine_state}")
+        frame_candidate = wine_frame_candidate_summary(failures.get("wine"))
+        if frame_candidate:
+            details.append(frame_candidate)
+        return "; ".join(details)
     stderr = str(row.get("stderr") or "").splitlines()
     stdout = str(row.get("stdout") or "").splitlines()
     text = stderr[-1] if stderr else (stdout[-1] if stdout else "")
     return text.replace("|", "\\|")[:160]
+
+
+def wine_failure_screen_state(failure: Any) -> str | None:
+    if not isinstance(failure, dict):
+        return None
+    screen = failure.get("screen")
+    if isinstance(screen, dict) and isinstance(screen.get("state"), str):
+        return str(screen["state"])
+    state = timeline_last_state(failure.get("screen_timeline"))
+    if state:
+        return state
+    return None
+
+
+def wine_frame_candidate_summary(failure: Any) -> str | None:
+    if not isinstance(failure, dict):
+        return None
+    frame_candidates = failure.get("frame_candidates")
+    if not isinstance(frame_candidates, dict):
+        return None
+    candidates = frame_candidates.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return None
+    candidate = candidates[0]
+    if not isinstance(candidate, dict):
+        return None
+    addr = candidate.get("addr")
+    last = candidate.get("last")
+    changes = candidate.get("changes")
+    reaches = candidate.get("reaches_target")
+    return f"frame candidate: {addr} last={last} changes={changes} reaches={int(bool(reaches))}"
 
 
 def worst_region_details(row: dict[str, Any]) -> str:
@@ -523,6 +565,33 @@ def run_self_test() -> int:
         "report": {},
     }
     assert classify_result(state_record) == "wine-top-scores"
+    failure_screen_record = {
+        "returncode": 1,
+        "targets": ["wine"],
+        "manifest": {
+            "failures": {
+                "wine": {
+                    "screen_timeline": {
+                        "last_state": "gameplay",
+                        "states": ["black", "gameplay"],
+                    },
+                    "screen": {"state": "top-scores"},
+                    "frame_candidates": {
+                        "candidates": [
+                            {
+                                "addr": "0x0068dea0",
+                                "last": 33,
+                                "changes": 0,
+                                "reaches_target": False,
+                            }
+                        ]
+                    },
+                }
+            }
+        },
+        "report": {},
+    }
+    assert classify_result(failure_screen_record) == "wine-top-scores"
     region_record = {
         "report": {
             "pairs": [
@@ -559,6 +628,13 @@ def run_self_test() -> int:
                         "worst_region": extract_worst_region(region_record),
                         **region_record,
                     },
+                    {
+                        "mission": "allied-l5",
+                        "frame": 1,
+                        "classification": "wine-top-scores",
+                        "manifest": failure_screen_record["manifest"],
+                        "failures": failure_screen_record["manifest"]["failures"],
+                    },
                 ],
                 "timestamp": "self-test",
             },
@@ -569,6 +645,8 @@ def run_self_test() -> int:
         assert "comparison-failed" in text
         assert "Worst Region" in text
         assert "timer_credit_tab" in text
+        assert "wine screen: top-scores" in text
+        assert "frame candidate: 0x0068dea0 last=33 changes=0 reaches=0" in text
     return 0
 
 

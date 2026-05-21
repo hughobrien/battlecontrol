@@ -161,6 +161,55 @@ def first_non_loading_state(entries: list[dict]) -> dict | None:
     return None
 
 
+FRAME_COUNTER_CANDIDATES = [
+    0x00642080,
+    0x0066B68C,
+    0x006544C8,
+    0x00655D18,
+    0x005EC258,
+    0x0068DEA0,
+    0x0069720C,
+    0x0069C41C,
+    0x0069C468,
+    0x0069C488,
+    0x005F166C,
+    0x006D7344,
+]
+
+
+def _summarize_frame_candidate_samples(
+    samples: dict[int, list[int]], target: int
+) -> list[dict]:
+    """Summarize sampled frame-counter candidate values."""
+    summaries = []
+    for addr, values in samples.items():
+        if not values:
+            continue
+        changes = sum(1 for i in range(1, len(values)) if values[i] != values[i - 1])
+        monotonic = all(values[i] >= values[i - 1] for i in range(1, len(values)))
+        summaries.append(
+            {
+                "addr": f"0x{addr:08x}",
+                "first": values[0],
+                "last": values[-1],
+                "min": min(values),
+                "max": max(values),
+                "changes": changes,
+                "monotonic": monotonic,
+                "reaches_target": values[-1] >= target,
+            }
+        )
+    summaries.sort(
+        key=lambda row: (
+            not row["reaches_target"],
+            -int(row["changes"]),
+            -int(row["last"]),
+            row["addr"],
+        )
+    )
+    return summaries
+
+
 class WineCapture:
     """Capture screenshots from RA95.EXE under Wine.
 
@@ -924,7 +973,13 @@ class WineCapture:
         return struct.unpack("<I", data)[0]
 
     def _wait_proc_frame(
-        self, staging: pathlib.Path, frame: int, addr_text: str, logfile, pid_hint=None
+        self,
+        staging: pathlib.Path,
+        frame: int,
+        addr_text: str,
+        logfile,
+        pid_hint=None,
+        candidate_path: pathlib.Path | None = None,
     ) -> tuple[bool, int, str]:
         addr = int(addr_text, 0)
         try:
@@ -984,7 +1039,43 @@ class WineCapture:
             f"wine-driver: proc-frameprobe timeout last={value} target={target}\n"
         )
         logfile.flush()
+        if candidate_path is not None:
+            self._write_proc_frame_candidate_scan(pid, target, candidate_path, logfile)
         return (False, value, "timeout")
+
+    def _write_proc_frame_candidate_scan(
+        self, pid: int, target: int, path: pathlib.Path, logfile
+    ) -> None:
+        polls = int(os.environ.get("WINE_FRAMEPROBE_SCAN_POLLS", "60"), 0)
+        interval = float(os.environ.get("WINE_FRAMEPROBE_SCAN_INTERVAL", "0.02"))
+        polls = max(1, polls)
+        interval = max(0.0, interval)
+        samples = {addr: [] for addr in FRAME_COUNTER_CANDIDATES}
+        for _ in range(polls):
+            for addr in FRAME_COUNTER_CANDIDATES:
+                try:
+                    samples[addr].append(self._read_proc_dword(pid, addr))
+                except OSError:
+                    continue
+            if interval:
+                time.sleep(interval)
+        report = {
+            "model": "ra-frame-candidates-v1",
+            "pid": pid,
+            "target": target,
+            "polls": polls,
+            "interval": interval,
+            "candidates": _summarize_frame_candidate_samples(samples, target),
+        }
+        path.write_text(json.dumps(report, indent=2) + "\n")
+        logfile.write(f"wine-driver: frame candidate scan={path}\n")
+        for row in report["candidates"][:5]:
+            logfile.write(
+                "wine-driver: frame candidate "
+                f"{row['addr']} first={row['first']} last={row['last']} "
+                f"changes={row['changes']} reaches={int(row['reaches_target'])}\n"
+            )
+        logfile.flush()
 
     def _note_failure_patch_manifest(
         self, output_dir: pathlib.Path, logfile=None
@@ -1208,7 +1299,12 @@ class WineCapture:
                 if os.environ.get("WINE_FRAMEPROBE_BACKEND", "proc") == "proc":
                     try:
                         probe_ok, actual_frame, frame_reason = self._wait_proc_frame(
-                            staging, frame, addr, logfile, wine_proc.pid
+                            staging,
+                            frame,
+                            addr,
+                            logfile,
+                            wine_proc.pid,
+                            output_dir / "wine-frame-candidates.json",
                         )
                     except Exception as exc:
                         probe_ok = False
