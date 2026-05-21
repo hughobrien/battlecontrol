@@ -37,10 +37,10 @@ Six patches to Select_Game() in the RA95.EXE binary:
      points; setting it makes RA95 follow the same install/autostart state that
      the original code was written for.
 
-Usage (apply after vqa-skip + cdlabel + game-in-focus):
-  python3 scripts/ra-autostart-patch.py RA95.EXE
+This standalone script is deprecated. Normal capture should use the unified
+mission patcher instead:
 
-Must run AFTER all other patches (vqa-skip, game-in-focus, cdlabel).
+  python3 scripts/ra/patch_ra95.py mission RA95.EXE --scenario SCG02EA.INI
 """
 
 import argparse

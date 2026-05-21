@@ -23,12 +23,17 @@ Patch site:
 
 Expected input SHA-256 (all prior patches already applied):
   1714053226390117a44770f2809aa409df9bef2d7d96c789d4ebdf0628ecffaf
-    (.#ra-patched-exe + focus-skip + game-in-focus)
+    (legacy standalone chain state)
 
 A mismatched SHA is downgraded to a warning — this patch verifies the
 PATCH_OFFSET site signature instead, so it works on slight variants of the
 chain. The hash above is the canonical pipeline; any other value prints a
 warning and proceeds.
+
+This standalone script is deprecated. Normal capture should use the unified
+mission patcher instead:
+
+  python3 scripts/ra/patch_ra95.py mission RA95.EXE --scenario SCG02EA.INI
 """
 
 import hashlib

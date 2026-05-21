@@ -18,8 +18,10 @@ Usage:
   python3 scripts/ra-scenario-patch.py RA95.EXE SCU02EA    # Soviet M2
   python3 scripts/ra-scenario-patch.py RA95.EXE --restore
 
-Accepts a patched RA95.EXE with focus-skip + game-in-focus already
-applied (follows the patch chain order from wine-allied-l1.sh).
+This standalone script is deprecated. Normal capture should use the unified
+mission patcher instead:
+
+  python3 scripts/ra/patch_ra95.py mission RA95.EXE --scenario SCG02EA.INI
 """
 
 import argparse
