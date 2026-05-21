@@ -53,6 +53,7 @@ SCENARIO_MAP = {
 SESSION_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-(mission|vqa|title|menu)-"
 )
+DEFAULT_RA_RANDOM_SEED = "0x1eed5eed"
 
 
 def resolve_scenario(id: str) -> str:
@@ -63,6 +64,16 @@ def resolve_scenario(id: str) -> str:
     raise ValueError(
         f"unknown mission: {id} (try allied-l1..allied-l5 or soviet-l1..soviet-l5)"
     )
+
+
+def apply_default_mission_seed(capture_type: str) -> str | None:
+    if capture_type != "mission":
+        return None
+    seed = os.environ.get("RA_RANDOM_SEED")
+    if seed:
+        return seed
+    os.environ["RA_RANDOM_SEED"] = DEFAULT_RA_RANDOM_SEED
+    return DEFAULT_RA_RANDOM_SEED
 
 
 def nix_build_package(attr: str) -> str:
@@ -256,6 +267,7 @@ def _run(args):
             raise ValueError("--state-only requires --targets wine")
     if args.type == "mission" and ("wine" in targets or "native" in targets):
         os.environ.setdefault("RA_CAPTURE_FPS", "10")
+    random_seed = apply_default_mission_seed(args.type)
 
     remove_known_safe_artifacts()
     check_tmp_free_space("/tmp")
@@ -271,6 +283,8 @@ def _run(args):
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "capture_environment": capture_environment_metadata(targets),
     }
+    if random_seed is not None:
+        manifest["random_seed"] = int(random_seed, 0)
 
     if args.type == "mission":
         scenario = resolve_scenario(args.id)

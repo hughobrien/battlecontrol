@@ -2,11 +2,12 @@
 
 Reference scene: `mission allied-l2 --frame 60`.
 
-Capture determinism: parity mission captures no longer force a random seed by
-default. Stable visual comparisons should be produced by frame/state control,
-not by pinning gameplay randomness in a way that could mask later drift. The
-capture harness still defaults `RA_CAPTURE_FPS=10` so Wine's cnc-ddraw limiter
-and native's capture throttle run at the same low rate.
+Capture determinism: parity mission captures now default `RA_RANDOM_SEED` to
+`0x1eed5eed` unless the caller explicitly sets another seed. This keeps ore,
+unit stance animation, and any other RNG-consuming gameplay state from drifting
+between Wine and native while we debug rendering. The capture harness also
+defaults `RA_CAPTURE_FPS=10` so Wine's cnc-ddraw limiter and native's capture
+throttle run at the same low rate.
 
 Latest useful captures:
 
@@ -66,6 +67,21 @@ Latest useful captures:
   `screenshot_ok()` quality gate, not just low tactical non-black fill. This
   catches tiny all-white/invalid frames that previously looked "nonblack" and
   could poison native frame sync.
+- D1 review capture, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-21-06-mission-allied-l2` confirms the
+  top-left mission text itself is clean: top message bar, timer/credit tab,
+  sidebar buttons, and radar panel all compare exactly (`SSIM=1.0`, `p99=0`).
+  The remaining visible diff is tactical-only: `tactical_viewport SSIM=0.9977`,
+  `p99=12`, with shroud-edge clusters around screen buckets near `(312,24)`,
+  `(360,216)`, `(408,48)`, `(384,216)`, and `(336,216)`. Units can be ignored;
+  the shroud-edge pattern is tracked separately as D17.
+- Seeded D2 review capture, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-37-39-mission-allied-l2` was launched with
+  `RA_RANDOM_SEED` unset by the caller and confirms the harness defaulted it to
+  `0x1eed5eed` (`random_seed=518872813`). Wine and native both captured
+  effective frame `84`; comparison passes with `SSIM=0.9984`, `p99=4`, and the
+  remaining visible differences are still tactical shroud-edge clusters rather
+  than UI/timer/credit text drift.
 - Multi-level synchronized rerun after Wine actual-frame reporting:
   - Allied L1: `/tmp/battlecontrol/2026-05-20T21-34-18-mission-allied-l1`, `SSIM=0.9969`
   - Allied L2: `/tmp/battlecontrol/2026-05-20T21-35-15-mission-allied-l2`, `SSIM=0.9984`
@@ -145,6 +161,7 @@ the right state being drawn through the wrong dirty/redraw path.
 | D16 | Soviet L3 shows native-only purple pixels in snow/overlay art. | Fixed | The bad pixels were not palette conversion or shroud blending. Shape probes showed the source shape data itself contained palette index `1` because native decoded non-LCW keyframe deltas as LCW. Git history points to porting commits `6c0e967` and `7037b77`, which changed RA shape deltas to blanket LCW after the portable XOR decoder crashed. The underlying decoder was incomplete: RA's XOR-delta stream uses byte opcodes plus extended `0x80` commands, not signed 16-bit commands. Native now decodes XOR streams with the original command format and uses LCW only when `KF_LCW` is set. |
 
 | D15 | Multi-level Soviet captures showed large native-only colored/noisy blocks and over-revealed terrain. | Mostly capture artifact | The bad Soviet L1/L2/L4/L5 samples compared Wine actual gameplay frame `1` to native frame `60` because the RA95 process-memory counter at `0x006544c8` stalls at `1` for those missions. When native is synced to Wine's reported actual frame, those missions pass. The remaining Soviet L3 issue is Wine capture entry falling into top scores, not a renderer diff. |
+| D17 | Residual tactical shroud-edge pixels differ while D1/D2/D3 UI regions match exactly. | Open | D1 review capture `/tmp/battlecontrol/2026-05-21T06-21-06-mission-allied-l2` has exact top message/timer/credit/sidebar/radar matches, but the diff still shows tactical shroud-edge clusters. This is distinct from the fixed D4 terrain-stamp Y-offset bug: current mismatch is small (`tactical_viewport SSIM=0.9977`, `p99=12`) and should be investigated as residual shroud shape/visibility/animation-state parity, ignoring moving units. |
 
 Remaining saturated samples at `(360..361,109..114)` are a different issue:
 native traces them to a 50x39 `SHAPE_FADING|SHAPE_GHOST` remapped object draw,
