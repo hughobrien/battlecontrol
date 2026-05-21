@@ -231,9 +231,8 @@ void *Get_Font_Palette_Ptr(void)
 //   SHAPE_CENTER (0x0020) — anchor at shape centre.
 //   SHAPE_TRANS  (0x0040) — skip colour-0 pixels.
 //   SHAPE_FADING (0x0100) — apply 256-byte LUT (house remap or fade table).
-// Ignored (cosmetic, future pass):
-//   SHAPE_GHOST  (0x1000) — translucency blending.
 //   SHAPE_PREDATOR (0x0200) — warping/stealth effect.
+//   SHAPE_GHOST  (0x1000) — translucency blending.
 // Vararg order matches KEYFBUFF.ASM:1294-1411 (decoded in blit-helpers.h).
 long Buffer_Frame_To_Page(int x, int y, int w, int h,
                           void *src, GraphicViewPortClass &dest,
@@ -272,11 +271,12 @@ long Buffer_Frame_To_Page(int x, int y, int w, int h,
 
     unsigned char *dst_base = (unsigned char*)dest.Get_Offset();
     const bool trans = (flags & BFTP_SHAPE_TRANS) != 0;
+    const unsigned char *dst_end = dst_base + static_cast<ptrdiff_t>(vh) * stride;
 
     for (int row = 0; row < dh; row++) {
         const unsigned char *srow = pixels   + static_cast<ptrdiff_t>(sy0 + row) * w      + sx0;
         unsigned char       *drow = dst_base + static_cast<ptrdiff_t>(y   + row) * stride + x;
-        blit_row(drow, srow, dw, trans, ba.remap, ba.fade_count, ba.ghost);
+        blit_row(drow, srow, dw, trans, ba, stride, dst_base, dst_end);
     }
     return 1;
 }
