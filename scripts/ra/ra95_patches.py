@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import struct
 import sys
 from pathlib import Path
 from typing import Iterable
@@ -121,37 +122,283 @@ def patch_registry() -> dict[str, PatchSpec]:
         ),
         "cd-label": PatchSpec(
             id="cd-label",
-            purpose="Normalize embedded CD-label bytes for capture disc selection.",
+            purpose="Select effective Allied/Soviet disc label for capture.",
+            status="capture-only",
+            default_allowed=True,
+        ),
+        "focus-wait-skip": PatchSpec(
+            id="focus-wait-skip",
+            purpose="Skip Wine headless focus wait branches.",
+            status="capture-only",
+            default_allowed=True,
+            edits=(
+                ByteEdit(0x154005, bytes.fromhex("0f8455ffffff"), b"\x90" * 6, "focus wait branch 1"),
+                ByteEdit(0x15F2F1, bytes.fromhex("0f847bffffff"), b"\x90" * 6, "focus wait branch 2"),
+                ByteEdit(0x15F583, bytes.fromhex("0f847affffff"), b"\x90" * 6, "focus wait branch 3"),
+            ),
+        ),
+        "vqa-skip": PatchSpec(
+            id="vqa-skip",
+            purpose="Make Play_Movie return immediately for gameplay capture.",
+            status="capture-only",
+            default_allowed=True,
+            edits=(
+                ByteEdit(0x0A53C4, bytes.fromhex("55"), bytes.fromhex("c3"), "Play_Movie prologue -> RET"),
+            ),
+        ),
+        "briefing-skip": PatchSpec(
+            id="briefing-skip",
+            purpose="Skip text mission briefing dialog.",
             status="capture-only",
             default_allowed=True,
             edits=(
                 ByteEdit(
-                    offset=0x1BFCB7,
-                    expected=b"C",
-                    replacement=b"\x00",
-                    label="default base CD1 label first byte -> NUL",
+                    va_to_file_offset(0x00542E96),
+                    bytes.fromhex("e8a1110000"),
+                    bytes.fromhex("9090909090"),
+                    "Restate_Mission call -> NOP",
+                    va=0x00542E96,
                 ),
             ),
         ),
+        "autostart": PatchSpec(
+            id="autostart",
+            purpose="Enter the selected mission directly at Normal difficulty.",
+            status="capture-only",
+            default_allowed=True,
+            edits=(
+                ByteEdit(
+                    va_to_file_offset(0x004FD00E),
+                    bytes.fromhex("f6050c5d650004"),
+                    bytes.fromhex("800d0c5d650004"),
+                    "set Special.IsFromInstall",
+                    va=0x004FD00E,
+                ),
+                ByteEdit(
+                    va_to_file_offset(0x004FD4F5),
+                    bytes.fromhex("803db8b66600007507"),
+                    bytes.fromhex("c605b8b66600009090"),
+                    "Session.Type = GAME_NORMAL",
+                    va=0x004FD4F5,
+                ),
+                ByteEdit(
+                    va_to_file_offset(0x004FD4FE),
+                    bytes.fromhex("be08000000"),
+                    bytes.fromhex("be01000000"),
+                    "SEL_NONE -> SEL_START_NEW_GAME",
+                    va=0x004FD4FE,
+                ),
+                ByteEdit(
+                    va_to_file_offset(0x004FD505),
+                    bytes.fromhex("be04000000"),
+                    bytes.fromhex("be01000000"),
+                    "SEL_MULTIPLAYER -> SEL_START_NEW_GAME",
+                    va=0x004FD505,
+                ),
+                ByteEdit(
+                    va_to_file_offset(0x004FD7A5),
+                    bytes.fromhex("7436"),
+                    bytes.fromhex("eb36"),
+                    "skip pending external/network game branch",
+                    va=0x004FD7A5,
+                ),
+                ByteEdit(
+                    va_to_file_offset(0x004FDC67),
+                    bytes.fromhex("7468"),
+                    bytes.fromhex("9090"),
+                    "skip Fetch_Difficulty",
+                    va=0x004FDC67,
+                ),
+                ByteEdit(
+                    va_to_file_offset(0x004FDD10),
+                    bytes.fromhex("755d"),
+                    bytes.fromhex("eb5d"),
+                    "skip faction dialog",
+                    va=0x004FDD10,
+                ),
+            ),
+        ),
+        "scenario": PatchSpec(
+            id="scenario",
+            purpose="Replace hardcoded L1 scenario strings.",
+            status="capture-only",
+            default_allowed=True,
+        ),
+        "random-seed": PatchSpec(
+            id="random-seed",
+            purpose="Use a fixed gameplay random seed.",
+            status="capture-only",
+            default_allowed=True,
+        ),
         "frameinfo-send-guard": PatchSpec(
             id="frameinfo-send-guard",
-            purpose="Diagnostic frame-info SendInput guard.",
+            purpose="Diagnostic: suppress malformed frameinfo send path.",
             status="diagnostic",
+            default_allowed=False,
             requires_allow_diagnostic=True,
+            edits=(
+                ByteEdit(
+                    va_to_file_offset(0x00533AF5),
+                    bytes.fromhex("e862070000"),
+                    bytes.fromhex("31c0909090"),
+                    "frameinfo builder",
+                    va=0x00533AF5,
+                ),
+                ByteEdit(
+                    va_to_file_offset(0x00533AFA),
+                    bytes.fromhex("6aff"),
+                    bytes.fromhex("9090"),
+                    "frameinfo send push",
+                    va=0x00533AFA,
+                ),
+                ByteEdit(
+                    va_to_file_offset(0x00533B0D),
+                    bytes.fromhex("ff5708"),
+                    bytes.fromhex("909090"),
+                    "frameinfo send call",
+                    va=0x00533B0D,
+                ),
+            ),
         ),
         "force-normal-queue": PatchSpec(
             id="force-normal-queue",
-            purpose="Diagnostic normal-queue forcing patch.",
+            purpose="Diagnostic: force Queue_AI to dispatch as GAME_NORMAL.",
             status="diagnostic",
+            default_allowed=False,
             requires_allow_diagnostic=True,
+            edits=(
+                ByteEdit(
+                    va_to_file_offset(0x005329A3),
+                    bytes.fromhex("a0b8b66600"),
+                    bytes.fromhex("31c0909090"),
+                    "Queue_AI Session.Type read -> GAME_NORMAL",
+                    va=0x005329A3,
+                ),
+            ),
         ),
         "game-in-focus": PatchSpec(
             id="game-in-focus",
-            purpose="Quarantined game focus override.",
+            purpose="Quarantined: confirmed bad Session.Type write previously mislabeled as GameInFocus.",
             status="quarantined",
+            default_allowed=False,
             requires_allow_quarantined=True,
         ),
     }
+
+
+def _find_all(data: bytearray, needle: bytes) -> list[int]:
+    offsets: list[int] = []
+    offset = 0
+    while True:
+        offset = data.find(needle, offset)
+        if offset < 0:
+            return offsets
+        offsets.append(offset)
+        offset += len(needle)
+
+
+def _scenario_edits(data: bytearray, scenario: str) -> list[dict]:
+    normalized = normalize_scenario(scenario).ljust(12, "\x00").encode("ascii")[:12]
+    source_strings = (b"SCG01EA.INI\x00", b"SCU01EA.INI\x00")
+    offsets = set()
+    for source in source_strings:
+        offsets.update(_find_all(data, source))
+    offsets.update(_find_all(data, normalized))
+
+    edits: list[dict] = []
+    for offset in sorted(offsets):
+        actual = bytes(data[offset : offset + 12])
+        if actual == normalized:
+            result = "already-applied"
+        elif actual in source_strings:
+            data[offset : offset + 12] = normalized
+            result = "applied"
+        else:
+            continue
+        edits.append(
+            {
+                "offset": f"0x{offset:08x}",
+                "va": None,
+                "expected": "|".join(source.hex() for source in source_strings),
+                "replacement": normalized.hex(),
+                "actual": actual.hex(),
+                "result": result,
+                "label": "scenario string replacement",
+            }
+        )
+    if not edits:
+        raise PatchError("scenario: could not find SCG01EA.INI or SCU01EA.INI")
+    return edits
+
+
+def _seed_edits(data: bytearray, seed: int) -> list[dict]:
+    if seed < 0 or seed > 0xFFFFFFFF:
+        raise PatchError(f"random-seed: seed out of 32-bit range: {seed}")
+    va = 0x004FF345
+    offset = va_to_file_offset(va)
+    expected = bytes.fromhex("31c0e8856d0b00e8dd6d0b00e8b46d0b00")
+    replacement = b"\xb8" + struct.pack("<I", seed) + b"\x90" * 12
+    actual = bytes(data[offset : offset + len(expected)])
+    if actual == replacement:
+        result = "already-applied"
+    elif actual == expected:
+        data[offset : offset + len(replacement)] = replacement
+        result = "applied"
+    else:
+        raise PatchError(
+            f"random-seed: unexpected bytes at 0x{offset:08x}: "
+            f"expected {expected.hex()} or {replacement.hex()}, got {actual.hex()}"
+        )
+    return [
+        {
+            "offset": f"0x{offset:08x}",
+            "va": f"0x{va:08x}",
+            "expected": expected.hex(),
+            "replacement": replacement.hex(),
+            "actual": actual.hex(),
+            "result": result,
+            "label": "single-player Init_Random seed",
+        }
+    ]
+
+
+def _cd_label_edits(data: bytearray, side: str) -> list[dict]:
+    if side not in {"allied", "soviet"}:
+        raise PatchError(f"cd-label: unknown side {side!r}")
+
+    cd1_offset = 0x1BFCB7
+    cd2_offset = cd1_offset + 4
+    replacements = {
+        "allied": (
+            (cd1_offset, b"\x00", "CD1 label first byte"),
+            (cd2_offset, b"C", "CD2 label first byte"),
+        ),
+        "soviet": (
+            (cd1_offset, b"C", "CD1 label first byte"),
+            (cd2_offset, b"\x00", "CD2 label first byte"),
+        ),
+    }[side]
+    edits: list[dict] = []
+    for offset, replacement, label in replacements:
+        actual = bytes(data[offset : offset + 1])
+        if actual not in {b"C", b"\x00"}:
+            raise PatchError(
+                f"cd-label: unexpected bytes at 0x{offset:08x}: "
+                f"expected 43 or 00, got {actual.hex() or '<eof>'}"
+            )
+        data[offset : offset + 1] = replacement
+        edits.append(
+            {
+                "offset": f"0x{offset:08x}",
+                "va": None,
+                "expected": "43|00",
+                "replacement": replacement.hex(),
+                "actual": actual.hex(),
+                "result": "already-applied" if actual == replacement else "applied",
+                "label": label,
+            }
+        )
+    return edits
 
 
 def mode_patch_ids(
@@ -255,6 +502,8 @@ def apply_mode(
     before = exe.read_bytes()
     data = bytearray(before)
     registry = patch_registry()
+    if side is not None and side not in {"allied", "soviet"}:
+        raise PatchError(f"unknown RA95 side: {side!r}")
     selected = (
         list(patches)
         if patches is not None
@@ -279,7 +528,48 @@ def apply_mode(
             raise PatchError(f"{patch_id}: quarantined patch requires --allow-quarantined")
         if not spec.default_allowed and patches is None:
             raise PatchError(f"{patch_id}: patch is not allowed in default mode {mode}")
-        edits = _apply_static_patch(data, spec)
+        effective_side = side or (infer_side(scenario) if scenario else "allied")
+        if patch_id == "scenario":
+            if not scenario:
+                raise PatchError("scenario patch requires --scenario")
+            edits = _scenario_edits(data, scenario)
+        elif patch_id == "random-seed":
+            if seed is None:
+                raise PatchError("random-seed patch requires --seed")
+            edits = _seed_edits(data, seed)
+        elif patch_id == "cd-label":
+            edits = _cd_label_edits(data, effective_side if mode == "mission" else "allied")
+        elif patch_id == "autostart":
+            edits = _apply_static_patch(data, spec)
+            side_offset = va_to_file_offset(0x004FDD8F)
+            side_expected = bytes.fromhex("7507")
+            side_replacement = bytes.fromhex("eb07") if effective_side == "soviet" else bytes.fromhex("9090")
+            actual = bytes(data[side_offset : side_offset + 2])
+            if actual == side_replacement:
+                result = "already-applied"
+            elif actual == side_expected:
+                data[side_offset : side_offset + 2] = side_replacement
+                result = "applied"
+            else:
+                raise PatchError(
+                    f"autostart: unexpected side bytes at 0x{side_offset:08x}: "
+                    f"expected {side_expected.hex()} or {side_replacement.hex()}, got {actual.hex()}"
+                )
+            edits.append(
+                {
+                    "offset": f"0x{side_offset:08x}",
+                    "va": "0x004fdd8f",
+                    "expected": side_expected.hex(),
+                    "replacement": side_replacement.hex(),
+                    "actual": actual.hex(),
+                    "result": result,
+                    "label": f"select {effective_side} scenario path",
+                }
+            )
+        elif patch_id == "game-in-focus":
+            raise PatchError("game-in-focus: quarantined patch is non-applicable in unified patcher")
+        else:
+            edits = _apply_static_patch(data, spec)
         patch_entries.append(
             {
                 "id": spec.id,

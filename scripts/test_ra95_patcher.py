@@ -8,11 +8,13 @@ from pathlib import Path
 
 from ra.ra95_patches import (
     ByteEdit,
+    DEFAULT_RANDOM_SEED,
     PatchError,
     apply_mode,
     infer_side,
     mode_patch_ids,
     patch_registry,
+    va_to_file_offset,
 )
 
 
@@ -89,7 +91,7 @@ class RA95PatcherRegistryTest(unittest.TestCase):
             exe = Path(tmp) / "RA95.EXE"
             exe.write_bytes(b"\x00" * 16)
 
-            with self.assertRaisesRegex(PatchError, "game-in-focus: patch has no registered edits"):
+            with self.assertRaisesRegex(PatchError, "game-in-focus: .*quarantined.*non-applicable"):
                 apply_mode(
                     "base",
                     exe,
@@ -105,6 +107,80 @@ class RA95PatcherRegistryTest(unittest.TestCase):
                 replacement=b"\x90",
                 label="invalid edit",
             )
+
+    def test_diagnostic_patch_requires_allow_flag(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "RA95.EXE"
+            exe.write_bytes(b"\x00" * 0x200000)
+
+            with self.assertRaisesRegex(PatchError, "allow-diagnostic"):
+                apply_mode(
+                    "mission",
+                    exe,
+                    scenario="SCU01EA.INI",
+                    patches=["frameinfo-send-guard"],
+                )
+
+    def test_quarantined_patch_requires_allow_flag(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "RA95.EXE"
+            exe.write_bytes(b"\x00" * 0x200000)
+
+            with self.assertRaisesRegex(PatchError, "allow-quarantined"):
+                apply_mode(
+                    "mission",
+                    exe,
+                    scenario="SCU01EA.INI",
+                    patches=["game-in-focus"],
+                )
+
+    def test_dynamic_patches_are_idempotent(self):
+        scenario_offset = 0x1000
+        soviet_scenario_offset = 0x1020
+        seed_offset = va_to_file_offset(0x004FF345)
+        seed_expected = bytes.fromhex("31c0e8856d0b00e8dd6d0b00e8b46d0b00")
+        cd1_offset = 0x1BFCB7
+        cd2_offset = cd1_offset + 4
+        data = bytearray(b"\x00" * 0x200000)
+        data[scenario_offset : scenario_offset + 12] = b"SCG01EA.INI\x00"
+        data[soviet_scenario_offset : soviet_scenario_offset + 12] = b"SCU01EA.INI\x00"
+        data[seed_offset : seed_offset + len(seed_expected)] = seed_expected
+        data[cd1_offset : cd1_offset + 1] = b"C"
+        data[cd2_offset : cd2_offset + 1] = b"C"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "RA95.EXE"
+            exe.write_bytes(data)
+
+            first = apply_mode(
+                "mission",
+                exe,
+                scenario="SCU02EA.INI",
+                seed=DEFAULT_RANDOM_SEED,
+                patches=["cd-label", "scenario", "random-seed"],
+            )
+            second = apply_mode(
+                "mission",
+                exe,
+                scenario="SCU02EA.INI",
+                seed=DEFAULT_RANDOM_SEED,
+                patches=["cd-label", "scenario", "random-seed"],
+            )
+
+            first_edits = {
+                patch["id"]: [edit["result"] for edit in patch["edits"]]
+                for patch in first.manifest["patches"]
+            }
+            second_edits = {
+                patch["id"]: [edit["result"] for edit in patch["edits"]]
+                for patch in second.manifest["patches"]
+            }
+            self.assertEqual(first_edits["cd-label"], ["already-applied", "applied"])
+            self.assertEqual(first_edits["scenario"], ["applied", "applied"])
+            self.assertEqual(first_edits["random-seed"], ["applied"])
+            self.assertEqual(second_edits["cd-label"], ["already-applied", "already-applied"])
+            self.assertEqual(second_edits["scenario"], ["already-applied", "already-applied"])
+            self.assertEqual(second_edits["random-seed"], ["already-applied"])
 
 
 if __name__ == "__main__":
