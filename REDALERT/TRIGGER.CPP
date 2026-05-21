@@ -46,6 +46,84 @@
 
 #include "function.h"
 
+#ifndef _MSC_VER
+static bool RA_Trace_Triggers_Enabled(void)
+{
+	static int enabled = -1;
+
+	if (enabled == -1) {
+		char const * env = getenv("RA_TRACE_TRIGGERS");
+		enabled = (env && env[0] && strcmp(env, "0") != 0) ? 1 : 0;
+	}
+	return enabled != 0;
+}
+
+static char const * RA_Trace_Action_Name(TActionType action)
+{
+	switch (action) {
+		case TACTION_WIN: return "WIN";
+		case TACTION_LOSE: return "LOSE";
+		case TACTION_FORCE_TRIGGER: return "FORCE_TRIGGER";
+		case TACTION_DESTROY_TRIGGER: return "DESTROY_TRIGGER";
+		case TACTION_ALLOWWIN: return "ALLOWWIN";
+		default: return Name_From_Action(action);
+	}
+}
+
+static char const * RA_Trace_Source(ObjectClass const * obj, CELL cell, bool forced)
+{
+	if (forced) return "forced";
+	if (obj) return "object";
+	if (cell) return "cell";
+	return "logic";
+}
+
+static void RA_Trace_Sanitize_Label(char const * label, char * buffer, size_t buffer_size)
+{
+	if (!buffer_size) return;
+	size_t out = 0;
+	for (size_t in = 0; label && label[in] && out + 1 < buffer_size; in++) {
+		unsigned char ch = (unsigned char)label[in];
+		if (ch <= ' ' || ch == '"' || ch == '\\') {
+			buffer[out++] = '_';
+		} else {
+			buffer[out++] = (char)ch;
+		}
+	}
+	buffer[out] = '\0';
+}
+
+static void RA_Trace_Trigger_Action(TriggerClass const * trigger, TEventType event,
+	TActionClass const & action, ObjectClass const * obj, CELL cell, bool forced, char const * slot)
+{
+	if (!RA_Trace_Triggers_Enabled()) return;
+
+	char event_label[80];
+	char action_label[80];
+	RA_Trace_Sanitize_Label(Name_From_Event(event), event_label, sizeof(event_label));
+	RA_Trace_Sanitize_Label(RA_Trace_Action_Name(action.Action), action_label, sizeof(action_label));
+
+	fprintf(stderr,
+		"[RA_TRIGGER] frame=%ld scenario=%s name=%s event_id=%d event_label=\"%s\" "
+		"action_id=%d action_label=\"%s\" source=%s slot=%s forced=%d "
+		"object_ptr=%p cell=%d id=%d\n",
+		(long)Frame,
+		Scen.ScenarioName[0] ? Scen.ScenarioName : "<none>",
+		trigger && trigger->Class.Is_Valid() ? trigger->Class->IniName : "<unknown>",
+		(int)event,
+		event_label,
+		(int)action.Action,
+		action_label,
+		RA_Trace_Source(obj, cell, forced),
+		slot,
+		forced ? 1 : 0,
+		(void const *)obj,
+		(int)cell,
+		trigger ? trigger->ID : -1);
+	fflush(stderr);
+}
+#endif
+
 
 #if defined(CHEAT_KEYS) || defined(SCENARIO_EDITOR)
 /***********************************************************************************************
@@ -302,18 +380,37 @@ bool TriggerClass::Spring(TEventType event, ObjectClass * obj, CELL cell, bool f
 		bool ok = false;
 		HousesType hh = Class->House;
 		if (Class->EventControl == MULTI_LINKED) {
-			if (e1 || forced) ok |= Class->Action1(hh, obj, ID, cell);
-			if (e2 && !forced) ok |= Class->Action2(hh, obj, ID, cell);
+			if (e1 || forced) {
+#ifndef _MSC_VER
+				RA_Trace_Trigger_Action(this, event, Class->Action1, obj, cell, forced, "action1");
+#endif
+				ok |= Class->Action1(hh, obj, ID, cell);
+			}
+			if (e2 && !forced) {
+#ifndef _MSC_VER
+				RA_Trace_Trigger_Action(this, event, Class->Action2, obj, cell, forced, "action2");
+#endif
+				ok |= Class->Action2(hh, obj, ID, cell);
+			}
 		} else {
 
 			switch (Class->ActionControl) {
 				case MULTI_ONLY:
+#ifndef _MSC_VER
+					RA_Trace_Trigger_Action(this, event, Class->Action1, obj, cell, forced, "action1");
+#endif
 					ok |= Class->Action1(hh, obj, ID, cell);
 					break;
 
 				default:
 				case MULTI_AND:
+#ifndef _MSC_VER
+					RA_Trace_Trigger_Action(this, event, Class->Action1, obj, cell, forced, "action1");
+#endif
 					ok |= Class->Action1(hh, obj, ID, cell);
+#ifndef _MSC_VER
+					RA_Trace_Trigger_Action(this, event, Class->Action2, obj, cell, forced, "action2");
+#endif
 					ok |= Class->Action2(hh, obj, ID, cell);
 					break;
 			}

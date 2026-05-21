@@ -122,6 +122,63 @@ TcpipManagerClass	Winsock;
 #include <SDL2/SDL.h>  // TIM-531: SDL_PushEvent for in-game click injection
 #endif
 
+#ifndef _MSC_VER
+static bool RA_Trace_Outcomes_Enabled(void)
+{
+	static int enabled = -1;
+
+	if (enabled == -1) {
+		const char * env = getenv("RA_TRACE_OUTCOMES");
+		enabled = (env && env[0] && strcmp(env, "0") != 0) ? 1 : 0;
+	}
+	return enabled != 0;
+}
+
+static void RA_Trace_Outcome_Field(char const * field, bool from, bool to, char const * source)
+{
+	fprintf(stderr,
+	        "[RA_OUTCOME] frame=%ld scenario=%s field=%s from=%d to=%d source=%s "
+	        "PlayerWins=%d PlayerLoses=%d player_defeated=%d\n",
+	        (long)Frame,
+	        Scen.ScenarioName[0] ? Scen.ScenarioName : "<none>",
+	        field,
+	        from ? 1 : 0,
+	        to ? 1 : 0,
+	        source,
+	        PlayerWins ? 1 : 0,
+	        PlayerLoses ? 1 : 0,
+	        PlayerPtr && PlayerPtr->IsDefeated ? 1 : 0);
+	fflush(stderr);
+}
+
+static void RA_Trace_Outcome_Transitions(char const * source)
+{
+	if (!RA_Trace_Outcomes_Enabled()) return;
+
+	static bool last_wins = false;
+	static bool last_loses = false;
+	static bool last_defeated = false;
+
+	bool wins = PlayerWins;
+	bool loses = PlayerLoses;
+	bool defeated = PlayerPtr && PlayerPtr->IsDefeated;
+
+	if (last_wins != wins) {
+		RA_Trace_Outcome_Field("PlayerWins", last_wins, wins, source);
+	}
+	if (last_loses != loses) {
+		RA_Trace_Outcome_Field("PlayerLoses", last_loses, loses, source);
+	}
+	if (last_defeated != defeated) {
+		RA_Trace_Outcome_Field("PlayerPtr->IsDefeated", last_defeated, defeated, source);
+	}
+
+	last_wins = wins;
+	last_loses = loses;
+	last_defeated = defeated;
+}
+#endif
+
 #ifdef WOLAPI_INTEGRATION
 //#include "WolDebug.h"
 #include "WolStrng.h"
@@ -2688,6 +2745,10 @@ Mono_Set_Cursor(0,0);
 	}
 #endif
 
+#ifndef _MSC_VER
+	RA_Trace_Outcome_Transitions("pre-outcome-check");
+#endif
+
 	if (PlayerWins) {
 #ifndef _MSC_VER
 		if (getenv("RA_AUTOSTART")) fprintf(stderr, "[PLAYER-WINS] frame=%ld\n", (long)Frame);
@@ -2708,6 +2769,9 @@ Mono_Set_Cursor(0,0);
 		PlayerLoses = false;
 		PlayerWins = false;
 		PlayerRestarts = false;
+#ifndef _MSC_VER
+		RA_Trace_Outcome_Transitions("consume-win");
+#endif
 		Map.Help_Text(TXT_NONE);
 		Do_Win();
 		return(!GameActive);
@@ -2730,6 +2794,9 @@ Mono_Set_Cursor(0,0);
 		PlayerWins = false;
 		PlayerLoses = false;
 		PlayerRestarts = false;
+#ifndef _MSC_VER
+		RA_Trace_Outcome_Transitions("consume-loss");
+#endif
 		Map.Help_Text(TXT_NONE);
 		Do_Lose();
 		return(!GameActive);

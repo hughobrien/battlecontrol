@@ -155,7 +155,7 @@ or score.
 - Modify: `tools/wine-input/ra-frameprobe.c` only if comparable Wine state can
   be read safely.
 
-- [ ] **Step 1: Add native trigger trace behind env var**
+- [x] **Step 1: Add native trigger trace behind env var**
 
 Add `RA_TRACE_TRIGGERS=1` logging:
 
@@ -166,12 +166,12 @@ Add `RA_TRACE_TRIGGERS=1` logging:
 Keep this diagnostic-only unless it proves broadly useful; do not commit noisy
 trace code unless gated and low-risk.
 
-- [ ] **Step 2: Add native outcome trace**
+- [x] **Step 2: Add native outcome trace**
 
 Log transitions of `PlayerWins`, `PlayerLoses`, and `PlayerPtr->IsDefeated`
 with frame and scenario.
 
-- [ ] **Step 3: Correlate with Wine**
+- [x] **Step 3: Correlate with Wine**
 
 Use Wine state probe plus screenshots first. If needed, add a Wine memory scan
 for trigger arrays only after native tells us what to look for.
