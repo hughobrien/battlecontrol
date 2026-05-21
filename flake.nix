@@ -289,7 +289,10 @@
             pname = "cnc-ddraw";
             version = "unstable-2026-05-16";
             src = cnc-ddraw;
-            patches = [ ./tools/cnc-ddraw/tim740-scanline-double.patch ];
+            patches = [
+              ./tools/cnc-ddraw/tim740-scanline-double.patch
+              ./tools/cnc-ddraw/tim780-capture-hook.patch
+            ];
             nativeBuildInputs = [ pkgs.pkgsCross.mingw32.buildPackages.gcc ];
             buildPhase = ''
               runHook preBuild

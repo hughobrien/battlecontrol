@@ -115,7 +115,11 @@ def mission_data_dir(scenario: str, target: str) -> str | None:
             return override
         return nix_build_package("ra-data-soviet")
     if target == "wine":
-        return os.environ.get("WINE_DATA_DIR")
+        return (
+            os.environ.get("WINE_DATA_DIR")
+            or os.environ.get("DATA_DIR")
+            or os.environ.get("RA_ASSETS")
+        )
     return os.environ.get("DATA_DIR") or os.environ.get("RA_ASSETS")
 
 

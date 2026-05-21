@@ -36,6 +36,11 @@ def _env_flag(name: str, default: str = "0") -> bool:
     return os.environ.get(name, default) not in ("", "0")
 
 
+def _wine_z_path(path: pathlib.Path) -> str:
+    """Return Wine's default Z: mapping for an absolute host path."""
+    return "Z:" + str(path.resolve()).replace("/", "\\")
+
+
 def _scenario_stem(scenario: str | None) -> str | None:
     if not scenario:
         return None
@@ -53,6 +58,11 @@ def _scenario_side(scenario: str | None) -> str | None:
 
 
 def _cd_label_mode(scenario: str | None) -> str:
+    override = os.environ.get("WINE_CD_LABEL_MODE")
+    if override:
+        mode = override.strip().lower()
+        if mode in ("cd1", "cd2"):
+            return mode
     return "cd2" if _scenario_side(scenario) == "soviet" else "cd1"
 
 
@@ -215,6 +225,8 @@ FRAME_COUNTER_CANDIDATES = [
     0x005F166C,
     0x006D7344,
 ]
+
+DEFAULT_WINE_FRAME_ADDR = "0x006544c8"
 
 
 def _summarize_frame_candidate_samples(
@@ -618,27 +630,129 @@ class WineCapture:
         shutil.rmtree(self.wineprefix, ignore_errors=False)
         self.wineprefix = None
 
-    def _launch(self, staging: pathlib.Path, logfile, disp: str) -> subprocess.Popen:
+    def _launch(
+        self,
+        staging: pathlib.Path,
+        logfile,
+        disp: str,
+        extra_env: dict[str, str] | None = None,
+    ) -> subprocess.Popen:
         try:
             pathlib.Path("/tmp/wine-audio.raw").unlink()
         except FileNotFoundError:
             pass
+        env = {
+            **os.environ,
+            "DISPLAY": disp,
+            "WINEPREFIX": str(self.wineprefix),
+            "WINEDLLOVERRIDES": "ddraw=n;mscoree=;mshtml=",
+            "WINEDEBUG": "-all",
+            "AUDIODEV": "null",
+            "WAYLAND_DISPLAY": "",
+        }
+        if extra_env:
+            env.update(extra_env)
         return subprocess.Popen(
             [str(self.wine), str(staging / "RA95.EXE")],
             cwd=str(staging),
             start_new_session=True,
-            env={
-                **os.environ,
-                "DISPLAY": disp,
-                "WINEPREFIX": str(self.wineprefix),
-                "WINEDLLOVERRIDES": "ddraw=n;mscoree=;mshtml=",
-                "WINEDEBUG": "-all",
-                "AUDIODEV": "null",
-                "WAYLAND_DISPLAY": "",
-            },
+            env=env,
             stdout=logfile,
             stderr=logfile,
         )
+
+    def _wait_for_cncddraw_capture(
+        self,
+        path: pathlib.Path,
+        wine_proc: subprocess.Popen,
+        timeout_s: float,
+        logfile,
+    ) -> pathlib.Path:
+        deadline = time.monotonic() + timeout_s
+        last_size = -1
+        stable_since = None
+        while time.monotonic() < deadline:
+            if path.exists():
+                size = path.stat().st_size
+                if size > 0 and size == last_size:
+                    if stable_since is None:
+                        stable_since = time.monotonic()
+                    elif time.monotonic() - stable_since >= 0.2:
+                        return path
+                else:
+                    stable_since = None
+                    last_size = size
+            if wine_proc.poll() is not None:
+                break
+            time.sleep(0.05)
+        logfile.write(
+            "wine-driver: cnc-ddraw capture did not arrive "
+            f"path={path} timeout={timeout_s:.1f}s proc_rc={wine_proc.poll()}\n"
+        )
+        logfile.flush()
+        raise RuntimeError("cnc-ddraw capture did not arrive")
+
+    def _wait_for_cncddraw_sequence(
+        self,
+        sequence_dir: pathlib.Path,
+        start_frame: int,
+        count: int,
+        clock: str,
+        wine_proc: subprocess.Popen,
+        timeout_s: float,
+        logfile,
+    ) -> list[pathlib.Path]:
+        expected = []
+        if clock == "render":
+            expected = [
+                sequence_dir / f"frame_{frame:06d}.png"
+                for frame in range(start_frame, start_frame + count)
+            ]
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if clock == "ra":
+                present = sorted(
+                    path
+                    for path in sequence_dir.glob("frame_*.png")
+                    if path.stat().st_size > 0
+                )
+            else:
+                present = [
+                    path
+                    for path in expected
+                    if path.exists() and path.stat().st_size > 0
+                ]
+            if len(present) >= count:
+                time.sleep(0.2)
+                if clock == "ra":
+                    stable = sorted(
+                        path
+                        for path in sequence_dir.glob("frame_*.png")
+                        if path.stat().st_size > 0
+                    )
+                    if len(stable) >= count:
+                        return stable[:count]
+                elif all(
+                    path.exists() and path.stat().st_size > 0 for path in expected
+                ):
+                    return expected
+            if wine_proc.poll() is not None:
+                break
+            time.sleep(0.05)
+        missing = []
+        if expected:
+            missing = [
+                path.name
+                for path in expected
+                if not path.exists() or path.stat().st_size == 0
+            ]
+        logfile.write(
+            "wine-driver: cnc-ddraw sequence did not complete "
+            f"dir={sequence_dir} start={start_frame} count={count} clock={clock} "
+            f"missing={missing[:8]} timeout={timeout_s:.1f}s proc_rc={wine_proc.poll()}\n"
+        )
+        logfile.flush()
+        raise RuntimeError("cnc-ddraw sequence did not complete")
 
     def _sendinput_seq(self, staging: pathlib.Path, disp: str, seq: str, logfile):
         r = subprocess.run(
@@ -749,7 +863,7 @@ class WineCapture:
         except Exception as exc:
             return self._write_unknown_state(output_dir, str(exc), logfile)
 
-        addr = os.environ.get("WINE_FRAME_ADDR", "0x006544c8")
+        addr = os.environ.get("WINE_FRAME_ADDR", DEFAULT_WINE_FRAME_ADDR)
         try:
             r = subprocess.run(
                 [str(self.wine), str(self._frameprobe_exe), "--state", addr],
@@ -1047,9 +1161,39 @@ class WineCapture:
         """Capture a screenshot from a mission at the given game frame."""
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
-        xvfb = wm = wine_proc = staging = None
+        xvfb = wm = wine_proc = staging = session_clamp = None
         menu_drive = os.environ.get("WINE_MENU_DRIVE", "0") not in ("", "0")
         try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            cncddraw_capture = _env_flag("WINE_CNCDDRAW_CAPTURE")
+            cncddraw_capture_path = output_dir / "wine-cncddraw.png"
+            cncddraw_sequence_dir = output_dir / "wine-sequence"
+            cncddraw_capture_flip = os.environ.get(
+                "WINE_CNCDDRAW_CAPTURE_FLIP", str(frame)
+            )
+            cncddraw_capture_count = int(
+                os.environ.get("WINE_CNCDDRAW_CAPTURE_COUNT", "1"), 0
+            )
+            wine_extra_env = {}
+            if cncddraw_capture:
+                wine_extra_env = {
+                    "BC_CAPTURE_FLIP": cncddraw_capture_flip,
+                    "BC_CAPTURE_START": os.environ.get(
+                        "WINE_CNCDDRAW_CAPTURE_START", cncddraw_capture_flip
+                    ),
+                    "BC_CAPTURE_RA_START": os.environ.get(
+                        "WINE_CNCDDRAW_CAPTURE_RA_START", ""
+                    ),
+                    "BC_CAPTURE_COUNT": str(cncddraw_capture_count),
+                    "BC_CAPTURE_FILE": _wine_z_path(cncddraw_capture_path),
+                    "BC_CAPTURE_DIR": _wine_z_path(cncddraw_sequence_dir),
+                    "BC_CAPTURE_HALT": os.environ.get(
+                        "WINE_CNCDDRAW_CAPTURE_HALT", "1"
+                    ),
+                    "BC_CAPTURE_RA_FRAME_ADDR": os.environ.get(
+                        "WINE_FRAME_ADDR", DEFAULT_WINE_FRAME_ADDR
+                    ),
+                }
             staging = self._setup_staging(
                 scenario,
                 skip_vqa=True,
@@ -1059,14 +1203,32 @@ class WineCapture:
             xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             self._create_wineprefix(staging)
-            wine_proc = self._launch(staging, logfile, disp)
+            wine_proc = self._launch(staging, logfile, disp, wine_extra_env)
+            if os.environ.get("WINE_FORCE_SESSION_NORMAL", "0") not in ("", "0"):
+                self._build_frameprobe()
+                clamp_ms = os.environ.get("WINE_FORCE_SESSION_NORMAL_MS", "12000")
+                session_clamp = subprocess.Popen(
+                    [
+                        str(self.wine),
+                        str(self._frameprobe_exe),
+                        "--session-normal",
+                        clamp_ms,
+                    ],
+                    cwd=str(staging),
+                    env=self._frameprobe_env(disp),
+                    stdout=logfile,
+                    stderr=logfile,
+                )
             if not wait_for_window(disp, "Red Alert", timeout=30):
                 raise RuntimeError("Red Alert window never appeared")
             boot_settle = float(os.environ.get("WINE_BOOT_SETTLE", "5.0"))
-            strict_frameprobe = os.environ.get("WINE_FRAMEPROBE", "0") not in (
+            use_frameprobe = os.environ.get("WINE_FRAMEPROBE", "1") not in (
                 "",
                 "0",
-            ) and os.environ.get("WINE_FRAMEPROBE_STRICT", "0") not in ("", "0")
+            )
+            strict_frameprobe = use_frameprobe and os.environ.get(
+                "WINE_FRAMEPROBE_STRICT", "1"
+            ) not in ("", "0")
             timeline_entries = []
             timeline_path = output_dir / "wine-screen-timeline.json"
             timeline_metadata = {
@@ -1158,11 +1320,89 @@ class WineCapture:
                 )
                 self._xtest_click(disp, 320, 327, logfile)
                 time.sleep(1.0)
+            if session_clamp is not None and session_clamp.poll() not in (None, 0):
+                raise RuntimeError(
+                    f"session-normal clamp failed rc={session_clamp.returncode}"
+                )
             center_mouse(disp, 640, 400)
             time.sleep(float(os.environ.get("WINE_GAMEPLAY_SETTLE", "0.0")))
+            if cncddraw_capture:
+                timeout_s = float(os.environ.get("WINE_CNCDDRAW_CAPTURE_TIMEOUT", "60"))
+                if cncddraw_capture_count > 1:
+                    sequence_start = int(
+                        os.environ.get(
+                            "WINE_CNCDDRAW_CAPTURE_RA_START",
+                            os.environ.get(
+                                "WINE_CNCDDRAW_CAPTURE_START", cncddraw_capture_flip
+                            ),
+                        ),
+                        0,
+                    )
+                    sequence_paths = self._wait_for_cncddraw_sequence(
+                        cncddraw_sequence_dir,
+                        sequence_start,
+                        cncddraw_capture_count,
+                        "ra"
+                        if os.environ.get("WINE_CNCDDRAW_CAPTURE_RA_START")
+                        else "render",
+                        wine_proc,
+                        timeout_s,
+                        logfile,
+                    )
+                    (output_dir / "wine-frame.txt").write_text(
+                        "requested={requested}\nactual={actual}\n"
+                        "reason=cnc-ddraw-sequence\naddr=none\n"
+                        "bc_capture_start={start}\n"
+                        "bc_capture_count={count}\n".format(
+                            requested=frame,
+                            actual=sequence_start,
+                            start=sequence_start,
+                            count=cncddraw_capture_count,
+                        )
+                    )
+                    return sequence_paths[0]
+                cap_path = self._wait_for_cncddraw_capture(
+                    cncddraw_capture_path, wine_proc, timeout_s, logfile
+                )
+                (output_dir / "wine-frame.txt").write_text(
+                    "requested={requested}\nactual={flip}\n"
+                    "reason=cnc-ddraw-flip\naddr=none\n"
+                    "bc_capture_flip={flip}\n".format(
+                        requested=frame,
+                        flip=cncddraw_capture_flip,
+                    )
+                )
+                return cap_path
+            if os.environ.get("WINE_COUNTER_SCAN", "0") not in ("", "0"):
+                self._build_frameprobe()
+                subprocess.run(
+                    [str(self.wine), str(self._frameprobe_exe), "-9"],
+                    cwd=str(staging),
+                    env={
+                        **os.environ,
+                        "DISPLAY": disp,
+                        "WINEPREFIX": str(self.wineprefix),
+                        "WINEDEBUG": "-all",
+                        "WAYLAND_DISPLAY": "",
+                    },
+                    stdout=logfile,
+                    stderr=logfile,
+                    timeout=45,
+                )
             # Wait for target frame
-            if os.environ.get("WINE_FRAMEPROBE", "0") not in ("", "0"):
-                addr = os.environ.get("WINE_FRAME_ADDR", "0x006544c8")
+            if use_frameprobe:
+                if session_clamp is not None:
+                    try:
+                        session_clamp.wait(timeout=15)
+                    except subprocess.TimeoutExpired:
+                        session_clamp.terminate()
+                        session_clamp.wait(timeout=5)
+                        raise RuntimeError("session-normal clamp timeout")
+                    if session_clamp.returncode != 0:
+                        raise RuntimeError(
+                            f"session-normal clamp failed rc={session_clamp.returncode}"
+                        )
+                addr = os.environ.get("WINE_FRAME_ADDR", DEFAULT_WINE_FRAME_ADDR)
                 if os.environ.get("WINE_FRAMEPROBE_BACKEND", "proc") == "proc":
                     try:
                         probe_ok, actual_frame, frame_reason = self._wait_proc_frame(
@@ -1184,7 +1424,7 @@ class WineCapture:
                         f"requested={frame}\nactual={actual_frame}\nreason={frame_reason}\naddr={addr}\n"
                     )
                     if not probe_ok:
-                        if os.environ.get("WINE_FRAMEPROBE_STRICT", "0") not in (
+                        if os.environ.get("WINE_FRAMEPROBE_STRICT", "1") not in (
                             "",
                             "0",
                         ):
@@ -1392,7 +1632,56 @@ class WineCapture:
         except Exception as exc:
             self._raise_with_patch_manifest(exc, output_dir, logfile)
         finally:
+            if session_clamp is not None and session_clamp.poll() is None:
+                session_clamp.terminate()
+                try:
+                    session_clamp.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    session_clamp.kill()
+                    session_clamp.wait(timeout=5)
             self._cleanup(disp, staging, wine_proc, xvfb, wm)
+
+    def capture_mission_sequence(
+        self,
+        scenario: str,
+        start_frame: int,
+        count: int,
+        output_dir: pathlib.Path,
+        clock: str = "ra",
+        logfile=None,
+    ) -> pathlib.Path:
+        """Capture a deterministic cnc-ddraw render-frame sequence from Wine."""
+        if count <= 0:
+            raise ValueError("count must be positive")
+        if clock not in ("ra", "render"):
+            raise ValueError("clock must be 'ra' or 'render'")
+        keys = [
+            "WINE_CNCDDRAW_CAPTURE",
+            "WINE_CNCDDRAW_CAPTURE_START",
+            "WINE_CNCDDRAW_CAPTURE_RA_START",
+            "WINE_CNCDDRAW_CAPTURE_FLIP",
+            "WINE_CNCDDRAW_CAPTURE_COUNT",
+            "WINE_CNCDDRAW_CAPTURE_HALT",
+        ]
+        old_env = {key: os.environ.get(key) for key in keys}
+        try:
+            os.environ["WINE_CNCDDRAW_CAPTURE"] = "1"
+            os.environ["WINE_CNCDDRAW_CAPTURE_START"] = str(start_frame)
+            os.environ["WINE_CNCDDRAW_CAPTURE_FLIP"] = str(start_frame)
+            os.environ["WINE_CNCDDRAW_CAPTURE_COUNT"] = str(count)
+            if clock == "ra":
+                os.environ["WINE_CNCDDRAW_CAPTURE_RA_START"] = str(start_frame)
+            else:
+                os.environ.pop("WINE_CNCDDRAW_CAPTURE_RA_START", None)
+            os.environ.setdefault("WINE_CNCDDRAW_CAPTURE_HALT", "1")
+            self.capture_mission(scenario, start_frame, output_dir, logfile)
+            return output_dir / "wine-sequence"
+        finally:
+            for key, value in old_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def capture_mission_state(
         self, scenario: str, output_dir: pathlib.Path, logfile=None

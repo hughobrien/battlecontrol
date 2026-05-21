@@ -75,6 +75,25 @@ Latest useful captures:
   `p99=12`, with shroud-edge clusters around screen buckets near `(312,24)`,
   `(360,216)`, `(408,48)`, `(384,216)`, and `(336,216)`. Units can be ignored;
   the shroud-edge pattern is tracked as the residual D4 blending issue.
+- Wine cnc-ddraw root-of-trust probe, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T22-55-47-mission-allied-l1` and
+  `/tmp/battlecontrol/2026-05-21T22-56-34-mission-allied-l1` capture Allied L1
+  render-frame 50 directly inside cnc-ddraw's GDI render loop. The two Wine
+  PNGs are byte-identical (`sha256=f88994da...`), proving the previous Allied
+  L1 Wine drift was at least partly a screenshot/root-of-trust problem rather
+  than unavoidable RA95 nondeterminism.
+- Native repeatability probe, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T22-57-23-mission-allied-l1` and
+  `/tmp/battlecontrol/2026-05-21T22-57-40-mission-allied-l1` capture native
+  Allied L1 frame 50 and are also byte-identical (`sha256=b2f9f09e...`).
+- Wine render-frame to native frame alignment probe, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T23-08-46-mission-allied-l1` logs
+  `bc-capture: render_frame=50 ra_frame=91`. Comparing that stable Wine PNG
+  against native frames shows the first good match at native frame 93
+  (`/tmp/battlecontrol/native-align-raframe91-20260521T230940Z`,
+  `SSIM=0.9786`, `p99=112`). Native frames 88-92 remain around `SSIM=0.465`,
+  so the remaining timing issue is a present/counter boundary offset, not a
+  smooth one-or-two-frame animation drift.
 - Seeded D2 review capture, 2026-05-21:
   `/tmp/battlecontrol/2026-05-21T06-37-39-mission-allied-l2` was launched with
   `RA_RANDOM_SEED` unset by the caller and confirms the harness defaulted it to
@@ -242,7 +261,7 @@ the right state being drawn through the wrong dirty/redraw path.
 | D4 | Native shroud/fog edge blending differs from Wine at revealed-area boundaries. | Open | The original D4 terrain/stamp offset is fixed: `Buffer_Draw_Stamp_Clip()` treated clipped stamp coordinates as full-page coordinates while shape drawing treated them as window-relative, drawing terrain stamps 16 pixels too high in the Allied L2 Win95 layout (`TacPixelY=16`). The remaining visible issue is the same residual tactical shroud-edge/blending difference formerly tracked as D17; D4 review capture `/tmp/battlecontrol/2026-05-21T06-59-03-mission-allied-l2` still has concentrated edge deltas in the tactical viewport while top/UI regions match. |
 | D5 | Native had stale one-pixel text/crosshair remnants. | Fixed | `Buffer_Fill_Rect` used exclusive right/bottom; original callers pass inclusive coordinates. |
 | D6 | Native initially captured wrong viewport/camera. | Fixed | `Set_Tactical_Position()` ignored its requested coordinate; Linux also needed Win95 sidebar/start-view logic. |
-| D7 | Wine/native captures are at different simulation times. | Mostly fixed for native | Native now traps after the target gameplay frame is presented. Wine still uses FPS-limited wall-clock capture, but `RA_CAPTURE_FPS=10` and deterministic seed make Allied L2 frame-60 close enough to debug rendering. |
+| D7 | Wine/native captures are at different simulation times. | Open, now measurable | Native traps after the target gameplay frame is presented. Wine now has an optional cnc-ddraw render-loop capture hook (`WINE_CNCDDRAW_CAPTURE=1`) that dumps the actual DirectDraw surface and logs RA95's internal frame counter at that present. Allied L1 render-frame 50 is byte-reproducible in Wine and reports `ra_frame=91`; the closest native match is frame 93, showing a concrete present/counter-boundary offset still to resolve. |
 | D8 | Native credit text smears/overprints during credit counter animation. | Fixed | `CreditClass::Graphic_Logic()` now redraws the credit/timer tab background before printing updated text; frame-60 native capture shows a clean `5666`. |
 | D9 | Native tutorial message lifetime differs from Wine at later frames. | Fixed | `MessageListClass` now uses the gameplay frame clock while `GameActive`; trace showed the old native path added the message at `Frame=0` with `timeout=540` but expired it at `Frame=45` because it compared against `TickCount`. Frame-60 now has `messages=1`. |
 | D10 | Road/ground template art was fragmented or looked like the wrong subtile. | Fixed | The portable `Buffer_Draw_Stamp*` implementations skipped the original iconset logical-to-physical `Map` remap. Restoring that remap fixes Allied L1/L2 road fragmentation and the earlier “template rendering” issue. |
