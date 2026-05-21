@@ -305,7 +305,7 @@ _CACHE_DIR = os.path.expanduser("~/.cache/battlecontrol")
 _SWEEP_PATTERNS = ("wine-prefix-*", "wine-capture-*")
 _SWEEP_DISPLAY_RANGE = range(92, 99)
 _WINE_AUDIO_CAPTURE = Path("/tmp/wine-audio.raw")
-_DEFAULT_MIN_TMP_FREE_MB = 1024
+_DEFAULT_MIN_TMP_FREE_MB = 4096
 
 
 class PreflightError(RuntimeError):
@@ -340,8 +340,10 @@ def check_tmp_free_space(path: str | os.PathLike = "/tmp") -> None:
     if free_mb < min_mb:
         raise PreflightError(
             f"Preflight failed: {path} has {free_mb} MiB free; need at least "
-            f"{min_mb} MiB. Free space in /tmp before capturing or lower "
-            "RA_MIN_TMP_FREE_MB for a deliberate low-space run."
+            f"{min_mb} MiB. Free space in /tmp before capturing; RA95 may show "
+            "a modal low-disk warning before gameplay if the capture volume is "
+            "too full. Lower RA_MIN_TMP_FREE_MB only for a deliberate low-space "
+            "run."
         )
 
 

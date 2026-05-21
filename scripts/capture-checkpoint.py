@@ -31,9 +31,9 @@ from drivers.compare import full_report
 from drivers.common import (
     check_tmp_free_space,
     PreflightError,
-    remove_known_safe_artifacts,
     require_capture_tools,
     screenshot_ok,
+    sweep_state,
     tactical_nonblack_fraction,
 )
 
@@ -269,7 +269,7 @@ def _run(args):
         os.environ.setdefault("RA_CAPTURE_FPS", "10")
     random_seed = apply_default_mission_seed(args.type)
 
-    remove_known_safe_artifacts()
+    sweep_state()
     check_tmp_free_space("/tmp")
     require_capture_tools(targets)
 
