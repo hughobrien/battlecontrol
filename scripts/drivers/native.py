@@ -25,6 +25,13 @@ MIN_CAPTURE_RGB_SPREAD = 32
 MIN_CAPTURE_NONBLACK_FRACTION = 0.05
 
 
+def default_ra_bin() -> str:
+    for candidate in ("build/ra/redalert", "build/ra"):
+        if pathlib.Path(candidate).is_file():
+            return candidate
+    return "build/ra/redalert"
+
+
 def _warn(message: str, logfile=None) -> None:
     text = f"WARNING native capture: {message}"
     print(f"  {text}", file=sys.stderr)
@@ -165,10 +172,10 @@ class NativeCapture:
     """Capture screenshots from the native Linux RA build."""
 
     def __init__(self, ra_bin=None, data_dir=None):
-        ra_bin = ra_bin or os.environ.get("RA_BIN") or "build/ra/redalert"
+        ra_bin = ra_bin or os.environ.get("RA_BIN") or default_ra_bin()
         if not ra_bin:
             raise RuntimeError("RA_BIN not set; export RA_BIN=/abs/path/to/ra")
-        self.ra_bin = pathlib.Path(ra_bin)
+        self.ra_bin = pathlib.Path(ra_bin).resolve()
         if not self.ra_bin.is_file():
             raise RuntimeError(
                 f"RA_BIN/default native binary {self.ra_bin} is not a file; "

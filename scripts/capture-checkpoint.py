@@ -160,6 +160,13 @@ def file_metadata(path: str | None) -> dict:
     return data
 
 
+def default_native_ra_path() -> str:
+    for candidate in ("build/ra/redalert", "build/ra"):
+        if pathlib.Path(candidate).is_file():
+            return candidate
+    return "build/ra/redalert"
+
+
 def git_value(args: list[str]) -> str | None:
     try:
         r = subprocess.run(
@@ -182,7 +189,9 @@ def capture_environment_metadata(targets: list[str]) -> dict:
         "git_dirty": bool(git_value(["status", "--porcelain"])),
         "tools": {
             "wine": file_metadata(os.environ.get("WINE_BIN") or shutil.which("wine")),
-            "native_ra": file_metadata("build/ra/redalert"),
+            "native_ra": file_metadata(
+                os.environ.get("RA_BIN") or default_native_ra_path()
+            ),
             "nix": file_metadata(os.environ.get("NIX_BIN") or shutil.which("nix")),
         },
         "targets": targets,

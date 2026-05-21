@@ -374,7 +374,14 @@ def _wine_bin_preflight_error() -> str | None:
 
 
 def _native_bin_preflight_error() -> str | None:
-    ra_bin = os.environ.get("RA_BIN") or "build/ra/redalert"
+    ra_bin = os.environ.get("RA_BIN")
+    if not ra_bin:
+        for candidate in ("build/ra/redalert", "build/ra"):
+            if os.path.isfile(candidate):
+                ra_bin = candidate
+                break
+        else:
+            ra_bin = "build/ra/redalert or build/ra"
     if not os.path.isfile(ra_bin):
         return (
             f"RA_BIN is unset and default native binary {ra_bin} is missing; "
