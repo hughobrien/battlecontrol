@@ -56,6 +56,7 @@ class NativeCapture:
             env = {
                 **os.environ,
                 "DISPLAY": disp,
+                "SDL_AUDIODRIVER": "dummy",
                 "RA_AUTOSTART": "1",
                 "RA_AUTOSTART_SCENARIO": f"{scenario}.INI",
                 "RA_CAPTURE_FPS": os.environ.get("RA_CAPTURE_FPS", "10"),

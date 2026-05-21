@@ -9,25 +9,33 @@ Allies), and ra-scenario-patch (target scenario name), the game will:
   Boot → VQAs skip → menu bypassed → DIFF_NORMAL → no faction dialog
   → "SCG01EA.INI" (patched to target) → mission loads
 
-Four patches to Select_Game() in the RA95.EXE binary:
+Six patches to Select_Game() in the RA95.EXE binary:
 
-  1. selection=SEL_MULTIPLAYER(4) → selection=SEL_START_NEW_GAME(1)
-     With GameInFocus=1 (pinned by ra-game-in-focus-patch) the code was
-     picking SEL_MULTIPLAYER instead of SEL_NONE.  Redirect to
-     SEL_START_NEW_GAME so the new-game handler fires.
+  1. selection=SEL_NONE(8) → selection=SEL_START_NEW_GAME(1)
+     Redirect the normal cold-start path into the new-game handler instead of
+     drawing the main menu. This is the critical zero-input mission-start patch.
 
-  2. NOP je after testb IsFromInstall in SEL_START_NEW_GAME handler.
+  2. selection=SEL_MULTIPLAYER(4) → selection=SEL_START_NEW_GAME(1)
+     Redirect the alternate non-normal-session path as well, so returning from
+     a previous mode cannot fall back to the menu during capture.
+
+  3. NOP je after testb IsFromInstall in SEL_START_NEW_GAME handler.
      Always takes the DIFF_NORMAL branch — skips Fetch_Difficulty dialog.
 
-  3. Change jne to jmp after second IsFromInstall test.
+  4. Change jne to jmp after second IsFromInstall test.
      Always jumps to the Choose_Side path (Play_Movie call which
      vqa-skip already NOPs) instead of the faction WWMessageBox.
 
-  4. Patch jne after Choose_Side returns (CurrentCD flag check).
+  5. Patch jne after Choose_Side returns (CurrentCD flag check).
      By default this NOPs the branch to force the Allied/SCG01EA.INI string
      path.  With --side soviet it becomes an unconditional jump to the
      Soviet/SCU01EA.INI string path.  ra-scenario-patch replaces the chosen
      string with the target mission name.
+
+  6. Set the runtime Special.IsFromInstall bit at the first install check.
+     Several startup branches key off this global beyond the patched decision
+     points; setting it makes RA95 follow the same install/autostart state that
+     the original code was written for.
 
 Usage (apply after vqa-skip + cdlabel + game-in-focus):
   python3 scripts/ra-autostart-patch.py RA95.EXE
@@ -42,16 +50,30 @@ import shutil
 import sys
 
 
-# Four patches: (VA, expected_bytes, replacement_bytes)
+# Core patches: (VA, expected_bytes, replacement_bytes)
 # Each modifies one decision point in Select_Game().
 PATCHES = [
-    # 1. selection = SEL_START_NEW_GAME (value 1) instead of SEL_MULTIPLAYER (value 4)
+    # 0. Convert the first install-mode test into an install-mode setter.
+    #    Same length as the original `test byte ptr [Special], 4`, and it leaves
+    #    ZF clear so the following `je` falls through to the install setup call.
+    #    VA 0x4fd00e: test byte [0x655d0c], 4  →  or byte [0x655d0c], 4
+    (
+        0x004FD00E,
+        b"\xf6\x05\x0c\x5d\x65\x00\x04",
+        b"\x80\x0d\x0c\x5d\x65\x00\x04",
+    ),
+    # 1. selection = SEL_START_NEW_GAME (value 1) instead of SEL_NONE (value 8).
+    #    This is the normal cold-start path when Session.Type == GAME_NORMAL.
+    #    VA 0x4fd4fe: mov esi, 8   →  mov esi, 1
+    (0x004FD4FE, b"\xbe\x08\x00\x00\x00", b"\xbe\x01\x00\x00\x00"),
+    # 2. selection = SEL_START_NEW_GAME (value 1) instead of SEL_MULTIPLAYER (value 4)
+    #    Alternate path used when the previous Session.Type is not GAME_NORMAL.
     #    VA 0x4fd505: mov esi, 4   →  mov esi, 1
     (0x004FD505, b"\xbe\x04\x00\x00\x00", b"\xbe\x01\x00\x00\x00"),
-    # 2. NOP je after IsFromInstall->testb in SEL_START_NEW_GAME handler.
+    # 3. NOP je after IsFromInstall->testb in SEL_START_NEW_GAME handler.
     #    VA 0x4fdc67: je +0x68   →  nop nop
     (0x004FDC67, b"\x74\x68", b"\x90\x90"),
-    # 3. Change jne->jmp after IsFromInstall test for faction/Choose_Side.
+    # 4. Change jne->jmp after IsFromInstall test for faction/Choose_Side.
     #    VA 0x4fdd10: jne +0x5d  →  jmp +0x5d
     (0x004FDD10, b"\x75\x5d", b"\xeb\x5d"),
 ]
@@ -61,13 +83,13 @@ SIDE_PATCH = {
         0x004FDD8F,
         b"\x75\x07",
         b"\x90\x90",
-        "4. NOP jne -> always Allies/SCG01EA.INI after Choose_Side",
+        "5. NOP jne -> always Allies/SCG01EA.INI after Choose_Side",
     ),
     "soviet": (
         0x004FDD8F,
         b"\x75\x07",
         b"\xeb\x07",
-        "4. jne->jmp -> always Soviets/SCU01EA.INI after Choose_Side",
+        "5. jne->jmp -> always Soviets/SCU01EA.INI after Choose_Side",
     ),
 }
 
@@ -134,13 +156,27 @@ def disasm_hint(old: bytes, new: bytes, side: str = "allied") -> str:
     """Return a human-readable description of the patch."""
     hints = {
         (
-            0xBE04000000,
-            0xBE01000000,
-        ): "1. selection = SEL_START_NEW_GAME (1) instead of SEL_MULTIPLAYER (4)",
-        (0x7468, 0x9090): "2. NOP je -> always DIFF_NORMAL (skip Fetch_Difficulty)",
-        (0x755D, 0xEB5D): "3. jne->jmp -> always Choose_Side (skip faction dialog)",
-        (0x7507, 0x9090): SIDE_PATCH["allied"][3],
-        (0x7507, 0xEB07): SIDE_PATCH["soviet"][3],
+            b"\xbe\x04\x00\x00\x00",
+            b"\xbe\x01\x00\x00\x00",
+        ): "2. selection = SEL_START_NEW_GAME (1) instead of SEL_MULTIPLAYER (4)",
+        (
+            b"\xbe\x08\x00\x00\x00",
+            b"\xbe\x01\x00\x00\x00",
+        ): "1. selection = SEL_START_NEW_GAME (1) instead of SEL_NONE (8)",
+        (
+            b"\xf6\x05\x0c\x5d\x65\x00\x04",
+            b"\x80\x0d\x0c\x5d\x65\x00\x04",
+        ): "0. set Special.IsFromInstall at first install-mode check",
+        (
+            b"\x74\x68",
+            b"\x90\x90",
+        ): "3. NOP je -> always DIFF_NORMAL (skip Fetch_Difficulty)",
+        (
+            b"\x75\x5d",
+            b"\xeb\x5d",
+        ): "4. jne->jmp -> always Choose_Side (skip faction dialog)",
+        (b"\x75\x07", b"\x90\x90"): SIDE_PATCH["allied"][3],
+        (b"\x75\x07", b"\xeb\x07"): SIDE_PATCH["soviet"][3],
     }
     key = (bytes(old), bytes(new))
     if key in hints:

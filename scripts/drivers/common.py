@@ -216,6 +216,7 @@ def kill_process_tree(proc: subprocess.Popen):
 _CACHE_DIR = os.path.expanduser("~/.cache/battlecontrol")
 _SWEEP_PATTERNS = ("wine-prefix-*", "wine-capture-*")
 _SWEEP_DISPLAY_RANGE = range(92, 99)
+_WINE_AUDIO_CAPTURE = Path("/tmp/wine-audio.raw")
 
 
 def _read_proc_environ(pid: int) -> dict[str, str]:
@@ -274,6 +275,13 @@ def sweep_state(verbose: bool = False) -> tuple[int, int, int]:
     import shutil
 
     procs_killed = _kill_capture_orphans(verbose=verbose)
+
+    try:
+        _WINE_AUDIO_CAPTURE.unlink()
+        if verbose:
+            print(f"removed file: {_WINE_AUDIO_CAPTURE}")
+    except FileNotFoundError:
+        pass
 
     dirs_removed = 0
     for pat in _SWEEP_PATTERNS:

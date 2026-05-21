@@ -185,7 +185,8 @@ class WineCapture:
         ]
         if skip_vqa:
             patches.append("ra/ra-vqa-skip-patch.py")
-            patches.append("ra/ra-briefing-skip-patch.py")
+            if os.environ.get("WINE_BRIEFING_SKIP_PATCH", "1") not in ("", "0"):
+                patches.append("ra/ra-briefing-skip-patch.py")
         if scenario:
             patches.append("ra/ra-scenario-patch.py")
         if autostart:
@@ -367,6 +368,10 @@ class WineCapture:
         self.wineprefix = None
 
     def _launch(self, staging: pathlib.Path, logfile, disp: str) -> subprocess.Popen:
+        try:
+            pathlib.Path("/tmp/wine-audio.raw").unlink()
+        except FileNotFoundError:
+            pass
         return subprocess.Popen(
             [str(self.wine), str(staging / "RA95.EXE")],
             cwd=str(staging),
@@ -538,11 +543,7 @@ class WineCapture:
             # patched past dialogs/VQAs; unsolicited Enter/Space can race slower
             # CD2 starts and select Top Scores from the main menu.
             time.sleep(float(os.environ.get("WINE_BOOT_SETTLE", "5.0")))
-            boot_dismiss_default = (
-                "1"
-                if not menu_drive and scenario and scenario.upper().startswith("SCG")
-                else "0"
-            )
+            boot_dismiss_default = "0"
             if os.environ.get("WINE_BOOT_DISMISS", boot_dismiss_default) not in (
                 "",
                 "0",
