@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from ra.ra95_patches import (
+    ByteEdit,
     PatchError,
     apply_mode,
     infer_side,
@@ -22,6 +23,7 @@ class RA95PatcherRegistryTest(unittest.TestCase):
         self.assertIn("focus-wait-skip", ids)
         self.assertIn("vqa-skip", ids)
         self.assertIn("briefing-skip", ids)
+        self.assertIn("cd-label", ids)
         self.assertIn("scenario", ids)
         self.assertIn("autostart", ids)
         self.assertIn("random-seed", ids)
@@ -81,6 +83,28 @@ class RA95PatcherRegistryTest(unittest.TestCase):
             apply_mode("base", exe, manifest_path=manifest, patches=["nocd"])
             second_manifest = json.loads(manifest.read_text())
             self.assertEqual(second_manifest["patches"][0]["edits"][0]["result"], "already-applied")
+
+    def test_explicit_placeholder_patch_cannot_noop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "RA95.EXE"
+            exe.write_bytes(b"\x00" * 16)
+
+            with self.assertRaisesRegex(PatchError, "game-in-focus: patch has no registered edits"):
+                apply_mode(
+                    "base",
+                    exe,
+                    patches=["game-in-focus"],
+                    allow_quarantined=True,
+                )
+
+    def test_byte_edit_requires_equal_length_replacement(self):
+        with self.assertRaisesRegex(ValueError, "expected and replacement must have equal length"):
+            ByteEdit(
+                offset=0,
+                expected=b"\x75\xdd",
+                replacement=b"\x90",
+                label="invalid edit",
+            )
 
 
 if __name__ == "__main__":

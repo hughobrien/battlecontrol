@@ -26,6 +26,10 @@ class ByteEdit:
     label: str
     va: int | None = None
 
+    def __post_init__(self) -> None:
+        if len(self.expected) != len(self.replacement):
+            raise ValueError("expected and replacement must have equal length")
+
 
 @dataclass(frozen=True)
 class PatchSpec:
@@ -168,7 +172,7 @@ def mode_patch_ids(
             ids.append("vqa-skip")
             if skip_briefing:
                 ids.append("briefing-skip")
-        ids.extend(["scenario", "autostart"])
+        ids.extend(["cd-label", "scenario", "autostart"])
         if seed is not None:
             ids.append("random-seed")
         return ids
@@ -203,6 +207,9 @@ def diff_byte_ranges(before: bytes, after: bytes) -> list[dict[str, str]]:
 
 
 def _apply_static_patch(data: bytearray, spec: PatchSpec) -> list[dict]:
+    if not spec.edits:
+        raise PatchError(f"{spec.id}: patch has no registered edits")
+
     edit_results: list[dict] = []
     for edit in spec.edits:
         actual = bytes(data[edit.offset : edit.offset + len(edit.expected)])
