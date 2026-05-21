@@ -293,8 +293,8 @@ work around each missing piece.
 
 Patches are applied by the unified `scripts/ra/patch_ra95.py` patcher. The base
 mode applies the durable Wine setup patches; mission mode applies the capture
-patches for one scenario. Old standalone `ra-*-patch.py` scripts remain as
-temporary compatibility shims, but new capture code should use patch ids.
+patches for one scenario. The old standalone RA patch scripts have been removed;
+new capture code must use patch ids through the unified patcher.
 
 | Patch id | What it does | Why we need it |
 |---|---|---|
@@ -307,14 +307,14 @@ temporary compatibility shims, but new capture code should use patch ids.
 | `scenario` | Replaces hardcoded scenario strings (e.g. `SCG01EA` → `SCG02EA`) | Lets us pick which mission auto-launches without going through menus |
 | `autostart` | Applies the `Select_Game()` and related startup patches that skip the main-menu / difficulty / faction dialogs | Zero-click boot directly into the chosen mission |
 | `random-seed` | Replaces the startup random seed with a fixed value | Keeps Wine/native/WASM gameplay state deterministic for parity captures |
-| `game-in-focus` | Quarantined: old patch path for a write now known to behave as `Session.Type`, not `GameInFocus` | Must not be used for normal captures; the unified patch id is registered only for history/manifest clarity and is intentionally non-applicable, while the old standalone script refuses to run unless `RA_ALLOW_QUARANTINED_GAME_IN_FOCUS=1` is set for historical reproduction |
+| `game-in-focus` | Quarantined: old patch path for a write now known to behave as `Session.Type`, not `GameInFocus` | Must not be used for normal captures; the unified patch id is registered only for history/manifest clarity and is intentionally non-applicable |
 
 The unified patcher verifies each edit site before writing, records manifests,
 and marks diagnostic or quarantined patch ids behind explicit allow flags.
 
-### Why `ra-ddscl-patch.py` *only* touches the cooperative-level bytes
+### Why `ddscl-normal` *only* touches the cooperative-level bytes
 
-Earlier revisions of `ra-ddscl-patch.py` also stubbed
+Earlier revisions of the DirectDraw cooperative-level patch also stubbed
 `SetDisplayMode(640,480,8)` to fake-return DD_OK without calling through.
 That was correct for the wined3d path (Wine forwards `SetDisplayMode` to
 `NtUserChangeDisplaySettings`, which Xvfb refuses, which the game treats
@@ -368,8 +368,8 @@ look like green/magenta noise but with recognisable shapes.
   ends up reinterpreted under a wrong palette.
 - **Fix:** check the bytes at file offset `0x1a4a69` in the staged
   `RA95.EXE`. Should be `ff 53 54` (the original `call [ebx+0x54]`). If
-  they're `31 c0 90` (`xor eax,eax; nop`), an old version of
-  `ra-ddscl-patch.py` has been re-introduced.
+  they're `31 c0 90` (`xor eax,eax; nop`), an obsolete SetDisplayMode stub has
+  been re-introduced outside the unified `ddscl-normal` patch.
 
 ### "Window appears, content rendered, but every other row is black"
 

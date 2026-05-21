@@ -9,7 +9,6 @@ import shutil
 import struct
 import json
 import math
-import hashlib
 import sys
 from .common import (
     pick_free_display,
@@ -31,45 +30,6 @@ def _user_tmpdir(prefix="wine-capture-"):
     base = pathlib.Path.home() / ".cache" / "battlecontrol"
     base.mkdir(parents=True, exist_ok=True)
     return pathlib.Path(tempfile.mkdtemp(prefix=prefix, dir=str(base)))
-
-
-def _sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def _sha256_file(path: pathlib.Path) -> str:
-    return _sha256_bytes(path.read_bytes())
-
-
-def _diff_byte_ranges(before: bytes, after: bytes) -> list[dict[str, str]]:
-    """Return exact contiguous changed byte ranges between two byte strings."""
-    ranges = []
-    limit = max(len(before), len(after))
-    index = 0
-    while index < limit:
-        old_byte = before[index : index + 1] if index < len(before) else b""
-        new_byte = after[index : index + 1] if index < len(after) else b""
-        if old_byte == new_byte:
-            index += 1
-            continue
-
-        start = index
-        index += 1
-        while index < limit:
-            old_byte = before[index : index + 1] if index < len(before) else b""
-            new_byte = after[index : index + 1] if index < len(after) else b""
-            if old_byte == new_byte:
-                break
-            index += 1
-
-        ranges.append(
-            {
-                "offset": f"0x{start:08X}",
-                "before": before[start : min(index, len(before))].hex(),
-                "after": after[start : min(index, len(after))].hex(),
-            }
-        )
-    return ranges
 
 
 def _env_flag(name: str, default: str = "0") -> bool:
@@ -471,118 +431,6 @@ class WineCapture:
             "status": "preparing",
         }
 
-    def _new_patch_manifest(
-        self, exe: pathlib.Path, scenario=None, skip_vqa=True, autostart=True
-    ) -> dict:
-        return {
-            "scenario": _scenario_stem(scenario),
-            "side": _scenario_side(scenario),
-            "cd_label_mode": _cd_label_mode(scenario),
-            "boot_dismiss": _env_flag("WINE_BOOT_DISMISS", "0"),
-            "menu_drive": _env_flag("WINE_MENU_DRIVE", "0"),
-            "skip_vqa": bool(skip_vqa),
-            "autostart": bool(autostart),
-            "random_seed": self.random_seed,
-            "ra95_path": str(exe),
-            "sha256_initial": _sha256_file(exe),
-            "patches": [],
-            "status": "patching",
-        }
-
-    def _record_patch_entry(
-        self,
-        manifest: dict,
-        manifest_path: pathlib.Path | None,
-        exe: pathlib.Path,
-        script: str,
-        rc: int | None,
-        stdout: str,
-        stderr: str,
-        before: bytes,
-        after: bytes,
-        error: str | None = None,
-    ) -> dict:
-        changed_ranges = _diff_byte_ranges(before, after)
-        entry = {
-            "script": script,
-            "rc": rc,
-            "applied": [item["offset"] for item in changed_ranges],
-            "changed_ranges": changed_ranges,
-            "sha256_before": _sha256_bytes(before),
-            "sha256_after": _sha256_bytes(after),
-            "stdout": stdout,
-            "stderr": stderr,
-        }
-        if error:
-            entry["error"] = error
-        manifest["patches"].append(entry)
-        manifest["sha256_after"] = entry["sha256_after"]
-        self._write_patch_manifest(manifest_path, manifest)
-        return entry
-
-    def _record_missing_patch_entry(
-        self,
-        manifest: dict,
-        manifest_path: pathlib.Path | None,
-        script: pathlib.Path,
-    ) -> dict:
-        entry = {
-            "script": script.name,
-            "rc": None,
-            "applied": [],
-            "changed_ranges": [],
-            "stdout": "",
-            "stderr": "",
-            "skipped": "missing",
-            "path": str(script),
-        }
-        manifest["patches"].append(entry)
-        self._write_patch_manifest(manifest_path, manifest)
-        return entry
-
-    def _run_patch_script(
-        self,
-        manifest: dict,
-        manifest_path: pathlib.Path | None,
-        exe: pathlib.Path,
-        cmd: list[str],
-    ) -> subprocess.CompletedProcess:
-        before = exe.read_bytes()
-        script = (
-            pathlib.Path(cmd[1]).name if len(cmd) > 1 else pathlib.Path(cmd[0]).name
-        )
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            after = exe.read_bytes()
-            self._record_patch_entry(
-                manifest,
-                manifest_path,
-                exe,
-                script,
-                result.returncode,
-                result.stdout or "",
-                result.stderr or "",
-                before,
-                after,
-            )
-        except subprocess.TimeoutExpired as exc:
-            after = exe.read_bytes()
-            stdout = self._timeout_output(exc)
-            self._record_patch_entry(
-                manifest,
-                manifest_path,
-                exe,
-                script,
-                None,
-                stdout,
-                "",
-                before,
-                after,
-                error="timeout",
-            )
-            raise
-        return result
-
     def _patch_chain(
         self,
         exe: pathlib.Path,
@@ -618,43 +466,6 @@ class WineCapture:
             )
         if scenario is not None and self.random_seed is not None:
             (exe.parent / "RA_RANDOM_SEED.txt").write_text(f"{self.random_seed}\n")
-
-    def _patch_cd_label(
-        self,
-        exe: pathlib.Path,
-        scenario=None,
-        manifest: dict | None = None,
-        manifest_path: pathlib.Path | None = None,
-    ):
-        """Make Wine's blank staging volume label identify as the mission CD."""
-        label_offset = 0x1BFCB7
-        before = exe.read_bytes()
-        data = bytearray(before)
-        if len(data) < label_offset + 8:
-            raise RuntimeError(f"{exe} too small for RA CD label patch")
-
-        # The base flake derivation blanks CD1 for Allied captures. Soviet
-        # captures need the blank Wine volume label to match CD2 instead.
-        if _scenario_side(scenario) == "soviet":
-            data[label_offset] = ord("C")
-            data[label_offset + 4] = 0
-        else:
-            data[label_offset] = 0
-            data[label_offset + 4] = ord("C")
-        exe.write_bytes(data)
-        if manifest is not None:
-            after = bytes(data)
-            self._record_patch_entry(
-                manifest,
-                manifest_path,
-                exe,
-                "cd-label",
-                0,
-                f"cd_label_mode={_cd_label_mode(scenario)}",
-                "",
-                before,
-                after,
-            )
 
     def _setup_staging(
         self,

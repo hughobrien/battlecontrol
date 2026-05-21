@@ -46,8 +46,8 @@ without invoking `NtUserChangeDisplaySettings` (which Xvfb refuses). That was
 needed under Wine's builtin ddraw. Once the pipeline standardised on cnc-ddraw
 (approach 7), the stub became actively harmful — cnc-ddraw must receive the
 `SetDisplayMode(640,480,8)` call to size its X11-backed surface; without it the
-framebuffer is half-width and the palette is mangled. The current
-`ra-ddscl-patch.py` therefore only changes the cooperative-level bytes.
+framebuffer is half-width and the palette is mangled. The current unified
+`ddscl-normal` patch therefore only changes the cooperative-level bytes.
 
 **Result:** ❌ alone — GLX not available on Xvfb, so wined3d's no3d fallback
 still produces NULL draw_textures. The DDSCL_NORMAL change is a prerequisite for

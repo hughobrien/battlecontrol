@@ -519,12 +519,11 @@ python3 scripts/ra/patch_ra95.py base RA95.EXE
 python3 scripts/ra/patch_ra95.py mission RA95.EXE --scenario SCG02EA.INI
 ```
 
-The old standalone `ra-*-patch.py` scripts remain temporarily as compatibility
-shims, but new capture work should use `patch_ra95.py`. The old
-`ra-game-in-focus-patch.py` path is quarantined because it writes to an address
-now known to behave as `Session.Type`, not `GameInFocus`, and must not be used
-for normal captures. The standalone script refuses to run unless
-`RA_ALLOW_QUARANTINED_GAME_IN_FOCUS=1` is set for historical reproduction.
+The old standalone `ra-*-patch.py` scripts have been removed. `patch_ra95.py`
+is the only supported RA95 binary patch path. The old `game-in-focus` patch is
+quarantined in the unified registry because it writes to an address now known to
+behave as `Session.Type`, not `GameInFocus`, and must not be used for normal
+captures.
 
 ### What it does
 
