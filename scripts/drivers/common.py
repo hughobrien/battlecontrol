@@ -363,13 +363,25 @@ def remove_known_safe_artifacts(
 
 
 def _wine_bin_preflight_error() -> str | None:
-    wine_bin = os.environ.get("WINE_BIN")
+    wine_bin = os.environ.get("WINE_BIN") or shutil.which("wine")
     if not wine_bin:
-        return "WINE_BIN is unset"
+        return "WINE_BIN is unset and `wine` is not on PATH"
     if not os.path.isfile(wine_bin):
         return f"WINE_BIN={wine_bin} is not a file"
     if not os.access(wine_bin, os.X_OK):
         return f"WINE_BIN={wine_bin} is not executable"
+    return None
+
+
+def _native_bin_preflight_error() -> str | None:
+    ra_bin = os.environ.get("RA_BIN") or "build/ra/redalert"
+    if not os.path.isfile(ra_bin):
+        return (
+            f"RA_BIN is unset and default native binary {ra_bin} is missing; "
+            "build RA or export RA_BIN=/abs/path/to/redalert"
+        )
+    if not os.access(ra_bin, os.X_OK):
+        return f"RA_BIN/default native binary {ra_bin} is not executable"
     return None
 
 
@@ -393,13 +405,16 @@ def require_capture_tools(targets) -> None:
             "(native root fallback capture)"
         )
     wine_error = _wine_bin_preflight_error() if "wine" in target_set else None
+    native_error = _native_bin_preflight_error() if "native" in target_set else None
 
-    if not missing and wine_error is None:
+    if not missing and wine_error is None and native_error is None:
         return
 
     nix_status = _nix_shell_status()
     if wine_error:
         missing.append(wine_error)
+    if native_error:
+        missing.append(native_error)
     raise PreflightError(_missing_tool_message(", ".join(missing), nix_status))
 
 

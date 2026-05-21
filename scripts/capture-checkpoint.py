@@ -181,7 +181,7 @@ def capture_environment_metadata(targets: list[str]) -> dict:
         "git_commit": git_value(["rev-parse", "HEAD"]),
         "git_dirty": bool(git_value(["status", "--porcelain"])),
         "tools": {
-            "wine": file_metadata(os.environ.get("WINE_BIN")),
+            "wine": file_metadata(os.environ.get("WINE_BIN") or shutil.which("wine")),
             "native_ra": file_metadata("build/ra/redalert"),
             "nix": file_metadata(os.environ.get("NIX_BIN") or shutil.which("nix")),
         },

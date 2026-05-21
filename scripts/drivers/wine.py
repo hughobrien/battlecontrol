@@ -201,9 +201,12 @@ class WineCapture:
     }
 
     def __init__(self, data_dir=None):
-        wine = os.environ.get("WINE_BIN")
+        wine = os.environ.get("WINE_BIN") or shutil.which("wine")
         if not wine:
-            raise RuntimeError("WINE_BIN not set; export WINE_BIN=/abs/path/to/wine")
+            raise RuntimeError(
+                "WINE_BIN not set and `wine` is not on PATH; "
+                "export WINE_BIN=/abs/path/to/wine"
+            )
         self.wine = pathlib.Path(wine)
         if not self.wine.is_file():
             raise RuntimeError(f"WINE_BIN={self.wine} is not a file")

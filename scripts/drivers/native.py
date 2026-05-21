@@ -165,12 +165,15 @@ class NativeCapture:
     """Capture screenshots from the native Linux RA build."""
 
     def __init__(self, ra_bin=None, data_dir=None):
-        ra_bin = ra_bin or os.environ.get("RA_BIN")
+        ra_bin = ra_bin or os.environ.get("RA_BIN") or "build/ra/redalert"
         if not ra_bin:
             raise RuntimeError("RA_BIN not set; export RA_BIN=/abs/path/to/ra")
         self.ra_bin = pathlib.Path(ra_bin)
         if not self.ra_bin.is_file():
-            raise RuntimeError(f"RA_BIN={self.ra_bin} is not a file")
+            raise RuntimeError(
+                f"RA_BIN/default native binary {self.ra_bin} is not a file; "
+                "build RA or export RA_BIN=/abs/path/to/redalert"
+            )
 
         data_dir = data_dir or os.environ.get("DATA_DIR")
         if not data_dir:
