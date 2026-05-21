@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-TIM-735 — Pin GameInFocus = TRUE in RA95.EXE for headless Wine runs.
+TIM-735 — quarantined legacy patch originally believed to pin GameInFocus.
+
+This standalone script is retained only for historical reproduction. It writes
+to an address now known to behave as Session.Type, not GameInFocus, and must not
+be used for normal captures. Use scripts/ra/patch_ra95.py instead.
 
 TIM-732 established the root cause for the perpetually-black DDraw surface
 under Wine 10 + cnc-ddraw + Xvfb+openbox: RA's main render branch is gated on
@@ -70,15 +74,33 @@ Accepted input SHA-256:
 (ra-focus-skip-patch.py must run first.)
 """
 
+import hashlib
+import os
+import shutil
 import sys
 
-print(
-    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
-    file=sys.stderr,
-)
 
-import hashlib
-import shutil
+def _warn_deprecated() -> None:
+    print(
+        "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+        file=sys.stderr,
+    )
+
+
+def _check_quarantine_override() -> bool:
+    if os.environ.get("RA_ALLOW_QUARANTINED_GAME_IN_FOCUS") == "1":
+        return True
+    print(
+        "ERROR: ra-game-in-focus-patch.py is quarantined because it writes to "
+        "Session.Type, not GameInFocus.",
+        file=sys.stderr,
+    )
+    print(
+        "Use scripts/ra/patch_ra95.py for normal captures. For historical "
+        "reproduction only, set RA_ALLOW_QUARANTINED_GAME_IN_FOCUS=1.",
+        file=sys.stderr,
+    )
+    return False
 
 ACCEPTED_INPUT_SHA256 = {
     "9e34d336469e42b5a33499a37b34c0ab513e54ec0844f890873090a423be972b",  # .#ra-patched-exe + focus-skip
@@ -208,6 +230,9 @@ def patch(path: str, dry_run: bool = False) -> int:
 
 
 if __name__ == "__main__":
+    _warn_deprecated()
+    if not _check_quarantine_override():
+        sys.exit(1)
     dry_run = "--dry-run" in sys.argv
     paths = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not paths:

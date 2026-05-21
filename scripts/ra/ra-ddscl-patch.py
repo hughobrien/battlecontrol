@@ -28,15 +28,16 @@ Expected input SHA-256 (NoCD-patched RA95.EXE, see scripts/ra/ra-nocd-patch.py):
   292f858724dc215ea1db7ad36c9617fdd1acd808b4fb01593e0719ff87ee8edf
 """
 
-import sys
-
-print(
-    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
-    file=sys.stderr,
-)
-
 import hashlib
 import shutil
+import sys
+
+
+def _warn_deprecated() -> None:
+    print(
+        "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+        file=sys.stderr,
+    )
 
 INPUT_SHA256 = "292f858724dc215ea1db7ad36c9617fdd1acd808b4fb01593e0719ff87ee8edf"
 
@@ -115,6 +116,7 @@ def patch(path: str, dry_run: bool = False) -> int:
 
 
 if __name__ == "__main__":
+    _warn_deprecated()
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     if not args:
         print(f"Usage: {__file__} <exe-path> [exe-path ...]", file=sys.stderr)

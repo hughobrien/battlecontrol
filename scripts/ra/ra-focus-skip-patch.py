@@ -23,15 +23,16 @@ Accepted input SHA-256:
     (nocd + ddscl + cdlabel — i.e. output of .#ra-patched-exe)
 """
 
-import sys
-
-print(
-    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
-    file=sys.stderr,
-)
-
 import hashlib
 import shutil
+import sys
+
+
+def _warn_deprecated() -> None:
+    print(
+        "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+        file=sys.stderr,
+    )
 
 ACCEPTED_SHA256 = {
     "f55e92c706cb87e4e5972388f4b4c6cf6f7b282ff1fe15012d2584df07ca43a0",  # .#ra-patched-exe
@@ -99,6 +100,7 @@ def patch(path: str, dry_run: bool = False) -> int:
 
 
 if __name__ == "__main__":
+    _warn_deprecated()
     dry_run = "--dry-run" in sys.argv
     paths = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not paths:

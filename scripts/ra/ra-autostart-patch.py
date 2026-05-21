@@ -49,10 +49,12 @@ import os
 import shutil
 import sys
 
-print(
-    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
-    file=sys.stderr,
-)
+
+def _warn_deprecated() -> None:
+    print(
+        "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+        file=sys.stderr,
+    )
 
 
 # Core patches: (VA, expected_bytes, replacement_bytes)
@@ -200,6 +202,7 @@ def restore(path: str) -> int:
 
 
 def main() -> int:
+    _warn_deprecated()
     ap = argparse.ArgumentParser()
     ap.add_argument("--restore", action="store_true")
     ap.add_argument("--side", choices=("allied", "soviet"), default="allied")

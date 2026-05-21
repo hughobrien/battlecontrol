@@ -13,10 +13,12 @@ import hashlib
 import shutil
 import sys
 
-print(
-    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
-    file=sys.stderr,
-)
+
+def _warn_deprecated() -> None:
+    print(
+        "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+        file=sys.stderr,
+    )
 
 
 CALL_VA = 0x00542E96
@@ -66,6 +68,7 @@ def patch(path: str) -> int:
 
 
 def main() -> int:
+    _warn_deprecated()
     if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} <RA95.EXE> [RA95.EXE ...]", file=sys.stderr)
         return 1

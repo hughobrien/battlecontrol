@@ -523,7 +523,8 @@ The old standalone `ra-*-patch.py` scripts remain temporarily as compatibility
 shims, but new capture work should use `patch_ra95.py`. The old
 `ra-game-in-focus-patch.py` path is quarantined because it writes to an address
 now known to behave as `Session.Type`, not `GameInFocus`, and must not be used
-for normal captures.
+for normal captures. The standalone script refuses to run unless
+`RA_ALLOW_QUARANTINED_GAME_IN_FOCUS=1` is set for historical reproduction.
 
 ### What it does
 

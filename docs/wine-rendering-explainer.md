@@ -307,7 +307,7 @@ temporary compatibility shims, but new capture code should use patch ids.
 | `scenario` | Replaces hardcoded scenario strings (e.g. `SCG01EA` → `SCG02EA`) | Lets us pick which mission auto-launches without going through menus |
 | `autostart` | Applies the `Select_Game()` and related startup patches that skip the main-menu / difficulty / faction dialogs | Zero-click boot directly into the chosen mission |
 | `random-seed` | Replaces the startup random seed with a fixed value | Keeps Wine/native/WASM gameplay state deterministic for parity captures |
-| `game-in-focus` | Quarantined: old patch path for a write now known to behave as `Session.Type`, not `GameInFocus` | Must not be used for normal captures; only available behind the quarantined guard for historical diagnosis |
+| `game-in-focus` | Quarantined: old patch path for a write now known to behave as `Session.Type`, not `GameInFocus` | Must not be used for normal captures; the unified patch id requires the quarantined guard, and the old standalone script refuses to run unless `RA_ALLOW_QUARANTINED_GAME_IN_FOCUS=1` is set for historical reproduction |
 
 The unified patcher verifies each edit site before writing, records manifests,
 and marks diagnostic or quarantined patch ids behind explicit allow flags.

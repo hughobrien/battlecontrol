@@ -31,15 +31,16 @@ chain. The hash above is the canonical pipeline; any other value prints a
 warning and proceeds.
 """
 
-import sys
-
-print(
-    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
-    file=sys.stderr,
-)
-
 import hashlib
 import shutil
+import sys
+
+
+def _warn_deprecated() -> None:
+    print(
+        "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+        file=sys.stderr,
+    )
 
 ORIGINAL_SHA256 = "1714053226390117a44770f2809aa409df9bef2d7d96c789d4ebdf0628ecffaf"
 
@@ -114,6 +115,7 @@ def patch(path: str, dry_run: bool = False) -> int:
 
 
 if __name__ == "__main__":
+    _warn_deprecated()
     if len(sys.argv) < 2:
         print(f"Usage: {__file__} <exe-path> [exe-path ...]", file=sys.stderr)
         sys.exit(1)

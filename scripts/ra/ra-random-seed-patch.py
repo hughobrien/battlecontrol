@@ -17,10 +17,12 @@ import shutil
 import struct
 import sys
 
-print(
-    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
-    file=sys.stderr,
-)
+
+def _warn_deprecated() -> None:
+    print(
+        "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+        file=sys.stderr,
+    )
 
 
 SITES = [
@@ -96,6 +98,7 @@ def patch(path: str, seed: int, dry_run: bool) -> int:
 
 
 def main() -> int:
+    _warn_deprecated()
     ap = argparse.ArgumentParser()
     ap.add_argument("exe_path")
     ap.add_argument("seed", type=lambda s: int(s, 0))

@@ -28,10 +28,12 @@ import os
 import shutil
 import sys
 
-print(
-    "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
-    file=sys.stderr,
-)
+
+def _warn_deprecated() -> None:
+    print(
+        "WARNING: this standalone patch script is deprecated; use scripts/ra/patch_ra95.py",
+        file=sys.stderr,
+    )
 
 
 def sha256(data: bytes) -> str:
@@ -117,6 +119,7 @@ def restore(path: str) -> int:
 
 
 def main() -> int:
+    _warn_deprecated()
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
