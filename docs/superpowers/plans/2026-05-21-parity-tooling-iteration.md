@@ -277,12 +277,12 @@ Write `matrix-report.md` and `matrix-report.json` into a timestamped
 - Modify only if needed: native capture trap implementation in the file found
   by `rg "RA_CAPTURE_BMP_FILE|native-ready|RA_CAPTURE_FRAME"`
 
-- [ ] **Step 1: Verify `RA_CAPTURE_BMP_FILE` content**
+- [x] **Step 1: Verify `RA_CAPTURE_BMP_FILE` content**
 
 The native driver currently waits for `native-ready.txt` but still captures the
 X root. Make the driver prefer `capture.bmp` when it is non-empty and valid.
 
-- [ ] **Step 2: Convert BMP to PNG deterministically**
+- [x] **Step 2: Convert BMP to PNG deterministically**
 
 Use ImageMagick only for file conversion, not screen capture:
 
@@ -293,7 +293,7 @@ convert capture.bmp capture.png
 If conversion is unavailable or BMP is empty, fall back to root capture with a
 warning.
 
-- [ ] **Step 3: Assert dimensions and pixel range**
+- [x] **Step 3: Assert dimensions and pixel range**
 
 Reject empty/blank internal captures with the same smoke-test design rule as
 screenshots.

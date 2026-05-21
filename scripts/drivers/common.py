@@ -378,9 +378,20 @@ def require_capture_tools(targets) -> None:
     target_set = set(targets)
     tools = set()
     if target_set.intersection({"wine", "native"}):
-        tools.update(("Xvfb", "openbox", "import", "xdpyinfo", "xdotool"))
+        tools.update(("Xvfb", "openbox", "xdpyinfo", "xdotool"))
+    if "wine" in target_set:
+        tools.add("import")
 
     missing = sorted(tool for tool in tools if shutil.which(tool) is None)
+    if (
+        "native" in target_set
+        and shutil.which("convert") is None
+        and shutil.which("import") is None
+    ):
+        missing.append(
+            "convert (native internal BMP conversion) or import "
+            "(native root fallback capture)"
+        )
     wine_error = _wine_bin_preflight_error() if "wine" in target_set else None
 
     if not missing and wine_error is None:
