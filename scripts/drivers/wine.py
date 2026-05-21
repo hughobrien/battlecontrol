@@ -64,7 +64,7 @@ class WineCapture:
         "SOVIET2": 12.0,
     }
 
-    def __init__(self):
+    def __init__(self, data_dir=None):
         wine = os.environ.get("WINE_BIN")
         if not wine:
             raise RuntimeError("WINE_BIN not set; export WINE_BIN=/abs/path/to/wine")
@@ -72,7 +72,7 @@ class WineCapture:
         if not self.wine.is_file():
             raise RuntimeError(f"WINE_BIN={self.wine} is not a file")
 
-        data_dir = os.environ.get("WINE_DATA_DIR")
+        data_dir = data_dir or os.environ.get("WINE_DATA_DIR")
         if not data_dir:
             raise RuntimeError(
                 "WINE_DATA_DIR not set; export WINE_DATA_DIR=/abs/path/to/CD1"
@@ -197,11 +197,15 @@ class WineCapture:
             cmd = ["python3", str(script), str(exe)]
             if name.endswith("ra-scenario-patch.py") and scenario:
                 cmd.append(scenario)
+            if name.endswith("ra-autostart-patch.py") and scenario:
+                side = "soviet" if scenario.upper().startswith("SCU") else "allied"
+                cmd.extend(["--side", side])
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if r.returncode != 0:
                 raise RuntimeError(
                     f"{script.name} failed (rc={r.returncode}): {r.stderr or r.stdout}"
                 )
+        self._patch_cd_label(exe, scenario)
         if self.random_seed is not None:
             subprocess.run(
                 [
@@ -215,6 +219,23 @@ class WineCapture:
                 timeout=30,
             )
             (exe.parent / "RA_RANDOM_SEED.txt").write_text(f"{self.random_seed}\n")
+
+    def _patch_cd_label(self, exe: pathlib.Path, scenario=None):
+        """Make Wine's blank staging volume label identify as the mission CD."""
+        label_offset = 0x1BFCB7
+        data = bytearray(exe.read_bytes())
+        if len(data) < label_offset + 8:
+            raise RuntimeError(f"{exe} too small for RA CD label patch")
+
+        # The base flake derivation blanks CD1 for Allied captures. Soviet
+        # captures need the blank Wine volume label to match CD2 instead.
+        if scenario and scenario.upper().startswith("SCU"):
+            data[label_offset] = ord("C")
+            data[label_offset + 4] = 0
+        else:
+            data[label_offset] = 0
+            data[label_offset + 4] = ord("C")
+        exe.write_bytes(data)
 
     def _setup_staging(
         self, scenario=None, skip_vqa=True, autostart=True
@@ -441,7 +462,11 @@ class WineCapture:
             logfile.flush()
         max_polls = int(os.environ.get("RA_FRAMEPROBE_MAX_POLLS", "1200"), 0)
         relative = os.environ.get("RA_FRAMEPROBE_RELATIVE", "0") not in ("", "0")
-        stable_ok_polls = int(os.environ.get("RA_FRAMEPROBE_STABLE_OK_POLLS", "50"), 0)
+        stable_ok_polls = int(os.environ.get("RA_FRAMEPROBE_STABLE_OK_POLLS", "0"), 0)
+        accept_stable = os.environ.get("WINE_FRAMEPROBE_ACCEPT_STABLE", "0") not in (
+            "",
+            "0",
+        )
         value = self._read_proc_dword(pid, addr)
         target = value + frame if relative else frame
         logfile.write(
@@ -467,7 +492,12 @@ class WineCapture:
                 stable_polls += 1
             if value >= target:
                 return (True, value, "target")
-            if stable_ok_polls > 0 and value > 0 and stable_polls >= stable_ok_polls:
+            if (
+                accept_stable
+                and stable_ok_polls > 0
+                and value > 0
+                and stable_polls >= stable_ok_polls
+            ):
                 logfile.write(
                     f"wine-driver: proc-frameprobe stable value={value}; "
                     "capturing current gameplay state\n"
@@ -502,11 +532,25 @@ class WineCapture:
             wine_proc = self._launch(staging, logfile, disp)
             if not wait_for_window(disp, "Red Alert", timeout=30):
                 raise RuntimeError("Red Alert window never appeared")
-            # Dismiss DirectSound dialog, skip VQAs. Use SendInput for anything
-            # RA95 itself may read through DirectInput; XTest/xdotool often only
-            # reaches the X/WM path under Wine.
-            time.sleep(5)
-            self._sendinput_seq(staging, disp, "k=0x0D@300;k=0x20@300", logfile)
+            # Optional legacy boot-dismiss input. Autostart captures are fully
+            # patched past dialogs/VQAs; unsolicited Enter/Space can race slower
+            # CD2 starts and select Top Scores from the main menu.
+            time.sleep(float(os.environ.get("WINE_BOOT_SETTLE", "5.0")))
+            boot_dismiss_default = (
+                "1"
+                if not menu_drive and scenario and scenario.upper().startswith("SCG")
+                else "0"
+            )
+            if os.environ.get("WINE_BOOT_DISMISS", boot_dismiss_default) not in (
+                "",
+                "0",
+            ):
+                self._sendinput_seq(
+                    staging,
+                    disp,
+                    os.environ.get("WINE_BOOT_DISMISS_SEQ", "k=0x0D@300"),
+                    logfile,
+                )
             if menu_drive:
                 side_click = (
                     "380,228" if scenario.upper().startswith("SCU") else "258,228"
@@ -514,7 +558,7 @@ class WineCapture:
                 self._sendinput_seq(
                     staging,
                     disp,
-                    f"s=1000;c=322,183;s=2000;c=470,244;s=2000;c={side_click};s=5000;c=320,327",
+                    f"s=1000;c=322,183;s=500;c=322,183;s=2000;c=470,244;s=2000;c={side_click};s=5000;c=320,327",
                     logfile,
                 )
             # Older captures used synthetic input to dismiss the text mission

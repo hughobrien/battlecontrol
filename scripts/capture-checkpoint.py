@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import time
 import socket
 
@@ -53,6 +54,35 @@ def resolve_scenario(id: str) -> str:
     raise ValueError(
         f"unknown mission: {id} (try allied-l1..allied-l5 or soviet-l1..soviet-l5)"
     )
+
+
+def nix_build_package(attr: str) -> str:
+    nix = os.environ.get("NIX_BIN", "/nix/var/nix/profiles/default/bin/nix")
+    r = subprocess.run(
+        [nix, "build", f".#{attr}", "--impure", "--print-out-paths"],
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"nix build .#{attr} failed (rc={r.returncode}): {r.stderr.strip()}"
+        )
+    return r.stdout.strip()
+
+
+def mission_data_dir(scenario: str, target: str) -> str | None:
+    if not scenario:
+        return None
+    is_soviet = scenario.upper().startswith("SCU")
+    if is_soviet and target == "wine":
+        override = os.environ.get("RA_SOVIET_ASSETS")
+        if override:
+            return override
+        return nix_build_package("ra-data-soviet")
+    if target == "wine":
+        return os.environ.get("WINE_DATA_DIR")
+    return os.environ.get("DATA_DIR") or os.environ.get("RA_ASSETS")
 
 
 def prune_old_sessions(
@@ -127,6 +157,7 @@ def _run(args):
     if args.type == "mission":
         scenario = resolve_scenario(args.id)
         manifest["scenario"] = f"{scenario}.INI"
+        manifest["data"] = {}
     else:
         scenario = None
         manifest["vqa_stem"] = args.id
@@ -156,6 +187,10 @@ def _run(args):
     with open(checkpoint_dir / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 
+    def write_manifest():
+        with open(checkpoint_dir / "manifest.json", "w") as f:
+            json.dump(manifest, f, indent=2)
+
     captures = {}
     effective_frames = {}
     seed_file = checkpoint_dir / "RA_RANDOM_SEED.txt"
@@ -169,7 +204,11 @@ def _run(args):
         logfile = open(log_path, "w")
         try:
             if target == "wine":
-                driver = WineCapture()
+                data_dir = mission_data_dir(scenario, "wine")
+                if data_dir:
+                    manifest["data"]["wine"] = data_dir
+                    write_manifest()
+                driver = WineCapture(data_dir=data_dir)
                 if args.type == "mission":
                     result = driver.capture_mission(
                         scenario, args.frame, target_dir, logfile
@@ -229,14 +268,23 @@ def _run(args):
                             values[key] = value
                     reason = values.get("reason", "")
                     actual = int(values.get("actual", args.frame), 0)
-                    if reason == "stable" and actual > 0:
+                    if reason == "target" and actual > 0:
                         capture_frame = actual
                         print(
                             f"  NOTE native frame synced to Wine actual={actual} "
                             f"(requested {args.frame})"
                         )
+                    elif reason:
+                        raise RuntimeError(
+                            "Wine frameprobe did not reach requested target "
+                            f"(requested={args.frame}, actual={actual}, reason={reason})"
+                        )
                 effective_frames[target] = capture_frame
-                driver = NativeCapture()
+                data_dir = mission_data_dir(scenario, "native")
+                if data_dir:
+                    manifest["data"]["native"] = data_dir
+                    write_manifest()
+                driver = NativeCapture(data_dir=data_dir)
                 result = driver.capture_mission(
                     scenario, capture_frame, target_dir, logfile
                 )
@@ -280,7 +328,7 @@ def _run(args):
             and effective_frames.get("wine") == 1
             and effective_frames.get("native") == 1
             and report["summary"] != "PASS"
-            and os.environ.get("RA_RETRY_NATIVE_FRAME2_ON_FAIL", "1") not in ("", "0")
+            and os.environ.get("RA_RETRY_NATIVE_FRAME2_ON_FAIL", "0") not in ("", "0")
         ):
             old_native = checkpoint_dir / "native.png"
             if old_native.exists():
@@ -314,11 +362,10 @@ def _run(args):
         print("\nFAIL: no captures produced")
         sys.exit(1)
 
-    with open(checkpoint_dir / "manifest.json", "w") as f:
-        manifest["captures"] = captures
-        if effective_frames:
-            manifest["effective_frames"] = effective_frames
-        json.dump(manifest, f, indent=2)
+    manifest["captures"] = captures
+    if effective_frames:
+        manifest["effective_frames"] = effective_frames
+    write_manifest()
 
     # Start HTTP server on port 1234, restarting it if an existing instance
     # is serving the wrong directory (so the index shows every session under

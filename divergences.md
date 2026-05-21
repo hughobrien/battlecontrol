@@ -168,9 +168,27 @@ point directly:
 
 The capture harness now writes `wine-frame.txt`, records `effective_frames` in
 the manifest, and can sync native to Wine's actual frame with
-`RA_SYNC_NATIVE_TO_WINE_FRAME=1`. It also rejects Wine captures whose tactical
-viewport is effectively blank; this catches the Soviet L3 top-scores/main-menu
-failure that previously looked like a black-but-passing screenshot.
+`RA_SYNC_NATIVE_TO_WINE_FRAME=1`, but only when Wine reports `reason=target`.
+The old stable-nonzero fallback is no longer enabled by default because it
+allowed requested frame 60 to become Wine actual frame 1; it can only be
+re-enabled explicitly with `WINE_FRAMEPROBE_ACCEPT_STABLE=1` plus
+`RA_FRAMEPROBE_STABLE_OK_POLLS=N`. Native frame-2 retry after a frame-1 failure
+is also opt-in (`RA_RETRY_NATIVE_FRAME2_ON_FAIL=1`) so the comparison cannot
+silently paper over a bad root of trust.
+
+The harness also rejects Wine captures whose tactical viewport is effectively
+blank; this catches the Soviet L3 top-scores/main-menu failure that previously
+looked like a black-but-passing screenshot.
+
+2026-05-20 follow-up: the Wine mission path is not actually zero-click. Allied
+captures depend on a single `Enter` to select Start New Game; the broader
+legacy `Enter`+`Space` sequence can race and select Top Scores. Soviet captures
+also require CD2 semantics: the Wine staging code now uses `.#ra-data-soviet`
+for `SCU*` missions and rewrites the staged RA95 volume-label table so Wine's
+blank volume label maps to `CD2` instead of `CD1`. Strict frameprobe still
+shows Soviet missions reaching the main menu/top-scores path rather than
+gameplay, so Soviet campaign parity remains blocked on a scenario-entry fix
+rather than a renderer comparison.
 
 As of the keyframe-delta fix, Allied L2 must be compared with
 `WINE_FRAMEPROBE=1 RA_SYNC_NATIVE_TO_WINE_FRAME=1`; otherwise Wine's timed wait

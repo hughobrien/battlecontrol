@@ -7,8 +7,17 @@ import signal
 def pick_free_display() -> str:
     """Return ':92'..':98' that isn't in use."""
     for d in range(92, 99):
-        if not os.path.exists(f"/tmp/.X{d}-lock"):
-            return f":{d}"
+        disp = f":{d}"
+        if os.path.exists(f"/tmp/.X{d}-lock") or os.path.exists(f"/tmp/.X11-unix/X{d}"):
+            continue
+        r = subprocess.run(
+            ["xdpyinfo", "-display", disp],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+        )
+        if r.returncode != 0:
+            return disp
     raise RuntimeError("no free X display")
 
 
@@ -20,6 +29,8 @@ def start_xvfb(
         stderr=logfile,
     )
     time.sleep(1)
+    if p.poll() is not None:
+        raise RuntimeError(f"Xvfb failed to start on {disp} (rc={p.returncode})")
     return p
 
 
