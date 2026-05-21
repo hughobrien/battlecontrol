@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from unittest import mock
 
+from PIL import Image, ImageDraw
+
 
 SCRIPT = pathlib.Path(__file__).parent / "drivers" / "common.py"
 
@@ -67,6 +69,31 @@ class CapturePreflightTest(unittest.TestCase):
             self.assertFalse(stale_prefix.exists())
             self.assertFalse(stale_capture.exists())
             self.assertTrue(keep.exists())
+
+    def test_classifies_all_white_transition_as_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            screenshot = pathlib.Path(tmp) / "white.png"
+            Image.new("RGB", (640, 400), (255, 255, 255)).save(screenshot)
+
+            screen = self.common.classify_ra_screen(str(screenshot))
+
+            self.assertEqual(screen["state"], "unknown")
+
+    def test_classifies_windows_application_error_dialog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            screenshot = pathlib.Path(tmp) / "error-dialog.png"
+            image = Image.new("RGB", (640, 400), (0, 0, 0))
+            draw = ImageDraw.Draw(image)
+            draw.rectangle((480, 16, 639, 176), fill=(140, 0, 0))
+            draw.rectangle((150, 132, 487, 275), fill=(245, 245, 245))
+            draw.rectangle((150, 132, 487, 156), fill=(84, 125, 177))
+            draw.rectangle((153, 157, 484, 272), outline=(90, 90, 90))
+            draw.ellipse((170, 180, 202, 212), fill=(230, 45, 45))
+            image.save(screenshot)
+
+            screen = self.common.classify_ra_screen(str(screenshot))
+
+            self.assertEqual(screen["state"], "error-dialog")
 
 
 if __name__ == "__main__":

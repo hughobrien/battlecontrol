@@ -154,6 +154,7 @@ def _pixel_fraction(im, box, predicate) -> float:
 RA_SCREEN_STATES = (
     "main-menu",
     "briefing-or-dialog",
+    "error-dialog",
     "loading",
     "gameplay",
     "score",
@@ -162,7 +163,7 @@ RA_SCREEN_STATES = (
     "unknown",
 )
 
-RA_SCREEN_IMPOSSIBLE_STATES = ("score", "top-scores")
+RA_SCREEN_IMPOSSIBLE_STATES = ("error-dialog", "score", "top-scores")
 RA_SCREEN_TIMELINE_MODEL = "ra-screen-timeline-v1"
 
 
@@ -185,6 +186,14 @@ def classify_ra_screen(path: str) -> dict:
         red, green, blue = pixel
         return abs(red - green) < 18 and abs(red - blue) < 18 and red > 80
 
+    def is_bright(pixel):
+        red, green, blue = pixel
+        return red > 230 and green > 230 and blue > 230
+
+    def is_dialog_title_blue(pixel):
+        red, green, blue = pixel
+        return 55 <= red <= 150 and 90 <= green <= 185 and blue > 135
+
     def is_black(pixel):
         red, green, blue = pixel
         return red < 12 and green < 12 and blue < 12
@@ -201,14 +210,28 @@ def classify_ra_screen(path: str) -> dict:
         im, (480, 16, min(width, 640), min(height, 400)), is_red
     )
     overall_black = _pixel_fraction(im, (0, 0, width, height), is_black)
+    overall_bright = _pixel_fraction(im, (0, 0, width, height), is_bright)
+    error_title_blue = _pixel_fraction(
+        im, (150, 132, min(width, 490), min(height, 160)), is_dialog_title_blue
+    )
+    error_body_bright = _pixel_fraction(
+        im, (155, 160, min(width, 485), min(height, 275)), is_bright
+    )
+    error_icon_red = _pixel_fraction(
+        im, (165, 175, min(width, 210), min(height, 220)), is_red
+    )
     ui_signal = top_green + center_red + dialog_gray + score_gray + right_red
 
     if unsupported_dimensions:
         state = "unknown"
+    elif error_title_blue > 0.20 and error_body_bright > 0.35 and error_icon_red > 0.03:
+        state = "error-dialog"
     elif top_green > 0.015 and overall_black > 0.70:
         state = "top-scores"
     elif overall_black > 0.96:
         state = "black"
+    elif overall_bright > 0.95:
+        state = "unknown"
     elif score_gray > 0.20 and right_red > 0.03 and tactical_fill < 0.45:
         state = "score"
     elif dialog_gray > 0.08 and center_red > 0.05:
@@ -236,6 +259,10 @@ def classify_ra_screen(path: str) -> dict:
         "score_gray": round(score_gray, 6),
         "right_red": round(right_red, 6),
         "overall_black": round(overall_black, 6),
+        "overall_bright": round(overall_bright, 6),
+        "error_title_blue": round(error_title_blue, 6),
+        "error_body_bright": round(error_body_bright, 6),
+        "error_icon_red": round(error_icon_red, 6),
         "ui_signal": round(ui_signal, 6),
         "unsupported_dimensions": unsupported_dimensions,
     }

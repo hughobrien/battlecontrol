@@ -30,7 +30,9 @@ from drivers.wine import parse_wine_state_line
 from drivers.compare import full_report
 from drivers.common import (
     check_tmp_free_space,
+    classify_ra_screen,
     PreflightError,
+    RA_SCREEN_IMPOSSIBLE_STATES,
     require_capture_tools,
     screenshot_ok,
     sweep_state,
@@ -54,6 +56,18 @@ SESSION_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-(mission|vqa|title|menu)-"
 )
 DEFAULT_RA_RANDOM_SEED = "0x1eed5eed"
+
+
+def wine_capture_problem(path: pathlib.Path, min_tactical: float) -> str | None:
+    tactical_fill = tactical_nonblack_fraction(str(path))
+    if tactical_fill < min_tactical:
+        return f"blank tactical viewport (tactical nonblack={tactical_fill:.3f})"
+    if not screenshot_ok(str(path)):
+        return "invalid screenshot"
+    screen = classify_ra_screen(str(path))
+    if screen["state"] in RA_SCREEN_IMPOSSIBLE_STATES:
+        return f"invalid screen state {screen['state']}"
+    return None
 
 
 def resolve_scenario(id: str) -> str:
@@ -467,28 +481,29 @@ def _run(args):
                     )
                     max_retries = int(os.environ.get("WINE_GAMEPLAY_RETRIES", "4"), 0)
                     retry = 0
-                    while (
-                        tactical_nonblack_fraction(str(result)) < min_tactical
-                        or not screenshot_ok(str(result))
-                    ) and retry < max_retries:
+                    problem = wine_capture_problem(result, min_tactical)
+                    while problem and retry < max_retries:
                         retry += 1
                         invalid_path = checkpoint_dir / f"wine-invalid-{retry}.png"
                         result.rename(invalid_path)
                         preserve_wine_retry_artifacts(retry)
                         print(
-                            f"  NOTE Wine tactical viewport was blank; "
+                            f"  NOTE Wine capture was invalid ({problem}); "
                             f"retrying gameplay capture ({retry}/{max_retries})"
                         )
                         result = driver.capture_mission(
                             scenario, args.frame, target_dir, logfile
                         )
+                        problem = wine_capture_problem(result, min_tactical)
                     tactical_fill = tactical_nonblack_fraction(str(result))
                     valid_screenshot = screenshot_ok(str(result))
-                    if tactical_fill < min_tactical or not valid_screenshot:
+                    screen = classify_ra_screen(str(result))
+                    if problem:
                         raise RuntimeError(
                             "Wine capture did not enter gameplay "
                             f"(tactical nonblack={tactical_fill:.3f}, "
-                            f"screenshot_ok={int(valid_screenshot)})"
+                            f"screenshot_ok={int(valid_screenshot)}, "
+                            f"screen={screen['state']})"
                         )
                     effective_frames[target] = args.frame
                     wine_frame = checkpoint_dir / "wine-frame.txt"
