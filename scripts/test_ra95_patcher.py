@@ -83,18 +83,24 @@ class RA95PatcherRegistryTest(unittest.TestCase):
 
             self.assertEqual(result.output_sha256, first_manifest["output_sha256"])
             self.assertEqual(first_manifest["patches"][0]["id"], "nocd")
-            self.assertEqual(first_manifest["patches"][0]["edits"][0]["result"], "applied")
+            self.assertEqual(
+                first_manifest["patches"][0]["edits"][0]["result"], "applied"
+            )
 
             apply_mode("base", exe, manifest_path=manifest, patches=["nocd"])
             second_manifest = json.loads(manifest.read_text())
-            self.assertEqual(second_manifest["patches"][0]["edits"][0]["result"], "already-applied")
+            self.assertEqual(
+                second_manifest["patches"][0]["edits"][0]["result"], "already-applied"
+            )
 
     def test_explicit_placeholder_patch_cannot_noop(self):
         with tempfile.TemporaryDirectory() as tmp:
             exe = Path(tmp) / "RA95.EXE"
             exe.write_bytes(b"\x00" * 16)
 
-            with self.assertRaisesRegex(PatchError, "game-in-focus: .*quarantined.*non-applicable"):
+            with self.assertRaisesRegex(
+                PatchError, "game-in-focus: .*quarantined.*non-applicable"
+            ):
                 apply_mode(
                     "base",
                     exe,
@@ -103,7 +109,9 @@ class RA95PatcherRegistryTest(unittest.TestCase):
                 )
 
     def test_byte_edit_requires_equal_length_replacement(self):
-        with self.assertRaisesRegex(ValueError, "expected and replacement must have equal length"):
+        with self.assertRaisesRegex(
+            ValueError, "expected and replacement must have equal length"
+        ):
             ByteEdit(
                 offset=0,
                 expected=b"\x75\xdd",
@@ -181,8 +189,12 @@ class RA95PatcherRegistryTest(unittest.TestCase):
             self.assertEqual(first_edits["cd-label"], ["already-applied", "applied"])
             self.assertEqual(first_edits["scenario"], ["applied", "applied"])
             self.assertEqual(first_edits["random-seed"], ["applied"])
-            self.assertEqual(second_edits["cd-label"], ["already-applied", "already-applied"])
-            self.assertEqual(second_edits["scenario"], ["already-applied", "already-applied"])
+            self.assertEqual(
+                second_edits["cd-label"], ["already-applied", "already-applied"]
+            )
+            self.assertEqual(
+                second_edits["scenario"], ["already-applied", "already-applied"]
+            )
             self.assertEqual(second_edits["random-seed"], ["already-applied"])
 
     def test_explicit_cd_label_patch_honors_side(self):

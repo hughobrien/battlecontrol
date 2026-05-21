@@ -52,10 +52,68 @@
             "open-watcom-bin-unwrapped"
           ];
       };
+      pythonEnv = pkgs.python3.withPackages (
+        ps: with ps; [
+          numpy
+          pillow
+          scikit-image
+        ]
+      );
+      appRuntimePath = pkgs.lib.makeBinPath (
+        with pkgs;
+        [
+          bash
+          binutils
+          ccache
+          clang-tools
+          cmake
+          coreutils
+          cppcheck
+          curl
+          emscripten
+          ffmpeg-headless
+          findutils
+          gawk
+          gh
+          git
+          gnumake
+          gnugrep
+          gnused
+          gnutar
+          gzip
+          imagemagick
+          mono
+          ninja
+          nix
+          nixfmt
+          openbox
+          open-watcom-bin
+          pkg-config
+          pkgsCross.mingw32.buildPackages.gcc
+          playwright-test
+          pythonEnv
+          ripgrep
+          ruff
+          shellcheck
+          shfmt
+          unar
+          uv
+          wineWow64Packages.stableFull
+          xdotool
+          xvfb
+          xvfb-run
+          yamllint
+        ]
+      );
 
       mkApp = name: script: rec {
         type = "app";
-        program = toString (pkgs.writeShellScript name script);
+        program = toString (
+          pkgs.writeShellScript name ''
+            export PATH="${appRuntimePath}:''${PATH:-}"
+            ${script}
+          ''
+        );
       };
     in
     {
@@ -280,13 +338,7 @@
           cmake
           gnumake
           ninja
-          (python3.withPackages (
-            ps: with ps; [
-              numpy
-              pillow
-              scikit-image
-            ]
-          ))
+          pythonEnv
           pkg-config
           emscripten # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
           # CI deps
@@ -343,7 +395,15 @@
             echo "pre-commit: must be run inside nix develop" >&2
             exit 1
           fi
-          nix run .#lint
+          NIX_BIN="$(command -v nix || true)"
+          if [[ -z "$NIX_BIN" && -x /nix/var/nix/profiles/default/bin/nix ]]; then
+            NIX_BIN=/nix/var/nix/profiles/default/bin/nix
+          fi
+          if [[ -z "$NIX_BIN" ]]; then
+            echo "pre-commit: nix not found; avoid login shells inside nix develop" >&2
+            exit 1
+          fi
+          "$NIX_BIN" run .#lint
           PREHOOK
                       chmod +x "$HOOK"
                       echo "Installed git pre-commit hook: nix run .#lint"

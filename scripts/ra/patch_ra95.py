@@ -547,9 +547,13 @@ def apply_mode(
         except KeyError as exc:
             raise PatchError(f"unknown RA95 patch id: {patch_id}") from exc
         if spec.status == "diagnostic" and not allow_diagnostic:
-            raise PatchError(f"{patch_id}: diagnostic patch requires --allow-diagnostic")
+            raise PatchError(
+                f"{patch_id}: diagnostic patch requires --allow-diagnostic"
+            )
         if spec.status == "quarantined" and not allow_quarantined:
-            raise PatchError(f"{patch_id}: quarantined patch requires --allow-quarantined")
+            raise PatchError(
+                f"{patch_id}: quarantined patch requires --allow-quarantined"
+            )
         if not spec.default_allowed and patches is None:
             raise PatchError(f"{patch_id}: patch is not allowed in default mode {mode}")
         effective_side = side or (infer_side(scenario) if scenario else "allied")
@@ -648,7 +652,9 @@ def build_parser() -> argparse.ArgumentParser:
     base.add_argument("exe_path", metavar="RA95.EXE")
     base.add_argument("--manifest", metavar="PATH")
 
-    mission = subparsers.add_parser("mission", help="apply default Wine mission capture patches")
+    mission = subparsers.add_parser(
+        "mission", help="apply default Wine mission capture patches"
+    )
     mission.add_argument("exe_path", metavar="RA95.EXE")
     mission.add_argument("--scenario", required=True)
     mission.add_argument("--side", choices=("allied", "soviet"))
