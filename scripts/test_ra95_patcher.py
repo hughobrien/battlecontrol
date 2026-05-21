@@ -182,6 +182,32 @@ class RA95PatcherRegistryTest(unittest.TestCase):
             self.assertEqual(second_edits["scenario"], ["already-applied", "already-applied"])
             self.assertEqual(second_edits["random-seed"], ["already-applied"])
 
+    def test_explicit_cd_label_patch_honors_side(self):
+        cd1_offset = 0x1BFCB7
+        cd2_offset = cd1_offset + 4
+        data = bytearray(b"\x00" * (cd2_offset + 1))
+        data[cd1_offset : cd1_offset + 1] = b"C"
+        data[cd2_offset : cd2_offset + 1] = b"C"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "RA95.EXE"
+            manifest = Path(tmp) / "patches.json"
+            exe.write_bytes(data)
+
+            apply_mode(
+                "apply",
+                exe,
+                patches=["cd-label"],
+                side="soviet",
+                manifest_path=manifest,
+            )
+
+            patched = exe.read_bytes()
+            recorded = json.loads(manifest.read_text())
+            self.assertEqual(patched[cd1_offset : cd1_offset + 1], b"C")
+            self.assertEqual(patched[cd2_offset : cd2_offset + 1], b"\x00")
+            self.assertEqual(recorded["side"], "soviet")
+
 
 class RA95PatcherCLITest(unittest.TestCase):
     def test_cli_help_imports(self):

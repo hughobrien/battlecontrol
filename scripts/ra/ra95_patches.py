@@ -538,7 +538,7 @@ def apply_mode(
                 raise PatchError("random-seed patch requires --seed")
             edits = _seed_edits(data, seed)
         elif patch_id == "cd-label":
-            edits = _cd_label_edits(data, effective_side if mode == "mission" else "allied")
+            edits = _cd_label_edits(data, effective_side)
         elif patch_id == "autostart":
             edits = _apply_static_patch(data, spec)
             side_offset = va_to_file_offset(0x004FDD8F)
