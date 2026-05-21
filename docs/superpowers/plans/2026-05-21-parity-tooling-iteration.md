@@ -103,7 +103,7 @@ session type, win/loss flags, player house, and player defeat state.
 - Modify: `tools/wine-input/ra-frameprobe.c`
 - Modify: `scripts/drivers/wine.py`
 
-- [ ] **Step 1: Add a `--state`/negative-target mode to `ra-frameprobe`**
+- [x] **Step 1: Add a `--state`/negative-target mode to `ra-frameprobe`**
 
 Dump a compact JSON-ish line to stderr with known or discovered addresses:
 
@@ -114,7 +114,7 @@ state scenario=SCG03EA.INI frame=1 player_wins=0 player_loses=1 session=GAME_NOR
 Start with addresses already used by source/disassembly when known. If an
 address is unknown, emit `unknown` rather than guessing.
 
-- [ ] **Step 2: Call the state probe on every frameprobe failure**
+- [x] **Step 2: Call the state probe on every frameprobe failure**
 
 When Wine strict frameprobe fails, run the state probe before teardown and write:
 
@@ -124,7 +124,7 @@ wine-state.txt
 
 Include state in the manifest failure object.
 
-- [ ] **Step 3: Add a state-only command path**
+- [x] **Step 3: Add a state-only command path**
 
 Allow:
 

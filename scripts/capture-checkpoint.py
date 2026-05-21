@@ -25,6 +25,7 @@ import socket
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from drivers import WineCapture, NativeCapture, WasmCapture
+from drivers.wine import parse_wine_state_line
 from drivers.compare import full_report
 from drivers.common import (
     check_tmp_free_space,
@@ -141,6 +142,11 @@ def main():
         default=None,
         help="capture sessions to keep under --output (default: RA_KEEP_CAPTURE_SESSIONS or 5)",
     )
+    ap.add_argument(
+        "--state-only",
+        action="store_true",
+        help="for mission --targets wine, dump Wine state and exit without capture/comparison",
+    )
     args = ap.parse_args()
 
     try:
@@ -157,6 +163,11 @@ def _run(args):
     for target in targets:
         if target not in ("wine", "native", "wasm"):
             raise ValueError(f"unknown target: {target} (allowed: wine, native, wasm)")
+    if args.state_only:
+        if args.type != "mission":
+            raise ValueError("--state-only is only supported for mission captures")
+        if targets != ["wine"]:
+            raise ValueError("--state-only requires --targets wine")
 
     remove_known_safe_artifacts()
     check_tmp_free_space("/tmp")
@@ -168,6 +179,7 @@ def _run(args):
         "id": args.id,
         "frame": args.frame,
         "targets": targets,
+        "state_only": bool(args.state_only),
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
@@ -217,6 +229,15 @@ def _run(args):
                 key, value = line.split("=", 1)
                 values[key] = value
         return values
+
+    def read_state_file(path: pathlib.Path) -> dict:
+        if not path.exists():
+            return {}
+        for line in path.read_text().splitlines():
+            values = parse_wine_state_line(line)
+            if values:
+                return values
+        return {}
 
     def summarize_timeline(path: pathlib.Path) -> dict:
         if not path.exists():
@@ -268,6 +289,9 @@ def _run(args):
         frame_file = checkpoint_dir / f"{target}-frame.txt"
         if frame_file.exists():
             failure["frame"] = read_kv_file(frame_file)
+        state_file = checkpoint_dir / f"{target}-state.txt"
+        if state_file.exists():
+            failure["state"] = read_state_file(state_file)
         screen_file = checkpoint_dir / f"{target}-screen.json"
         if screen_file.exists():
             failure["screen"] = json.loads(screen_file.read_text())
@@ -293,6 +317,30 @@ def _run(args):
     captures = {}
     effective_frames = {}
     seed_file = checkpoint_dir / "RA_RANDOM_SEED.txt"
+    if args.state_only:
+        log_path = checkpoint_dir / "wine-driver.log"
+        with open(log_path, "w") as logfile:
+            try:
+                data_dir = mission_data_dir(scenario, "wine")
+                if data_dir:
+                    manifest["data"]["wine"] = data_dir
+                    write_manifest()
+                driver = WineCapture(data_dir=data_dir)
+                state = driver.capture_mission_state(scenario, checkpoint_dir, logfile)
+                manifest["wine_state"] = state
+                timeline = summarize_timeline(
+                    checkpoint_dir / "wine-screen-timeline.json"
+                )
+                if timeline["status"] != "missing":
+                    manifest.setdefault("screen_timelines", {})["wine"] = timeline
+                write_manifest()
+                print(f"  OK wine state: {checkpoint_dir / 'wine-state.txt'}")
+                print(f"  State: {state}")
+                print(f"\nSession dir: {checkpoint_dir}")
+                return 0
+            except Exception as exc:
+                record_failure("wine", exc)
+                return 1
     if args.type == "mission" and ("wine" in targets or "native" in targets):
         os.environ.setdefault("RA_CAPTURE_FPS", "10")
     for target in targets:

@@ -74,6 +74,28 @@ def _parse_timeline_sample_times(
     return sorted(sample_times)
 
 
+def parse_wine_state_line(line: str) -> dict[str, str]:
+    """Parse a compact ra-frameprobe state line into key/value pairs."""
+    values: dict[str, str] = {}
+    parts = line.strip().split()
+    if not parts or parts[0] != "state":
+        return values
+    for item in parts[1:]:
+        if "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        values[key] = value
+    return values
+
+
+def first_non_loading_state(entries: list[dict]) -> dict | None:
+    """Return the first timeline entry that is not a loading-like state."""
+    for entry in entries:
+        if entry.get("state") not in ("loading", "black", "unknown"):
+            return entry
+    return None
+
+
 class WineCapture:
     """Capture screenshots from RA95.EXE under Wine.
 
@@ -201,11 +223,6 @@ class WineCapture:
             pathlib.Path.home() / ".cache" / "battlecontrol" / "ra-frameprobe.exe"
         )
         self._frameprobe_exe.parent.mkdir(parents=True, exist_ok=True)
-        if (
-            self._frameprobe_exe.exists()
-            and src.stat().st_mtime <= self._frameprobe_exe.stat().st_mtime
-        ):
-            return
         r = subprocess.run(
             [
                 "i686-w64-mingw32-gcc",
@@ -455,6 +472,133 @@ class WineCapture:
         if r.returncode != 0:
             raise RuntimeError(f"ra-sendinput seq failed (rc={r.returncode})")
 
+    def _frameprobe_env(self, disp: str) -> dict:
+        return {
+            **os.environ,
+            "DISPLAY": disp,
+            "WINEPREFIX": str(self.wineprefix),
+            "WINEDEBUG": "-all",
+            "WAYLAND_DISPLAY": "",
+            "RA_FRAMEPROBE_MAX_POLLS": os.environ.get(
+                "RA_FRAMEPROBE_MAX_POLLS", "1200"
+            ),
+            "RA_FRAMEPROBE_IDLE_POLLS": os.environ.get(
+                "RA_FRAMEPROBE_IDLE_POLLS", "600"
+            ),
+            "RA_FRAMEPROBE_RELATIVE": os.environ.get("RA_FRAMEPROBE_RELATIVE", "1"),
+        }
+
+    def _write_unknown_state(
+        self, output_dir: pathlib.Path, reason: str, logfile=None
+    ) -> dict[str, str]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        line = self._fallback_state_line(reason)
+        (output_dir / "wine-state.txt").write_text(line + "\n")
+        if hasattr(logfile, "write"):
+            logfile.write(f"wine-driver: state probe unavailable: {reason}\n")
+            logfile.flush()
+        return parse_wine_state_line(line)
+
+    @staticmethod
+    def _fallback_state_line(reason: str) -> str:
+        return (
+            "state scenario=unknown frame=unknown player_wins=unknown "
+            "player_loses=unknown session=unknown PlayerWins=unknown "
+            "PlayerLoses=unknown Session.Type=unknown player=unknown defeated=unknown "
+            f"error={reason.replace(' ', '_')}"
+        )
+
+    def _write_state_probe_fallback(
+        self,
+        output_dir: pathlib.Path,
+        reason: str,
+        raw_output: str,
+        logfile=None,
+    ) -> dict[str, str]:
+        if raw_output:
+            (output_dir / "wine-state-raw.txt").write_text(raw_output)
+            if not raw_output.endswith("\n"):
+                raw_output += "\n"
+        fallback = self._fallback_state_line(reason)
+        if raw_output:
+            (output_dir / "wine-state.txt").write_text(raw_output + fallback + "\n")
+        else:
+            (output_dir / "wine-state.txt").write_text(fallback + "\n")
+        if hasattr(logfile, "write"):
+            logfile.write(f"wine-driver: state probe unavailable: {reason}\n")
+            logfile.flush()
+        return parse_wine_state_line(fallback)
+
+    @staticmethod
+    def _timeout_output(exc: subprocess.TimeoutExpired) -> str:
+        def decode(value):
+            if value is None:
+                return ""
+            if isinstance(value, bytes):
+                return value.decode("utf-8", "replace")
+            return str(value)
+
+        stdout = decode(exc.stdout)
+        stderr = decode(exc.stderr)
+        parts = []
+        if stdout:
+            parts.append(stdout)
+        if stderr:
+            parts.append(stderr)
+        return "".join(parts)
+
+    def _run_state_probe(
+        self,
+        staging: pathlib.Path,
+        disp: str,
+        output_dir: pathlib.Path,
+        logfile=None,
+        timeout: float = 20.0,
+    ) -> dict[str, str]:
+        """Run ra-frameprobe --state and write wine-state.txt."""
+        output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self._build_frameprobe()
+        except Exception as exc:
+            return self._write_unknown_state(output_dir, str(exc), logfile)
+
+        addr = os.environ.get("WINE_FRAME_ADDR", "0x006544c8")
+        try:
+            r = subprocess.run(
+                [str(self.wine), str(self._frameprobe_exe), "--state", addr],
+                cwd=str(staging),
+                env=self._frameprobe_env(disp),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            return self._write_state_probe_fallback(
+                output_dir, "state_probe_timeout", self._timeout_output(exc), logfile
+            )
+
+        combined = (r.stdout or "") + (r.stderr or "")
+        (output_dir / "wine-state.txt").write_text(combined)
+        if combined:
+            (output_dir / "wine-state-raw.txt").write_text(combined)
+        if hasattr(logfile, "write"):
+            logfile.write("wine-driver: state probe output:\n")
+            logfile.write(combined)
+            if r.returncode != 0:
+                logfile.write(f"wine-driver: state probe rc={r.returncode}\n")
+            logfile.flush()
+
+        for line in combined.splitlines():
+            parsed = parse_wine_state_line(line)
+            if parsed:
+                return parsed
+        return self._write_state_probe_fallback(
+            output_dir,
+            f"state_probe_no_state_line_rc_{r.returncode}",
+            combined,
+            logfile,
+        )
+
     def _xtest_click(self, disp: str, x: int, y: int, logfile):
         r = subprocess.run(
             ["xdotool", "mousemove", str(x), str(y), "click", "1"],
@@ -577,6 +721,7 @@ class WineCapture:
         logfile,
         max_elapsed_s: float,
         metadata: dict,
+        stop_on_first_non_loading: bool = False,
     ) -> tuple[list[dict], pathlib.Path]:
         """Capture a short mission-entry screen-state timeline."""
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -609,6 +754,12 @@ class WineCapture:
                 )
                 logfile.flush()
                 write_screen_timeline(timeline_path, entries, metadata)
+                if stop_on_first_non_loading and entry["state"] not in (
+                    "loading",
+                    "black",
+                    "unknown",
+                ):
+                    break
                 if entry["state"] == "gameplay" and not continue_after_gameplay:
                     break
             except Exception as exc:
@@ -666,6 +817,7 @@ class WineCapture:
             if strict_frameprobe and timeline_entries:
                 reason = _timeline_strict_failure(timeline_entries)
                 if reason:
+                    self._run_state_probe(staging, disp, output_dir, logfile)
                     raise RuntimeError(
                         f"Wine mission entry reached {reason}; timeline={timeline_path}"
                     )
@@ -706,6 +858,7 @@ class WineCapture:
                 if strict_frameprobe:
                     reason = _timeline_strict_failure(timeline_entries)
                     if reason:
+                        self._run_state_probe(staging, disp, output_dir, logfile)
                         raise RuntimeError(
                             "Wine mission entry reached "
                             f"{reason}; timeline={timeline_path}"
@@ -776,6 +929,7 @@ class WineCapture:
                                     f"wine-driver: failure screenshot failed: {exc}\n"
                                 )
                                 logfile.flush()
+                            self._run_state_probe(staging, disp, output_dir, logfile)
                             raise RuntimeError("proc frameprobe failed")
                         frame_wait = float(
                             os.environ.get("WINE_FRAMEPROBE_FALLBACK_WAIT", "0")
@@ -788,35 +942,10 @@ class WineCapture:
                         time.sleep(frame_wait)
                 else:
                     self._build_frameprobe()
-                    frameprobe_env = {
-                        **os.environ,
-                        "DISPLAY": disp,
-                        "WINEPREFIX": str(self.wineprefix),
-                        "WINEDEBUG": "-all",
-                        "WAYLAND_DISPLAY": "",
-                        "RA_FRAMEPROBE_MAX_POLLS": os.environ.get(
-                            "RA_FRAMEPROBE_MAX_POLLS", "1200"
-                        ),
-                        "RA_FRAMEPROBE_IDLE_POLLS": os.environ.get(
-                            "RA_FRAMEPROBE_IDLE_POLLS", "600"
-                        ),
-                        "RA_FRAMEPROBE_RELATIVE": os.environ.get(
-                            "RA_FRAMEPROBE_RELATIVE", "1"
-                        ),
-                    }
-                    r = subprocess.run(
-                        [str(self.wine), str(self._frameprobe_exe), str(frame), addr],
-                        cwd=str(staging),
-                        env=frameprobe_env,
-                        stdout=logfile,
-                        stderr=logfile,
-                        timeout=20,
-                    )
-                    if r.returncode != 0:
-                        logfile.write(
-                            "wine-driver: frameprobe failed; retrying without input\n"
-                        )
-                        logfile.flush()
+                    frameprobe_env = self._frameprobe_env(disp)
+                    frameprobe_rc = 1
+                    frameprobe_failure = "unknown"
+                    try:
                         r = subprocess.run(
                             [
                                 str(self.wine),
@@ -830,7 +959,39 @@ class WineCapture:
                             stderr=logfile,
                             timeout=20,
                         )
-                    if r.returncode != 0:
+                        frameprobe_rc = r.returncode
+                        frameprobe_failure = f"rc={r.returncode}"
+                    except subprocess.TimeoutExpired:
+                        frameprobe_failure = "timeout"
+                        logfile.write("wine-driver: frameprobe timed out\n")
+                        logfile.flush()
+                    if frameprobe_rc != 0:
+                        logfile.write(
+                            "wine-driver: frameprobe failed; retrying without input\n"
+                        )
+                        logfile.flush()
+                        try:
+                            r = subprocess.run(
+                                [
+                                    str(self.wine),
+                                    str(self._frameprobe_exe),
+                                    str(frame),
+                                    addr,
+                                ],
+                                cwd=str(staging),
+                                env=frameprobe_env,
+                                stdout=logfile,
+                                stderr=logfile,
+                                timeout=20,
+                            )
+                            frameprobe_rc = r.returncode
+                            frameprobe_failure = f"rc={r.returncode}"
+                        except subprocess.TimeoutExpired:
+                            frameprobe_rc = 1
+                            frameprobe_failure = "timeout"
+                            logfile.write("wine-driver: frameprobe retry timed out\n")
+                            logfile.flush()
+                    if frameprobe_rc != 0:
                         try:
                             capture_root(
                                 disp, output_dir / "wine-frameprobe-failure.png"
@@ -840,7 +1001,10 @@ class WineCapture:
                                 f"wine-driver: failure screenshot failed: {exc}\n"
                             )
                             logfile.flush()
-                        raise RuntimeError(f"ra-frameprobe failed (rc={r.returncode})")
+                        self._run_state_probe(staging, disp, output_dir, logfile)
+                        raise RuntimeError(
+                            f"ra-frameprobe failed ({frameprobe_failure})"
+                        )
                 if os.environ.get("WINE_CELL_SCAN", "0") not in ("", "0"):
                     subprocess.run(
                         [str(self.wine), str(self._frameprobe_exe), "-2"],
@@ -939,6 +1103,55 @@ class WineCapture:
             cap_path = output_dir / "capture.png"
             capture_root(disp, str(cap_path))
             return cap_path
+        finally:
+            self._cleanup(disp, staging, wine_proc, xvfb, wm)
+
+    def capture_mission_state(
+        self, scenario: str, output_dir: pathlib.Path, logfile=None
+    ) -> dict[str, str]:
+        """Launch a Wine mission and dump state without taking a final capture."""
+        disp = pick_free_display()
+        logfile = logfile or subprocess.DEVNULL
+        xvfb = wm = wine_proc = None
+        menu_drive = os.environ.get("WINE_MENU_DRIVE", "0") not in ("", "0")
+        staging = self._setup_staging(scenario, skip_vqa=True, autostart=not menu_drive)
+        try:
+            xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
+            wm = start_openbox(disp, logfile=logfile)
+            self._create_wineprefix(staging)
+            wine_proc = self._launch(staging, logfile, disp)
+            if not wait_for_window(disp, "Red Alert", timeout=30):
+                raise RuntimeError("Red Alert window never appeared")
+            timeline_metadata = {
+                "scenario": f"{scenario}.INI",
+                "state_only": True,
+                "menu_drive": menu_drive,
+            }
+            old_samples = os.environ.get("WINE_SCREEN_TIMELINE_SECONDS")
+            os.environ["WINE_SCREEN_TIMELINE_SECONDS"] = os.environ.get(
+                "WINE_STATE_TIMELINE_SECONDS", "0,1,2,5,10,15"
+            )
+            try:
+                timeline_entries, timeline_path = self._capture_screen_timeline(
+                    disp,
+                    output_dir,
+                    logfile,
+                    float(os.environ.get("WINE_STATE_WAIT", "15.0")),
+                    timeline_metadata,
+                    stop_on_first_non_loading=True,
+                )
+            finally:
+                if old_samples is None:
+                    os.environ.pop("WINE_SCREEN_TIMELINE_SECONDS", None)
+                else:
+                    os.environ["WINE_SCREEN_TIMELINE_SECONDS"] = old_samples
+            if not first_non_loading_state(timeline_entries):
+                self._run_state_probe(staging, disp, output_dir, logfile)
+                raise RuntimeError(
+                    "Wine state-only did not observe non-loading state; "
+                    f"timeline={timeline_path}"
+                )
+            return self._run_state_probe(staging, disp, output_dir, logfile)
         finally:
             self._cleanup(disp, staging, wine_proc, xvfb, wm)
 
