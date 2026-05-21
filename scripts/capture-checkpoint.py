@@ -129,6 +129,12 @@ def main():
         default=0.90,
         help="SSIM pass threshold (default: 0.90)",
     )
+    ap.add_argument(
+        "--keep",
+        type=int,
+        default=None,
+        help="capture sessions to keep under --output (default: RA_KEEP_CAPTURE_SESSIONS or 5)",
+    )
     args = ap.parse_args()
 
     try:
@@ -190,6 +196,34 @@ def _run(args):
     def write_manifest():
         with open(checkpoint_dir / "manifest.json", "w") as f:
             json.dump(manifest, f, indent=2)
+
+    def read_kv_file(path: pathlib.Path) -> dict:
+        values = {}
+        if not path.exists():
+            return values
+        for line in path.read_text().splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value
+        return values
+
+    def record_failure(target: str, exc: Exception):
+        failure = {
+            "error": str(exc),
+            "log": str(checkpoint_dir / f"{target}-driver.log"),
+        }
+        frame_file = checkpoint_dir / f"{target}-frame.txt"
+        if frame_file.exists():
+            failure["frame"] = read_kv_file(frame_file)
+        screen_file = checkpoint_dir / f"{target}-screen.json"
+        if screen_file.exists():
+            failure["screen"] = json.loads(screen_file.read_text())
+        manifest.setdefault("failures", {})[target] = failure
+        write_manifest()
+        print(f"  FAIL {target}: {exc}")
+        if "screen" in failure:
+            print(f"  Screen classified as: {failure['screen']['state']}")
+        print(f"  Session dir: {checkpoint_dir}")
 
     captures = {}
     effective_frames = {}
@@ -307,6 +341,9 @@ def _run(args):
                 captures[target] = str(flat_path)
                 sz = flat_path.stat().st_size
             print(f"  OK {target}: {captures[target]} ({sz} bytes)")
+        except Exception as exc:
+            record_failure(target, exc)
+            raise
         finally:
             logfile.close()
 
@@ -416,7 +453,11 @@ def _run(args):
         print(f"  HTTP server started at http://localhost:1234/ (serving {want})")
 
     print(f"\nSession dir: {checkpoint_dir}")
-    keep_sessions = int(os.environ.get("RA_KEEP_CAPTURE_SESSIONS", "5"), 0)
+    keep_sessions = (
+        args.keep
+        if args.keep is not None
+        else int(os.environ.get("RA_KEEP_CAPTURE_SESSIONS", "5"), 0)
+    )
     removed = prune_old_sessions(output_root, keep_sessions, checkpoint_dir)
     if removed:
         print(f"  Pruned {removed} old capture session(s); kept newest {keep_sessions}")

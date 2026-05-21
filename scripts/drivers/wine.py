@@ -7,12 +7,14 @@ import pathlib
 import tempfile
 import shutil
 import struct
+import json
 from .common import (
     pick_free_display,
     start_xvfb,
     start_openbox,
     wait_for_window,
     capture_root,
+    classify_ra_screen,
     center_mouse,
     teardown_display,
 )
@@ -607,9 +609,21 @@ class WineCapture:
                             "0",
                         ):
                             try:
-                                capture_root(
-                                    disp, output_dir / "wine-frameprobe-failure.png"
+                                failure_path = (
+                                    output_dir / "wine-frameprobe-failure.png"
                                 )
+                                capture_root(disp, failure_path)
+                                screen = classify_ra_screen(str(failure_path))
+                                (output_dir / "wine-screen.json").write_text(
+                                    json.dumps(screen, indent=2) + "\n"
+                                )
+                                with open(output_dir / "wine-frame.txt", "a") as f:
+                                    f.write(f"screen={screen['state']}\n")
+                                logfile.write(
+                                    "wine-driver: failure screen="
+                                    f"{screen['state']} metrics={screen}\n"
+                                )
+                                logfile.flush()
                             except Exception as exc:
                                 logfile.write(
                                     f"wine-driver: failure screenshot failed: {exc}\n"

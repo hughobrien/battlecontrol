@@ -23,9 +23,11 @@ Four patches to Select_Game() in the RA95.EXE binary:
      Always jumps to the Choose_Side path (Play_Movie call which
      vqa-skip already NOPs) instead of the faction WWMessageBox.
 
-  4. NOP jne after Choose_Side returns (CurrentCD flag check).
-     Always takes the Allied/SCG01EA.INI string path.  ra-scenario-patch
-     replaces that string with any target name.
+  4. Patch jne after Choose_Side returns (CurrentCD flag check).
+     By default this NOPs the branch to force the Allied/SCG01EA.INI string
+     path.  With --side soviet it becomes an unconditional jump to the
+     Soviet/SCU01EA.INI string path.  ra-scenario-patch replaces the chosen
+     string with the target mission name.
 
 Usage (apply after vqa-skip + cdlabel + game-in-focus):
   python3 scripts/ra-autostart-patch.py RA95.EXE
@@ -33,6 +35,7 @@ Usage (apply after vqa-skip + cdlabel + game-in-focus):
 Must run AFTER all other patches (vqa-skip, game-in-focus, cdlabel).
 """
 
+import argparse
 import hashlib
 import os
 import shutil
@@ -51,10 +54,22 @@ PATCHES = [
     # 3. Change jne->jmp after IsFromInstall test for faction/Choose_Side.
     #    VA 0x4fdd10: jne +0x5d  →  jmp +0x5d
     (0x004FDD10, b"\x75\x5d", b"\xeb\x5d"),
-    # 4. NOP jne after Choose_Side returns (Allies/Soviets flag check).
-    #    VA 0x4fdd8f: jne +0x07  →  nop nop
-    (0x004FDD8F, b"\x75\x07", b"\x90\x90"),
 ]
+
+SIDE_PATCH = {
+    "allied": (
+        0x004FDD8F,
+        b"\x75\x07",
+        b"\x90\x90",
+        "4. NOP jne -> always Allies/SCG01EA.INI after Choose_Side",
+    ),
+    "soviet": (
+        0x004FDD8F,
+        b"\x75\x07",
+        b"\xeb\x07",
+        "4. jne->jmp -> always Soviets/SCU01EA.INI after Choose_Side",
+    ),
+}
 
 
 def sha256(data: bytes) -> str:
@@ -70,12 +85,13 @@ def va_to_file_offset(va: int) -> int:
     raise ValueError(f"VA 0x{va:08x} not in mapped sections")
 
 
-def patch(path: str, dry_run: bool = False) -> int:
+def patch(path: str, side: str = "allied", dry_run: bool = False) -> int:
     with open(path, "rb") as f:
         data = bytearray(f.read())
 
     applied = 0
-    for va, expected, replacement in PATCHES:
+    patch_list = PATCHES + [SIDE_PATCH[side][:3]]
+    for va, expected, replacement in patch_list:
         fo = va_to_file_offset(va)
         actual = bytes(data[fo : fo + len(expected)])
 
@@ -86,7 +102,7 @@ def patch(path: str, dry_run: bool = False) -> int:
         if not dry_run:
             data[fo : fo + len(replacement)] = replacement
 
-        old_mnem = disasm_hint(expected, replacement)
+        old_mnem = disasm_hint(expected, replacement, side)
         print(f"  VA 0x{va:08x} file 0x{fo:08x}: {old_mnem}")
         applied += 1
 
@@ -95,8 +111,8 @@ def patch(path: str, dry_run: bool = False) -> int:
         print(f"  SHA-256: {sha256(bytes(data))[:32]}...")
         return 1
 
-    if applied < len(PATCHES):
-        print(f"WARNING: only {applied}/{len(PATCHES)} patches applied")
+    if applied < len(patch_list):
+        print(f"WARNING: only {applied}/{len(patch_list)} patches applied")
 
     if dry_run:
         return 0
@@ -114,7 +130,7 @@ def patch(path: str, dry_run: bool = False) -> int:
     return 0
 
 
-def disasm_hint(old: bytes, new: bytes) -> str:
+def disasm_hint(old: bytes, new: bytes, side: str = "allied") -> str:
     """Return a human-readable description of the patch."""
     hints = {
         (
@@ -123,7 +139,8 @@ def disasm_hint(old: bytes, new: bytes) -> str:
         ): "1. selection = SEL_START_NEW_GAME (1) instead of SEL_MULTIPLAYER (4)",
         (0x7468, 0x9090): "2. NOP je -> always DIFF_NORMAL (skip Fetch_Difficulty)",
         (0x755D, 0xEB5D): "3. jne->jmp -> always Choose_Side (skip faction dialog)",
-        (0x7507, 0x9090): "4. NOP jne -> always Allies/SCG01EA.INI after Choose_Side",
+        (0x7507, 0x9090): SIDE_PATCH["allied"][3],
+        (0x7507, 0xEB07): SIDE_PATCH["soviet"][3],
     }
     key = (bytes(old), bytes(new))
     if key in hints:
@@ -142,18 +159,19 @@ def restore(path: str) -> int:
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <exe-path> [exe-path ...]", file=sys.stderr)
-        print(f"       {sys.argv[0]} --restore <exe-path>", file=sys.stderr)
-        return 1
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--restore", action="store_true")
+    ap.add_argument("--side", choices=("allied", "soviet"), default="allied")
+    ap.add_argument("exe_path", nargs="+")
+    args = ap.parse_args()
 
-    if sys.argv[1] == "--restore":
-        return restore(sys.argv[2])
+    if args.restore:
+        return restore(args.exe_path[0])
 
     rc = 0
-    for p in sys.argv[1:]:
+    for p in args.exe_path:
         try:
-            rc |= patch(p)
+            rc |= patch(p, side=args.side)
         except FileNotFoundError:
             print(f"SKIP: {p} not found")
             rc |= 1

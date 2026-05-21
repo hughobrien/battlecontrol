@@ -2,6 +2,7 @@ import subprocess
 import time
 import os
 import signal
+from pathlib import Path
 
 
 def pick_free_display() -> str:
@@ -130,6 +131,66 @@ def tactical_nonblack_fraction(path: str) -> float:
     return nonblack / total if total else 0.0
 
 
+def _pixel_fraction(im, box, predicate) -> float:
+    crop = im.crop(box)
+    pixels = list(crop.getdata())
+    if not pixels:
+        return 0.0
+    return sum(1 for pixel in pixels if predicate(pixel)) / len(pixels)
+
+
+def classify_ra_screen(path: str) -> dict:
+    """Classify common RA capture failure screens with cheap pixel heuristics."""
+    from PIL import Image
+
+    im = Image.open(path).convert("RGB")
+    width, height = im.size
+
+    def is_green(pixel):
+        red, green, blue = pixel
+        return green > 100 and red < 90 and blue < 90
+
+    def is_red(pixel):
+        red, green, blue = pixel
+        return red > 90 and green < 60 and blue < 60
+
+    def is_gray(pixel):
+        red, green, blue = pixel
+        return abs(red - green) < 18 and abs(red - blue) < 18 and red > 80
+
+    def is_black(pixel):
+        red, green, blue = pixel
+        return red < 12 and green < 12 and blue < 12
+
+    tactical_fill = tactical_nonblack_fraction(path)
+    top_green = _pixel_fraction(im, (235, 20, min(width, 405), 45), is_green)
+    center_red = _pixel_fraction(im, (200, 170, min(width, 445), 315), is_red)
+    dialog_gray = _pixel_fraction(im, (185, 135, min(width, 455), 295), is_gray)
+    overall_black = _pixel_fraction(im, (0, 0, width, height), is_black)
+
+    if top_green > 0.015 and overall_black > 0.70:
+        state = "top-scores"
+    elif dialog_gray > 0.08 and center_red > 0.05:
+        state = "modal-dialog"
+    elif center_red > 0.10:
+        state = "main-menu"
+    elif tactical_fill < 0.05:
+        state = "blank"
+    elif tactical_fill < 0.20:
+        state = "not-gameplay"
+    else:
+        state = "gameplay"
+
+    return {
+        "state": state,
+        "tactical_nonblack": round(tactical_fill, 6),
+        "top_green": round(top_green, 6),
+        "center_red": round(center_red, 6),
+        "dialog_gray": round(dialog_gray, 6),
+        "overall_black": round(overall_black, 6),
+    }
+
+
 def kill_process_tree(proc: subprocess.Popen):
     """Kill a process and its children."""
     if proc is None:
@@ -157,8 +218,52 @@ _SWEEP_PATTERNS = ("wine-prefix-*", "wine-capture-*")
 _SWEEP_DISPLAY_RANGE = range(92, 99)
 
 
-def sweep_state(verbose: bool = False) -> tuple[int, int]:
-    """Remove leftover per-run capture state. Returns (dirs, locks) counts.
+def _read_proc_environ(pid: int) -> dict[str, str]:
+    try:
+        raw = Path(f"/proc/{pid}/environ").read_bytes()
+    except (FileNotFoundError, ProcessLookupError, PermissionError):
+        return {}
+    env = {}
+    for item in raw.split(b"\0"):
+        if b"=" not in item:
+            continue
+        key, value = item.split(b"=", 1)
+        env[key.decode("latin1", "replace")] = value.decode("latin1", "replace")
+    return env
+
+
+def _kill_capture_orphans(verbose: bool = False) -> int:
+    killed = 0
+    displays = {f":{n}" for n in _SWEEP_DISPLAY_RANGE}
+    for proc_dir in Path("/proc").iterdir():
+        if not proc_dir.name.isdigit():
+            continue
+        pid = int(proc_dir.name)
+        try:
+            cmdline = proc_dir.joinpath("cmdline").read_bytes().replace(b"\0", b" ")
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            continue
+        cmd = cmdline.decode("latin1", "replace")
+        should_kill = False
+        if any(f"Xvfb {display}" in cmd for display in displays):
+            should_kill = True
+        elif "openbox" in cmd:
+            display = _read_proc_environ(pid).get("DISPLAY")
+            should_kill = display in displays
+        if not should_kill:
+            continue
+        try:
+            os.kill(pid, signal.SIGKILL)
+            killed += 1
+            if verbose:
+                print(f"killed capture process: pid={pid} cmd={cmd.strip()}")
+        except (ProcessLookupError, PermissionError, OSError):
+            pass
+    return killed
+
+
+def sweep_state(verbose: bool = False) -> tuple[int, int, int]:
+    """Remove leftover per-run capture state. Returns (dirs, locks, procs).
 
     Always safe to call at the end of a run: only nukes per-session
     artefacts (wine-prefix-*, wine-capture-*) and our X display range's
@@ -167,6 +272,8 @@ def sweep_state(verbose: bool = False) -> tuple[int, int]:
     """
     import glob
     import shutil
+
+    procs_killed = _kill_capture_orphans(verbose=verbose)
 
     dirs_removed = 0
     for pat in _SWEEP_PATTERNS:
@@ -187,7 +294,7 @@ def sweep_state(verbose: bool = False) -> tuple[int, int]:
                 print(f"removed lock: {path}")
             locks_removed += 1
 
-    return dirs_removed, locks_removed
+    return dirs_removed, locks_removed, procs_killed
 
 
 def teardown_display(disp: str, *procs: subprocess.Popen):

@@ -4,12 +4,12 @@ import subprocess
 import os
 import time
 import pathlib
-import tempfile
 from .common import (
     pick_free_display,
     start_xvfb,
     start_openbox,
     capture_root,
+    center_mouse,
     teardown_display,
 )
 
@@ -40,6 +40,17 @@ class NativeCapture:
         logfile = logfile or subprocess.DEVNULL
         xvfb = wm = ra_proc = None
         try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            ready_path = output_dir / "native-ready.txt"
+            bmp_path = output_dir / "capture.bmp"
+            try:
+                ready_path.unlink()
+            except FileNotFoundError:
+                pass
+            try:
+                bmp_path.unlink()
+            except FileNotFoundError:
+                pass
             xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             env = {
@@ -47,6 +58,10 @@ class NativeCapture:
                 "DISPLAY": disp,
                 "RA_AUTOSTART": "1",
                 "RA_AUTOSTART_SCENARIO": f"{scenario}.INI",
+                "RA_CAPTURE_FPS": os.environ.get("RA_CAPTURE_FPS", "10"),
+                "RA_CAPTURE_FRAME": str(max(frame, 1)),
+                "RA_CAPTURE_READY_FILE": str(ready_path),
+                "RA_CAPTURE_BMP_FILE": str(bmp_path),
             }
             ra_proc = subprocess.Popen(
                 [str(self.ra_bin)],
@@ -55,24 +70,19 @@ class NativeCapture:
                 stdout=logfile,
                 stderr=logfile,
             )
-            # Probe for non-black canvas (up to 45s)
+            center_mouse(disp, 640, 400)
+            # Wait for the in-game frame trap instead of wall-clock guessing.
             deadline = time.time() + 45
-            found = False
             while time.time() < deadline:
-                probe_path = tempfile.mktemp(suffix=".png")
-                capture_root(disp, probe_path)
-                sz = os.path.getsize(probe_path)
-                os.unlink(probe_path)
-                if sz >= 5000:
-                    found = True
+                if ready_path.exists():
                     break
-                time.sleep(1)
-            if not found:
-                raise RuntimeError("native RA never rendered non-black canvas")
-            # Wait remaining frames
-            wait = max(frame / 15.0, 1.0)
-            time.sleep(wait)
-            output_dir.mkdir(parents=True, exist_ok=True)
+                if ra_proc.poll() is not None:
+                    raise RuntimeError(
+                        f"native RA exited before frame trap (rc={ra_proc.returncode})"
+                    )
+                time.sleep(0.05)
+            else:
+                raise RuntimeError("native RA never reached requested capture frame")
             cap_path = output_dir / "capture.png"
             capture_root(disp, str(cap_path))
             return cap_path

@@ -6,7 +6,8 @@ under normal operation you never need to run this manually. Use it after a
 SIGKILLed or crashed run that didn't reach its cleanup.
 
 Removed: ~/.cache/battlecontrol/wine-prefix-*, wine-capture-*,
-         /tmp/.X{92..98}-lock, /tmp/.X11-unix/X{92..98}
+         /tmp/.X{92..98}-lock, /tmp/.X11-unix/X{92..98},
+         orphan Xvfb/openbox processes on displays :92..:98
 """
 
 import pathlib
@@ -17,8 +18,11 @@ from drivers.common import sweep_state
 
 
 def main() -> int:
-    dirs, locks = sweep_state(verbose=True)
-    print(f"\nSwept {dirs} cache dir(s) and {locks} X lock/socket(s).")
+    dirs, locks, procs = sweep_state(verbose=True)
+    print(
+        f"\nSwept {dirs} cache dir(s), {locks} X lock/socket(s), "
+        f"and {procs} process(es)."
+    )
     return 0
 
 
