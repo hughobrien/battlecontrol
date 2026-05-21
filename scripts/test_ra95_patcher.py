@@ -19,6 +19,9 @@ from ra.ra95_patches import (
 
 
 class RA95PatcherRegistryTest(unittest.TestCase):
+    def test_base_mode_uses_default_base_patch_sequence(self):
+        self.assertEqual(mode_patch_ids("base"), ["nocd", "ddscl-normal", "cd-label"])
+
     def test_mission_mode_has_smart_defaults(self):
         ids = mode_patch_ids("mission", scenario="SCU01EA.INI", seed=0x1EED5EED)
 
