@@ -233,7 +233,7 @@ tools are available. If not, emit paths and keep JSON mandatory.
 **Files:**
 - Add: `scripts/capture-matrix.py`
 
-- [ ] **Step 1: Add mission/frame/target expansion**
+- [x] **Step 1: Add mission/frame/target expansion**
 
 Support forms:
 
@@ -241,7 +241,7 @@ Support forms:
 python3 scripts/capture-matrix.py --missions allied-l1..l5,soviet-l1..l5 --frames 1,10,60 --targets wine,native
 ```
 
-- [ ] **Step 2: Sort failures by reason**
+- [x] **Step 2: Sort failures by reason**
 
 Group results by:
 
@@ -255,7 +255,7 @@ native-failed
 comparison-failed
 ```
 
-- [ ] **Step 3: Emit human and machine reports**
+- [x] **Step 3: Emit human and machine reports**
 
 Write `matrix-report.md` and `matrix-report.json` into a timestamped
 `/tmp/battlecontrol/<timestamp>-matrix/` directory.
