@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import time
 import socket
+import hashlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from drivers import WineCapture, NativeCapture, WasmCapture
@@ -113,6 +114,81 @@ def prune_old_sessions(
     return removed
 
 
+CAPTURE_ENV_KEYS = [
+    "RA_CAPTURE_FPS",
+    "WINE_FRAMEPROBE",
+    "WINE_FRAMEPROBE_STRICT",
+    "WINE_FRAME_ADDR",
+    "RA_SYNC_NATIVE_TO_WINE_FRAME",
+    "WINE_FRAMEPROBE_BACKEND",
+    "WINE_BIN",
+    "WINE_DATA_DIR",
+    "RA_SOVIET_ASSETS",
+    "DATA_DIR",
+    "RA_ASSETS",
+    "RA_RANDOM_SEED",
+    "WINE_BOOT_DISMISS",
+    "WINE_MENU_DRIVE",
+]
+
+
+def sha256_file(path: pathlib.Path) -> str | None:
+    try:
+        h = hashlib.sha256()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def file_metadata(path: str | None) -> dict:
+    if not path:
+        return {"path": None, "exists": False}
+    p = pathlib.Path(path)
+    data = {"path": str(p), "exists": p.exists()}
+    if p.exists() and p.is_file():
+        stat = p.stat()
+        data.update(
+            {
+                "size": stat.st_size,
+                "mtime": int(stat.st_mtime),
+                "sha256": sha256_file(p),
+            }
+        )
+    return data
+
+
+def git_value(args: list[str]) -> str | None:
+    try:
+        r = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return None
+    if r.returncode != 0:
+        return None
+    return r.stdout.strip()
+
+
+def capture_environment_metadata(targets: list[str]) -> dict:
+    return {
+        "env": {key: os.environ.get(key) for key in CAPTURE_ENV_KEYS},
+        "git_commit": git_value(["rev-parse", "HEAD"]),
+        "git_dirty": bool(git_value(["status", "--porcelain"])),
+        "tools": {
+            "wine": file_metadata(os.environ.get("WINE_BIN")),
+            "native_ra": file_metadata("build/ra/redalert"),
+            "nix": file_metadata(os.environ.get("NIX_BIN") or shutil.which("nix")),
+        },
+        "targets": targets,
+    }
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -168,6 +244,8 @@ def _run(args):
             raise ValueError("--state-only is only supported for mission captures")
         if targets != ["wine"]:
             raise ValueError("--state-only requires --targets wine")
+    if args.type == "mission" and ("wine" in targets or "native" in targets):
+        os.environ.setdefault("RA_CAPTURE_FPS", "10")
 
     remove_known_safe_artifacts()
     check_tmp_free_space("/tmp")
@@ -181,6 +259,7 @@ def _run(args):
         "targets": targets,
         "state_only": bool(args.state_only),
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "capture_environment": capture_environment_metadata(targets),
     }
 
     if args.type == "mission":
@@ -341,8 +420,6 @@ def _run(args):
             except Exception as exc:
                 record_failure("wine", exc)
                 return 1
-    if args.type == "mission" and ("wine" in targets or "native" in targets):
-        os.environ.setdefault("RA_CAPTURE_FPS", "10")
     for target in targets:
         target_dir = checkpoint_dir
         log_path = checkpoint_dir / f"{target}-driver.log"

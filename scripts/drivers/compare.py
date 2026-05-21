@@ -20,6 +20,11 @@ REGION_BOXES = {
     "radar_panel": (480, 14, 640, 154),
 }
 REGION_NAMES = ["full_frame", *REGION_BOXES.keys()]
+COLOR_ANOMALY_LIMIT = 12
+COLOR_ANOMALIES = {
+    "bright_green": lambda r, g, b: g >= 240 and r <= 40 and b <= 80,
+    "purple": lambda r, g, b: r >= 180 and b >= 180 and g <= 80,
+}
 
 
 def _metric_number(value, fallback):
@@ -203,6 +208,69 @@ def _region_specs(golden_path: str, capture_path: str) -> dict:
     return clamped
 
 
+def _single_image_region_specs(path: str) -> dict:
+    size = _image_size(path)
+    if size is None:
+        return {}
+    width, height = size
+    specs = {
+        "full_frame": (0, 0, width, height),
+        **REGION_BOXES,
+    }
+    clamped = {}
+    for name, box in specs.items():
+        region_box = _clamp_box(box, width, height)
+        if region_box is not None:
+            clamped[name] = region_box
+    return clamped
+
+
+def _point_in_box(x: int, y: int, box: tuple[int, int, int, int]) -> bool:
+    left, top, right, bottom = box
+    return left <= x < right and top <= y < bottom
+
+
+def color_anomaly_report(path: str, sample_limit: int = COLOR_ANOMALY_LIMIT) -> dict:
+    """Count high-signal purple/green anomaly pixels by full frame and region."""
+    try:
+        from PIL import Image
+
+        with Image.open(path).convert("RGB") as im:
+            pixels = im.load()
+            width, height = im.size
+            region_specs = _single_image_region_specs(path)
+            report = {}
+            for name in COLOR_ANOMALIES:
+                report[name] = {
+                    "full_frame": {"count": 0, "samples": []},
+                    "regions": {
+                        region: {"count": 0, "samples": []}
+                        for region in region_specs
+                        if region != "full_frame"
+                    },
+                }
+            for y in range(height):
+                for x in range(width):
+                    r, g, b = pixels[x, y]
+                    for name, predicate in COLOR_ANOMALIES.items():
+                        if not predicate(r, g, b):
+                            continue
+                        bucket = report[name]["full_frame"]
+                        bucket["count"] += 1
+                        if len(bucket["samples"]) < sample_limit:
+                            bucket["samples"].append([x, y, r, g, b])
+                        for region, box in region_specs.items():
+                            if region == "full_frame" or not _point_in_box(x, y, box):
+                                continue
+                            region_bucket = report[name]["regions"][region]
+                            region_bucket["count"] += 1
+                            if len(region_bucket["samples"]) < sample_limit:
+                                region_bucket["samples"].append([x, y, r, g, b])
+            return report
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 def _compare_region(
     golden_path: str,
     capture_path: str,
@@ -332,6 +400,9 @@ def full_report(captures: dict, output_dir: str, threshold_ssim=0.90) -> dict:
     targets = list(captures.keys())
     results = []
     region_results = {}
+    color_anomalies = {
+        target: color_anomaly_report(str(path)) for target, path in captures.items()
+    }
     for i in range(len(targets)):
         for j in range(i + 1, len(targets)):
             a, b = targets[i], targets[j]
@@ -365,6 +436,7 @@ def full_report(captures: dict, output_dir: str, threshold_ssim=0.90) -> dict:
     report = {
         "pairs": results,
         "regions": region_results,
+        "color_anomalies": color_anomalies,
         "summary": summary,
         "threshold_ssim": threshold_ssim,
     }

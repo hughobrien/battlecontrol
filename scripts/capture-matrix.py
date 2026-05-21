@@ -277,10 +277,41 @@ def build_record(
         record["failures"] = failures
     if report.get("pairs"):
         record["comparisons"] = report["pairs"]
+    worst_region = extract_worst_region(record)
+    if worst_region:
+        record["worst_region"] = worst_region
 
     classification = classify_result(record)
     record["classification"] = classification
     return record
+
+
+def extract_worst_region(record: dict[str, Any]) -> dict[str, Any] | None:
+    report = record.get("report")
+    if not isinstance(report, dict):
+        return None
+    best: dict[str, Any] | None = None
+    for pair in report.get("pairs", []):
+        if not isinstance(pair, dict):
+            continue
+        pair_label = pair.get("pair")
+        for region in pair.get("worst_regions", []) or []:
+            if not isinstance(region, dict):
+                continue
+            candidate = {
+                "pair": pair_label,
+                "name": region.get("name"),
+                "ssim": region.get("ssim", 0.0),
+                "p99": region.get("p99", 0),
+            }
+            if best is None:
+                best = candidate
+                continue
+            candidate_key = (candidate["ssim"] or 0.0, -(candidate["p99"] or 0))
+            best_key = (best["ssim"] or 0.0, -(best["p99"] or 0))
+            if candidate_key < best_key:
+                best = candidate
+    return best
 
 
 def group_results(records: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -373,13 +404,14 @@ def write_reports(output_dir: pathlib.Path, report: dict[str, Any]) -> None:
         if not rows:
             continue
         lines.extend([f"### {group}", ""])
-        lines.append("| Mission | Frame | Session | Details |")
-        lines.append("|---|---:|---|---|")
+        lines.append("| Mission | Frame | Worst Region | Session | Details |")
+        lines.append("|---|---:|---|---|---|")
         for row in rows:
             session = row.get("session") or ""
+            worst_region = worst_region_details(row)
             details = result_details(row)
             lines.append(
-                f"| {row['mission']} | {row['frame']} | `{session}` | {details} |"
+                f"| {row['mission']} | {row['frame']} | {worst_region} | `{session}` | {details} |"
             )
         lines.append("")
     (output_dir / "matrix-report.md").write_text("\n".join(lines) + "\n")
@@ -401,6 +433,18 @@ def result_details(row: dict[str, Any]) -> str:
     stdout = str(row.get("stdout") or "").splitlines()
     text = stderr[-1] if stderr else (stdout[-1] if stdout else "")
     return text.replace("|", "\\|")[:160]
+
+
+def worst_region_details(row: dict[str, Any]) -> str:
+    region = row.get("worst_region")
+    if not isinstance(region, dict):
+        return ""
+    name = str(region.get("name") or "")
+    pair = str(region.get("pair") or "")
+    ssim = region.get("ssim")
+    p99 = region.get("p99")
+    ssim_text = f"{ssim:.4f}" if isinstance(ssim, (int, float)) else str(ssim)
+    return f"`{name}` {ssim_text} p99={p99} `{pair}`"
 
 
 def make_output_dir(base: str | None) -> pathlib.Path:
@@ -479,6 +523,24 @@ def run_self_test() -> int:
         "report": {},
     }
     assert classify_result(state_record) == "wine-top-scores"
+    region_record = {
+        "report": {
+            "pairs": [
+                {
+                    "pair": "wine-vs-native",
+                    "worst_regions": [
+                        {"name": "timer_credit_tab", "ssim": 0.5, "p99": 90}
+                    ],
+                }
+            ]
+        }
+    }
+    assert extract_worst_region(region_record) == {
+        "pair": "wine-vs-native",
+        "name": "timer_credit_tab",
+        "ssim": 0.5,
+        "p99": 90,
+    }
 
     with tempfile.TemporaryDirectory() as tmp:
         out = pathlib.Path(tmp)
@@ -488,7 +550,16 @@ def run_self_test() -> int:
                 "missions": missions,
                 "frames": [1],
                 "targets": ["wine", "native"],
-                "results": records,
+                "results": [
+                    *records,
+                    {
+                        "mission": "allied-l4",
+                        "frame": 1,
+                        "classification": "comparison-failed",
+                        "worst_region": extract_worst_region(region_record),
+                        **region_record,
+                    },
+                ],
                 "timestamp": "self-test",
             },
         )
@@ -496,6 +567,8 @@ def run_self_test() -> int:
         text = (out / "matrix-report.md").read_text()
         assert "wine-main-menu" in text
         assert "comparison-failed" in text
+        assert "Worst Region" in text
+        assert "timer_credit_tab" in text
     return 0
 
 
