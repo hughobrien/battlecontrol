@@ -503,13 +503,39 @@ def _run(args):
         print(f"\n=== Comparison: {report['summary']} ===")
         for r in report["pairs"]:
             status = "PASS" if r["passed"] else "FAIL"
-            print(f"  {r['pair']}: SSIM={r['ssim']:.4f} p99={r['p99']:.1f} [{status}]")
+            p99 = r.get("p99")
+            p99_text = f"{p99:.1f}" if isinstance(p99, (int, float)) else str(p99)
+            print(f"  {r['pair']}: SSIM={r['ssim']:.4f} p99={p99_text} [{status}]")
+            worst = r.get("worst_regions") or []
+            if worst:
+                summary = ", ".join(
+                    f"{region['name']} SSIM={region['ssim']:.4f} p99={region['p99']}"
+                    for region in worst
+                )
+                print(f"    worst regions: {summary}")
         # Promote diffs from diff/ subdir to session dir
         diff_dir = checkpoint_dir / "diff"
         if diff_dir.exists():
+            promoted = {}
             for f in diff_dir.iterdir():
-                f.rename(checkpoint_dir / f.name)
+                dest = checkpoint_dir / f.name
+                promoted[str(f)] = str(dest)
+                f.rename(dest)
             diff_dir.rmdir()
+            if promoted:
+
+                def promote_paths(value):
+                    if isinstance(value, dict):
+                        return {key: promote_paths(item) for key, item in value.items()}
+                    if isinstance(value, list):
+                        return [promote_paths(item) for item in value]
+                    if isinstance(value, str):
+                        return promoted.get(value, value)
+                    return value
+
+                report = promote_paths(report)
+                with open(checkpoint_dir / "report.json", "w") as f:
+                    json.dump(report, f, indent=2)
     elif len(captures) == 1:
         print("\n(one target — no comparison)")
     else:

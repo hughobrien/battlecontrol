@@ -390,7 +390,7 @@ When capture fails, print the session path and mention `wine-patches.json`.
 **Files:**
 - Modify: `scripts/drivers/compare.py` or add a helper used by it
 
-- [ ] **Step 1: Define stable regions**
+- [x] **Step 1: Define stable regions**
 
 At minimum:
 
@@ -403,12 +403,12 @@ radar_panel
 full_frame
 ```
 
-- [ ] **Step 2: Report per-region SSIM/p99**
+- [x] **Step 2: Report per-region SSIM/p99**
 
 Add a `regions` object to `report.json` and print the worst regions in CLI
 output.
 
-- [ ] **Step 3: Save region diffs on failure**
+- [x] **Step 3: Save region diffs on failure**
 
 Crop and save `diff-region-<name>-wine-vs-native.png` for the worst N regions.
 
