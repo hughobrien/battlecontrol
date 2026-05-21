@@ -57,6 +57,11 @@ Latest useful captures:
   The `0x0069720c` value behaves like a mission-ready/progress counter for
   Allied L3/L5 rather than a gameplay frame counter, so native must not be
   synced to it.
+- Follow-up validation after adding a per-mission settle policy:
+  `/tmp/battlecontrol/2026-05-21T05-41-43-matrix` passes `allied-l2` and
+  `allied-l3` together. Allied L2 needs `--settle-after-gameplay allied-l2`
+  so `0x006544c8` starts advancing before native sync; Allied L3 must skip
+  that settle and use `0x0069720c` without native sync.
 - Multi-level synchronized rerun after Wine actual-frame reporting:
   - Allied L1: `/tmp/battlecontrol/2026-05-20T21-34-18-mission-allied-l1`, `SSIM=0.9969`
   - Allied L2: `/tmp/battlecontrol/2026-05-20T21-35-15-mission-allied-l2`, `SSIM=0.9984`

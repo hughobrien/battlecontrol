@@ -741,6 +741,12 @@ def main() -> int:
         help="missions/ranges where native should capture Wine's reported actual frame",
     )
     ap.add_argument(
+        "--settle-after-gameplay",
+        type=parse_mission_set,
+        default=set(),
+        help="missions/ranges where Wine should still wait WINE_BOOT_SETTLE after first gameplay",
+    )
+    ap.add_argument(
         "--dry-run",
         action="store_true",
         help="expand the matrix and write reports without launching captures",
@@ -805,6 +811,11 @@ def main() -> int:
                 elif env is not None or args.sync_native_to_wine:
                     env = {**(env or os.environ)}
                     env.pop("RA_SYNC_NATIVE_TO_WINE_FRAME", None)
+                if mission in args.settle_after_gameplay:
+                    env = {**(env or os.environ), "WINE_SETTLE_AFTER_GAMEPLAY": "1"}
+                elif env is not None or args.settle_after_gameplay:
+                    env = {**(env or os.environ)}
+                    env.pop("WINE_SETTLE_AFTER_GAMEPLAY", None)
                 record = run_capture(
                     mission,
                     frame,

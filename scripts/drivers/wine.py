@@ -1237,8 +1237,12 @@ class WineCapture:
             # patched past dialogs/VQAs; unsolicited Enter/Space can race slower
             # CD2 starts and select Top Scores from the main menu.
             elapsed = timeline_entries[-1]["t"] if timeline_entries else 0.0
-            if elapsed < boot_settle and not _timeline_reached_gameplay(
-                timeline_entries
+            settle_after_gameplay = os.environ.get(
+                "WINE_SETTLE_AFTER_GAMEPLAY", "0"
+            ) not in ("", "0")
+            if elapsed < boot_settle and (
+                settle_after_gameplay
+                or not _timeline_reached_gameplay(timeline_entries)
             ):
                 time.sleep(boot_settle - elapsed)
             boot_dismiss_default = "0"
