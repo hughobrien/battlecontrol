@@ -115,6 +115,52 @@ def mission_patch_scripts(skip_vqa=True, scenario=None, autostart=True) -> list[
     return patches
 
 
+def mission_patch_command(
+    *,
+    exe: pathlib.Path | str,
+    scenario: str | None,
+    manifest: pathlib.Path | str | None,
+    skip_vqa: bool = True,
+    autostart: bool = True,
+    random_seed: int | None = None,
+) -> list[str]:
+    """Return the unified RA95 mission patcher command, run from repo root."""
+    if not autostart:
+        raise ValueError("Wine mission capture requires autostart")
+    if not scenario:
+        raise ValueError("Wine mission capture requires a scenario")
+
+    command = [
+        "python3",
+        "scripts/ra/patch_ra95.py",
+        "mission",
+        str(exe),
+        "--scenario",
+        scenario,
+    ]
+    if manifest is not None:
+        command.extend(["--manifest", str(manifest)])
+    if random_seed is None:
+        command.append("--no-seed")
+    else:
+        command.extend(["--seed", f"0x{random_seed:x}"])
+    if not skip_vqa:
+        command.append("--no-vqa-skip")
+    if os.environ.get("WINE_BRIEFING_SKIP_PATCH", "1") in ("", "0"):
+        command.append("--no-briefing-skip")
+
+    diagnostics = []
+    if os.environ.get("WINE_FORCE_NORMAL_QUEUE", "0") not in ("", "0"):
+        diagnostics.append("force-normal-queue")
+    if os.environ.get("WINE_FRAMEINFO_GUARD", "0") not in ("", "0"):
+        diagnostics.append("frameinfo-send-guard")
+    for diagnostic in diagnostics:
+        command.extend(["--diagnostic", diagnostic])
+    if diagnostics:
+        command.append("--allow-diagnostic")
+    return command
+
+
 def _timeline_strict_failure(entries: list[dict]) -> str | None:
     """Return the strict-mode failure reason for a screen timeline."""
     for entry in entries:
@@ -535,44 +581,28 @@ class WineCapture:
         manifest: dict | None = None,
         manifest_path: pathlib.Path | None = None,
     ):
-        if manifest is None:
-            manifest = self._new_patch_manifest(exe, scenario, skip_vqa, autostart)
-            self._write_patch_manifest(manifest_path, manifest)
-        patches = mission_patch_scripts(skip_vqa, scenario, autostart)
-        for name in patches:
-            script = self.scripts_dir / name
-            if not script.exists():
-                self._record_missing_patch_entry(manifest, manifest_path, script)
-                continue
-            cmd = ["python3", str(script), str(exe)]
-            if name.endswith("ra-scenario-patch.py") and scenario:
-                cmd.append(scenario)
-            if name.endswith("ra-autostart-patch.py") and scenario:
-                side = _scenario_side(scenario) or "allied"
-                cmd.extend(["--side", side])
-            r = self._run_patch_script(manifest, manifest_path, exe, cmd)
-            if r.returncode != 0:
-                raise RuntimeError(
-                    f"{script.name} failed (rc={r.returncode}): {r.stderr or r.stdout}"
-                )
-        self._patch_cd_label(exe, scenario, manifest, manifest_path)
-        if self.random_seed is not None:
-            r = self._run_patch_script(
-                manifest,
-                manifest_path,
-                exe,
-                [
-                    "python3",
-                    str(self.scripts_dir / "ra" / "ra-random-seed-patch.py"),
-                    str(exe),
-                    str(self.random_seed),
-                ],
+        del manifest
+        command = mission_patch_command(
+            exe=exe,
+            scenario=scenario,
+            manifest=manifest_path,
+            skip_vqa=skip_vqa,
+            autostart=autostart,
+            random_seed=self.random_seed,
+        )
+        r = subprocess.run(
+            command,
+            cwd=self.scripts_dir.parent,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if r.returncode != 0:
+            raise RuntimeError(
+                "patch_ra95.py mission failed "
+                f"(rc={r.returncode}): {r.stderr or r.stdout}"
             )
-            if r.returncode != 0:
-                raise RuntimeError(
-                    "ra-random-seed-patch.py failed "
-                    f"(rc={r.returncode}): {r.stderr or r.stdout}"
-                )
+        if self.random_seed is not None:
             (exe.parent / "RA_RANDOM_SEED.txt").write_text(f"{self.random_seed}\n")
 
     def _patch_cd_label(
@@ -673,8 +703,6 @@ class WineCapture:
                 "[Sound]\nCard=-1\n\n[Options]\nHardwareFills=no\n\n[Intro]\nPlayIntro=no\n"
             )
             exe = staging / "RA95.EXE"
-            manifest = self._new_patch_manifest(exe, scenario, skip_vqa, autostart)
-            self._write_patch_manifest(manifest_path, manifest)
             self._patch_chain(
                 exe,
                 scenario,
@@ -683,8 +711,6 @@ class WineCapture:
                 manifest=manifest,
                 manifest_path=manifest_path,
             )
-            manifest["status"] = "patched"
-            self._write_patch_manifest(manifest_path, manifest)
             return staging
         except Exception as exc:
             try:
