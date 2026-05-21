@@ -183,5 +183,21 @@ class RA95PatcherRegistryTest(unittest.TestCase):
             self.assertEqual(second_edits["random-seed"], ["already-applied"])
 
 
+class RA95PatcherCLITest(unittest.TestCase):
+    def test_cli_help_imports(self):
+        import subprocess
+
+        result = subprocess.run(
+            ["python3", "scripts/ra/patch_ra95.py", "--help"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("base", result.stdout)
+        self.assertIn("mission", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
