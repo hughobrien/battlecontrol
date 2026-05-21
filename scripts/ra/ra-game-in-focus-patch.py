@@ -2,76 +2,17 @@
 """
 TIM-735 — quarantined legacy patch originally believed to pin GameInFocus.
 
-This standalone script is retained only for historical reproduction. It writes
-to an address now known to behave as Session.Type, not GameInFocus, and must not
-be used for normal captures. Use scripts/ra/patch_ra95.py instead.
+This standalone script is retained only for historical reproduction. It was
+written from an incorrect address assumption: the patched address behaves as
+Session.Type, not GameInFocus. Normal capture must use the unified mission
+patcher instead:
 
-TIM-732 established the root cause for the perpetually-black DDraw surface
-under Wine 10 + cnc-ddraw + Xvfb+openbox: RA's main render branch is gated on
-`GameInFocus`, a global bool that the WM_ACTIVATEAPP window handler sets to
-wParam. Under Xvfb+openbox WM_ACTIVATEAPP is never delivered, so GameInFocus
-stays FALSE and the render path is skipped every frame. `ra-focus-skip-patch.py`
-only NOPs three `while (!GameInFocus)` spin loops; the render guards remain.
+  python3 scripts/ra/patch_ra95.py mission RA95.EXE --scenario SCG02EA.INI
 
-Strategy
---------
-Two cooperating runtime writes ensure the GameInFocus byte is `1` from
-process start through every gated path:
+Direct execution is blocked by default. To reproduce the historical patch for
+diagnosis only, set:
 
-  1. Entry-point detour. The PE entry point is rewritten to jump into a
-     code cave at the .text zero-padding region. The cave does
-     `mov byte [GameInFocus], 1`, replays the original first entry
-     instruction, then jumps to the original second-instr target. Sets the
-     byte in .bss before any user code runs.
-
-  2. Runtime re-writes at the focus-skip spin loops. Where ra-focus-skip-patch
-     replaced 6 bytes of the loop's JZ with NOPs, this patch replaces the
-     preceding `cmp byte [GameInFocus], 0` (7 bytes) + the 6 NOPs with
-     `mov byte [GameInFocus], 1` (7 bytes) + 6 NOPs. So the moment any of
-     the three Watcom-emitted spin loops in Init_Game / title / netdlg is
-     entered (which happens after CRT init), GameInFocus is re-pinned —
-     defending against any path that the C runtime might have re-zeroed
-     .bss across.
-
-Static cmp-imm flips were considered and rejected: flipping
-`cmp byte [GameInFocus], 0` to `cmp byte [GameInFocus], 1` inverts the
-branch direction at every check, which conflicts with the runtime writes
-in (1)/(2) — when GameInFocus actually IS 1 after the writes, the flipped
-cmp produces ZF=1 and the "GameInFocus is FALSE" branch is taken instead.
-Use either runtime writes or imm flip, never both. Runtime writes are
-preferred because they also cover access patterns like
-`mov al, [GameInFocus]; test al, al` that the imm flip cannot reach.
-
-GameInFocus address
--------------------
-Determined empirically from the cmp opcode used at the three known
-ra-focus-skip sites in `ra-focus-skip-patch.py`:
-
-    file 0x153FFE: 80 3D B8 B6 66 00 00   cmp byte ptr [0x0066B6B8], 0
-                                          (and the same disp32 at 0x15F2EA and 0x15F57C)
-
-so GameInFocus_VA = 0x0066B6B8 (in .bss). The 1996 EXE has no ASLR, so the
-absolute address encoded in the shim is correct without adding .reloc
-entries.
-
-Code cave layout (file 0x1BCABF, VA 0x005CC6BF, 22 of 65 zero bytes used):
-
-    C6 05 B8 B6 66 00 01            mov byte [0x66B6B8], 1
-    C7 05 4C 79 6D 00 B0 94 55 00   mov [0x6D794C], 0x005594B0  (replay entry insn 1)
-    E9 B3 93 FF FF                  jmp 0x005C5A88              (continue to CRT)
-
-Entry patch (file 0x1AD8CA, VA 0x005BD4CA):
-
-    Original: C7 05 4C 79 6D 00 B0 94 55 00   mov [...], ...
-              E9 AF 85 00 00                  jmp 0x005C5A88
-    Patched:  E9 F0 F1 00 00                  jmp 0x005CC6BF  (cave)
-              90 ×10
-
-Accepted input SHA-256:
-  9e34d336469e42b5a33499a37b34c0ab513e54ec0844f890873090a423be972b
-    (.#ra-patched-exe + focus-skip)
-
-(ra-focus-skip-patch.py must run first.)
+  RA_ALLOW_QUARANTINED_GAME_IN_FOCUS=1
 """
 
 import hashlib
