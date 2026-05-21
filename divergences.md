@@ -550,3 +550,43 @@ captures reach an apparently black initial mission view, while others fall into
 top-scores/endgame. The next useful assertion is to identify whether SCU03EA
 legitimately starts with a black tactical area and why the Wine autostart path
 can reach `Multi_Score_Presentation()` so early.
+
+### 2026-05-21 Soviet L1 Sidebar/Radar Follow-up
+
+Fresh Soviet L1 review exposed two right-panel divergences after the gamma
+capture issue was ruled out:
+
+- the construction/sidebar decal behind the build window was blue in native
+  but red in Wine;
+- the radar panel did not line up visually, especially around the active/static
+  radar view.
+
+Root cause for the blue decal is now identified. Native `Read_Scenario_INI()`
+calls `Map.Read_INI()`, which runs `DisplayClass::Init()` ->
+`SidebarClass::Init_Theater()` -> `Reload_Sidebar()` before `[Basic] Player`
+has assigned `PlayerPtr` from the scenario INI. That early load uses the default
+Allied/NATO player state and caches `SIDE?NA.SHP`. A later diagnostic proved
+the scenario data itself is correct:
+
+- early sidebar load: `SIDE?NA.SHP`;
+- then `[Basic] Player` assigns `house=2 actlike=2 name=USSR`;
+- reloading after `PlayerPtr` selection loads `SIDE?US.SHP`;
+- sampled pixel `(530,178)` changes from native blue `(24,40,84)` to Soviet red
+  `(76,0,0)`, matching Wine.
+
+This bug was introduced by the native autostart/porting path exposing an
+initialization order that the original RA95 autostart patch avoids by following
+the install/side-selection path. The correct native fix is to reload the
+player-side sidebar assets after `PlayerPtr` is assigned, not to force Soviet
+art from the renderer.
+
+The radar mismatch is still open and should be tracked separately. In the
+current captures the full frame can pass (`SSIM=0.9737` at
+`2026-05-21T16-56-07-mission-soviet-l1`), but `radar_panel` remains poor
+(`SSIM=0.3834`). Wine frame-10 visually matches native closer around native
+frame-20, confirming that Wine's reported `effective_frame` is not a true
+internal gameplay frame. Even when phases are closer, the radar viewport marker
+differs: Wine draws the tactical viewport line in yellowish pixels
+`(252,248,84)`, while native draws the same `LTGREEN` path as green
+`(84,252,84)`. Continue radar work with a trustworthy Wine frame counter before
+changing radar drawing code.

@@ -109,7 +109,7 @@ def mission_data_dir(scenario: str, target: str) -> str | None:
     if not scenario:
         return None
     is_soviet = scenario.upper().startswith("SCU")
-    if is_soviet and target == "wine":
+    if is_soviet:
         override = os.environ.get("RA_SOVIET_ASSETS")
         if override:
             return override

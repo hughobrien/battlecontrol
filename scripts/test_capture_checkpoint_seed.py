@@ -50,6 +50,13 @@ class CaptureCheckpointSeedTest(unittest.TestCase):
         self.assertIsNone(seed)
         self.assertNotIn("RA_RANDOM_SEED", os.environ)
 
+    def test_soviet_native_capture_uses_soviet_assets(self):
+        os.environ["RA_SOVIET_ASSETS"] = "/tmp/ra-cd2"
+
+        data_dir = self.capture_checkpoint.mission_data_dir("SCU01EA", "native")
+
+        self.assertEqual(data_dir, "/tmp/ra-cd2")
+
 
 if __name__ == "__main__":
     unittest.main()

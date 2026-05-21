@@ -6,6 +6,7 @@ import shutil
 import sys
 import time
 import pathlib
+import tempfile
 from .common import (
     pick_free_display,
     start_xvfb,
@@ -23,6 +24,14 @@ MIN_CAPTURE_LUMINANCE_SPREAD = 32
 MIN_CAPTURE_MAX_LUMINANCE = 96
 MIN_CAPTURE_RGB_SPREAD = 32
 MIN_CAPTURE_NONBLACK_FRACTION = 0.05
+
+
+def capture_timeout_seconds(frame: int, fps: int) -> int:
+    """Return enough time for startup plus the requested internal frame."""
+    if fps <= 0:
+        fps = 10
+    effective_fps = max(fps / 2.0, 1.0)
+    return max(45, int(frame / effective_fps) + 30)
 
 
 def default_ra_bin() -> str:
@@ -168,6 +177,36 @@ def _convert_valid_internal_bmp(
     return _validate_capture_image(png_path)
 
 
+def stage_data_dir(
+    data_dir: pathlib.Path,
+    parent_dir: pathlib.Path,
+    base_data_dir: pathlib.Path | None = None,
+) -> pathlib.Path:
+    """Create a writable run directory containing links to the RA data files."""
+    staged = pathlib.Path(tempfile.mkdtemp(prefix="native-data-", dir=str(parent_dir)))
+
+    def link_entries(source_dir: pathlib.Path, overwrite: bool) -> None:
+        for source in source_dir.iterdir():
+            target = staged / source.name
+            if source.is_dir():
+                continue
+            if target.exists() or target.is_symlink():
+                if not overwrite:
+                    continue
+                target.unlink()
+            target.symlink_to(source)
+
+    if base_data_dir is not None and base_data_dir.is_dir():
+        link_entries(base_data_dir, overwrite=False)
+    link_entries(data_dir, overwrite=True)
+
+    if not (staged / "REDALERT.INI").exists():
+        (staged / "REDALERT.INI").write_text(
+            "[Sound]\nCard=-1\n[Options]\nHardwareFills=no\n[Intro]\nPlayIntro=no\n"
+        )
+    return staged
+
+
 class NativeCapture:
     """Capture screenshots from the native Linux RA build."""
 
@@ -196,8 +235,15 @@ class NativeCapture:
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
         xvfb = wm = ra_proc = None
+        staged_data_dir = None
         try:
             output_dir.mkdir(parents=True, exist_ok=True)
+            base_data_dir = os.environ.get("RA_ASSETS")
+            staged_data_dir = stage_data_dir(
+                self.data_dir,
+                output_dir,
+                pathlib.Path(base_data_dir) if base_data_dir else None,
+            )
             ready_path = output_dir / "native-ready.txt"
             bmp_path = output_dir / "capture.bmp"
             try:
@@ -224,13 +270,14 @@ class NativeCapture:
             ra_proc = subprocess.Popen(
                 [str(self.ra_bin)],
                 env=env,
-                cwd=str(self.data_dir),
+                cwd=str(staged_data_dir),
                 stdout=logfile,
                 stderr=logfile,
             )
             center_mouse(disp, 640, 400)
             # Wait for the in-game frame trap instead of wall-clock guessing.
-            deadline = time.time() + 45
+            fps = int(env["RA_CAPTURE_FPS"])
+            deadline = time.time() + capture_timeout_seconds(max(frame, 1), fps)
             while time.time() < deadline:
                 if ready_path.exists():
                     break
@@ -256,3 +303,5 @@ class NativeCapture:
             return cap_path
         finally:
             teardown_display(disp, ra_proc, wm, xvfb)
+            if staged_data_dir is not None:
+                shutil.rmtree(staged_data_dir, ignore_errors=True)

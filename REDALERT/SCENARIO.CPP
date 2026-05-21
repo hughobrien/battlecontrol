@@ -2529,6 +2529,7 @@ bool Read_Scenario_INI(char * fname, bool )
 	}
 	PlayerPtr->IsHuman = true;
 	PlayerPtr->IsPlayerControl = true;
+	Map.Reload_Sidebar();
 
 //	if (NewINIFormat < 2 || !ini.Is_Present("MapPack")) {
 //		Map.Read_Binary(root, &ScenarioCRC);
