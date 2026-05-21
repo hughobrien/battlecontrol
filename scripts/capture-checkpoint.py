@@ -218,6 +218,48 @@ def _run(args):
                 values[key] = value
         return values
 
+    def summarize_timeline(path: pathlib.Path) -> dict:
+        if not path.exists():
+            return {
+                "path": str(path),
+                "status": "missing",
+                "states": [],
+                "last_state": "unknown",
+                "ever_gameplay": None,
+            }
+        try:
+            timeline = json.loads(path.read_text())
+        except Exception as exc:
+            return {
+                "path": str(path),
+                "status": "malformed",
+                "states": [],
+                "last_state": "unknown",
+                "ever_gameplay": None,
+                "error": str(exc),
+            }
+        entries = timeline.get("entries", [])
+        states = [entry.get("state", "unknown") for entry in entries]
+        return {
+            "path": str(path),
+            "status": "ok",
+            "states": states,
+            "last_state": states[-1] if states else "unknown",
+            "ever_gameplay": "gameplay" in states,
+        }
+
+    def preserve_wine_retry_artifacts(retry: int) -> None:
+        retry_dir = checkpoint_dir / f"wine-invalid-{retry}-timeline"
+        timeline = checkpoint_dir / "wine-screen-timeline.json"
+        screenshots = sorted(checkpoint_dir.glob("wine-screen-*.png"))
+        if not timeline.exists() and not screenshots:
+            return
+        retry_dir.mkdir()
+        if timeline.exists():
+            timeline.rename(retry_dir / timeline.name)
+        for path in screenshots:
+            path.rename(retry_dir / path.name)
+
     def record_failure(target: str, exc: Exception):
         failure = {
             "error": str(exc),
@@ -229,11 +271,23 @@ def _run(args):
         screen_file = checkpoint_dir / f"{target}-screen.json"
         if screen_file.exists():
             failure["screen"] = json.loads(screen_file.read_text())
+        timeline = summarize_timeline(checkpoint_dir / f"{target}-screen-timeline.json")
+        failure["screen_timeline"] = timeline
         manifest.setdefault("failures", {})[target] = failure
         write_manifest()
         print(f"  FAIL {target}: {exc}")
         if "screen" in failure:
             print(f"  Screen classified as: {failure['screen']['state']}")
+        if "screen_timeline" in failure:
+            timeline = failure["screen_timeline"]
+            states = " -> ".join(timeline["states"]) if timeline["states"] else "<none>"
+            print(
+                "  Screen timeline: "
+                f"{states} "
+                f"(status={timeline['status']}, "
+                f"ever_gameplay={timeline['ever_gameplay']}, "
+                f"path={timeline['path']})"
+            )
         print(f"  Session dir: {checkpoint_dir}")
 
     captures = {}
@@ -268,6 +322,7 @@ def _run(args):
                         retry += 1
                         invalid_path = checkpoint_dir / f"wine-invalid-{retry}.png"
                         result.rename(invalid_path)
+                        preserve_wine_retry_artifacts(retry)
                         print(
                             f"  NOTE Wine tactical viewport was blank; "
                             f"retrying gameplay capture ({retry}/{max_retries})"
@@ -343,6 +398,11 @@ def _run(args):
                 manifest["random_seed"] = int(os.environ["RA_RANDOM_SEED"], 0)
             if target == "native" and seed_file.exists():
                 manifest["random_seed"] = int(seed_file.read_text().strip(), 0)
+            timeline = summarize_timeline(
+                checkpoint_dir / f"{target}-screen-timeline.json"
+            )
+            if timeline["status"] != "missing":
+                manifest.setdefault("screen_timelines", {})[target] = timeline
             sz = result.stat().st_size if result.exists() else 0
             if result and result.exists():
                 flat_path = checkpoint_dir / f"{target}.png"

@@ -36,7 +36,7 @@ timeout or final screenshot validation.
 - Modify: `scripts/drivers/wine.py`
 - Modify: `scripts/capture-checkpoint.py`
 
-- [ ] **Step 1: Promote screen classification to a reusable timeline API**
+- [x] **Step 1: Promote screen classification to a reusable timeline API**
 
 Extend the current `classify_ra_screen(path)` helper with a small structured
 state model:
@@ -55,7 +55,7 @@ unknown
 Keep the implementation image-based and cheap. It should tolerate screenshots
 from `capture_root()` and return metrics already useful in failure reports.
 
-- [ ] **Step 2: Poll Wine screen state during mission entry**
+- [x] **Step 2: Poll Wine screen state during mission entry**
 
 In `WineCapture.capture_mission()`, after the RA window appears and before
 waiting for the target frame, capture a small timeline:
@@ -70,7 +70,7 @@ Write this to `wine-screen-timeline.json` in the session directory. Do not add
 expensive polling after gameplay has been confirmed unless an env var enables
 it.
 
-- [ ] **Step 3: Fail early on impossible states**
+- [x] **Step 3: Fail early on impossible states**
 
 If the timeline reaches `top-scores`, `score`, or stable `main-menu` while
 strict frameprobe is enabled, fail immediately with the classified state and the

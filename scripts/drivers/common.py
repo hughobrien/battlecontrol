@@ -3,6 +3,7 @@ import time
 import os
 import signal
 import shutil
+import json
 from pathlib import Path
 
 
@@ -140,6 +141,9 @@ def tactical_nonblack_fraction(path: str) -> float:
 
 
 def _pixel_fraction(im, box, predicate) -> float:
+    left, top, right, bottom = box
+    if right <= left or bottom <= top:
+        return 0.0
     crop = im.crop(box)
     pixels = list(crop.getdata())
     if not pixels:
@@ -147,8 +151,23 @@ def _pixel_fraction(im, box, predicate) -> float:
     return sum(1 for pixel in pixels if predicate(pixel)) / len(pixels)
 
 
+RA_SCREEN_STATES = (
+    "main-menu",
+    "briefing-or-dialog",
+    "loading",
+    "gameplay",
+    "score",
+    "top-scores",
+    "black",
+    "unknown",
+)
+
+RA_SCREEN_IMPOSSIBLE_STATES = ("score", "top-scores")
+RA_SCREEN_TIMELINE_MODEL = "ra-screen-timeline-v1"
+
+
 def classify_ra_screen(path: str) -> dict:
-    """Classify common RA capture failure screens with cheap pixel heuristics."""
+    """Classify common RA screens with cheap pixel heuristics."""
     from PIL import Image
 
     im = Image.open(path).convert("RGB")
@@ -171,32 +190,93 @@ def classify_ra_screen(path: str) -> dict:
         return red < 12 and green < 12 and blue < 12
 
     tactical_fill = tactical_nonblack_fraction(path)
+    unsupported_dimensions = width < 640 or height < 400
     top_green = _pixel_fraction(im, (235, 20, min(width, 405), 45), is_green)
     center_red = _pixel_fraction(im, (200, 170, min(width, 445), 315), is_red)
     dialog_gray = _pixel_fraction(im, (185, 135, min(width, 455), 295), is_gray)
+    score_gray = _pixel_fraction(
+        im, (105, 55, min(width, 535), min(height, 360)), is_gray
+    )
+    right_red = _pixel_fraction(
+        im, (480, 16, min(width, 640), min(height, 400)), is_red
+    )
     overall_black = _pixel_fraction(im, (0, 0, width, height), is_black)
+    ui_signal = top_green + center_red + dialog_gray + score_gray + right_red
 
-    if top_green > 0.015 and overall_black > 0.70:
+    if unsupported_dimensions:
+        state = "unknown"
+    elif top_green > 0.015 and overall_black > 0.70:
         state = "top-scores"
+    elif overall_black > 0.96:
+        state = "black"
+    elif score_gray > 0.20 and right_red > 0.03 and tactical_fill < 0.45:
+        state = "score"
     elif dialog_gray > 0.08 and center_red > 0.05:
-        state = "modal-dialog"
+        state = "briefing-or-dialog"
     elif center_red > 0.10:
         state = "main-menu"
+    elif right_red > 0.18 and overall_black > 0.45 and tactical_fill < 0.45:
+        state = "main-menu"
     elif tactical_fill < 0.05:
-        state = "blank"
-    elif tactical_fill < 0.20:
-        state = "not-gameplay"
+        state = "black"
+    elif tactical_fill < 0.25:
+        state = "loading"
+    elif tactical_fill < 0.55 and ui_signal < 0.02 and overall_black > 0.30:
+        state = "unknown"
     else:
         state = "gameplay"
 
-    return {
-        "state": state,
+    metrics = {
+        "width": width,
+        "height": height,
         "tactical_nonblack": round(tactical_fill, 6),
         "top_green": round(top_green, 6),
         "center_red": round(center_red, 6),
         "dialog_gray": round(dialog_gray, 6),
+        "score_gray": round(score_gray, 6),
+        "right_red": round(right_red, 6),
         "overall_black": round(overall_black, 6),
+        "ui_signal": round(ui_signal, 6),
+        "unsupported_dimensions": unsupported_dimensions,
     }
+    result = {
+        "model": "ra-screen-v1",
+        "state": state,
+        "metrics": metrics,
+    }
+    result.update(metrics)
+    return result
+
+
+def screen_timeline_entry(
+    elapsed_s: float, path: str | os.PathLike, classification: dict | None = None
+) -> dict:
+    """Return a compact JSON-safe screen timeline entry."""
+    path = Path(path)
+    screen = classification or classify_ra_screen(str(path))
+    entry = {
+        "t": round(float(elapsed_s), 3),
+        "state": screen["state"],
+        "path": path.name,
+        "metrics": screen.get("metrics", {}),
+    }
+    if "model" in screen:
+        entry["screen_model"] = screen["model"]
+    return entry
+
+
+def write_screen_timeline(
+    path: str | os.PathLike, entries: list[dict], metadata: dict | None = None
+) -> None:
+    """Write a screen-state timeline JSON file."""
+    payload = {
+        "model": RA_SCREEN_TIMELINE_MODEL,
+        "states": list(RA_SCREEN_STATES),
+        "entries": entries,
+    }
+    if metadata:
+        payload["metadata"] = metadata
+    Path(path).write_text(json.dumps(payload, indent=2) + "\n")
 
 
 def kill_process_tree(proc: subprocess.Popen):

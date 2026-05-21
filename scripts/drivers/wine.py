@@ -8,6 +8,7 @@ import tempfile
 import shutil
 import struct
 import json
+import math
 from .common import (
     pick_free_display,
     start_xvfb,
@@ -15,6 +16,9 @@ from .common import (
     wait_for_window,
     capture_root,
     classify_ra_screen,
+    screen_timeline_entry,
+    write_screen_timeline,
+    RA_SCREEN_IMPOSSIBLE_STATES,
     center_mouse,
     teardown_display,
 )
@@ -25,6 +29,49 @@ def _user_tmpdir(prefix="wine-capture-"):
     base = pathlib.Path.home() / ".cache" / "battlecontrol"
     base.mkdir(parents=True, exist_ok=True)
     return pathlib.Path(tempfile.mkdtemp(prefix=prefix, dir=str(base)))
+
+
+def _timeline_strict_failure(entries: list[dict]) -> str | None:
+    """Return the strict-mode failure reason for a screen timeline."""
+    for entry in entries:
+        if entry.get("state") in RA_SCREEN_IMPOSSIBLE_STATES:
+            return entry["state"]
+    previous_state = None
+    for entry in entries:
+        state = entry.get("state")
+        if state == "main-menu" and previous_state == "main-menu":
+            return "stable main-menu"
+        previous_state = state
+    return None
+
+
+def _parse_timeline_sample_times(
+    env_name: str, default: str, max_elapsed_s: float
+) -> list[float]:
+    """Parse and cap timeline sample offsets from an env var."""
+    raw = os.environ.get(env_name, default)
+    cap = max(0.0, float(max_elapsed_s))
+    sample_times = set()
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            value = float(item)
+        except ValueError as exc:
+            raise ValueError(
+                f"{env_name} must be comma-separated seconds, got {raw!r}"
+            ) from exc
+        if not math.isfinite(value):
+            raise ValueError(
+                f"{env_name} must contain finite seconds, got {item!r} in {raw!r}"
+            )
+        sample = max(0.0, value)
+        if sample <= cap:
+            sample_times.add(sample)
+    if not sample_times:
+        sample_times.add(0.0)
+    return sorted(sample_times)
 
 
 class WineCapture:
@@ -523,6 +570,62 @@ class WineCapture:
         self._destroy_wineprefix()
         shutil.rmtree(staging, ignore_errors=True)
 
+    def _capture_screen_timeline(
+        self,
+        disp: str,
+        output_dir: pathlib.Path,
+        logfile,
+        max_elapsed_s: float,
+        metadata: dict,
+    ) -> tuple[list[dict], pathlib.Path]:
+        """Capture a short mission-entry screen-state timeline."""
+        output_dir.mkdir(parents=True, exist_ok=True)
+        timeline_path = output_dir / "wine-screen-timeline.json"
+        sample_times = _parse_timeline_sample_times(
+            "WINE_SCREEN_TIMELINE_SECONDS", "0,2,5", max_elapsed_s
+        )
+        continue_after_gameplay = os.environ.get(
+            "WINE_SCREEN_TIMELINE_AFTER_GAMEPLAY", "0"
+        ) not in ("", "0")
+
+        entries = []
+        start = time.monotonic()
+        for index, sample_time in enumerate(sample_times):
+            delay = start + sample_time - time.monotonic()
+            if delay > 0:
+                time.sleep(delay)
+            screenshot = output_dir / f"wine-screen-{index:02d}.png"
+            try:
+                capture_root(disp, str(screenshot))
+                screen = classify_ra_screen(str(screenshot))
+                entry = screen_timeline_entry(
+                    time.monotonic() - start, screenshot, screen
+                )
+                entries.append(entry)
+                logfile.write(
+                    "wine-driver: screen timeline "
+                    f"t={entry['t']:.3f}s state={entry['state']} "
+                    f"metrics={entry['metrics']}\n"
+                )
+                logfile.flush()
+                write_screen_timeline(timeline_path, entries, metadata)
+                if entry["state"] == "gameplay" and not continue_after_gameplay:
+                    break
+            except Exception as exc:
+                entries.append(
+                    {
+                        "t": round(time.monotonic() - start, 3),
+                        "state": "unknown",
+                        "path": screenshot.name,
+                        "error": str(exc),
+                    }
+                )
+                write_screen_timeline(timeline_path, entries, metadata)
+                logfile.write(f"wine-driver: screen timeline capture failed: {exc}\n")
+                logfile.flush()
+                break
+        return entries, timeline_path
+
     def capture_mission(
         self, scenario: str, frame: int, output_dir: pathlib.Path, logfile=None
     ) -> pathlib.Path:
@@ -539,10 +642,39 @@ class WineCapture:
             wine_proc = self._launch(staging, logfile, disp)
             if not wait_for_window(disp, "Red Alert", timeout=30):
                 raise RuntimeError("Red Alert window never appeared")
+            boot_settle = float(os.environ.get("WINE_BOOT_SETTLE", "5.0"))
+            strict_frameprobe = os.environ.get("WINE_FRAMEPROBE", "0") not in (
+                "",
+                "0",
+            ) and os.environ.get("WINE_FRAMEPROBE_STRICT", "0") not in ("", "0")
+            timeline_entries = []
+            timeline_path = output_dir / "wine-screen-timeline.json"
+            timeline_metadata = {
+                "scenario": f"{scenario}.INI",
+                "frame": frame,
+                "strict_frameprobe": strict_frameprobe,
+                "menu_drive": menu_drive,
+            }
+            if not menu_drive:
+                timeline_entries, timeline_path = self._capture_screen_timeline(
+                    disp,
+                    output_dir,
+                    logfile,
+                    boot_settle,
+                    {**timeline_metadata, "phase": "boot-settle"},
+                )
+            if strict_frameprobe and timeline_entries:
+                reason = _timeline_strict_failure(timeline_entries)
+                if reason:
+                    raise RuntimeError(
+                        f"Wine mission entry reached {reason}; timeline={timeline_path}"
+                    )
             # Optional legacy boot-dismiss input. Autostart captures are fully
             # patched past dialogs/VQAs; unsolicited Enter/Space can race slower
             # CD2 starts and select Top Scores from the main menu.
-            time.sleep(float(os.environ.get("WINE_BOOT_SETTLE", "5.0")))
+            elapsed = timeline_entries[-1]["t"] if timeline_entries else 0.0
+            if elapsed < boot_settle:
+                time.sleep(boot_settle - elapsed)
             boot_dismiss_default = "0"
             if os.environ.get("WINE_BOOT_DISMISS", boot_dismiss_default) not in (
                 "",
@@ -564,6 +696,20 @@ class WineCapture:
                     f"s=1000;c=322,183;s=500;c=322,183;s=2000;c=470,244;s=2000;c={side_click};s=5000;c=320,327",
                     logfile,
                 )
+                timeline_entries, timeline_path = self._capture_screen_timeline(
+                    disp,
+                    output_dir,
+                    logfile,
+                    float(os.environ.get("WINE_MENU_DRIVE_TIMELINE_SETTLE", "5.0")),
+                    {**timeline_metadata, "phase": "post-menu-drive"},
+                )
+                if strict_frameprobe:
+                    reason = _timeline_strict_failure(timeline_entries)
+                    if reason:
+                        raise RuntimeError(
+                            "Wine mission entry reached "
+                            f"{reason}; timeline={timeline_path}"
+                        )
             # Older captures used synthetic input to dismiss the text mission
             # briefing. The Wine executable is now patched to skip that dialog,
             # so extra input is opt-in; otherwise it can leak into gameplay or
