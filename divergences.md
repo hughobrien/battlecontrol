@@ -62,6 +62,10 @@ Latest useful captures:
   `allied-l3` together. Allied L2 needs `--settle-after-gameplay allied-l2`
   so `0x006544c8` starts advancing before native sync; Allied L3 must skip
   that settle and use `0x0069720c` without native sync.
+- The checkpoint validator now rejects Wine captures that fail the existing
+  `screenshot_ok()` quality gate, not just low tactical non-black fill. This
+  catches tiny all-white/invalid frames that previously looked "nonblack" and
+  could poison native frame sync.
 - Multi-level synchronized rerun after Wine actual-frame reporting:
   - Allied L1: `/tmp/battlecontrol/2026-05-20T21-34-18-mission-allied-l1`, `SSIM=0.9969`
   - Allied L2: `/tmp/battlecontrol/2026-05-20T21-35-15-mission-allied-l2`, `SSIM=0.9984`

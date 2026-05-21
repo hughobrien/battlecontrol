@@ -33,6 +33,7 @@ from drivers.common import (
     PreflightError,
     remove_known_safe_artifacts,
     require_capture_tools,
+    screenshot_ok,
     tactical_nonblack_fraction,
 )
 
@@ -454,8 +455,8 @@ def _run(args):
                     retry = 0
                     while (
                         tactical_nonblack_fraction(str(result)) < min_tactical
-                        and retry < max_retries
-                    ):
+                        or not screenshot_ok(str(result))
+                    ) and retry < max_retries:
                         retry += 1
                         invalid_path = checkpoint_dir / f"wine-invalid-{retry}.png"
                         result.rename(invalid_path)
@@ -468,10 +469,12 @@ def _run(args):
                             scenario, args.frame, target_dir, logfile
                         )
                     tactical_fill = tactical_nonblack_fraction(str(result))
-                    if tactical_fill < min_tactical:
+                    valid_screenshot = screenshot_ok(str(result))
+                    if tactical_fill < min_tactical or not valid_screenshot:
                         raise RuntimeError(
                             "Wine capture did not enter gameplay "
-                            f"(tactical nonblack={tactical_fill:.3f})"
+                            f"(tactical nonblack={tactical_fill:.3f}, "
+                            f"screenshot_ok={int(valid_screenshot)})"
                         )
                     effective_frames[target] = args.frame
                     wine_frame = checkpoint_dir / "wine-frame.txt"
