@@ -9,6 +9,8 @@ import shutil
 import struct
 import json
 import math
+import hashlib
+import sys
 from .common import (
     pick_free_display,
     start_xvfb,
@@ -29,6 +31,69 @@ def _user_tmpdir(prefix="wine-capture-"):
     base = pathlib.Path.home() / ".cache" / "battlecontrol"
     base.mkdir(parents=True, exist_ok=True)
     return pathlib.Path(tempfile.mkdtemp(prefix=prefix, dir=str(base)))
+
+
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _sha256_file(path: pathlib.Path) -> str:
+    return _sha256_bytes(path.read_bytes())
+
+
+def _diff_byte_ranges(before: bytes, after: bytes) -> list[dict[str, str]]:
+    """Return exact contiguous changed byte ranges between two byte strings."""
+    ranges = []
+    limit = max(len(before), len(after))
+    index = 0
+    while index < limit:
+        old_byte = before[index : index + 1] if index < len(before) else b""
+        new_byte = after[index : index + 1] if index < len(after) else b""
+        if old_byte == new_byte:
+            index += 1
+            continue
+
+        start = index
+        index += 1
+        while index < limit:
+            old_byte = before[index : index + 1] if index < len(before) else b""
+            new_byte = after[index : index + 1] if index < len(after) else b""
+            if old_byte == new_byte:
+                break
+            index += 1
+
+        ranges.append(
+            {
+                "offset": f"0x{start:08X}",
+                "before": before[start : min(index, len(before))].hex(),
+                "after": after[start : min(index, len(after))].hex(),
+            }
+        )
+    return ranges
+
+
+def _env_flag(name: str, default: str = "0") -> bool:
+    return os.environ.get(name, default) not in ("", "0")
+
+
+def _scenario_stem(scenario: str | None) -> str | None:
+    if not scenario:
+        return None
+    stem = scenario.upper().strip()
+    if stem.endswith(".INI"):
+        stem = stem[:-4]
+    return stem
+
+
+def _scenario_side(scenario: str | None) -> str | None:
+    stem = _scenario_stem(scenario)
+    if not stem:
+        return None
+    return "soviet" if stem.startswith("SCU") else "allied"
+
+
+def _cd_label_mode(scenario: str | None) -> str:
+    return "cd2" if _scenario_side(scenario) == "soviet" else "cd1"
 
 
 def _timeline_strict_failure(entries: list[dict]) -> str | None:
@@ -240,9 +305,164 @@ class WineCapture:
                 f"i686-w64-mingw32-gcc frameprobe failed (rc={r.returncode}): {r.stderr.strip()}"
             )
 
-    def _patch_chain(
+    @staticmethod
+    def _patch_manifest_path(output_dir: pathlib.Path | None) -> pathlib.Path | None:
+        if output_dir is None:
+            return None
+        return pathlib.Path(output_dir) / "wine-patches.json"
+
+    @staticmethod
+    def _write_patch_manifest(
+        manifest_path: pathlib.Path | None, manifest: dict
+    ) -> None:
+        if manifest_path is None:
+            return
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+
+    @staticmethod
+    def _new_patch_manifest_preflight(
+        scenario=None, skip_vqa=True, autostart=True
+    ) -> dict:
+        return {
+            "scenario": _scenario_stem(scenario),
+            "side": _scenario_side(scenario),
+            "cd_label_mode": _cd_label_mode(scenario),
+            "boot_dismiss": _env_flag("WINE_BOOT_DISMISS", "0"),
+            "menu_drive": _env_flag("WINE_MENU_DRIVE", "0"),
+            "skip_vqa": bool(skip_vqa),
+            "autostart": bool(autostart),
+            "random_seed": None,
+            "ra95_path": None,
+            "sha256_initial": None,
+            "patches": [],
+            "status": "preparing",
+        }
+
+    def _new_patch_manifest(
         self, exe: pathlib.Path, scenario=None, skip_vqa=True, autostart=True
+    ) -> dict:
+        return {
+            "scenario": _scenario_stem(scenario),
+            "side": _scenario_side(scenario),
+            "cd_label_mode": _cd_label_mode(scenario),
+            "boot_dismiss": _env_flag("WINE_BOOT_DISMISS", "0"),
+            "menu_drive": _env_flag("WINE_MENU_DRIVE", "0"),
+            "skip_vqa": bool(skip_vqa),
+            "autostart": bool(autostart),
+            "random_seed": self.random_seed,
+            "ra95_path": str(exe),
+            "sha256_initial": _sha256_file(exe),
+            "patches": [],
+            "status": "patching",
+        }
+
+    def _record_patch_entry(
+        self,
+        manifest: dict,
+        manifest_path: pathlib.Path | None,
+        exe: pathlib.Path,
+        script: str,
+        rc: int | None,
+        stdout: str,
+        stderr: str,
+        before: bytes,
+        after: bytes,
+        error: str | None = None,
+    ) -> dict:
+        changed_ranges = _diff_byte_ranges(before, after)
+        entry = {
+            "script": script,
+            "rc": rc,
+            "applied": [item["offset"] for item in changed_ranges],
+            "changed_ranges": changed_ranges,
+            "sha256_before": _sha256_bytes(before),
+            "sha256_after": _sha256_bytes(after),
+            "stdout": stdout,
+            "stderr": stderr,
+        }
+        if error:
+            entry["error"] = error
+        manifest["patches"].append(entry)
+        manifest["sha256_after"] = entry["sha256_after"]
+        self._write_patch_manifest(manifest_path, manifest)
+        return entry
+
+    def _record_missing_patch_entry(
+        self,
+        manifest: dict,
+        manifest_path: pathlib.Path | None,
+        script: pathlib.Path,
+    ) -> dict:
+        entry = {
+            "script": script.name,
+            "rc": None,
+            "applied": [],
+            "changed_ranges": [],
+            "stdout": "",
+            "stderr": "",
+            "skipped": "missing",
+            "path": str(script),
+        }
+        manifest["patches"].append(entry)
+        self._write_patch_manifest(manifest_path, manifest)
+        return entry
+
+    def _run_patch_script(
+        self,
+        manifest: dict,
+        manifest_path: pathlib.Path | None,
+        exe: pathlib.Path,
+        cmd: list[str],
+    ) -> subprocess.CompletedProcess:
+        before = exe.read_bytes()
+        script = (
+            pathlib.Path(cmd[1]).name if len(cmd) > 1 else pathlib.Path(cmd[0]).name
+        )
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            after = exe.read_bytes()
+            self._record_patch_entry(
+                manifest,
+                manifest_path,
+                exe,
+                script,
+                result.returncode,
+                result.stdout or "",
+                result.stderr or "",
+                before,
+                after,
+            )
+        except subprocess.TimeoutExpired as exc:
+            after = exe.read_bytes()
+            stdout = self._timeout_output(exc)
+            self._record_patch_entry(
+                manifest,
+                manifest_path,
+                exe,
+                script,
+                None,
+                stdout,
+                "",
+                before,
+                after,
+                error="timeout",
+            )
+            raise
+        return result
+
+    def _patch_chain(
+        self,
+        exe: pathlib.Path,
+        scenario=None,
+        skip_vqa=True,
+        autostart=True,
+        manifest: dict | None = None,
+        manifest_path: pathlib.Path | None = None,
     ):
+        if manifest is None:
+            manifest = self._new_patch_manifest(exe, scenario, skip_vqa, autostart)
+            self._write_patch_manifest(manifest_path, manifest)
         patches = [
             "ra/ra-focus-skip-patch.py",
             "ra/ra-game-in-focus-patch.py",
@@ -260,104 +480,158 @@ class WineCapture:
         for name in patches:
             script = self.scripts_dir / name
             if not script.exists():
+                self._record_missing_patch_entry(manifest, manifest_path, script)
                 continue
             cmd = ["python3", str(script), str(exe)]
             if name.endswith("ra-scenario-patch.py") and scenario:
                 cmd.append(scenario)
             if name.endswith("ra-autostart-patch.py") and scenario:
-                side = "soviet" if scenario.upper().startswith("SCU") else "allied"
+                side = _scenario_side(scenario) or "allied"
                 cmd.extend(["--side", side])
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            r = self._run_patch_script(manifest, manifest_path, exe, cmd)
             if r.returncode != 0:
                 raise RuntimeError(
                     f"{script.name} failed (rc={r.returncode}): {r.stderr or r.stdout}"
                 )
-        self._patch_cd_label(exe, scenario)
+        self._patch_cd_label(exe, scenario, manifest, manifest_path)
         if self.random_seed is not None:
-            subprocess.run(
+            r = self._run_patch_script(
+                manifest,
+                manifest_path,
+                exe,
                 [
                     "python3",
                     str(self.scripts_dir / "ra" / "ra-random-seed-patch.py"),
                     str(exe),
                     str(self.random_seed),
                 ],
-                check=True,
-                capture_output=True,
-                timeout=30,
             )
+            if r.returncode != 0:
+                raise RuntimeError(
+                    "ra-random-seed-patch.py failed "
+                    f"(rc={r.returncode}): {r.stderr or r.stdout}"
+                )
             (exe.parent / "RA_RANDOM_SEED.txt").write_text(f"{self.random_seed}\n")
 
-    def _patch_cd_label(self, exe: pathlib.Path, scenario=None):
+    def _patch_cd_label(
+        self,
+        exe: pathlib.Path,
+        scenario=None,
+        manifest: dict | None = None,
+        manifest_path: pathlib.Path | None = None,
+    ):
         """Make Wine's blank staging volume label identify as the mission CD."""
         label_offset = 0x1BFCB7
-        data = bytearray(exe.read_bytes())
+        before = exe.read_bytes()
+        data = bytearray(before)
         if len(data) < label_offset + 8:
             raise RuntimeError(f"{exe} too small for RA CD label patch")
 
         # The base flake derivation blanks CD1 for Allied captures. Soviet
         # captures need the blank Wine volume label to match CD2 instead.
-        if scenario and scenario.upper().startswith("SCU"):
+        if _scenario_side(scenario) == "soviet":
             data[label_offset] = ord("C")
             data[label_offset + 4] = 0
         else:
             data[label_offset] = 0
             data[label_offset + 4] = ord("C")
         exe.write_bytes(data)
+        if manifest is not None:
+            after = bytes(data)
+            self._record_patch_entry(
+                manifest,
+                manifest_path,
+                exe,
+                "cd-label",
+                0,
+                f"cd_label_mode={_cd_label_mode(scenario)}",
+                "",
+                before,
+                after,
+            )
 
     def _setup_staging(
-        self, scenario=None, skip_vqa=True, autostart=True
+        self,
+        scenario=None,
+        skip_vqa=True,
+        autostart=True,
+        output_dir: pathlib.Path | None = None,
     ) -> pathlib.Path:
         staging = _user_tmpdir()
-        for f in self.data_dir.glob("*.MIX"):
-            (staging / f.name).symlink_to(f)
-        for f in self.data_dir.glob("*.INI"):
-            (staging / f.name).symlink_to(f)
-        # Unlink existing INI symlinks so we can write fresh configs
-        for ini in list(staging.glob("*.INI")):
-            ini.unlink()
-        shutil.copy2(self.ra_exe, staging / "RA95.EXE")
-        (staging / "RA95.EXE").chmod(0o755)
-        # Use stub THIPX32.DLL (no 16-bit thunk dependency)
-        stub_src = self.scripts_dir / ".." / "tools" / "stub-thipx" / "thipx32.dll"
-        if stub_src.exists():
-            shutil.copy2(stub_src.resolve(), staging / "THIPX32.DLL")
-        # cnc-ddraw — the canonical Wine DirectDraw path. Built from the flake
-        # input (with the TIM-740 scanline_double patch applied) — nothing
-        # else in the pipeline works correctly under Xvfb.
-        #
-        # Don't switch to DDrawCompat (narzoul/DDrawCompat):
-        #   1. README says Wine is explicitly unsupported.
-        #   2. It wraps the real ddraw.dll, so under Wine it adds Wine's
-        #      DirectDraw impl as an extra variable in OG-vs-native parity.
-        #   3. No `windowed=true` equivalent — it would hit Xvfb's
-        #      no-exclusive-mode-set crash that we already observed when
-        #      flipping cnc-ddraw's `windowed=false` (see commit history).
-        # cnc-ddraw `renderer=gdi` bypasses DirectDraw entirely and is the
-        # CnCNet-community canonical shim for RA95/C&C95 specifically.
-        ddraw_r = subprocess.run(
-            [self.nix, "build", ".#cnc-ddraw", "--impure", "--print-out-paths"],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if ddraw_r.returncode != 0:
-            raise RuntimeError(
-                "nix build .#cnc-ddraw failed; Wine capture requires the "
-                "patched cnc-ddraw DLL.\n" + ddraw_r.stderr
+        manifest_path = self._patch_manifest_path(output_dir)
+        manifest = self._new_patch_manifest_preflight(scenario, skip_vqa, autostart)
+        try:
+            self._write_patch_manifest(manifest_path, manifest)
+            for f in self.data_dir.glob("*.MIX"):
+                (staging / f.name).symlink_to(f)
+            for f in self.data_dir.glob("*.INI"):
+                (staging / f.name).symlink_to(f)
+            # Unlink existing INI symlinks so we can write fresh configs
+            for ini in list(staging.glob("*.INI")):
+                ini.unlink()
+            shutil.copy2(self.ra_exe, staging / "RA95.EXE")
+            (staging / "RA95.EXE").chmod(0o755)
+            # Use stub THIPX32.DLL (no 16-bit thunk dependency)
+            stub_src = self.scripts_dir / ".." / "tools" / "stub-thipx" / "thipx32.dll"
+            if stub_src.exists():
+                shutil.copy2(stub_src.resolve(), staging / "THIPX32.DLL")
+            # cnc-ddraw — the canonical Wine DirectDraw path. Built from the flake
+            # input (with the TIM-740 scanline_double patch applied) — nothing
+            # else in the pipeline works correctly under Xvfb.
+            #
+            # Don't switch to DDrawCompat (narzoul/DDrawCompat):
+            #   1. README says Wine is explicitly unsupported.
+            #   2. It wraps the real ddraw.dll, so under Wine it adds Wine's
+            #      DirectDraw impl as an extra variable in OG-vs-native parity.
+            #   3. No `windowed=true` equivalent — it would hit Xvfb's
+            #      no-exclusive-mode-set crash that we already observed when
+            #      flipping cnc-ddraw's `windowed=false` (see commit history).
+            # cnc-ddraw `renderer=gdi` bypasses DirectDraw entirely and is the
+            # CnCNet-community canonical shim for RA95/C&C95 specifically.
+            ddraw_r = subprocess.run(
+                [self.nix, "build", ".#cnc-ddraw", "--impure", "--print-out-paths"],
+                capture_output=True,
+                text=True,
+                timeout=120,
             )
-        ddraw_src = pathlib.Path(ddraw_r.stdout.strip()) / "bin" / "ddraw.dll"
-        shutil.copy2(ddraw_src, staging / "ddraw.dll")
-        capture_fps = int(os.environ.get("RA_CAPTURE_FPS", "10"), 0)
-        (staging / "ddraw.ini").write_text(
-            "[ddraw]\nrenderer=gdi\nwindowed=true\nhook=0\n"
-            f"window_state=normal\nmaxfps={capture_fps}\n\n"
-            "[ra95]\nscanline_double=true\n"
-        )
-        (staging / "REDALERT.INI").write_text(
-            "[Sound]\nCard=-1\n\n[Options]\nHardwareFills=no\n\n[Intro]\nPlayIntro=no\n"
-        )
-        self._patch_chain(staging / "RA95.EXE", scenario, skip_vqa, autostart)
-        return staging
+            if ddraw_r.returncode != 0:
+                raise RuntimeError(
+                    "nix build .#cnc-ddraw failed; Wine capture requires the "
+                    "patched cnc-ddraw DLL.\n" + ddraw_r.stderr
+                )
+            ddraw_src = pathlib.Path(ddraw_r.stdout.strip()) / "bin" / "ddraw.dll"
+            shutil.copy2(ddraw_src, staging / "ddraw.dll")
+            capture_fps = int(os.environ.get("RA_CAPTURE_FPS", "10"), 0)
+            (staging / "ddraw.ini").write_text(
+                "[ddraw]\nrenderer=gdi\nwindowed=true\nhook=0\n"
+                f"window_state=normal\nmaxfps={capture_fps}\n\n"
+                "[ra95]\nscanline_double=true\n"
+            )
+            (staging / "REDALERT.INI").write_text(
+                "[Sound]\nCard=-1\n\n[Options]\nHardwareFills=no\n\n[Intro]\nPlayIntro=no\n"
+            )
+            exe = staging / "RA95.EXE"
+            manifest = self._new_patch_manifest(exe, scenario, skip_vqa, autostart)
+            self._write_patch_manifest(manifest_path, manifest)
+            self._patch_chain(
+                exe,
+                scenario,
+                skip_vqa,
+                autostart,
+                manifest=manifest,
+                manifest_path=manifest_path,
+            )
+            manifest["status"] = "patched"
+            self._write_patch_manifest(manifest_path, manifest)
+            return staging
+        except Exception as exc:
+            try:
+                manifest["status"] = "failed"
+                manifest["error"] = str(exc)
+                self._write_patch_manifest(manifest_path, manifest)
+            finally:
+                shutil.rmtree(staging, ignore_errors=True)
+            raise
 
     def _create_wineprefix(self, staging: pathlib.Path):
         """Create a fresh wineprefix from scratch and configure it.
@@ -709,10 +983,45 @@ class WineCapture:
         logfile.flush()
         return (False, value, "timeout")
 
+    def _note_failure_patch_manifest(
+        self, output_dir: pathlib.Path, logfile=None
+    ) -> pathlib.Path:
+        manifest_path = self._patch_manifest_path(output_dir)
+        assert manifest_path is not None
+        if manifest_path.exists():
+            message = (
+                f"wine-driver: failure artifacts in {output_dir}; "
+                f"patch manifest: {manifest_path}"
+            )
+        else:
+            message = (
+                f"wine-driver: failure artifacts in {output_dir}; "
+                f"patch manifest was not created: {manifest_path}"
+            )
+        print(message, file=sys.stderr)
+        if hasattr(logfile, "write"):
+            logfile.write(message + "\n")
+            logfile.flush()
+        return manifest_path
+
+    def _raise_with_patch_manifest(
+        self, exc: Exception, output_dir: pathlib.Path, logfile=None
+    ):
+        manifest_path = self._note_failure_patch_manifest(output_dir, logfile)
+        text = str(exc)
+        if "wine-patches.json" in text:
+            raise
+        if manifest_path.exists():
+            raise RuntimeError(f"{text}; patch manifest: {manifest_path}") from exc
+        raise RuntimeError(
+            f"{text}; patch manifest was not created: {manifest_path}"
+        ) from exc
+
     def _cleanup(self, disp, staging, wine_proc, xvfb, wm):
         teardown_display(disp, wine_proc, wm, xvfb)
         self._destroy_wineprefix()
-        shutil.rmtree(staging, ignore_errors=True)
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
 
     def _capture_screen_timeline(
         self,
@@ -783,10 +1092,15 @@ class WineCapture:
         """Capture a screenshot from a mission at the given game frame."""
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
-        xvfb = wm = wine_proc = None
+        xvfb = wm = wine_proc = staging = None
         menu_drive = os.environ.get("WINE_MENU_DRIVE", "0") not in ("", "0")
-        staging = self._setup_staging(scenario, skip_vqa=True, autostart=not menu_drive)
         try:
+            staging = self._setup_staging(
+                scenario,
+                skip_vqa=True,
+                autostart=not menu_drive,
+                output_dir=output_dir,
+            )
             xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             self._create_wineprefix(staging)
@@ -1103,6 +1417,8 @@ class WineCapture:
             cap_path = output_dir / "capture.png"
             capture_root(disp, str(cap_path))
             return cap_path
+        except Exception as exc:
+            self._raise_with_patch_manifest(exc, output_dir, logfile)
         finally:
             self._cleanup(disp, staging, wine_proc, xvfb, wm)
 
@@ -1112,10 +1428,15 @@ class WineCapture:
         """Launch a Wine mission and dump state without taking a final capture."""
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
-        xvfb = wm = wine_proc = None
+        xvfb = wm = wine_proc = staging = None
         menu_drive = os.environ.get("WINE_MENU_DRIVE", "0") not in ("", "0")
-        staging = self._setup_staging(scenario, skip_vqa=True, autostart=not menu_drive)
         try:
+            staging = self._setup_staging(
+                scenario,
+                skip_vqa=True,
+                autostart=not menu_drive,
+                output_dir=output_dir,
+            )
             xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             self._create_wineprefix(staging)
@@ -1152,6 +1473,8 @@ class WineCapture:
                     f"timeline={timeline_path}"
                 )
             return self._run_state_probe(staging, disp, output_dir, logfile)
+        except Exception as exc:
+            self._raise_with_patch_manifest(exc, output_dir, logfile)
         finally:
             self._cleanup(disp, staging, wine_proc, xvfb, wm)
 
@@ -1161,9 +1484,9 @@ class WineCapture:
         """Capture a screenshot from a VQA at the given frame."""
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
-        xvfb = wm = wine_proc = None
-        staging = self._setup_staging(None, skip_vqa=False)
+        xvfb = wm = wine_proc = staging = None
         try:
+            staging = self._setup_staging(None, skip_vqa=False, output_dir=output_dir)
             # VQA cinematics render at 640x480 (the title/intro mode)
             xvfb = start_xvfb(disp, 640, 480, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
@@ -1196,6 +1519,8 @@ class WineCapture:
             cap_path = output_dir / "capture.png"
             capture_root(disp, str(cap_path))
             return cap_path
+        except Exception as exc:
+            self._raise_with_patch_manifest(exc, output_dir, logfile)
         finally:
             self._cleanup(disp, staging, wine_proc, xvfb, wm)
 
@@ -1219,9 +1544,11 @@ class WineCapture:
         delay = delays[mode]
         disp = pick_free_display()
         logfile = logfile or subprocess.DEVNULL
-        xvfb = wm = wine_proc = None
-        staging = self._setup_staging(scenario=None, skip_vqa=True)
+        xvfb = wm = wine_proc = staging = None
         try:
+            staging = self._setup_staging(
+                scenario=None, skip_vqa=True, output_dir=output_dir
+            )
             xvfb = start_xvfb(disp, 640, 480, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             self._create_wineprefix(staging)
@@ -1240,6 +1567,8 @@ class WineCapture:
             cap_path = output_dir / f"{mode}.png"
             capture_root(disp, str(cap_path))
             return cap_path
+        except Exception as exc:
+            self._raise_with_patch_manifest(exc, output_dir, logfile)
         finally:
             self._cleanup(disp, staging, wine_proc, xvfb, wm)
 

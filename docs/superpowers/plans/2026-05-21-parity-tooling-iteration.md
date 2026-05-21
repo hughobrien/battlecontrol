@@ -348,7 +348,7 @@ missing, report the missing tool or `WINE_BIN` problem and whether
 - Modify: `scripts/drivers/wine.py`
 - Modify: RA patch scripts as needed to support machine-readable output
 
-- [ ] **Step 1: Capture patch stdout/stderr into manifest data**
+- [x] **Step 1: Capture patch stdout/stderr into manifest data**
 
 For each patch script record:
 
@@ -361,7 +361,7 @@ For each patch script record:
 }
 ```
 
-- [ ] **Step 2: Record side/CD/scenario decisions**
+- [x] **Step 2: Record side/CD/scenario decisions**
 
 Write `wine-patches.json` with:
 
@@ -374,7 +374,7 @@ Write `wine-patches.json` with:
 }
 ```
 
-- [ ] **Step 3: Include patch manifest link in failure output**
+- [x] **Step 3: Include patch manifest link in failure output**
 
 When capture fails, print the session path and mention `wine-patches.json`.
 
