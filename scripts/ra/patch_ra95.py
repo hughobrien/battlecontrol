@@ -7,16 +7,23 @@ import argparse
 from pathlib import Path
 import sys
 
-if __package__ is None or __package__ == "":
+if __package__:
+    from .ra95_patches import (
+        DEFAULT_RANDOM_SEED,
+        PatchError,
+        apply_mode,
+        mode_patch_ids,
+        patch_registry,
+    )
+else:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from ra.ra95_patches import (  # noqa: E402
-    DEFAULT_RANDOM_SEED,
-    PatchError,
-    apply_mode,
-    mode_patch_ids,
-    patch_registry,
-)
+    from ra.ra95_patches import (  # noqa: E402
+        DEFAULT_RANDOM_SEED,
+        PatchError,
+        apply_mode,
+        mode_patch_ids,
+        patch_registry,
+    )
 
 
 def _int_auto(value: str) -> int:

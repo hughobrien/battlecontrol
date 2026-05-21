@@ -198,6 +198,20 @@ class RA95PatcherCLITest(unittest.TestCase):
         self.assertIn("base", result.stdout)
         self.assertIn("mission", result.stdout)
 
+    def test_module_help_imports(self):
+        import subprocess
+
+        result = subprocess.run(
+            ["python3", "-m", "scripts.ra.patch_ra95", "--help"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("base", result.stdout)
+        self.assertIn("mission", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
