@@ -333,6 +333,9 @@
       console.log('[preloader] mounted ' + GAME_DIR + '/' + name);
     });
 
+    // TIM-924: validate game data after mount; blocking error overlay if missing.
+    Module._validateGameData();
+
     // Synthesize the required INI config file if not already in the asset bundle.
     // TIM-399: RA STARTUP.CPP gates init on RawFileClass("REDALERT.INI").Is_Available().
     // TIM-404: TD STARTUP.CPP gates init on RawFileClass("CONQUER.INI").Is_Available().
@@ -502,6 +505,71 @@
       launchGame();
     }
   }
+
+  // TIM-924: C++-callable IDBFS force-sync for save persistence.
+  // Called from C++ via EM_ASM({ Module._saveToIDBFS(); }) after Save_Game
+  // writes a file to /saves/, ensuring it reaches IndexedDB before the page
+  // context can terminate.
+  Module._saveToIDBFS = function (callback) {
+    var FS = Module.FS;
+    if (!FS.filesystems || !FS.filesystems.IDBFS) {
+      if (callback) callback('IDBFS not available');
+      return;
+    }
+    FS.syncfs(/*populate=*/false, function (err) {
+      if (err) {
+        console.error('[idbfs] _saveToIDBFS sync error:', err.message);
+        if (callback) callback(err.message);
+      } else {
+        console.log('[idbfs] _saveToIDBFS sync OK');
+        if (callback) callback(null);
+      }
+    });
+  };
+
+  // TIM-924: C++-callable IDBFS force-populate for load.
+  // Called from C++ via EM_ASM({ Module._loadFromIDBFS(); }) before Load_Game
+  // reads a file from /saves/, ensuring IndexedDB state is synced to MEMFS.
+  Module._loadFromIDBFS = function (callback) {
+    var FS = Module.FS;
+    if (!FS.filesystems || !FS.filesystems.IDBFS) {
+      if (callback) callback('IDBFS not available');
+      return;
+    }
+    FS.syncfs(/*populate=*/true, function (err) {
+      if (err) {
+        console.error('[idbfs] _loadFromIDBFS sync error:', err.message);
+        if (callback) callback(err.message);
+      } else {
+        console.log('[idbfs] _loadFromIDBFS sync OK');
+        if (callback) callback(null);
+      }
+    });
+  };
+
+  // TIM-924: validate that essential MIX files are present in /game/.
+  // Called from C++ or JS after preload completes.  Returns true when all
+  // required files exist; false + error overlay otherwise.
+  Module._validateGameData = function () {
+    var FS = Module.FS;
+    var ESSENTIAL_MIXES = ['REDALERT.MIX', 'LOCAL.MIX', 'MAIN.MIX', 'CONQUER.MIX'];
+    var missing = [];
+    for (var i = 0; i < ESSENTIAL_MIXES.length; i++) {
+      try {
+        FS.stat('/game/' + ESSENTIAL_MIXES[i]);
+      } catch (e) {
+        missing.push(ESSENTIAL_MIXES[i]);
+      }
+    }
+    if (missing.length > 0) {
+      showPreloaderError(
+        'Missing required game files: ' + missing.join(', ') +
+        '. The selected folder may not contain valid game data.'
+      );
+      return false;
+    }
+    return true;
+  };
 
   document.addEventListener('DOMContentLoaded', function () {
     var params = new URLSearchParams(window.location.search);
