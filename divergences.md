@@ -119,6 +119,12 @@ Latest useful captures:
   shroud/fog blending at the revealed-area boundary. This is the same residual
   tactical shroud-edge issue formerly tracked as D17, so D17 is merged into D4
   and D4 remains open for the blending/state difference.
+- D4 fixed capture, 2026-05-22:
+  `/tmp/battlecontrol/2026-05-22T07-11-52-mission-allied-l2` confirms the
+  residual shroud-edge blending is fixed. Wine and native both captured
+  effective frame `91`; comparison passes with full-frame `SSIM=0.9989`,
+  `p99=0`, tactical viewport `p99=0`, and exact pixels at the prior D4 probes
+  `(318,21)`, `(324,21)`, `(302,54)`, `(396,29)`, and `(417,214)`.
 - D5 review accepted, 2026-05-21:
   `/tmp/battlecontrol/2026-05-21T07-02-21-mission-allied-l2` has exact top
   message/top bar regions (`changed_gt0=0`, `p99=0`), and human review confirms
@@ -258,7 +264,7 @@ the right state being drawn through the wrong dirty/redraw path.
 | D1 | Native misses mission instruction text: `Clear the way for the convoy` at top left. | Fixed | `MessageListClass::Add_Message()` was forwarding to the GlyphX callback while the in-engine label list was compiled out; native now keeps the callback and restores the label list for port builds. |
 | D2 | Native misses mission countdown timer in the top bar. | Fixed | Native/WASM port now uses the Win95 high-res tab path and re-enables timer text drawing in `CreditClass::Graphic_Logic()`. |
 | D3 | Native misses credit balance in the top right. | Fixed | Same high-res tab/credit draw restoration as D2; remaining credit-value mismatch was capture timing, not missing rendering. |
-| D4 | Native shroud/fog edge blending differs from Wine at revealed-area boundaries. | Open | The original D4 terrain/stamp offset is fixed: `Buffer_Draw_Stamp_Clip()` treated clipped stamp coordinates as full-page coordinates while shape drawing treated them as window-relative, drawing terrain stamps 16 pixels too high in the Allied L2 Win95 layout (`TacPixelY=16`). The remaining visible issue is the same residual tactical shroud-edge/blending difference formerly tracked as D17; D4 review capture `/tmp/battlecontrol/2026-05-21T06-59-03-mission-allied-l2` still has concentrated edge deltas in the tactical viewport while top/UI regions match. |
+| D4 | Native shroud/fog edge blending differs from Wine at revealed-area boundaries. | Fixed | This had two causes. The original blocky terrain/shroud offset was `Buffer_Draw_Stamp_Clip()` treating clipped stamp coordinates as full-page coordinates while shape drawing treated them as window-relative, drawing terrain stamps 16 pixels too high in the Allied L2 Win95 layout (`TacPixelY=16`). The remaining D4/D17 edge-blending mismatch was a porting regression in the portable RA `Build_Fading_Table()` replacement: it did not preserve the original x86 routine's signed 8-bit blend math, self-match skip, and last-match-wins tie behavior. Native now builds the same tactical shroud translucent table as RA95; fixed capture `/tmp/battlecontrol/2026-05-22T07-11-52-mission-allied-l2` has tactical `p99=0` and the prior D4 probe pixels are exact. |
 | D5 | Native had stale one-pixel text/crosshair remnants. | Fixed | `Buffer_Fill_Rect` used exclusive right/bottom; original callers pass inclusive coordinates. |
 | D6 | Native initially captured wrong viewport/camera. | Fixed | `Set_Tactical_Position()` ignored its requested coordinate; Linux also needed Win95 sidebar/start-view logic. |
 | D7 | Wine/native captures are at different simulation times. | Open, now measurable | Native traps after the target gameplay frame is presented. Wine now has an optional cnc-ddraw render-loop capture hook (`WINE_CNCDDRAW_CAPTURE=1`) that dumps the actual DirectDraw surface and logs RA95's internal frame counter at that present. Allied L1 render-frame 50 is byte-reproducible in Wine and reports `ra_frame=91`; the closest native match is frame 93, showing a concrete present/counter-boundary offset still to resolve. |
@@ -267,7 +273,7 @@ the right state being drawn through the wrong dirty/redraw path.
 | D10 | Road/ground template art was fragmented or looked like the wrong subtile. | Fixed | The portable `Buffer_Draw_Stamp*` implementations skipped the original iconset logical-to-physical `Map` remap. Restoring that remap fixes Allied L1/L2 road fragmentation and the earlier “template rendering” issue. |
 | D11 | Native inactive radar panel shows static/noise where Wine shows the Allied cover plate. | Fixed | Porting regression from `84604ef`: `Get_Jammed(PlayerPtr)` was used as a replacement for disabled legacy `IsRadarJammed`, but it is true when no radar building exists. Native now only draws jam snow when a radar exists and is jammed; no-radar Allied L2 draws the cover plate like Wine. |
 | D12 | Wine has drop shadows to the right of the three control panel buttons (spanner, dollar, earth), native does not. | Fixed | The dark pixels are ordinary `SIDE1NA.SHP` sidebar art, not button shadow effects. Native drew those pixels correctly, then `RadarClass::AI()` unconditionally flagged an inactive no-radar cover redraw and `RadarClass::Draw_It()` repainted `RadarAnim` frame 0 over the sidebar. Native now advances/flags the jammed-radar animation only when a radar exists and is actually jammed. |
-| D13 | Wine shroud/fog appears to have four grades between revealed and hidden, native closer to three. | Fixed | Porting regression in the portable `Build_Fading_Table()` replacement: it allowed fixed/control palette slots `0..15` as nearest fade targets, so shroud pixels from `SHADOW.SHP` source colors 13/14 over terrain color 79 collapsed to black index 0/12. RA95's table maps those cases to terrain-shadow index 16. Native now preserves transparent black and searches the game-art palette range starting at 16. |
+| D13 | Wine shroud/fog appears to have four grades between revealed and hidden, native closer to three. | Fixed | Porting regression in the portable RA `Build_Fading_Table()` replacement. Earlier partial fixes handled the most obvious black-collapse cases, but the correct fix is to reproduce the original x86 routine's signed 8-bit fade arithmetic and nearest-color tie behavior. This produces the same shroud translucent table as RA95 for the observed D13/D4 samples. |
 | D14 | Native has native-only saturated green/purple/cyan/red pixels near the infantry cluster; Wine is clean. | Fixed | The saturated cluster was mapped ore (`OVERLAY_GOLD2`, `OverlayData=3`) in cell `5972`, which native drew even though the cell was mapped but not visible. The later shroud mask has transparent holes, so ore colors leaked through. Native now skips overlays for mapped-but-not-visible cells, matching Wine at the reported green/purple pixels. |
 | D16 | Soviet L3 shows native-only purple pixels in snow/overlay art. | Blocked review | The underlying native decoder bug appears fixed: shape probes showed the source shape data itself contained palette index `1` because native decoded non-LCW keyframe deltas as LCW, and native now decodes XOR streams with the original command format. However, human review rejected native-only acceptance because Wine Soviet L3 is still entering game-over/top-scores/invalid frames. D16 needs a clean Wine Soviet L3 gameplay comparison before it can be accepted. |
 | D18 | Allied L5 sidebar has a one-pixel vertical line difference immediately left of the leftmost build column. | Fixed | Stable aligned-sequence artifact at screen `x=499`, mostly `y=195..371`. Wine keeps this column as the sidebar bevel color `(68,68,60)`, while native left pixels from the middle/bottom sidebar chunks exposed. Native probes showed `SIDE2NA/SIDE3NA` write local `x=19` into `x=499`; Wine process-memory source scans found matching decoded source rows, ruling out asset load and sidebar decode provenance. A full late `PowerClass::Draw_It()` fixed the strip but wrongly overwrote radar/top/bottom pixels. The accepted fix keeps the normal power/radar order and redraws only the clipped retail-overlap strip of `POWERBAR.SHP` after the sliced sidebar background. Verification at Allied L5 frame 52: the sidebar crop `(470,160)-(640,400)` and line band `(496,176)-(502,390)` are pixel-exact against Wine, while the radar crop matches the baseline. Human review confirmed resolved using `/tmp/battlecontrol/review-d18-sidebar-line/{wine,native}.png`. |
@@ -392,9 +398,10 @@ Follow-up probes:
 - Reducing all infantry sight ranges by one makes the target pixels black but
   hides much too much of the visible island (`SSIM=0.7967`).
 - Drawing shadow shapes opaquely leaves the same top-left pixels uncovered.
-  Therefore the open native block is not a translucency table blend error; it is
-  either an unmapped/different-neighborhood state in RA95 or a different
-  selected shadow shape.
+  At the time this suggested the open native block was not solely a
+  translucency table blend error. Later exact source/destination table probes
+  superseded this: the same visible symptom included both the earlier terrain
+  offset and the later portable fade-table mismatch.
 - Colorizing the native shroud pass with `RA_COLOR_SHADOW_CELLS=1` in
   `/tmp/battlecontrol/2026-05-20T08-26-57-mission-allied-l2` proves the pale
   top-left pixels are not terrain being drawn after the shroud. They are the
@@ -459,10 +466,16 @@ Follow-up probes:
   exact final color varies between captures.
 - A Wine process-memory scan found a matching RA95 translucent-table candidate
   at `0x00644a18`: `control[16]=0`, `control[15]=1`, and samples
-  `s16_d79=137`, `s15_d79=140`. This means the table mapping itself is not yet
-  enough to explain the saturated native pixels. The next likely axes are the
-  active palette values for those indices or whether Wine draws a different
-  shadow source/destination at the same screen coordinate.
+  `s16_d79=137`, `s15_d79=140`. That early sample was too narrow: later D4
+  samples involving `src14/dst116`, `src15/dst130`, and `src15/dst65` exposed
+  the portable fade-table mismatch.
+- Superseding D4 table probe, 2026-05-22: tracing the current D4 probe pixels
+  showed native using different translucent table outputs for the same live
+  source/destination pairs. Wine's table at `0x00644a18` maps
+  `src14/dst116 -> 12`, `src15/dst130 -> 140`, and `src15/dst65 -> 24`; the
+  native portable `Build_Fading_Table()` path produced `16`, `31`, and `23`.
+  Reimplementing RA's original x86 fade-table arithmetic makes the D4 shroud
+  probe pixels exact against Wine.
 
 ### D12 Button-Shadow Probe
 

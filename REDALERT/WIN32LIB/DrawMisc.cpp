@@ -1768,24 +1768,53 @@ void * __cdecl Build_Fading_Table(void const *palette, void const *dest, long in
 	unsigned char matchcolor = 0;		//:BYTE		; Tentative match color.
 
 #ifndef _MSC_VER
-	// TIM-160: blend each palette entry toward 'color' by frac/256,
-	// find nearest match across the full 256-entry palette.
-		{
-			const unsigned char *pal = (const unsigned char*)palette;
-			unsigned char *out = const_cast<unsigned char*>((const unsigned char*)dest);
-			int tred = pal[color*3], tgrn = pal[color*3+1], tblu = pal[color*3+2];
-			out[0] = 0;
-			for (int i = 1; i < 256; i++) {
-				int ired = pal[i*3]   + ((tred - pal[i*3])   * (int)frac >> 8);
-				int igrn = pal[i*3+1] + ((tgrn - pal[i*3+1]) * (int)frac >> 8);
-				int iblu = pal[i*3+2] + ((tblu - pal[i*3+2]) * (int)frac >> 8);
-				int best = 0x7FFFFFFF; matchcolor = (unsigned char)16;
-				for (int j = 16; j < 256; j++) {
-					int dr = pal[j*3]-ired, dg = pal[j*3+1]-igrn, db = pal[j*3+2]-iblu;
-					int d = dr*dr + dg*dg + db*db;
-					if (d < best) { best = d; matchcolor = (unsigned char)j; if (!d) break; }
+	{
+		if (!palette || !dest) return (void*)dest;
+
+		unsigned char const *pal = (unsigned char const *)palette;
+		unsigned char *out = const_cast<unsigned char *>((unsigned char const *)dest);
+		if (frac >= 0x100) frac = 0xff;
+
+		targetred = pal[color * 3 + 0];
+		targetgreen = pal[color * 3 + 1];
+		targetblue = pal[color * 3 + 2];
+
+		out[0] = 0;
+		for (int source = 1; source < 256; source++) {
+			auto fade_channel = [frac](unsigned char original, unsigned char target) -> unsigned char {
+				int diff = (signed char)(original - target);
+				int product = diff * (int)(frac >> 1);
+				unsigned short product_word = (unsigned short)(short)product;
+				product_word <<= 1;
+				unsigned char high = (unsigned char)(product_word >> 8);
+				return (unsigned char)(original - high);
+			};
+
+			idealred = fade_channel(pal[source * 3 + 0], targetred);
+			idealgreen = fade_channel(pal[source * 3 + 1], targetgreen);
+			idealblue = fade_channel(pal[source * 3 + 2], targetblue);
+
+			matchcolor = (unsigned char)color;
+			matchvalue = -1;
+
+			for (int candidate = 1; candidate < 256; candidate++) {
+				if (candidate == source) continue;
+
+				int red_diff = (signed char)(pal[candidate * 3 + 0] - idealred);
+				int green_diff = (signed char)(pal[candidate * 3 + 1] - idealgreen);
+				int blue_diff = (signed char)(pal[candidate * 3 + 2] - idealblue);
+				int value = red_diff * red_diff + green_diff * green_diff + blue_diff * blue_diff;
+
+				if (value == 0) {
+					matchcolor = (unsigned char)candidate;
+					break;
+				}
+				if ((unsigned int)value <= (unsigned int)matchvalue) {
+					matchvalue = value;
+					matchcolor = (unsigned char)candidate;
+				}
 			}
-			out[i] = matchcolor;
+			out[source] = matchcolor;
 		}
 		return (void*)dest;
 	}
