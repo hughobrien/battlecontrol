@@ -819,6 +819,10 @@ void SidebarClass::Draw_It(bool complete)
 	**	Draw the side strip elements by calling their respective draw functions.
 	*/
 	if (IsSidebarActive) {
+		if (shadow_background_redrawn) {
+			Column[0].IsToRedraw = true;
+			Column[1].IsToRedraw = true;
+		}
 		Column[0].Draw_It(complete);
 		Column[1].Draw_It(complete);
 
