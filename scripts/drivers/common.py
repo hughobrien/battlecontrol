@@ -425,9 +425,9 @@ def require_capture_tools(targets) -> None:
     """Fail early when capture tools are missing from PATH/Nix env."""
     target_set = set(targets)
     tools = set()
-    if target_set.intersection({"wine", "native"}):
+    if target_set.intersection({"wine", "native", "mingw"}):
         tools.update(("Xvfb", "openbox", "xdpyinfo", "xdotool"))
-    if "wine" in target_set:
+    if target_set.intersection({"wine", "mingw"}):
         tools.add("import")
 
     missing = sorted(tool for tool in tools if shutil.which(tool) is None)

@@ -25,7 +25,7 @@ import socket
 import hashlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from drivers import WineCapture, NativeCapture, WasmCapture
+from drivers import WineCapture, NativeCapture, MingwCapture, WasmCapture
 from drivers.wine import parse_wine_state_line
 from drivers.compare import full_report
 from drivers.common import (
@@ -240,7 +240,7 @@ def main():
     ap.add_argument(
         "--targets",
         default="wine,native",
-        help="comma-separated targets: wine,native,wasm,all",
+        help="comma-separated targets: wine,native,wasm,mingw,all",
     )
     ap.add_argument(
         "--output", default="/tmp/battlecontrol", help="output root directory"
@@ -276,8 +276,10 @@ def _run(args):
     if "all" in targets:
         targets = ["wine", "native", "wasm"]
     for target in targets:
-        if target not in ("wine", "native", "wasm"):
-            raise ValueError(f"unknown target: {target} (allowed: wine, native, wasm)")
+        if target not in ("wine", "native", "wasm", "mingw"):
+            raise ValueError(
+                f"unknown target: {target} (allowed: wine, native, wasm, mingw)"
+            )
     if args.state_only:
         if args.type != "mission":
             raise ValueError("--state-only is only supported for mission captures")
@@ -419,6 +421,9 @@ def _run(args):
         candidates_file = checkpoint_dir / f"{target}-frame-candidates.json"
         if candidates_file.exists():
             failure["frame_candidates"] = json.loads(candidates_file.read_text())
+        state_json = checkpoint_dir / f"{target}-state.json"
+        if state_json.exists():
+            failure["state_json"] = json.loads(state_json.read_text())
         timeline = summarize_timeline(checkpoint_dir / f"{target}-screen-timeline.json")
         failure["screen_timeline"] = timeline
         manifest.setdefault("failures", {})[target] = failure
@@ -426,6 +431,11 @@ def _run(args):
         print(f"  FAIL {target}: {exc}")
         if "screen" in failure:
             print(f"  Screen classified as: {failure['screen']['state']}")
+        if "state_json" in failure:
+            state_json = failure["state_json"]
+            if isinstance(state_json, dict) and state_json.get("status"):
+                detail = state_json.get("detail") or ""
+                print(f"  State classified as: {state_json['status']} {detail}")
         if "screen_timeline" in failure:
             timeline = failure["screen_timeline"]
             states = " -> ".join(timeline["states"]) if timeline["states"] else "<none>"
@@ -558,6 +568,16 @@ def _run(args):
                 driver = NativeCapture(data_dir=data_dir)
                 result = driver.capture_mission(
                     scenario, capture_frame, target_dir, logfile
+                )
+            elif target == "mingw":
+                effective_frames[target] = args.frame
+                data_dir = mission_data_dir(scenario, "mingw")
+                if data_dir:
+                    manifest["data"]["mingw"] = data_dir
+                    write_manifest()
+                driver = MingwCapture(data_dir=data_dir)
+                result = driver.capture_mission(
+                    scenario, args.frame, target_dir, logfile
                 )
             else:  # wasm
                 driver = WasmCapture()
