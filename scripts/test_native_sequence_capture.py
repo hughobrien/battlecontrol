@@ -15,10 +15,25 @@ class NativeSequenceCaptureTest(unittest.TestCase):
 
         self.assertIn("NativeCapture", text)
         self.assertIn("native-sequence-report.json", text)
+        self.assertIn("RA_CAPTURE_SEQUENCE_DIR", text)
+        self.assertIn("RA_CAPTURE_SEQUENCE_START", text)
+        self.assertIn("RA_CAPTURE_SEQUENCE_COUNT", text)
         self.assertIn("sha256_rgba", text)
         self.assertIn("--fps", text)
         self.assertIn('default="60"', text)
         self.assertIn("default=50", text)
+
+    def test_native_source_defines_sequence_capture_controls(self):
+        conquer = (REPO_ROOT / "REDALERT" / "CONQUER.CPP").read_text()
+        init = (REPO_ROOT / "REDALERT" / "INIT.CPP").read_text()
+
+        self.assertIn("RA_CAPTURE_SEQUENCE_DIR", conquer)
+        self.assertIn("RA_CAPTURE_SEQUENCE_START", conquer)
+        self.assertIn("RA_CAPTURE_SEQUENCE_COUNT", conquer)
+        self.assertIn("RA_Save_Gameplay_BMP_Path", conquer)
+        self.assertIn("RA_Deterministic_Color_Cycle", conquer)
+        self.assertIn("RA_RANDOM_SEED", init)
+        self.assertIn("RA_CAPTURE_FPS", init)
 
 
 if __name__ == "__main__":

@@ -753,6 +753,17 @@ bool Select_Game(bool fade)
 			BuildLevel = 10;
 			IsTanyaDead = false;
 			SaveTanya = false;
+			{
+				const char * fps_env = getenv("RA_CAPTURE_FPS");
+				if (fps_env && fps_env[0]) {
+					int fps = atoi(fps_env);
+					if (fps > 0) {
+						Options.GameSpeed = Bound(TIMER_SECOND / fps, 0, 6);
+						fprintf(stderr, "[RA] RA_CAPTURE_FPS=%d -> GameSpeed=%u\n", fps, Options.GameSpeed);
+						fflush(stderr);
+					}
+				}
+			}
 			Whom = HOUSE_GOOD;
 			Scen.Set_Scenario_Name("SCG01EA.INI");
 			Session.Type = GAME_NORMAL;
@@ -2741,8 +2752,15 @@ void Init_Random(void)
 		if (CustomSeed != 0) {
 			Seed = CustomSeed;
 		} else {
-			srand(time(NULL));
-			Seed = rand();
+			const char * seed_env = getenv("RA_RANDOM_SEED");
+			if (seed_env && seed_env[0]) {
+				Seed = (int)strtoul(seed_env, NULL, 0);
+				fprintf(stderr, "[RA] RA_RANDOM_SEED=%d\n", Seed);
+				fflush(stderr);
+			} else {
+				srand(time(NULL));
+				Seed = rand();
+			}
 		}
 	}
 

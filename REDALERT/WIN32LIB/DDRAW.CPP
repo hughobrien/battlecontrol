@@ -112,12 +112,10 @@ int SDL_Get_Primary_Pitch(void)
     return SDL_PrimarySurface ? SDL_PrimarySurface->pitch : 0;
 }
 
-// TIM-490: save a BMP snapshot of the current rendered frame, keyed by game loop frame.
-void RA_Save_Gameplay_BMP(int game_frame)
+void RA_Save_Gameplay_BMP_Path(int game_frame, char const * path)
 {
     if (SDL_PrimaryARGB == nullptr) return;
-    char path[64];
-    snprintf(path, sizeof(path), "/tmp/redalert-gameplay-f%03d.bmp", game_frame);
+    if (path == nullptr || path[0] == '\0') return;
     int rc = SDL_SaveBMP(SDL_PrimaryARGB, path);
     const uint32_t* px = (const uint32_t*)SDL_PrimaryARGB->pixels;
     int total = SDL_PrimaryARGB->w * SDL_PrimaryARGB->h;
@@ -127,6 +125,21 @@ void RA_Save_Gameplay_BMP(int game_frame)
     fprintf(stderr, "[RA] gameplay BMP frame=%d rc=%d nz_pixels=%d path=%s\n",
             game_frame, rc, nz, path);
     fflush(stderr);
+}
+
+// TIM-490: save a BMP snapshot of the current rendered frame, keyed by game loop frame.
+void RA_Save_Gameplay_BMP(int game_frame)
+{
+    char path[512];
+    const char* capture_path = getenv("RA_CAPTURE_BMP_FILE");
+    const char* capture_frame = getenv("RA_CAPTURE_FRAME");
+    int capture_target = (capture_frame && capture_frame[0]) ? atoi(capture_frame) : -1;
+    if (capture_path && capture_path[0] && capture_target == game_frame) {
+        snprintf(path, sizeof(path), "%s", capture_path);
+    } else {
+        snprintf(path, sizeof(path), "/tmp/redalert-gameplay-f%03d.bmp", game_frame);
+    }
+    RA_Save_Gameplay_BMP_Path(game_frame, path);
 }
 
 // TIM-141 commit 6: window-class event pump. Drives

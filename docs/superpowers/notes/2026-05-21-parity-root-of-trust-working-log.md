@@ -196,3 +196,34 @@ Initial native sequence harness:
 - Smoke run A: `/tmp/battlecontrol/2026-05-21T23-55-09-native-sequence-allied-l1`
 - Smoke run B: `/tmp/battlecontrol/2026-05-21T23-55-39-native-sequence-allied-l1`
 - Result: frames `50..52` are complete and byte-identical across both runs.
+
+In-process native sequence harness:
+
+- Native source now supports `RA_CAPTURE_SEQUENCE_DIR`,
+  `RA_CAPTURE_SEQUENCE_START`, `RA_CAPTURE_SEQUENCE_COUNT`, and
+  `RA_CAPTURE_SEQUENCE_READY_FILE`. The driver launches one native process,
+  dumps BMPs after `Map.Render()`, then converts the sequence to PNG.
+- First 100-frame attempt exposed native-only nondeterminism: 22/100 frame
+  hashes differed across two runs, but every mismatch was exactly 141 pixels
+  in a small water/palette-cycling rectangle `(104,187)-(176,254)`.
+- Root cause: `Color_Cycle()` uses `CDTimerClass<SystemTimerClass>`, so water
+  palette rotation can land on adjacent game frames depending on scheduler
+  timing even when the capture itself is frame-indexed.
+- Capture-mode fix: sequence capture uses frame-derived palette cycling for
+  pulse/ember/water colours. Normal gameplay remains on the original
+  `SystemTimerClass` timers.
+- Verified native root-of-trust:
+  `/tmp/battlecontrol/2026-05-22T00-19-08-native-sequence-allied-l1` vs
+  `/tmp/battlecontrol/2026-05-22T00-19-42-native-sequence-allied-l1`.
+  Result: complete, 100/100 RGBA hashes match for frames `50..149`.
+- Re-verified from a clean temporary worktree with only the staged patch:
+  `/tmp/battlecontrol/2026-05-22T00-26-44-native-sequence-allied-l1` vs
+  `/tmp/battlecontrol/2026-05-22T00-27-18-native-sequence-allied-l1`.
+  Result: complete, 100/100 RGBA hashes match for frames `50..149`.
+- First Wine/native corpus alignment check used Wine
+  `/tmp/battlecontrol/2026-05-21T23-36-58-wine-sequence-allied-l1` and native
+  `/tmp/battlecontrol/2026-05-22T00-27-18-native-sequence-allied-l1`.
+  Comparing Wine frames `60..139` against native offsets `-10..+10` shows
+  native `wine+2` is the best alignment (`avg_luma_delta=1.86`, down from
+  `3.13` at offset `0`). Browse representative aligned pairs and amplified
+  diffs at `/tmp/battlecontrol/sequence-compare-wine50-native52`.

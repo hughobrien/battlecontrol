@@ -305,3 +305,88 @@ class NativeCapture:
             teardown_display(disp, ra_proc, wm, xvfb)
             if staged_data_dir is not None:
                 shutil.rmtree(staged_data_dir, ignore_errors=True)
+
+    def capture_mission_sequence(
+        self,
+        scenario: str,
+        start: int,
+        count: int,
+        output_dir: pathlib.Path,
+        logfile=None,
+    ) -> pathlib.Path:
+        """Capture a run of native RA gameplay frames from one process."""
+        disp = pick_free_display()
+        logfile = logfile or subprocess.DEVNULL
+        xvfb = wm = ra_proc = None
+        staged_data_dir = None
+        try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            sequence_dir = output_dir / "native-sequence"
+            sequence_dir.mkdir(parents=True, exist_ok=True)
+            bmp_dir = output_dir / "native-bmp-sequence"
+            if bmp_dir.exists():
+                shutil.rmtree(bmp_dir)
+            bmp_dir.mkdir(parents=True)
+            ready_path = output_dir / "native-sequence-ready.txt"
+            try:
+                ready_path.unlink()
+            except FileNotFoundError:
+                pass
+
+            base_data_dir = os.environ.get("RA_ASSETS")
+            staged_data_dir = stage_data_dir(
+                self.data_dir,
+                output_dir,
+                pathlib.Path(base_data_dir) if base_data_dir else None,
+            )
+            xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
+            wm = start_openbox(disp, logfile=logfile)
+            env = {
+                **os.environ,
+                "DISPLAY": disp,
+                "SDL_AUDIODRIVER": "dummy",
+                "RA_AUTOSTART": "1",
+                "RA_AUTOSTART_SCENARIO": f"{scenario}.INI",
+                "RA_CAPTURE_FPS": os.environ.get("RA_CAPTURE_FPS", "60"),
+                "RA_CAPTURE_SEQUENCE_DIR": str(bmp_dir),
+                "RA_CAPTURE_SEQUENCE_START": str(max(start, 1)),
+                "RA_CAPTURE_SEQUENCE_COUNT": str(max(count, 1)),
+                "RA_CAPTURE_SEQUENCE_READY_FILE": str(ready_path),
+            }
+            ra_proc = subprocess.Popen(
+                [str(self.ra_bin)],
+                env=env,
+                cwd=str(staged_data_dir),
+                stdout=logfile,
+                stderr=logfile,
+            )
+            center_mouse(disp, 640, 400)
+            fps = int(env["RA_CAPTURE_FPS"])
+            final_frame = max(start, 1) + max(count, 1) - 1
+            deadline = time.time() + capture_timeout_seconds(final_frame, fps)
+            while time.time() < deadline:
+                if ready_path.exists():
+                    break
+                if ra_proc.poll() is not None:
+                    raise RuntimeError(
+                        f"native RA exited before sequence trap (rc={ra_proc.returncode})"
+                    )
+                time.sleep(0.05)
+            else:
+                raise RuntimeError(
+                    "native RA never completed requested capture sequence"
+                )
+
+            for frame_id in range(max(start, 1), max(start, 1) + max(count, 1)):
+                bmp_path = bmp_dir / f"frame_{frame_id:06d}.bmp"
+                png_path = sequence_dir / f"frame_{frame_id:06d}.png"
+                ok, reason = _convert_valid_internal_bmp(bmp_path, png_path)
+                if not ok:
+                    raise RuntimeError(
+                        f"native sequence frame {frame_id} invalid: {reason}"
+                    )
+            return sequence_dir
+        finally:
+            teardown_display(disp, ra_proc, wm, xvfb)
+            if staged_data_dir is not None:
+                shutil.rmtree(staged_data_dir, ignore_errors=True)

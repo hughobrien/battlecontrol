@@ -122,6 +122,155 @@ TcpipManagerClass	Winsock;
 #include <SDL2/SDL.h>  // TIM-531: SDL_PushEvent for in-game click injection
 #endif
 
+
+#ifndef _MSC_VER
+struct RA_Capture_Sequence_Config {
+	bool initialized;
+	bool enabled;
+	long start;
+	long count;
+	char dir[512];
+	char ready_path[512];
+};
+
+static RA_Capture_Sequence_Config & RA_Capture_Sequence(void)
+{
+	static RA_Capture_Sequence_Config config = { false, false, 0, 0, {0}, {0} };
+
+	if (!config.initialized) {
+		const char * dir = getenv("RA_CAPTURE_SEQUENCE_DIR");
+		const char * start = getenv("RA_CAPTURE_SEQUENCE_START");
+		const char * count = getenv("RA_CAPTURE_SEQUENCE_COUNT");
+		const char * ready = getenv("RA_CAPTURE_SEQUENCE_READY_FILE");
+
+		config.initialized = true;
+		config.start = (start && start[0]) ? strtol(start, NULL, 0) : -1;
+		config.count = (count && count[0]) ? strtol(count, NULL, 0) : 0;
+		config.enabled = dir && dir[0] && config.start >= 0 && config.count > 0;
+		if (config.enabled) {
+			strncpy(config.dir, dir, sizeof(config.dir) - 1);
+			config.dir[sizeof(config.dir) - 1] = '\0';
+			if (ready && ready[0]) {
+				strncpy(config.ready_path, ready, sizeof(config.ready_path) - 1);
+				config.ready_path[sizeof(config.ready_path) - 1] = '\0';
+			}
+			fprintf(stderr, "[RA_CAPTURE_SEQUENCE] dir=%s start=%ld count=%ld ready=%s\n",
+			        config.dir,
+			        config.start,
+			        config.count,
+			        config.ready_path[0] ? config.ready_path : "<none>");
+			fflush(stderr);
+		}
+	}
+	return config;
+}
+
+static bool RA_Capture_Sequence_Enabled(void)
+{
+	return RA_Capture_Sequence().enabled;
+}
+
+static void RA_Write_Capture_Ready(char const * env_name, long frame)
+{
+	const char * ready_path = getenv(env_name);
+	if (!ready_path || !ready_path[0]) return;
+
+	FILE * fp = fopen(ready_path, "w");
+	if (fp) {
+		fprintf(fp, "frame=%ld\n", frame);
+		fclose(fp);
+	}
+}
+
+static long RA_Capture_Target_Frame(void)
+{
+	static long target = -2;
+
+	if (target == -2) {
+		const char * frame_env = getenv("RA_CAPTURE_FRAME");
+		target = (frame_env && frame_env[0]) ? strtol(frame_env, NULL, 0) : -1;
+	}
+	return target;
+}
+
+static bool RA_Is_Capture_Frame(long frame)
+{
+	long target = RA_Capture_Target_Frame();
+	return target >= 0 && frame == target;
+}
+
+static void RA_Capture_Sequence_Frame(long frame)
+{
+	static bool complete = false;
+	RA_Capture_Sequence_Config & config = RA_Capture_Sequence();
+
+	if (complete || !config.enabled) return;
+	if (frame < config.start || frame >= config.start + config.count) return;
+
+	char path[1024];
+	snprintf(path, sizeof(path), "%s/frame_%06ld.bmp", config.dir, frame);
+	RA_Save_Gameplay_BMP_Path((int)frame, path);
+
+	if (frame == config.start + config.count - 1) {
+		complete = true;
+		if (config.ready_path[0]) {
+			FILE * fp = fopen(config.ready_path, "w");
+			if (fp) {
+				fprintf(fp, "start=%ld\ncount=%ld\nlast=%ld\n", config.start, config.count, frame);
+				fclose(fp);
+			}
+		}
+		fprintf(stderr, "[RA_CAPTURE_SEQUENCE] complete start=%ld count=%ld last=%ld ready=%s\n",
+		        config.start,
+		        config.count,
+		        frame,
+		        config.ready_path[0] ? config.ready_path : "<none>");
+		fflush(stderr);
+	}
+}
+
+static int RA_Deterministic_Pulse_Value(long frame)
+{
+	static const int values[] = {
+		235, 215, 195, 175, 155, 135, 115, 95, 75, 55, 35, 32,
+		52, 72, 92, 112, 132, 150
+	};
+	long step = frame / (TIMER_SECOND / 6);
+	long period = (long)(sizeof(values) / sizeof(values[0]));
+	return values[step % period];
+}
+
+static void RA_Deterministic_Color_Cycle(void)
+{
+	static bool initialized = false;
+	static RGBClass cycle_base[CYCLE_COLOR_COUNT];
+
+	if (!Options.IsPaletteScroll) return;
+	if (!RA_Capture_Sequence_Enabled()) return;
+
+	if (!initialized) {
+		for (int index = 0; index < CYCLE_COLOR_COUNT; index++) {
+			cycle_base[index] = InGamePalette[CYCLE_COLOR_START + index];
+		}
+		initialized = true;
+	}
+
+	long frame = Frame < 0 ? 0 : Frame;
+	int val = RA_Deterministic_Pulse_Value(frame);
+	InGamePalette[CC_PULSE_COLOR] = GamePalette[WHITE];
+	InGamePalette[CC_PULSE_COLOR].Adjust(val, BlackColor);
+	InGamePalette[CC_EMBER_COLOR] = RGBClass(255, 80, 80);
+	InGamePalette[CC_EMBER_COLOR].Adjust(val, BlackColor);
+
+	int shift = (int)((frame / (TIMER_SECOND / 4) + 1) % CYCLE_COLOR_COUNT);
+	for (int index = 0; index < CYCLE_COLOR_COUNT; index++) {
+		int source = (index - shift + CYCLE_COLOR_COUNT) % CYCLE_COLOR_COUNT;
+		InGamePalette[CYCLE_COLOR_START + index] = cycle_base[source];
+	}
+	InGamePalette.Set();
+}
+#endif
+
 #ifndef _MSC_VER
 static bool RA_Trace_Outcomes_Enabled(void)
 {
@@ -1614,6 +1763,12 @@ void Color_Cycle(void)
 	bool changed = false;
 
 	if (Options.IsPaletteScroll) {
+#ifndef _MSC_VER
+		if (RA_Capture_Sequence_Enabled()) {
+			RA_Deterministic_Color_Cycle();
+			return;
+		}
+#endif
 		/*
 		**	Process the fading white color. It is used for the radar box and other glowing
 		**	game interface elements.
@@ -2649,6 +2804,13 @@ Mono_Set_Cursor(0,0);
 				Keyboard_Process(input);
 			}
 			Map.Render();
+#ifndef _MSC_VER
+			RA_Capture_Sequence_Frame(_ra_frame_count);
+			if (!RA_Capture_Sequence_Enabled() && RA_Is_Capture_Frame(_ra_frame_count)) {
+				RA_Save_Gameplay_BMP((int)_ra_frame_count);
+				RA_Write_Capture_Ready("RA_CAPTURE_READY_FILE", _ra_frame_count);
+			}
+#endif
 		}
 	}
 

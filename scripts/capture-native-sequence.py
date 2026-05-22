@@ -26,6 +26,12 @@ SCENARIO_MAP = {
     "soviet-l5": "SCU05EA",
 }
 DEFAULT_RA_RANDOM_SEED = "0x1eed5eed"
+NATIVE_SEQUENCE_ENV_KEYS = (
+    "RA_CAPTURE_SEQUENCE_DIR",
+    "RA_CAPTURE_SEQUENCE_START",
+    "RA_CAPTURE_SEQUENCE_COUNT",
+    "RA_CAPTURE_SEQUENCE_READY_FILE",
+)
 
 
 def resolve_scenario(value: str) -> str:
@@ -85,6 +91,7 @@ def write_report(
         "start": start,
         "count": count,
         "fps": os.environ.get("RA_CAPTURE_FPS"),
+        "capture_env_keys": list(NATIVE_SEQUENCE_ENV_KEYS),
         "sequence_dir": str(sequence_dir),
         "complete": all(row["exists"] and row["size"] > 0 for row in frames),
         "frames": frames,
@@ -120,17 +127,11 @@ def main() -> int:
     sequence_dir.mkdir(parents=True, exist_ok=True)
 
     driver = NativeCapture(data_dir=data_dir)
-    for frame_id in range(args.start, args.start + args.count):
-        frame_dir = output_dir / f"frame-{frame_id:06d}"
-        frame_dir.mkdir(parents=True, exist_ok=True)
-        log_path = frame_dir / "native-driver.log"
-        with log_path.open("w") as logfile:
-            capture_path = driver.capture_mission(
-                scenario, frame_id, frame_dir, logfile
-            )
-        target = sequence_dir / f"frame_{frame_id:06d}.png"
-        target.write_bytes(capture_path.read_bytes())
-        print(f"captured native frame {frame_id}: {target}", flush=True)
+    log_path = output_dir / "native-sequence-driver.log"
+    with log_path.open("w") as logfile:
+        sequence_dir = driver.capture_mission_sequence(
+            scenario, args.start, args.count, output_dir, logfile
+        )
 
     report_path = write_report(
         output_dir, sequence_dir, args.start, args.count, scenario
