@@ -258,3 +258,24 @@ Incremental tooling improvement:
   `avg_diff_pixels=9149.4`.
 - Runtime after caching/C-backed stats: about 5.7 seconds for offsets `-10..+10`
   over the 100-frame corpora.
+
+MinGW-under-Wine probe update, 2026-05-22:
+
+- Added `capture-checkpoint.py --targets mingw` as a classified probe for the
+  ported Win32 executable (`build-mingw32/ra.exe`) running under Wine.
+- Initial state after SDL3 runtime staging was fixed: `MAIN.MIX` decoded as the
+  wrong header and `LOCAL.MIX` produced implausible metadata
+  (`count=89 size=-1`) before `std::bad_alloc`.
+- Root cause: the MinGW build uses the shared POSIX file-I/O substrate, and
+  MinGW's `open()` defaults to text mode. Binary MIX reads stopped at `0x1A`
+  bytes, so encrypted headers and cached MIX bodies were truncated.
+- Fix: force `O_BINARY` in `linux/win32-stubs/posix_fileio.cpp` for all
+  translated `CreateFileA` opens. This is a real portability fix, not a render
+  workaround.
+- Verification: `/tmp/battlecontrol/2026-05-22T20-59-35-mission-allied-l2`
+  reached `Start_Scenario OK`, skipped Allied L2 VQAs under `RA_AUTOSTART`,
+  decoded `LOCAL.MIX` as `count=66 size=3828933`, cached it fully, and advanced
+  through main-loop frame 300.
+- The MinGW target is now useful as a Wine-hosted ported-engine comparison
+  point. It still needs frame-exact dumping before it can participate in the
+  100-frame root-of-trust corpus.

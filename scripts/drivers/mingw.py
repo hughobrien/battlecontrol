@@ -133,7 +133,7 @@ def classify_mingw_failure(
     elif "std::bad_alloc" in stderr_text:
         status = "bad-alloc"
         detail = "process terminated with std::bad_alloc"
-    elif "[RA] Bootstrap_Mix: Init_Bootstrap_Mixfiles done" in stderr_text:
+    elif "[RA] Bootstrap: Init_Bootstrap_Mixfiles done" in stderr_text:
         status = "bootstrap-mix-ok"
         detail = "bootstrap MIX loading completed"
     elif "[RA] STARTUP:" in stderr_text:
@@ -179,7 +179,7 @@ class MingwCapture:
     def capture_mission(
         self, scenario: str, frame: int, output_dir: pathlib.Path, logfile=None
     ) -> pathlib.Path:
-        del scenario, frame
+        del frame
         output_dir.mkdir(parents=True, exist_ok=True)
         logfile = logfile or subprocess.DEVNULL
         disp = pick_free_display()
@@ -198,6 +198,8 @@ class MingwCapture:
                     "DATA_DIR": str(self.data_dir),
                     "RA_MINGW_RUN_DIR": str(run_dir),
                     "RA_MINGW_EXE": str(self.ra_exe),
+                    "RA_AUTOSTART": "1",
+                    "RA_AUTOSTART_SCENARIO": f"{scenario}.INI",
                 }
             )
             with stdout_path.open("w") as stdout, stderr_path.open("w") as stderr:

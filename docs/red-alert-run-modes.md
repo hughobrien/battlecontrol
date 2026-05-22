@@ -129,10 +129,17 @@ Key pieces:
 - Wine
 - The same ported engine sources used by native Linux
 
-Current status: builds and launches, but runtime currently fails during early MIX
-loading while reading `LOCAL.MIX` metadata. That makes it a useful next
-debugging target before adding it as a first-class `capture-checkpoint.py`
-target.
+Current status: builds, launches, and enters autostarted gameplay under Wine.
+It is available as a `capture-checkpoint.py` probe target:
+
+```sh
+python3 scripts/capture-checkpoint.py mission allied-l2 --targets mingw
+```
+
+The first MinGW/Wine blocker was MIX corruption caused by MinGW text-mode file
+I/O: reads stopped at `0x1A` inside binary MIX files. The shared POSIX file-I/O
+substrate now forces `O_BINARY`, so `LOCAL.MIX` and other encrypted MIX files
+decode with the same metadata as native Linux.
 
 ## Verification Loop
 
@@ -259,7 +266,7 @@ The active engineering fronts are:
 - Keep reducing visual divergences in `divergences.md` with reproducible
   screenshot pairs.
 - Promote capture tooling from ad hoc debugging into a root of trust.
-- Add MinGW-under-Wine as a comparison target once its MIX loading failure is
-  fixed.
+- Extend MinGW-under-Wine from a gameplay probe into a frame-exact comparison
+  target.
 - Expand parity from hand-reviewed scenes to broad campaign sampling.
 - Harden browser save/load and long-session behavior.

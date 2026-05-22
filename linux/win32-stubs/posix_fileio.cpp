@@ -55,6 +55,10 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 namespace {
 
 struct PosixFileDesc {
@@ -109,7 +113,7 @@ int translate_open_flags(DWORD desired_access, DWORD creation_disposition)
         break;
     }
 
-    return flags;
+    return flags | O_BINARY;
 }
 
 int translate_seek_whence(DWORD move_method)
