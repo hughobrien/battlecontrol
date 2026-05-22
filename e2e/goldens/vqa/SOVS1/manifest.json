@@ -1,0 +1,30 @@
+{
+  "file": "SOVS1.vqa",
+  "total_frames": 180,
+  "width": 320,
+  "height": 156,
+  "fps": 15,
+  "engine": "ffmpeg",
+  "extracted": [
+    {
+      "index": 0,
+      "frame_num": 1,
+      "path": "frame_0001.png"
+    },
+    {
+      "index": 1,
+      "frame_num": 61,
+      "path": "frame_0002.png"
+    },
+    {
+      "index": 2,
+      "frame_num": 120,
+      "path": "frame_0003.png"
+    },
+    {
+      "index": 3,
+      "frame_num": 180,
+      "path": "frame_0004.png"
+    }
+  ]
+}

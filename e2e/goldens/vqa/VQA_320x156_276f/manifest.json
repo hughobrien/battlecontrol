@@ -1,0 +1,15 @@
+{
+  "file": "VQA_320x156_276f.vqa",
+  "total_frames": 276,
+  "width": 320,
+  "height": 156,
+  "fps": 15,
+  "engine": "ffmpeg",
+  "extracted": [
+    {
+      "index": 0,
+      "frame_num": 1,
+      "path": "frame_0001.png"
+    }
+  ]
+}

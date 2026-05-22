@@ -1,0 +1,30 @@
+{
+  "file": "ENGLISH.vqa",
+  "total_frames": 1456,
+  "width": 320,
+  "height": 200,
+  "fps": 15,
+  "engine": "ffmpeg",
+  "extracted": [
+    {
+      "index": 0,
+      "frame_num": 1,
+      "path": "frame_0001.png"
+    },
+    {
+      "index": 1,
+      "frame_num": 486,
+      "path": "frame_0002.png"
+    },
+    {
+      "index": 2,
+      "frame_num": 971,
+      "path": "frame_0003.png"
+    },
+    {
+      "index": 3,
+      "frame_num": 1456,
+      "path": "frame_0004.png"
+    }
+  ]
+}
