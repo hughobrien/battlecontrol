@@ -216,6 +216,25 @@ These issue classes are why the workflow now favors paired screenshots, region
 diffs, process/frame probes, and source-level instrumentation over visual
 inspection alone.
 
+## Why Nix Helped
+
+Nix turned out to be part of the debugging infrastructure, not just a packaging
+choice.
+
+It helped by making the strange toolchain mix reproducible:
+
+- native CMake builds for Linux
+- Emscripten builds for WASM
+- MinGW cross-builds for Win32-under-Wine experiments
+- Wine, Xvfb, Openbox, cnc-ddraw, Python, Playwright, image tools, and linters
+- fixed flake inputs for vendored or patched dependencies such as cnc-ddraw
+
+That mattered because parity debugging is sensitive to environment drift. If a
+capture changes, we need to know whether the cause is source, data, frame timing,
+Wine behavior, a rendering shim, or the host environment. The Nix shell made it
+possible to hand the same command set to agents and CI, add missing tools in one
+place, pin local patches, and keep the capture loop reproducible enough to trust.
+
 ## Project History
 
 Milestone shape:
