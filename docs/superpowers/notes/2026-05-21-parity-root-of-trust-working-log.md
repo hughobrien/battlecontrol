@@ -227,3 +227,34 @@ In-process native sequence harness:
   native `wine+2` is the best alignment (`avg_luma_delta=1.86`, down from
   `3.13` at offset `0`). Browse representative aligned pairs and amplified
   diffs at `/tmp/battlecontrol/sequence-compare-wine50-native52`.
+
+Alignment blockers as of 2026-05-22:
+
+- The capture root of trust is stable, but the Wine and native frame labels are
+  still not exactly the same semantic boundary. Wine is captured at cnc-ddraw
+  present/RA-clock territory; native is dumped after `Map.Render()`.
+- A fixed seed only controls PRNG-derived gameplay state. It does not by itself
+  force palette-cycle phase, callback count before mission entry, or any
+  timer-derived UI/render state to match.
+- Native sequence capture now removes the known native real-time
+  `Color_Cycle()` nondeterminism. Wine may still have stable-but-different
+  timer phase relative to native.
+- Therefore the next goal is not "make offset zero"; it is to prove both sides
+  represent the same simulation/render boundary and then treat residual aligned
+  pixel clusters as real rendering/state divergences.
+
+Incremental tooling improvement:
+
+- Added `scripts/compare-frame-sequences.py` and
+  `scripts/test_compare_frame_sequences.py`.
+- The tool accepts sequence dirs or `*-sequence-report.json` files, sweeps frame
+  offsets, writes `sequence-alignment-report.json`, and emits amplified sample
+  diffs for the best offset.
+- Current run:
+  `python3 scripts/compare-frame-sequences.py --a /tmp/battlecontrol/2026-05-21T23-36-58-wine-sequence-allied-l1/wine-sequence-report.json --b /tmp/battlecontrol/2026-05-22T00-27-18-native-sequence-allied-l1/native-sequence-report.json --offset-min -10 --offset-max 10 --out /tmp/battlecontrol/sequence-align-wine-native-20260522 --sample-frames 50,60,70,90,120,140`
+- Result: best offset remains native `wine+2`, now across all overlapping
+  frames (`98` comparisons at offset `+2`). `avg_luma_delta=1.7666` and
+  `avg_diff_pixels=7264.2`, versus offset `0` at `avg_luma_delta=2.8486` and
+  `avg_diff_pixels=9149.4`.
+- Runtime after caching/C-backed stats: about 5.7 seconds for offsets `-10..+10`
+  over the 100-frame corpora.
