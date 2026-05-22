@@ -776,8 +776,10 @@ void SidebarClass::Draw_It(bool complete)
 
 	BStart(BENCH_SIDEBAR);
 
+	bool shadow_background_redrawn = false;
 	if (IsSidebarActive && (IsToRedraw || complete) && !Debug_Map) {
 		IsToRedraw = false;
+		shadow_background_redrawn = true;
 
 		if (LogicPage->Lock()) {
 			/*
@@ -812,6 +814,12 @@ void SidebarClass::Draw_It(bool complete)
 			Zoom.Draw_Me(true);
 			LogicPage->Unlock();
 		}
+	}
+	if (shadow_background_redrawn) {
+		int clip_x = Column[0].X + (StripClass::LEFT_EDGE_OFFSET * RESFACTOR) - 1;
+		int clip_y = Column[0].Y + StripClass::TEXT_Y_OFFSET;
+		int clip_bottom = WindowList[WINDOW_SIDEBAR][WINDOWY] + WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT];
+		Draw_Power_Bar_Clip(clip_x, clip_y, 1, clip_bottom - clip_y);
 	}
 
 	/*

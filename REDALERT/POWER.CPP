@@ -244,6 +244,56 @@ void PowerClass::Draw_It(bool complete)
 	RadarClass::Draw_It(complete);
 }
 
+void PowerClass::Draw_Power_Bar_Clip(int x, int y, int width, int height)
+{
+	if (!PowerBarShape || !LogicPage || !Map.IsSidebarActive || width <= 0 || height <= 0) {
+		return;
+	}
+
+	ShapeFlags_Type flags = SHAPE_NORMAL;
+	void const * remap = NULL;
+
+	if (FlashTimer > 1 && ((FlashTimer % 3) & 0x01) != 0) {
+		flags = flags | SHAPE_FADING;
+		remap = Map.FadingRed;
+	}
+
+	int saved_x = WindowList[WINDOW_CUSTOM][WINDOWX];
+	int saved_y = WindowList[WINDOW_CUSTOM][WINDOWY];
+	int saved_w = WindowList[WINDOW_CUSTOM][WINDOWWIDTH];
+	int saved_h = WindowList[WINDOW_CUSTOM][WINDOWHEIGHT];
+
+	WindowList[WINDOW_CUSTOM][WINDOWX] = x;
+	WindowList[WINDOW_CUSTOM][WINDOWY] = y;
+	WindowList[WINDOW_CUSTOM][WINDOWWIDTH] = width;
+	WindowList[WINDOW_CUSTOM][WINDOWHEIGHT] = height;
+
+	CC_Draw_Shape(
+		PowerBarShape,
+		0,
+		(240 * RESFACTOR) - x,
+		(88 * RESFACTOR) - y,
+		WINDOW_CUSTOM,
+		flags | SHAPE_NORMAL | SHAPE_WIN_REL,
+		remap);
+
+#ifdef WIN32
+	CC_Draw_Shape(
+		PowerBarShape,
+		1,
+		(240 * RESFACTOR) - x,
+		(88 * RESFACTOR) + (56 * RESFACTOR) - y,
+		WINDOW_CUSTOM,
+		flags | SHAPE_NORMAL | SHAPE_WIN_REL,
+		remap);
+#endif
+
+	WindowList[WINDOW_CUSTOM][WINDOWX] = saved_x;
+	WindowList[WINDOW_CUSTOM][WINDOWY] = saved_y;
+	WindowList[WINDOW_CUSTOM][WINDOWWIDTH] = saved_w;
+	WindowList[WINDOW_CUSTOM][WINDOWHEIGHT] = saved_h;
+}
+
 
 /***********************************************************************************************
  * PowerClass::AI -- Process the power bar logic.                                              *
