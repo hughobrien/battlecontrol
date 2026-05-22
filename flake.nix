@@ -391,6 +391,7 @@
                     export MINGW_SDL2="${pkgs.pkgsCross.mingw32.SDL2}"
                     export MINGW_SDL2_DEV="${pkgs.pkgsCross.mingw32.SDL2.dev}"
                     export MINGW_SDL3="${pkgs.pkgsCross.mingw32.sdl3}"
+                    export MINGW_SDL3_BIN="${pkgs.lib.getBin pkgs.pkgsCross.mingw32.sdl3}"
                     export MINGW_MCFGTHREAD="${pkgs.pkgsCross.mingw32.windows.mcfgthreads}"
                     export MINGW_GCC_LIB="${pkgs.pkgsCross.mingw32.buildPackages.gcc.cc.lib}"
 

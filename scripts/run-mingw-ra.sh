@@ -12,7 +12,7 @@ if [[ ! -f "$ra_exe" ]]; then
 	exit 1
 fi
 
-required_env=(MINGW_SDL2_DEV MINGW_SDL3 MINGW_GCC_LIB MINGW_MCFGTHREAD)
+required_env=(MINGW_SDL2_DEV MINGW_SDL3_BIN MINGW_GCC_LIB MINGW_MCFGTHREAD)
 for name in "${required_env[@]}"; do
 	if [[ -z "${!name:-}" ]]; then
 		echo "missing $name; enter nix develop so the MinGW runtime paths are exported" >&2
@@ -23,7 +23,7 @@ done
 mkdir -p "$run_dir"
 cp "$ra_exe" "$run_dir/ra.exe"
 cp "$MINGW_SDL2_DEV/bin/SDL2.dll" "$run_dir/"
-cp "$MINGW_SDL3/bin/SDL3.dll" "$run_dir/"
+cp "$MINGW_SDL3_BIN/bin/SDL3.dll" "$run_dir/"
 cp "$MINGW_GCC_LIB/i686-w64-mingw32/lib/libgcc_s_sjlj-1.dll" "$run_dir/"
 cp "$MINGW_GCC_LIB/i686-w64-mingw32/lib/libstdc++-6.dll" "$run_dir/"
 cp "$MINGW_MCFGTHREAD/bin/libmcfgthread-2.dll" "$run_dir/"
