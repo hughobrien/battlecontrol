@@ -165,6 +165,57 @@ The goal is not just "looks close"; the loop should expose exact, reproducible
 divergences that can be traced back to real source differences or intentionally
 documented environmental differences.
 
+## Capture Stack Details
+
+The Wine reference path was the hardest part to make trustworthy because the
+original game is a closed Windows binary running in a headless Linux test
+environment.
+
+The final stack is:
+
+- `patch_ra95.py` prepares `RA95.EXE` for headless mission launch, scenario
+  selection, fixed seed, and briefing/VQA skipping.
+- Xvfb provides the virtual X11 display.
+- Openbox gives Wine a normal window-management environment.
+- Wine runs the original binary.
+- cnc-ddraw replaces the game's DirectDraw path with a controllable software
+  rendering path, FPS limiting, and a stable CPU-visible frame.
+- `tools/wine-input/*` provides Win32-side SendInput and BitBlt helpers when
+  ordinary X11 input or screenshots do not reach the same path as the game.
+- `scripts/drivers/wine.py` probes process state so the harness can tell
+  gameplay from menus, score screens, error dialogs, and black loading frames.
+
+The native and WASM paths mirror the same intent with source-level controls:
+`RA_AUTOSTART*` selects the scenario, `RA_CAPTURE_*` traps frames, and Playwright
+or Xvfb captures the presented surface.
+
+## Issue Classes We Hit
+
+Useful failures from the parity effort:
+
+- Missing UI text and counters: mission instructions, timer, and credits were
+  absent until the port restored the Win95 high-resolution tab/text paths.
+- Coordinate-space mistakes: clipped terrain/template drawing treated source
+  coordinates and destination-window coordinates differently, creating apparent
+  one-cell or one-stamp terrain shifts.
+- Palette and blend fidelity: a portable shroud fade-table replacement did not
+  preserve the original x86 signed 8-bit math and tie behavior, reducing fog
+  grades and changing revealed-edge blending.
+- Dirty-rectangle order: sidebar parent redraws could overwrite child strips or
+  powerbar edges, producing vertical and horizontal line artifacts.
+- Asset/decode parity: native-only saturated purple/green pixels exposed a shape
+  delta decoding bug and an overlay visibility difference.
+- Time and determinism: Wine and native can present captures at slightly
+  different simulation boundaries; fixed seeds help, but object animation, ore
+  phase, palette cycling, and capture-frame semantics still need explicit probes.
+- Harness misroutes: invalid Soviet captures often landed in main menu,
+  top-scores, score, black loading, or low-disk dialog states rather than
+  gameplay, so state classification became part of the root of trust.
+
+These issue classes are why the workflow now favors paired screenshots, region
+diffs, process/frame probes, and source-level instrumentation over visual
+inspection alone.
+
 ## Project History
 
 Milestone shape:
@@ -193,4 +244,3 @@ The active engineering fronts are:
   fixed.
 - Expand parity from hand-reviewed scenes to broad campaign sampling.
 - Harden browser save/load and long-session behavior.
-
