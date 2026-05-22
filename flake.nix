@@ -370,6 +370,10 @@
           SDL2
           SDL2.dev
           SDL2_ttf
+          pkgs.pkgsCross.mingw32.SDL2
+          pkgs.pkgsCross.mingw32.SDL2.dev
+          pkgs.pkgsCross.mingw32.sdl3
+          pkgs.pkgsCross.mingw32.windows.mcfgthreads
           openal
           libx11
           # Script deps (campaign captures, screenshots, etc.)
@@ -384,6 +388,11 @@
         shellHook = ''
                     export RA_ASSETS="''${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
                     export TD_ASSETS="''${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
+                    export MINGW_SDL2="${pkgs.pkgsCross.mingw32.SDL2}"
+                    export MINGW_SDL2_DEV="${pkgs.pkgsCross.mingw32.SDL2.dev}"
+                    export MINGW_SDL3="${pkgs.pkgsCross.mingw32.sdl3}"
+                    export MINGW_MCFGTHREAD="${pkgs.pkgsCross.mingw32.windows.mcfgthreads}"
+                    export MINGW_GCC_LIB="${pkgs.pkgsCross.mingw32.buildPackages.gcc.cc.lib}"
 
 
 

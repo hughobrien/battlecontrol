@@ -21,6 +21,17 @@
         "CMAKE_BUILD_TYPE": "Release"
       },
       "description": "emcmake injects CMAKE_TOOLCHAIN_FILE. Do not run cmake --preset wasm directly."
+    },
+    {
+      "name": "mingw32",
+      "displayName": "Win32 port build (MinGW, for Wine parity probes)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-mingw32",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/mingw32.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_PREFIX_PATH": "$env{MINGW_SDL2_DEV};$env{MINGW_SDL2}"
+      }
     }
   ],
   "buildPresets": [
@@ -37,6 +48,11 @@
       "name": "wasm-td",
       "configurePreset": "wasm",
       "targets": ["td"]
+    },
+    {
+      "name": "mingw32-ra",
+      "configurePreset": "mingw32",
+      "targets": ["ra"]
     }
   ]
 }

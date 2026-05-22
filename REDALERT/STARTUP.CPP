@@ -208,7 +208,9 @@ int main(int argc, char * argv[])
 #ifndef _MSC_VER
 	signal(SIGSEGV, crash_handler);
 	signal(SIGABRT, crash_handler);
+#ifdef SIGBUS
 	signal(SIGBUS,  crash_handler);
+#endif
 #endif
 
 #if defined(WIN32) && defined(_MSC_VER)

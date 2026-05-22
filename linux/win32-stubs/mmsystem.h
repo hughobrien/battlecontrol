@@ -88,6 +88,12 @@ static inline MMRESULT timeEndPeriod(UINT period)   { (void)period; return TIMER
  * preprocessor removes them. The eighth, DLLInterface.cpp:1011, is
  * unguarded and is the FAIL this edit clears. No header in the tree
  * currently declares timeGetTime, so there is no clash. */
+#if defined(__MINGW32__)
+__declspec(dllimport) DWORD __stdcall GetTickCount(void);
+static inline DWORD timeGetTime(void) {
+    return GetTickCount();
+}
+#else
 #include <time.h>
 static inline DWORD timeGetTime(void) {
     struct timespec ts;
@@ -95,6 +101,7 @@ static inline DWORD timeGetTime(void) {
     return (DWORD)((unsigned long long)ts.tv_sec * 1000ULL
                  + (unsigned long long)ts.tv_nsec / 1000000ULL);
 }
+#endif
 #endif
 
 /* TIM-56: multimedia-timer event-type macros. WIN32LIB/TIMERINI.CPP:122

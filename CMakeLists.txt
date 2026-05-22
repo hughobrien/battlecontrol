@@ -17,6 +17,8 @@ endif()
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(STATUS "Target ABI: LP64 (64-bit). DWORD/long width shim will be required for the RedAlert port.")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    message(STATUS "Target ABI: Win32/LLP32 cross build.")
 else()
     message(WARNING "Target ABI is 32-bit. Upstream sources assume LLP64; this is unusual on modern Linux.")
 endif()
@@ -342,10 +344,11 @@ else()
         -Wno-register
         -w
     )
+    find_package(SDL2 REQUIRED)
     target_link_libraries(ra PRIVATE SDL2::SDL2)
 endif()
 
 # TIM-369: installer experience port (native only — no installer for WASM)
-if(NOT EMSCRIPTEN)
+if(NOT EMSCRIPTEN AND NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_subdirectory(installer)
 endif()

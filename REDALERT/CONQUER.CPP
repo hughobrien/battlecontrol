@@ -2468,9 +2468,7 @@ Mono_Set_Cursor(0,0);
 		// TIM-489: include elapsed-since-frame-100 so FPS can be derived from the log.
 		long elapsed_ms = 0;
 		if (_ra_frame_count >= 100) {
-			struct timespec _ts;
-			clock_gettime(CLOCK_MONOTONIC, &_ts);
-			long now_ms = (long)(_ts.tv_sec * 1000L + _ts.tv_nsec / 1000000L);
+			long now_ms = (long)timeGetTime();
 			if (_ra_t100_ms == 0) _ra_t100_ms = now_ms;
 			elapsed_ms = now_ms - _ra_t100_ms;
 		}
@@ -3000,16 +2998,13 @@ Mono_Set_Cursor(0,0);
 #ifndef _MSC_VER
 	// TIM-316: FPS probe — only active under RA_AUTOSTART smoke tests (TIM-416).
 	if (getenv("RA_AUTOSTART")) {
-		static struct timespec _fps_t0 = {0, 0};
+		static long _fps_t0_ms = 0;
 		static long _fps_base_frame = 0;
-		if (_fps_t0.tv_sec == 0) {
-			clock_gettime(CLOCK_MONOTONIC, &_fps_t0);
+		if (_fps_t0_ms == 0) {
+			_fps_t0_ms = (long)timeGetTime();
 			_fps_base_frame = Frame;
 		} else if ((Frame - _fps_base_frame) % 500 == 0 && Frame > _fps_base_frame) {
-			struct timespec _fps_now;
-			clock_gettime(CLOCK_MONOTONIC, &_fps_now);
-			long elapsed_ms = (long)((_fps_now.tv_sec  - _fps_t0.tv_sec)  * 1000
-			                       + (_fps_now.tv_nsec - _fps_t0.tv_nsec) / 1000000);
+			long elapsed_ms = (long)timeGetTime() - _fps_t0_ms;
 			long frames_done = Frame - _fps_base_frame;
 			double fps = elapsed_ms > 0 ? frames_done * 1000.0 / elapsed_ms : 0.0;
 			fprintf(stderr, "[TIM-316] fps_probe frame=%ld elapsed_ms=%ld fps=%.2f\n",

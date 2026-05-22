@@ -54,7 +54,6 @@
 #include <climits>      // TIM-141 commit 2: Get_Free_Video_Memory uses INT_MAX
 #include <cstdint>      // TIM-908: uint32_t for palette LUT
 #include <cstring>       // TIM-908: memcmp/memcpy for palette dirty-check
-#include <ctime>         // TIM-908: clock_gettime for frame profiling
 #include "sdl_input.h"  // TIM-145 pass-43A: SDL_Process_Input_Events()
 #include "sdl_window.h" // TIM-152 pass-46B: SDL_Set_Main_Window registration
 static SDL_Window*   SDL_VideoWindow    = nullptr;
@@ -1121,9 +1120,9 @@ void Wait_Vert_Blank(void)
 		const uint32_t* lut     = SDL_PaletteLUT;
 
 		// TIM-908: profile conversion cost every 60 presents (~1s at 60fps)
-		struct timespec t0, t1;
+		Uint64 t0 = 0;
 		if (SDL_PresentCount % 60 == 0)
-			clock_gettime(CLOCK_MONOTONIC, &t0);
+			t0 = SDL_GetPerformanceCounter();
 
 		for (int y = 0; y < h; ++y) {
 			const uint8_t* srcRow = src + y * srcPitch;
@@ -1134,11 +1133,11 @@ void Wait_Vert_Blank(void)
 		}
 
 		if (SDL_PresentCount % 60 == 0) {
-			clock_gettime(CLOCK_MONOTONIC, &t1);
-			long ns = (t1.tv_sec - t0.tv_sec) * 1000000000L +
-			          (t1.tv_nsec - t0.tv_nsec);
+			Uint64 t1 = SDL_GetPerformanceCounter();
+			Uint64 freq = SDL_GetPerformanceFrequency();
+			long us = freq ? (long)(((t1 - t0) * 1000000ULL) / freq) : 0;
 			fprintf(stderr, "[RA] frame%4d indexed→ARGB conv: %7ld µs (%dx%d)\n",
-			        SDL_PresentCount, ns / 1000, w, h);
+			        SDL_PresentCount, us, w, h);
 		}
 	}
 	SDL_UpdateTexture(SDL_PrimaryTexture, nullptr,
@@ -1236,30 +1235,31 @@ void Wait_Vert_Blank(void)
 	// play far too fast.  This limiter uses wall-clock timing to throttle
 	// to ~60 FPS regardless of renderer type.
 	{
-		static struct timespec _wv_prev = {0, 0};
+		static Uint64 _wv_prev = 0;
 		static bool _wv_initialized = false;
-		struct timespec _wv_now;
-		clock_gettime(CLOCK_MONOTONIC, &_wv_now);
+		Uint64 _wv_now = SDL_GetPerformanceCounter();
+		Uint64 _wv_freq = SDL_GetPerformanceFrequency();
 
 		if (!_wv_initialized) {
 			_wv_prev = _wv_now;
 			_wv_initialized = true;
 		} else {
 			// Compute elapsed ns since last frame.
-			long elapsed_ns = (_wv_now.tv_sec - _wv_prev.tv_sec) * 1000000000L
-			                + (_wv_now.tv_nsec - _wv_prev.tv_nsec);
+			Uint64 elapsed_ns = _wv_freq
+			                   ? ((_wv_now - _wv_prev) * 1000000000ULL) / _wv_freq
+			                   : 0;
 			// Target: 16.666 ms per frame (~60 FPS).  If we're running
 			// faster than that (e.g. software renderer with no vsync),
 			// delay for the remaining time.
-			const long TARGET_NS = 16666667L;  // 1/60 second in ns
+			const Uint64 TARGET_NS = 16666667ULL;  // 1/60 second in ns
 			if (elapsed_ns < TARGET_NS) {
-				long delay_ms = (TARGET_NS - elapsed_ns + 999999L) / 1000000L;
+				Uint64 delay_ms = (TARGET_NS - elapsed_ns + 999999ULL) / 1000000ULL;
 				if (delay_ms > 0) {
 					SDL_Delay((Uint32)delay_ms);
 				}
 			}
 			// After any delay, update reference for next frame.
-			clock_gettime(CLOCK_MONOTONIC, &_wv_now);
+			_wv_now = SDL_GetPerformanceCounter();
 			_wv_prev = _wv_now;
 		}
 	}
