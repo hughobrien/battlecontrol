@@ -815,13 +815,6 @@ void SidebarClass::Draw_It(bool complete)
 			LogicPage->Unlock();
 		}
 	}
-	if (shadow_background_redrawn) {
-		int clip_x = Column[0].X + (StripClass::LEFT_EDGE_OFFSET * RESFACTOR) - 1;
-		int clip_y = Column[0].Y + StripClass::TEXT_Y_OFFSET;
-		int clip_bottom = WindowList[WINDOW_SIDEBAR][WINDOWY] + WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT];
-		Draw_Power_Bar_Clip(clip_x, clip_y, 1, clip_bottom - clip_y);
-	}
-
 	/*
 	**	Draw the side strip elements by calling their respective draw functions.
 	*/
@@ -834,6 +827,12 @@ void SidebarClass::Draw_It(bool complete)
 			Upgrade.Draw_Me(true);
 			Zoom.Draw_Me(true);
 		}
+	}
+	if (IsSidebarActive) {
+		int clip_x = Column[0].X + (StripClass::LEFT_EDGE_OFFSET * RESFACTOR) - 1;
+		int clip_y = Column[0].Y + StripClass::TEXT_Y_OFFSET;
+		int clip_bottom = WindowList[WINDOW_SIDEBAR][WINDOWY] + WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT];
+		Draw_Power_Bar_Clip(clip_x, clip_y, 1, clip_bottom - clip_y);
 	}
 	IsToRedraw = false;
 

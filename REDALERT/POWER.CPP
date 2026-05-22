@@ -268,25 +268,28 @@ void PowerClass::Draw_Power_Bar_Clip(int x, int y, int width, int height)
 	WindowList[WINDOW_CUSTOM][WINDOWWIDTH] = width;
 	WindowList[WINDOW_CUSTOM][WINDOWHEIGHT] = height;
 
+	/*
+	**	RA95's clipped overlap strip samples one pixel to the right of the
+	**	nominal power bar origin.
+	*/
+	int source_dx = -1;
 	CC_Draw_Shape(
 		PowerBarShape,
 		0,
-		(240 * RESFACTOR) - x,
+		(240 * RESFACTOR) - x + source_dx,
 		(88 * RESFACTOR) - y,
 		WINDOW_CUSTOM,
 		flags | SHAPE_NORMAL | SHAPE_WIN_REL,
 		remap);
 
-#ifdef WIN32
 	CC_Draw_Shape(
 		PowerBarShape,
 		1,
-		(240 * RESFACTOR) - x,
+		(240 * RESFACTOR) - x + source_dx,
 		(88 * RESFACTOR) + (56 * RESFACTOR) - y,
 		WINDOW_CUSTOM,
 		flags | SHAPE_NORMAL | SHAPE_WIN_REL,
 		remap);
-#endif
 
 	WindowList[WINDOW_CUSTOM][WINDOWX] = saved_x;
 	WindowList[WINDOW_CUSTOM][WINDOWY] = saved_y;
