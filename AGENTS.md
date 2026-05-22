@@ -415,6 +415,7 @@ When an agent hits a symptom, read the corresponding skill for diagnostic guidan
 | E2E testing | `skills/e2e-testing/` | `scripts/serve-wasm.sh`, `scripts/test-runner.sh` | pageerror, `__wasmReady` timeout, blank Xvfb |
 | VQA codec | `skills/vqa-codec/` | `python3 scripts/vqa-compare.py` | Block corruption, palette errors, CI failure |
 | Parity comparison | `skills/parity-comparison/` | `nix run .#parity` | SSIM regression, parity failure |
+| Frame sequence parity | `skills/frame-sequence-parity/` | `capture-wine-sequence.py`, `capture-native-sequence.py`, `compare-frame-sequences.py` | Gameplay frames drift, animation phase differs, single screenshots are too noisy |
 | CI/CD | `skills/ci-cd/` | `nix run .#build`, `nix run .#test` | CI failure, release broken, deploy stuck |
 | GHA updater | `skills/gha-updater/` | — | Stale action versions, Node.js deprecation warnings |
 | Nix shell escaping | `skills/nix-shell-escaping/` | — | nix-shell quoting errors, variable expansion traps |
