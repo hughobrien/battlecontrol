@@ -16,6 +16,7 @@ from .common import (
     start_openbox,
     teardown_display,
 )
+from .native import _convert_valid_internal_bmp, capture_timeout_seconds
 
 
 MIX_METADATA_PATTERNS = (
@@ -179,7 +180,6 @@ class MingwCapture:
     def capture_mission(
         self, scenario: str, frame: int, output_dir: pathlib.Path, logfile=None
     ) -> pathlib.Path:
-        del frame
         output_dir.mkdir(parents=True, exist_ok=True)
         logfile = logfile or subprocess.DEVNULL
         disp = pick_free_display()
@@ -188,9 +188,17 @@ class MingwCapture:
         run_dir = output_dir / "mingw-run"
         stderr_path = output_dir / "mingw-stderr.log"
         stdout_path = output_dir / "mingw-stdout.log"
+        ready_path = output_dir / "mingw-ready.txt"
+        bmp_path = output_dir / "mingw-capture.bmp"
+        cap_path = output_dir / "capture.png"
         screenshot = output_dir / "mingw-root.png"
+        for path in (ready_path, bmp_path, cap_path, screenshot):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
         try:
-            xvfb = start_xvfb(disp, 1024, 768, logfile=logfile)
+            xvfb = start_xvfb(disp, 640, 400, logfile=logfile)
             wm = start_openbox(disp, logfile=logfile)
             env.update(
                 {
@@ -200,8 +208,19 @@ class MingwCapture:
                     "RA_MINGW_EXE": str(self.ra_exe),
                     "RA_AUTOSTART": "1",
                     "RA_AUTOSTART_SCENARIO": f"{scenario}.INI",
+                    "RA_CAPTURE_FPS": os.environ.get("RA_CAPTURE_FPS", "10"),
+                    "RA_CAPTURE_FRAME": str(max(frame, 1)),
+                    "RA_CAPTURE_READY_FILE": str(ready_path),
+                    "RA_CAPTURE_BMP_FILE": str(bmp_path),
                 }
             )
+            frame_capture = {
+                "requested_frame": max(frame, 1),
+                "ready_file": str(ready_path),
+                "bmp": str(bmp_path),
+                "png": str(cap_path),
+                "status": "pending",
+            }
             with stdout_path.open("w") as stdout, stderr_path.open("w") as stderr:
                 proc = subprocess.Popen(
                     [str(self.repo / "scripts" / "run-mingw-ra.sh")],
@@ -210,13 +229,39 @@ class MingwCapture:
                     stdout=stdout,
                     stderr=stderr,
                 )
-                time.sleep(float(os.environ.get("MINGW_PROBE_SECONDS", "12")))
-                center_mouse(disp, 1024, 768)
-                try:
-                    capture_root(disp, str(screenshot))
-                except Exception as exc:
-                    if hasattr(logfile, "write"):
-                        logfile.write(f"mingw-driver: screenshot failed: {exc}\n")
+                center_mouse(disp, 640, 400)
+                fps = int(env["RA_CAPTURE_FPS"])
+                deadline = time.time() + max(
+                    capture_timeout_seconds(max(frame, 1), fps),
+                    float(os.environ.get("MINGW_PROBE_SECONDS", "12")),
+                )
+                while time.time() < deadline:
+                    if ready_path.exists():
+                        break
+                    if proc.poll() is not None:
+                        break
+                    time.sleep(0.05)
+                if ready_path.exists():
+                    ok, reason = _convert_valid_internal_bmp(
+                        bmp_path, cap_path, min_unique_colours=16
+                    )
+                    frame_capture["status"] = "ok" if ok else "invalid-bmp"
+                    frame_capture["detail"] = reason
+                else:
+                    frame_capture["status"] = "missing-ready"
+                    if proc.poll() is not None:
+                        frame_capture["detail"] = (
+                            f"process exited before frame trap rc={proc.returncode}"
+                        )
+                    else:
+                        frame_capture["detail"] = "timed out before frame trap"
+
+                if frame_capture["status"] != "ok":
+                    try:
+                        capture_root(disp, str(screenshot))
+                    except Exception as exc:
+                        if hasattr(logfile, "write"):
+                            logfile.write(f"mingw-driver: screenshot failed: {exc}\n")
                 if proc.poll() is None:
                     proc.terminate()
                     try:
@@ -226,8 +271,9 @@ class MingwCapture:
                         proc.wait(timeout=5)
 
             screenshot_state = None
-            if screenshot.exists():
-                screenshot_state = self._classify_screenshot(screenshot)
+            state_image = cap_path if cap_path.exists() else screenshot
+            if state_image.exists():
+                screenshot_state = self._classify_screenshot(state_image)
             classification = classify_mingw_failure(
                 _read_text(stderr_path), screenshot_state
             )
@@ -236,6 +282,7 @@ class MingwCapture:
                     "stdout": str(stdout_path),
                     "stderr": str(stderr_path),
                     "screenshot": str(screenshot) if screenshot.exists() else None,
+                    "frame_capture": frame_capture,
                     "process_returncode": proc.returncode if proc else None,
                 }
             )
@@ -251,11 +298,11 @@ class MingwCapture:
                     f"MinGW probe classified as {classification['status']}: "
                     f"{classification['detail']}"
                 )
-            if not screenshot.exists():
-                raise RuntimeError(
-                    "MinGW probe reached bootstrap but produced no screenshot"
-                )
-            return screenshot
+            if frame_capture["status"] == "ok" and cap_path.exists():
+                return cap_path
+            if screenshot.exists():
+                return screenshot
+            raise RuntimeError("MinGW probe reached bootstrap but produced no capture")
         finally:
             if proc is not None and proc.poll() is None:
                 proc.kill()

@@ -133,13 +133,16 @@ Current status: builds, launches, and enters autostarted gameplay under Wine.
 It is available as a `capture-checkpoint.py` probe target:
 
 ```sh
-python3 scripts/capture-checkpoint.py mission allied-l2 --targets mingw
+python3 scripts/capture-checkpoint.py mission allied-l2 --targets mingw --frame 60
 ```
 
 The first MinGW/Wine blocker was MIX corruption caused by MinGW text-mode file
 I/O: reads stopped at `0x1A` inside binary MIX files. The shared POSIX file-I/O
 substrate now forces `O_BINARY`, so `LOCAL.MIX` and other encrypted MIX files
-decode with the same metadata as native Linux.
+decode with the same metadata as native Linux. The target uses the ported
+engine's internal `RA_CAPTURE_FRAME` BMP trap when possible; current captures
+are frame-exact but low-colour/grayscale under Wine, which is a known follow-up
+divergence.
 
 ## Verification Loop
 

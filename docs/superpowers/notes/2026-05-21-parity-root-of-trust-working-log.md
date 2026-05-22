@@ -276,6 +276,12 @@ MinGW-under-Wine probe update, 2026-05-22:
   reached `Start_Scenario OK`, skipped Allied L2 VQAs under `RA_AUTOSTART`,
   decoded `LOCAL.MIX` as `count=66 size=3828933`, cached it fully, and advanced
   through main-loop frame 300.
+- Frame-trap verification:
+  `/tmp/battlecontrol/2026-05-22T21-03-22-mission-allied-l2` captured Allied L2
+  frame 60 through `RA_CAPTURE_FRAME` / `RA_CAPTURE_BMP_FILE`, not through a
+  root-window timing screenshot.
+- The frame is currently grayscale/low-colour (`35c`). Treat that as a real
+  MinGW/Wine port divergence to investigate, not as capture failure; the MinGW
+  validator accepts lower colour count while preserving dimension/range checks.
 - The MinGW target is now useful as a Wine-hosted ported-engine comparison
-  point. It still needs frame-exact dumping before it can participate in the
-  100-frame root-of-trust corpus.
+  point. The next step is repeated-frame reproducibility, then sequence capture.

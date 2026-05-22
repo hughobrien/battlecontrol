@@ -149,7 +149,9 @@ def _bmp_is_candidate(path: pathlib.Path) -> tuple[bool, str]:
 
 
 def _convert_valid_internal_bmp(
-    bmp_path: pathlib.Path, png_path: pathlib.Path
+    bmp_path: pathlib.Path,
+    png_path: pathlib.Path,
+    min_unique_colours: int = MIN_CAPTURE_UNIQUE_COLOURS,
 ) -> tuple[bool, str]:
     """Convert the internal BMP frame trap to PNG and validate the PNG."""
     ok, reason = _bmp_is_candidate(bmp_path)
@@ -174,7 +176,7 @@ def _convert_valid_internal_bmp(
         detail = f": {stderr}" if stderr else ""
         return False, f"`convert capture.bmp capture.png` failed{detail}"
 
-    return _validate_capture_image(png_path)
+    return _validate_capture_image(png_path, min_unique_colours=min_unique_colours)
 
 
 def stage_data_dir(
