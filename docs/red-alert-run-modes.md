@@ -1,14 +1,52 @@
-# Red Alert Run Modes
+# battlecontrol Project Overview
 
-This is the current map of ways we run Red Alert in this repo.
+This document and `docs/red-alert-run-modes.excalidraw` are a compact map of
+the project: where the code came from, what the port is trying to preserve, how
+we run each target, and how parity work is supposed to converge.
 
-See also: `docs/red-alert-run-modes.excalidraw`.
+## North Star
 
-## 1. Original RA95 under Wine
+`battlecontrol` ports the C&C Remastered Collection Red Alert and Tiberian Dawn
+engine sources to Linux and WebAssembly while keeping behavior close to the
+original 1990s games.
+
+The primary deliverable is browser-playable RA and TD using legally acquired
+local game data. Native Linux is the fast development and debugging target.
+Original Windows binaries under Wine are the behavioral reference, not the final
+product.
+
+## Source Lineage
+
+Inputs:
+
+- Remastered Collection engine sources for Red Alert and Tiberian Dawn.
+- User-supplied original game data such as MIX archives, scenarios, movies, and
+  audio.
+- Original Windows binaries (`RA95.EXE` and C&C95/TD equivalents) when we need a
+  reference capture under Wine.
+
+Porting layer:
+
+- Win32/DOS compatibility shims for types, APIs, filesystem behavior, and input.
+- LP64 fixes so Linux `long` and pointer widths do not corrupt 1990s binary data
+  structures.
+- Case-folding include shims for the original mixed-case source layout.
+- Platform replacements for DirectDraw, DirectSound, Windows input, and process
+  assumptions.
+
+Outputs:
+
+- Native Linux RA and TD executables.
+- WASM/browser RA and TD artifacts for GitHub Pages.
+- Wine reference screenshots and logs for parity investigations.
+- A developing MinGW Win32 build of the ported engine, intended to run under Wine
+  as a third lens between original Windows behavior and native Linux behavior.
+
+## Runtime Modes
+
+### 1. Original RA95 under Wine
 
 Purpose: reference behavior for parity.
-
-Path:
 
 ```sh
 python3 scripts/capture-checkpoint.py mission allied-l2 --targets wine
@@ -23,22 +61,16 @@ Key pieces:
 - `tools/wine-input/*`
 - Xvfb/Openbox/Wine
 
-Outputs land under `/tmp/battlecontrol/<session>/wine.png` and related logs.
+Outputs land under `/tmp/battlecontrol/<session>/wine.png` with driver logs,
+diffs, and `report.json`.
 
-## 2. Native Linux Port
+### 2. Native Linux Port
 
-Purpose: primary native development target and parity target.
-
-Build:
+Purpose: primary development target and parity target.
 
 ```sh
 cmake --preset linux-native
 cmake --build build --target ra --parallel
-```
-
-Run directly:
-
-```sh
 RA_AUTOSTART=1 RA_AUTOSTART_SCENARIO=SCG02EA.INI ./build/ra/redalert
 ```
 
@@ -51,25 +83,18 @@ python3 scripts/capture-checkpoint.py mission allied-l2 --targets native
 Key pieces:
 
 - `build/ra`
-- SDL2 port layer
+- SDL2 graphics, audio, and input paths
 - `RA_AUTOSTART*`
 - `RA_CAPTURE_*`
 - `scripts/drivers/native.py`
 
-## 3. WASM Port
+### 3. WASM Browser Port
 
-Purpose: browser deliverable and parity target.
-
-Build:
+Purpose: user-facing deliverable and parity target.
 
 ```sh
 emcmake cmake --preset wasm
 cmake --build build-wasm --target ra --parallel
-```
-
-Run:
-
-```sh
 scripts/serve-wasm.sh
 ```
 
@@ -87,20 +112,13 @@ Key pieces:
 - `wasm/preloader.js`
 - Playwright capture driver
 
-## 4. MinGW Win32 Port under Wine
+### 4. MinGW Win32 Port under Wine
 
 Purpose: isolate Linux-host differences from ported-engine differences.
-
-Build:
 
 ```sh
 cmake --preset mingw32
 cmake --build build-mingw32 --target ra --parallel
-```
-
-Run:
-
-```sh
 scripts/run-mingw-ra.sh
 ```
 
@@ -109,30 +127,70 @@ Key pieces:
 - `build-mingw32/ra.exe`
 - MinGW cross SDL runtime DLLs
 - Wine
-- Same ported engine sources as Linux native
+- The same ported engine sources used by native Linux
 
-Current status: builds and launches, but runtime currently fails during early MIX loading while reading `LOCAL.MIX` metadata. That makes it a useful next debugging target before adding it as a first-class `capture-checkpoint.py` target.
+Current status: builds and launches, but runtime currently fails during early MIX
+loading while reading `LOCAL.MIX` metadata. That makes it a useful next
+debugging target before adding it as a first-class `capture-checkpoint.py`
+target.
 
-## 5. Parity Orchestrator
+## Verification Loop
 
-Purpose: compare the above targets in one workflow.
+The parity loop is:
 
 ```sh
-python3 scripts/capture-checkpoint.py mission allied-l2 --targets wine,native,wasm
+python3 scripts/capture-checkpoint.py mission <id> --targets wine,native,wasm
 ```
 
-Outputs:
+The orchestrator produces:
 
-- `wine.png`
-- `native.png`
-- `wasm.png`
+- `wine.png`, `native.png`, and `wasm.png`
 - `diff-wine-vs-native.png`
 - `diff-wine-vs-wasm.png`
+- `diff-native-vs-wasm.png`
 - `report.json`
+- per-target driver logs
 
-Potential next addition:
+Important debugging controls:
 
-```text
---targets wine,native,wasm,mingw
-```
+- fixed gameplay seed
+- target frame capture traps
+- FPS limiting
+- system time control where useful
+- cnc-ddraw reference capture
+- framebuffer and process-memory probing
+- scenario sampling across Allied, Soviet, GDI, and Nod campaigns
+
+The goal is not just "looks close"; the loop should expose exact, reproducible
+divergences that can be traced back to real source differences or intentionally
+documented environmental differences.
+
+## Project History
+
+Milestone shape:
+
+- v0.1: toolchain bootstrap, Win32 shim, LP64 audit, portable graphics/audio
+  replacements, first visible menu/game frame, ASAN-clean smoke tests.
+- v0.2: RA and TD playable in browser/WASM with Emscripten, pthreads, SDL2,
+  VQA/audio fixes, and Playwright smoke tests.
+- v0.3: Wine original-game parity gates for representative RA and TD missions,
+  release artifacts, and CI validation.
+- v0.3+: mission parity expansion, deterministic capture tooling, divergence
+  cleanup, and MinGW-under-Wine investigation.
+- v0.4 target: broader TD parity, M2+ mission coverage, save/load through
+  browser storage, and harder e2e reliability.
+- v0.5+ target: native performance, accelerated rendering, full-campaign parity,
+  multiplayer, mod support, map/editor work, and more platforms.
+
+## Current Frontiers
+
+The active engineering fronts are:
+
+- Keep reducing visual divergences in `divergences.md` with reproducible
+  screenshot pairs.
+- Promote capture tooling from ad hoc debugging into a root of trust.
+- Add MinGW-under-Wine as a comparison target once its MIX loading failure is
+  fixed.
+- Expand parity from hand-reviewed scenes to broad campaign sampling.
+- Harden browser save/load and long-session behavior.
 
