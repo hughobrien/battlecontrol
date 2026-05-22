@@ -511,6 +511,28 @@
           exec bash scripts/build.sh "$@"
         '';
 
+        ra-wasm-build = mkApp "ra-wasm-build" ''
+          set -euo pipefail
+          emcmake cmake --preset wasm
+          cmake --build build-wasm --target ra --parallel
+          test -s build-wasm/ra.html
+          test -s build-wasm/ra.js
+          test -s build-wasm/ra.wasm
+          test "$(stat -c%s build-wasm/ra.wasm)" -gt 1000000
+          test "$(od -An -tx1 -N4 build-wasm/ra.wasm | tr -d ' \n')" = "0061736d"
+        '';
+
+        td-wasm-build = mkApp "td-wasm-build" ''
+          set -euo pipefail
+          emcmake cmake --preset wasm
+          cmake --build build-wasm --target td --parallel
+          test -s build-wasm/td.html
+          test -s build-wasm/td.js
+          test -s build-wasm/td.wasm
+          test "$(stat -c%s build-wasm/td.wasm)" -gt 1000000
+          test "$(od -An -tx1 -N4 build-wasm/td.wasm | tr -d ' \n')" = "0061736d"
+        '';
+
         test = mkApp "test" ''
           exec bash scripts/test.sh "$@"
         '';

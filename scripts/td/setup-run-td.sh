@@ -8,14 +8,14 @@
 #   - CONQUER.INI (game options)
 #
 # Usage: run from repo root.
-#   bash scripts/setup-run-td.sh
+#   bash scripts/td/setup-run-td.sh
 #
 # Prerequisites:
 #   TD game data at /CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1/
 #   (Steam CnC Remastered Collection install on Linux)
 
 set -e
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TD_DATA="/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1"
 RUN_DIR="$REPO_ROOT/build/run-td"
 
@@ -121,7 +121,5 @@ INIEOF
 
 echo ""
 echo "Done. To run the TD smoke test:"
-echo "  mkdir -p build/cmake-td && cd build/cmake-td"
-echo "  cmake ../.. -G Ninja && ninja td"
-echo "  cd ../run-td"
-echo "  TD_AUTOSTART=1 DISPLAY=:99 ./cmake-td/td"
+echo "  bash scripts/build-native.sh td"
+echo "  bash scripts/td/run-td-cheat.sh"
