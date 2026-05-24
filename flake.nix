@@ -65,6 +65,7 @@
           bash
           binutils
           ccache
+          clang
           clang-tools
           cmake
           coreutils
@@ -353,6 +354,7 @@
           ffmpeg-headless
           ccache
           gh
+          clang
           clang-tools
           cppcheck
           # Mingw-w64 cross-compiler (for stub THIPX32.DLL)

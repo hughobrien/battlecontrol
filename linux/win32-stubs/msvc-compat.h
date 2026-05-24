@@ -321,7 +321,10 @@ static inline int _memicmp(const void* a, const void* b, std::size_t n)
 // Same contract as MSVC's CRT: caller owns the buffer, NUL-terminated.
 #if !defined(_MSVC_STRLWR_STRUPR_DEFINED) && !defined(__MINGW32__)
 #define _MSVC_STRLWR_STRUPR_DEFINED
-#ifdef __cplusplus
+#if defined(__EMSCRIPTEN__)
+static inline char* _strlwr(char* s) { return strlwr(s); }
+static inline char* _strupr(char* s) { return strupr(s); }
+#elif defined(__cplusplus)
 #include <cctype>
 static inline char* _strlwr(char* s)
 {
