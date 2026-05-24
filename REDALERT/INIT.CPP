@@ -753,6 +753,19 @@ bool Select_Game(bool fade)
 			BuildLevel = 10;
 			IsTanyaDead = false;
 			SaveTanya = false;
+			{
+				const char * gamespeed_env = getenv("RA_AUTOSTART_GAMESPEED");
+				if (gamespeed_env && gamespeed_env[0]) {
+					int gamespeed = atoi(gamespeed_env);
+					Options.GameSpeed = Bound(gamespeed, 0, 6);
+					fprintf(stderr, "[RA] RA_AUTOSTART_GAMESPEED=%d -> GameSpeed=%u\n",
+					        gamespeed, Options.GameSpeed);
+					fflush(stderr);
+				} else {
+					fprintf(stderr, "[RA] RA_AUTOSTART using GameSpeed=%u\n", Options.GameSpeed);
+					fflush(stderr);
+				}
+			}
 			Whom = HOUSE_GOOD;
 			Scen.Set_Scenario_Name("SCG01EA.INI");
 			Session.Type = GAME_NORMAL;
@@ -1785,7 +1798,7 @@ bool Select_Game(bool fade)
 #endif	//WIN32
 	Show_Mouse();
 	Set_Logic_Page(SeenBuff);
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 	/*
 	** Sidebar is always active in hi-res.
 	*/
@@ -2741,8 +2754,15 @@ void Init_Random(void)
 		if (CustomSeed != 0) {
 			Seed = CustomSeed;
 		} else {
-			srand(time(NULL));
-			Seed = rand();
+			const char * seed_env = getenv("RA_RANDOM_SEED");
+			if (seed_env && seed_env[0]) {
+				Seed = (int)strtoul(seed_env, NULL, 0);
+				fprintf(stderr, "[RA] RA_RANDOM_SEED=%d\n", Seed);
+				fflush(stderr);
+			} else {
+				srand(time(NULL));
+				Seed = rand();
+			}
 		}
 	}
 

@@ -14,10 +14,15 @@
       flake = false;
     };
 
-    # Allied CD ISO from archive.org — single source for all game assets.
+    # Original Red Alert CD ISOs from archive.org.
     # Files are extracted via unar at build time.
-    redalert-iso = {
+    redalert-allied-iso = {
       url = "https://archive.org/download/cnc-red-alert/redalert_allied.iso";
+      flake = false;
+    };
+
+    redalert-soviet-iso = {
+      url = "https://archive.org/download/cnc-red-alert/redalert_soviets.iso";
       flake = false;
     };
   };
@@ -29,15 +34,87 @@
 
       wine-input,
       cnc-ddraw,
-      redalert-iso,
+      redalert-allied-iso,
+      redalert-soviet-iso,
     }:
     let
       system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfreePredicate =
+          pkg:
+          builtins.elem (nixpkgs.lib.getName pkg) [
+            "open-watcom-v2"
+            "open-watcom-v2-full"
+            "open-watcom-v2-unwrapped"
+            "open-watcom-v2-full-unwrapped"
+            "open-watcom-bin"
+            "open-watcom-bin-unwrapped"
+          ];
+      };
+      pythonEnv = pkgs.python3.withPackages (
+        ps: with ps; [
+          numpy
+          pillow
+          scikit-image
+        ]
+      );
+      appRuntimePath = pkgs.lib.makeBinPath (
+        with pkgs;
+        [
+          bash
+          binutils
+          ccache
+          clang-tools
+          cmake
+          coreutils
+          cppcheck
+          curl
+          emscripten
+          ffmpeg-headless
+          findutils
+          gawk
+          gh
+          git
+          gnumake
+          gnugrep
+          gnused
+          gnutar
+          gzip
+          imagemagick
+          mono
+          ninja
+          nix
+          nixfmt
+          openbox
+          open-watcom-bin
+          pkg-config
+          pkgsCross.mingw32.buildPackages.gcc
+          playwright-test
+          pythonEnv
+          ripgrep
+          ruff
+          shellcheck
+          shfmt
+          unar
+          uv
+          wineWow64Packages.stableFull
+          xdotool
+          xdpyinfo
+          xvfb
+          xvfb-run
+          yamllint
+        ]
+      );
 
       mkApp = name: script: rec {
         type = "app";
-        program = toString (pkgs.writeShellScript name script);
+        program = toString (
+          pkgs.writeShellScript name ''
+            export PATH="${appRuntimePath}:''${PATH:-}"
+            ${script}
+          ''
+        );
       };
     in
     {
@@ -47,6 +124,25 @@
       packages.${system} =
         let
           p = self.packages.${system};
+          mkRaData =
+            name: iso:
+            pkgs.runCommand name
+              {
+                src = iso;
+                nativeBuildInputs = [ pkgs.unar ];
+              }
+              ''
+                mkdir -p "$out"
+                unar -q -o "$out" -D "$src" MAIN.MIX 2>/dev/null
+                unar -q -o "$out" -D "$src" INSTALL/REDALERT.MIX 2>/dev/null
+                if [ -d "$out/INSTALL" ]; then
+                  mv "$out/INSTALL"/* "$out/"
+                  rmdir "$out/INSTALL"
+                fi
+                # Case-insensitive symlinks for the game's lowercase file lookups
+                ln -sf MAIN.MIX "$out/main.mix"
+                ln -sf REDALERT.MIX "$out/redalert.mix"
+              '';
         in
         {
           redalert = pkgs.clangStdenv.mkDerivation {
@@ -141,12 +237,11 @@
           };
 
           # ── ISO extraction packages ────────────────────────────────────────
-          # All extracted from the redalert-iso flake input via unar.
-
+          # Extracted from the original Red Alert CD flake inputs via unar.
           ra-patched-exe =
             pkgs.runCommand "ra-patched-exe"
               {
-                src = redalert-iso;
+                src = redalert-allied-iso;
                 nativeBuildInputs = [
                   pkgs.unar
                   pkgs.python3
@@ -156,35 +251,17 @@
                 unar -q -o "$(pwd)" -D "$src" INSTALL/RA95.EXE 2>/dev/null
                 cp INSTALL/RA95.EXE "$out"
                 chmod +w "$out"
-                python3 ${./scripts/ra/ra-nocd-patch.py} "$out"
-                python3 ${./scripts/ra/ra-ddscl-patch.py} "$out"
-                # cdlabel: zero the first byte of the "CD1" volume label string
-                printf '\x00' | dd of="$out" bs=1 seek=$((0x1BFCB7)) conv=notrunc 2>/dev/null
+                PYTHONPATH=${./scripts} python3 -m ra.patch_ra95 base "$out"
               '';
 
-          ra-data =
-            pkgs.runCommand "ra-data"
-              {
-                src = redalert-iso;
-                nativeBuildInputs = [ pkgs.unar ];
-              }
-              ''
-                mkdir -p "$out"
-                unar -q -o "$out" -D "$src" MAIN.MIX 2>/dev/null
-                unar -q -o "$out" -D "$src" INSTALL/REDALERT.MIX 2>/dev/null
-                if [ -d "$out/INSTALL" ]; then
-                  mv "$out/INSTALL"/* "$out/"
-                  rmdir "$out/INSTALL"
-                fi
-                # Case-insensitive symlinks for the game's lowercase file lookups
-                ln -sf MAIN.MIX "$out/main.mix"
-                ln -sf REDALERT.MIX "$out/redalert.mix"
-              '';
+          ra-data-allied = mkRaData "ra-data-allied" redalert-allied-iso;
+          ra-data-soviet = mkRaData "ra-data-soviet" redalert-soviet-iso;
+          ra-data = p.ra-data-allied;
 
           ra-thipx32-dll =
             pkgs.runCommand "ra-thipx32-dll"
               {
-                src = redalert-iso;
+                src = redalert-allied-iso;
                 nativeBuildInputs = [ pkgs.unar ];
               }
               ''
@@ -195,7 +272,7 @@
           ra-thipx16-dll =
             pkgs.runCommand "ra-thipx16-dll"
               {
-                src = redalert-iso;
+                src = redalert-allied-iso;
                 nativeBuildInputs = [ pkgs.unar ];
               }
               ''
@@ -213,7 +290,10 @@
             pname = "cnc-ddraw";
             version = "unstable-2026-05-16";
             src = cnc-ddraw;
-            patches = [ ./tools/cnc-ddraw/tim740-scanline-double.patch ];
+            patches = [
+              ./tools/cnc-ddraw/tim740-scanline-double.patch
+              ./tools/cnc-ddraw/tim780-capture-hook.patch
+            ];
             nativeBuildInputs = [ pkgs.pkgsCross.mingw32.buildPackages.gcc ];
             buildPhase = ''
               runHook preBuild
@@ -262,18 +342,13 @@
           cmake
           gnumake
           ninja
-          (python3.withPackages (
-            ps: with ps; [
-              numpy
-              pillow
-              scikit-image
-            ]
-          ))
+          pythonEnv
           pkg-config
           emscripten # WASM builds: emcmake cmake --preset wasm && cmake --build build-wasm --target ra
           # CI deps
           xvfb
           xvfb-run
+          xdpyinfo
           playwright-test # Playwright CLI + browsers via Nix
           ffmpeg-headless
           ccache
@@ -282,6 +357,8 @@
           cppcheck
           # Mingw-w64 cross-compiler (for stub THIPX32.DLL)
           pkgs.pkgsCross.mingw32.buildPackages.gcc
+          # OpenWatcom: diagnostic Win32 rebuild experiments for RA95 parity.
+          open-watcom-bin
           # Linting tools
           ruff
           shellcheck
@@ -295,6 +372,10 @@
           SDL2
           SDL2.dev
           SDL2_ttf
+          pkgs.pkgsCross.mingw32.SDL2
+          pkgs.pkgsCross.mingw32.SDL2.dev
+          pkgs.pkgsCross.mingw32.sdl3
+          pkgs.pkgsCross.mingw32.windows.mcfgthreads
           openal
           libx11
           # Script deps (campaign captures, screenshots, etc.)
@@ -309,6 +390,12 @@
         shellHook = ''
                     export RA_ASSETS="''${RA_ASSETS:-/CnCRemastered/Data/CNCDATA/RED_ALERT/CD1}"
                     export TD_ASSETS="''${TD_ASSETS:-/CnCRemastered/Data/CNCDATA/TIBERIAN_DAWN/CD1}"
+                    export MINGW_SDL2="${pkgs.pkgsCross.mingw32.SDL2}"
+                    export MINGW_SDL2_DEV="${pkgs.pkgsCross.mingw32.SDL2.dev}"
+                    export MINGW_SDL3="${pkgs.pkgsCross.mingw32.sdl3}"
+                    export MINGW_SDL3_BIN="${pkgs.lib.getBin pkgs.pkgsCross.mingw32.sdl3}"
+                    export MINGW_MCFGTHREAD="${pkgs.pkgsCross.mingw32.windows.mcfgthreads}"
+                    export MINGW_GCC_LIB="${pkgs.pkgsCross.mingw32.buildPackages.gcc.cc.lib}"
 
 
 
@@ -323,7 +410,15 @@
             echo "pre-commit: must be run inside nix develop" >&2
             exit 1
           fi
-          nix run .#lint
+          NIX_BIN="$(command -v nix || true)"
+          if [[ -z "$NIX_BIN" && -x /nix/var/nix/profiles/default/bin/nix ]]; then
+            NIX_BIN=/nix/var/nix/profiles/default/bin/nix
+          fi
+          if [[ -z "$NIX_BIN" ]]; then
+            echo "pre-commit: nix not found; avoid login shells inside nix develop" >&2
+            exit 1
+          fi
+          "$NIX_BIN" run .#lint
           PREHOOK
                       chmod +x "$HOOK"
                       echo "Installed git pre-commit hook: nix run .#lint"
@@ -426,6 +521,28 @@
         # Each tier calls the one before it. All support --all and --base REF.
         build = mkApp "build" ''
           exec bash scripts/build.sh "$@"
+        '';
+
+        ra-wasm-build = mkApp "ra-wasm-build" ''
+          set -euo pipefail
+          emcmake cmake --preset wasm
+          cmake --build build-wasm --target ra --parallel
+          test -s build-wasm/ra.html
+          test -s build-wasm/ra.js
+          test -s build-wasm/ra.wasm
+          test "$(stat -c%s build-wasm/ra.wasm)" -gt 1000000
+          test "$(od -An -tx1 -N4 build-wasm/ra.wasm | tr -d ' \n')" = "0061736d"
+        '';
+
+        td-wasm-build = mkApp "td-wasm-build" ''
+          set -euo pipefail
+          emcmake cmake --preset wasm
+          cmake --build build-wasm --target td --parallel
+          test -s build-wasm/td.html
+          test -s build-wasm/td.js
+          test -s build-wasm/td.wasm
+          test "$(stat -c%s build-wasm/td.wasm)" -gt 1000000
+          test "$(od -An -tx1 -N4 build-wasm/td.wasm | tr -d ' \n')" = "0061736d"
         '';
 
         test = mkApp "test" ''

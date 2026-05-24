@@ -1888,5 +1888,3 @@ void TeamTypeClass::Build_INI_Entry(char * buf)
 		buf += strlen(buf);
 	}
 }
-
-

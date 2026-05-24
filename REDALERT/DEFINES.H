@@ -94,6 +94,7 @@
 #define	FIXIT_APTIVA_MODEM		// Fixes crash with Aptiva modem.
 #define	FIXIT_FLAG_CHECK			// Disable placing building over a flag.
 
+#ifndef RA_ORIGINAL_CD_BEHAVIOR
 #define	FIXIT_ANTS              // Adds Ant Units
 
 #define	FIXIT_CSII					// Adds Aftermath CounterStrike II units
@@ -113,6 +114,7 @@
 //	ajw - Discovered that engineer changing fields were specifically left out of aftrmath.ini, thus this has no effect.
 //	Engineer changes (and other game rule changes) are in mplayer.ini, which was loaded before aftermath-only mplayer games.
 #define	FIXIT_ENGINEER				// Adds Engineer rules.ini overrides
+#endif
 
 //#define	FIXIT_FAST_LOAD			// Enables faster INI loading
 

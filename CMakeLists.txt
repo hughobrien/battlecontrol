@@ -11,12 +11,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(RA_BEHAVIOR "retail" CACHE STRING "Red Alert gameplay behavior set: original, retail, or remaster")
+set_property(CACHE RA_BEHAVIOR PROPERTY STRINGS original retail remaster)
+if(NOT RA_BEHAVIOR STREQUAL "original" AND NOT RA_BEHAVIOR STREQUAL "retail" AND NOT RA_BEHAVIOR STREQUAL "remaster")
+    message(FATAL_ERROR "RA_BEHAVIOR must be 'original', 'retail', or 'remaster' (got '${RA_BEHAVIOR}')")
+endif()
+message(STATUS "Red Alert behavior mode: ${RA_BEHAVIOR}")
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(STATUS "Target ABI: LP64 (64-bit). DWORD/long width shim will be required for the RedAlert port.")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    message(STATUS "Target ABI: Win32/LLP32 cross build.")
 else()
     message(WARNING "Target ABI is 32-bit. Upstream sources assume LLP64; this is unusual on modern Linux.")
 endif()
@@ -261,6 +270,12 @@ target_compile_definitions(ra PRIVATE
     UNIX=1
     POSIX=1
 )
+if(RA_BEHAVIOR STREQUAL "remaster")
+    target_compile_definitions(ra PRIVATE RA_REMASTER_BEHAVIOR=1)
+endif()
+if(RA_BEHAVIOR STREQUAL "original")
+    target_compile_definitions(ra PRIVATE RA_ORIGINAL_CD_BEHAVIOR=1)
+endif()
 
 target_include_directories(ra PRIVATE
     "${RA_SHIM_DIR}/redalert"
@@ -342,10 +357,11 @@ else()
         -Wno-register
         -w
     )
+    find_package(SDL2 REQUIRED)
     target_link_libraries(ra PRIVATE SDL2::SDL2)
 endif()
 
 # TIM-369: installer experience port (native only — no installer for WASM)
-if(NOT EMSCRIPTEN)
+if(NOT EMSCRIPTEN AND NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_subdirectory(installer)
 endif()

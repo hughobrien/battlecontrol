@@ -118,7 +118,10 @@ typedef struct _DDSURFACEDESC           FAR *LPDDSURFACEDESC;
 extern bool             SDL_Has_Primary_Surface(void);
 extern unsigned char *  SDL_Get_Primary_Pixels(void);
 extern int              SDL_Get_Primary_Pitch(void);
+extern "C" void         SDL_Process_System_Events(void);
+extern void             RA_Set_Capture_Game_Frame(long game_frame);
 extern void             RA_Save_Gameplay_BMP(int game_frame); // TIM-490 audit
+extern void             RA_Save_Gameplay_BMP_Path(int game_frame, char const * path);
 #endif
 
 /*

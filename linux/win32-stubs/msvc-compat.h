@@ -28,6 +28,12 @@
 
 #if !defined(_MSC_VER)
 
+#ifdef __cplusplus
+#include <cstring>
+#else
+#include <string.h>
+#endif
+
 // TIM-11: Honor DDRAW.H's upstream `#if defined(_WIN32) && !defined(_NO_COM)`
 // guard so its COM interface block (DECLARE_INTERFACE_ / STDMETHOD / IUnknown)
 // is skipped on Linux. WIN32LIB/wwstd.h auto-defines _WIN32, so without this
@@ -154,7 +160,7 @@
 // LP32 → LP64 type-width problem (deferred to TIM-7+). For now the
 // shim just unblocks the parser with the same semantics the original
 // code expected on its target ABI.
-#ifndef _lrotl
+#if !defined(_lrotl) && !defined(__MINGW32__)
 #ifdef __cplusplus
 static inline unsigned long _lrotl(unsigned long value, int shift)
 {
@@ -174,7 +180,7 @@ static inline unsigned long _lrotl(unsigned long value, int shift)
 // preserves MSVC return semantics (returns the destination buffer) and
 // supports the documented radix range 2..36. The caller is responsible
 // for sizing `buffer` — same contract as MSVC's CRT.
-#ifndef _ITOA_LTOA_DEFINED
+#if !defined(_ITOA_LTOA_DEFINED) && !defined(__MINGW32__)
 #define _ITOA_LTOA_DEFINED
 static inline char* _wwlib_itoa_impl(long value, char* buffer, int radix)
 {
@@ -241,7 +247,7 @@ static inline char* ltoa(long value, char* buffer, int radix)
 // so any TU reaching wwstd.h triggers the failure on clang 18.
 // These shims provide the symbols so mm_malloc.h compiles regardless
 // of the compiler version's header behaviour.
-#ifndef _ALIGNED_MALLOC_DEFINED
+#if !defined(_ALIGNED_MALLOC_DEFINED) && !defined(__MINGW32__)
 #define _ALIGNED_MALLOC_DEFINED
 #include <stdlib.h>
 static inline void* _aligned_malloc(size_t size, size_t alignment) {
@@ -256,7 +262,7 @@ static inline void _aligned_free(void* ptr) {
 }
 #endif
 
-#ifndef _MSVC_STRICMP_DEFINED
+#if !defined(_MSVC_STRICMP_DEFINED) && !defined(__MINGW32__)
 #define _MSVC_STRICMP_DEFINED
 #ifdef __cplusplus
 #include <strings.h>  // POSIX strcasecmp / strncasecmp
@@ -313,7 +319,7 @@ static inline int _memicmp(const void* a, const void* b, std::size_t n)
 // SESSION.CPP:1219 (_strlwr on a copied path), PROFILE.CPP:271 and
 // SESSION.CPP:818/843/851 (strupr on phone book entries / section name).
 // Same contract as MSVC's CRT: caller owns the buffer, NUL-terminated.
-#ifndef _MSVC_STRLWR_STRUPR_DEFINED
+#if !defined(_MSVC_STRLWR_STRUPR_DEFINED) && !defined(__MINGW32__)
 #define _MSVC_STRLWR_STRUPR_DEFINED
 #ifdef __cplusplus
 #include <cctype>
@@ -397,7 +403,7 @@ static inline char* strupr(char* s) { return _strupr(s); }
 // exercised here. The shim concatenates the non-NULL components with
 // portable forward-slash separators. The destination buffer is the
 // caller's responsibility -- same contract as MSVC's CRT.
-#ifndef _WWLIB_MAKEPATH_DEFINED
+#if !defined(_WWLIB_MAKEPATH_DEFINED) && !defined(__MINGW32__)
 #define _WWLIB_MAKEPATH_DEFINED
 #ifdef __cplusplus
 #include <cstring>
@@ -503,7 +509,7 @@ using std::max;
 // so stricmp("","LOCAL.MIX") never matched → MFCD::Cache always returned
 // false → assert(ok) fired after LOCAL.MIX ctor.
 // Implements MSVC semantics: drive="X:" dir="path\" fname="base" ext=".ext"
-#ifndef _WWLIB_SPLITPATH_DEFINED
+#if !defined(_WWLIB_SPLITPATH_DEFINED) && !defined(__MINGW32__)
 #define _WWLIB_SPLITPATH_DEFINED
 #include <cstring>
 static inline void _splitpath(const char* path,

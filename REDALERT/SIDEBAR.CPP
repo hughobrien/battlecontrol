@@ -776,8 +776,10 @@ void SidebarClass::Draw_It(bool complete)
 
 	BStart(BENCH_SIDEBAR);
 
+	bool shadow_background_redrawn = false;
 	if (IsSidebarActive && (IsToRedraw || complete) && !Debug_Map) {
 		IsToRedraw = false;
+		shadow_background_redrawn = true;
 
 		if (LogicPage->Lock()) {
 			/*
@@ -813,11 +815,14 @@ void SidebarClass::Draw_It(bool complete)
 			LogicPage->Unlock();
 		}
 	}
-
 	/*
 	**	Draw the side strip elements by calling their respective draw functions.
 	*/
 	if (IsSidebarActive) {
+		if (shadow_background_redrawn) {
+			Column[0].IsToRedraw = true;
+			Column[1].IsToRedraw = true;
+		}
 		Column[0].Draw_It(complete);
 		Column[1].Draw_It(complete);
 
@@ -826,6 +831,12 @@ void SidebarClass::Draw_It(bool complete)
 			Upgrade.Draw_Me(true);
 			Zoom.Draw_Me(true);
 		}
+	}
+	if (IsSidebarActive) {
+		int clip_x = Column[0].X + (StripClass::LEFT_EDGE_OFFSET * RESFACTOR) - 1;
+		int clip_y = Column[0].Y + StripClass::TEXT_Y_OFFSET;
+		int clip_bottom = WindowList[WINDOW_SIDEBAR][WINDOWY] + WindowList[WINDOW_SIDEBAR][WINDOWHEIGHT];
+		Draw_Power_Bar_Clip(clip_x, clip_y, 1, clip_bottom - clip_y);
 	}
 	IsToRedraw = false;
 

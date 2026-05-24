@@ -21,6 +21,35 @@
         "CMAKE_BUILD_TYPE": "Release"
       },
       "description": "emcmake injects CMAKE_TOOLCHAIN_FILE. Do not run cmake --preset wasm directly."
+    },
+    {
+      "name": "mingw32",
+      "displayName": "Win32 port build (MinGW, for Wine parity probes)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-mingw32",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/mingw32.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_PREFIX_PATH": "$env{MINGW_SDL2_DEV};$env{MINGW_SDL2}"
+      }
+    },
+    {
+      "name": "linux-native-remaster",
+      "displayName": "Linux native with remaster gameplay behavior",
+      "inherits": "linux-native",
+      "binaryDir": "${sourceDir}/build-remaster",
+      "cacheVariables": {
+        "RA_BEHAVIOR": "remaster"
+      }
+    },
+    {
+      "name": "mingw32-remaster",
+      "displayName": "Win32 port build with remaster gameplay behavior",
+      "inherits": "mingw32",
+      "binaryDir": "${sourceDir}/build-mingw32-remaster",
+      "cacheVariables": {
+        "RA_BEHAVIOR": "remaster"
+      }
     }
   ],
   "buildPresets": [
@@ -37,6 +66,21 @@
       "name": "wasm-td",
       "configurePreset": "wasm",
       "targets": ["td"]
+    },
+    {
+      "name": "mingw32-ra",
+      "configurePreset": "mingw32",
+      "targets": ["ra"]
+    },
+    {
+      "name": "linux-native-remaster",
+      "configurePreset": "linux-native-remaster",
+      "targets": ["ra"]
+    },
+    {
+      "name": "mingw32-ra-remaster",
+      "configurePreset": "mingw32-remaster",
+      "targets": ["ra"]
     }
   ]
 }

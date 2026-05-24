@@ -415,6 +415,7 @@ When an agent hits a symptom, read the corresponding skill for diagnostic guidan
 | E2E testing | `skills/e2e-testing/` | `scripts/serve-wasm.sh`, `scripts/test-runner.sh` | pageerror, `__wasmReady` timeout, blank Xvfb |
 | VQA codec | `skills/vqa-codec/` | `python3 scripts/vqa-compare.py` | Block corruption, palette errors, CI failure |
 | Parity comparison | `skills/parity-comparison/` | `nix run .#parity` | SSIM regression, parity failure |
+| Frame sequence parity | `skills/frame-sequence-parity/` | `capture-wine-sequence.py`, `capture-native-sequence.py`, `compare-frame-sequences.py` | Gameplay frames drift, animation phase differs, single screenshots are too noisy |
 | CI/CD | `skills/ci-cd/` | `nix run .#build`, `nix run .#test` | CI failure, release broken, deploy stuck |
 | GHA updater | `skills/gha-updater/` | — | Stale action versions, Node.js deprecation warnings |
 | Nix shell escaping | `skills/nix-shell-escaping/` | — | nix-shell quoting errors, variable expansion traps |
@@ -497,8 +498,7 @@ All reusable scripts live in `scripts/`.
 | `drivers/wasm.py` | WASM capture driver (Playwright headless) |
 | `drivers/compare.py` | Wrapper around parity-compare.py for multi-target comparison |
 | `wine-ra-setup.sh` / `wine-td-setup.sh` | First-time Wine prefix setup |
-| `ra-autostart-patch.py` | Binary patch for RA95.EXE: zero-click auto-boot into any Allied mission at Normal difficulty. See [Auto-launch patch](#auto-launch-patch-wine) below. |
-| `ra-scenario-patch.py` | Replace hardcoded mission name in RA95.EXE (e.g. SCG01EA→SCG02EA) |
+| `patch_ra95.py` | Unified RA95.EXE patcher: base Wine patches, mission capture patches, manifests, and guarded diagnostic/quarantined patch ids. See [Auto-launch patch](#auto-launch-patch-wine) below. |
 | `tools/wine-input/*` | SendInput injectors + BitBlt capture inside Wine |
 | `tools/cnc-ddraw/tim740-scanline-double.patch` | Vendored local patch applied to the upstream cnc-ddraw flake input (see `flake.nix`). Build with `nix build .#cnc-ddraw`. |
 
@@ -506,35 +506,37 @@ All reusable scripts live in `scripts/`.
 
 ## Auto-launch patch (Wine)
 
-The `ra-autostart-patch.py` + `ra-scenario-patch.py` chain applies binary patches
-to RA95.EXE so the game boots directly into any Allied mission at Normal difficulty
-with zero menu clicks — no SendInput automation needed.
+The unified `patch_ra95.py` patcher applies binary patches to RA95.EXE so the
+game boots directly into any Allied mission at Normal difficulty with zero menu
+clicks — no SendInput automation needed.
 
-### Patch chain order
+### Patch commands
 
-Apply in this order (existing Wine scripts apply the first 5 at runtime):
+Apply the base Wine patches once, then apply the mission capture patches for the
+target scenario:
 
 ```bash
-python3 scripts/ra/ra-nocd-patch.py RA95.EXE
-python3 scripts/ra/ra-ddscl-patch.py RA95.EXE
-printf '\x00' | dd of=RA95.EXE bs=1 seek=$((0x1BFCB7)) conv=notrunc  # cdlabel
-python3 scripts/ra/ra-focus-skip-patch.py RA95.EXE
-python3 scripts/ra/ra-game-in-focus-patch.py RA95.EXE
-python3 scripts/ra/ra-vqa-skip-patch.py RA95.EXE
-python3 scripts/ra/ra-scenario-patch.py RA95.EXE SCG02EA   # target mission
-python3 scripts/ra/ra-autostart-patch.py RA95.EXE           # auto-boot
+python3 scripts/ra/patch_ra95.py base RA95.EXE
+python3 scripts/ra/patch_ra95.py mission RA95.EXE --scenario SCG02EA.INI
 ```
+
+The old standalone `ra-*-patch.py` scripts have been removed. `patch_ra95.py`
+is the only supported RA95 binary patch path. The old `game-in-focus` patch is
+quarantined in the unified registry because it writes to an address now known to
+behave as `Session.Type`, not `GameInFocus`, and must not be used for normal
+captures.
 
 ### What it does
 
-Four patches to `Select_Game()` in the RA95.EXE binary:
+The mission mode applies the default Wine gameplay capture patch set:
 
 | Patch | Effect |
 |-------|--------|
-| `esi=4` → `esi=1` | Forces `selection=SEL_START_NEW_GAME` — enters new-game handler, skips Main_Menu |
-| NOP `je` to Fetch_Difficulty | Always sets DIFF_NORMAL — no difficulty dialog |
-| `jne` → `jmp` to Choose_Side | Skips faction dialog — Choose_Side just plays a movie (already NOPed by vqa-skip) |
-| NOP `jne` to Soviet string | Always picks SCG01EA.INI (already patched to target by ra-scenario-patch) |
+| `focus-wait-skip` | Skips headless Wine focus wait branches |
+| `vqa-skip` / `briefing-skip` | Skips movie and text briefing blockers |
+| `cd-label` / `scenario` | Selects the effective side and target scenario string |
+| `autostart` | Forces normal single-player mission startup, skips difficulty/faction dialogs, and loads the chosen scenario |
+| `random-seed` | Uses a fixed gameplay seed unless disabled |
 
 ### Mission naming
 
@@ -626,4 +628,3 @@ git pull origin master
 git branch -d <name>
 git push origin --delete <name>
 ```
-

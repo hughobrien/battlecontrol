@@ -16,22 +16,58 @@ import argparse
 import sys
 import pathlib
 import json
+import os
+import re
+import shutil
+import subprocess
 import time
 import socket
+import hashlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from drivers import WineCapture, NativeCapture, WasmCapture
+from drivers import WineCapture, NativeCapture, MingwCapture, WasmCapture
+from drivers.wine import parse_wine_state_line
 from drivers.compare import full_report
-from drivers.common import sweep_state
+from drivers.common import (
+    check_tmp_free_space,
+    classify_ra_screen,
+    PreflightError,
+    RA_SCREEN_IMPOSSIBLE_STATES,
+    require_capture_tools,
+    screenshot_ok,
+    sweep_state,
+    tactical_nonblack_fraction,
+)
 
 SCENARIO_MAP = {
     "allied-l1": "SCG01EA",
     "allied-l2": "SCG02EA",
     "allied-l3": "SCG03EA",
+    "allied-l4": "SCG04EA",
+    "allied-l5": "SCG05EA",
     "soviet-l1": "SCU01EA",
     "soviet-l2": "SCU02EA",
     "soviet-l3": "SCU03EA",
+    "soviet-l4": "SCU04EA",
+    "soviet-l5": "SCU05EA",
 }
+
+SESSION_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-(mission|vqa|title|menu)-"
+)
+DEFAULT_RA_RANDOM_SEED = "0x1eed5eed"
+
+
+def wine_capture_problem(path: pathlib.Path, min_tactical: float) -> str | None:
+    tactical_fill = tactical_nonblack_fraction(str(path))
+    if tactical_fill < min_tactical:
+        return f"blank tactical viewport (tactical nonblack={tactical_fill:.3f})"
+    if not screenshot_ok(str(path)):
+        return "invalid screenshot"
+    screen = classify_ra_screen(str(path))
+    if screen["state"] in RA_SCREEN_IMPOSSIBLE_STATES:
+        return f"invalid screen state {screen['state']}"
+    return None
 
 
 def resolve_scenario(id: str) -> str:
@@ -40,8 +76,156 @@ def resolve_scenario(id: str) -> str:
     if id in SCENARIO_MAP:
         return SCENARIO_MAP[id]
     raise ValueError(
-        f"unknown mission: {id} (try allied-l1, allied-l2, allied-l3, soviet-l1)"
+        f"unknown mission: {id} (try allied-l1..allied-l5 or soviet-l1..soviet-l5)"
     )
+
+
+def apply_default_mission_seed(capture_type: str) -> str | None:
+    if capture_type != "mission":
+        return None
+    seed = os.environ.get("RA_RANDOM_SEED")
+    if seed:
+        return seed
+    os.environ["RA_RANDOM_SEED"] = DEFAULT_RA_RANDOM_SEED
+    return DEFAULT_RA_RANDOM_SEED
+
+
+def nix_build_package(attr: str) -> str:
+    nix = os.environ.get("NIX_BIN", "/nix/var/nix/profiles/default/bin/nix")
+    r = subprocess.run(
+        [nix, "build", f".#{attr}", "--impure", "--print-out-paths"],
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"nix build .#{attr} failed (rc={r.returncode}): {r.stderr.strip()}"
+        )
+    return r.stdout.strip()
+
+
+def mission_data_dir(scenario: str, target: str) -> str | None:
+    if not scenario:
+        return None
+    is_soviet = scenario.upper().startswith("SCU")
+    if is_soviet:
+        override = os.environ.get("RA_SOVIET_ASSETS")
+        if override:
+            return override
+        return nix_build_package("ra-data-soviet")
+    if target == "wine":
+        return (
+            os.environ.get("WINE_DATA_DIR")
+            or os.environ.get("DATA_DIR")
+            or os.environ.get("RA_ASSETS")
+        )
+    return os.environ.get("DATA_DIR") or os.environ.get("RA_ASSETS")
+
+
+def prune_old_sessions(
+    output_root: pathlib.Path, keep: int, current: pathlib.Path
+) -> int:
+    if keep <= 0:
+        return 0
+    sessions = [
+        path
+        for path in output_root.iterdir()
+        if path.is_dir() and SESSION_RE.match(path.name)
+    ]
+    sessions.sort(key=lambda path: (path.stat().st_mtime, path.name), reverse=True)
+
+    removed = 0
+    for path in sessions[keep:]:
+        if path == current:
+            continue
+        shutil.rmtree(path)
+        removed += 1
+    return removed
+
+
+CAPTURE_ENV_KEYS = [
+    "RA_CAPTURE_FPS",
+    "WINE_FRAMEPROBE",
+    "WINE_FRAMEPROBE_STRICT",
+    "WINE_FRAME_ADDR",
+    "RA_SYNC_NATIVE_TO_WINE_FRAME",
+    "WINE_FRAMEPROBE_BACKEND",
+    "WINE_BIN",
+    "WINE_DATA_DIR",
+    "RA_SOVIET_ASSETS",
+    "DATA_DIR",
+    "RA_ASSETS",
+    "RA_RANDOM_SEED",
+    "WINE_BOOT_DISMISS",
+    "WINE_MENU_DRIVE",
+]
+
+
+def sha256_file(path: pathlib.Path) -> str | None:
+    try:
+        h = hashlib.sha256()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def file_metadata(path: str | None) -> dict:
+    if not path:
+        return {"path": None, "exists": False}
+    p = pathlib.Path(path)
+    data = {"path": str(p), "exists": p.exists()}
+    if p.exists() and p.is_file():
+        stat = p.stat()
+        data.update(
+            {
+                "size": stat.st_size,
+                "mtime": int(stat.st_mtime),
+                "sha256": sha256_file(p),
+            }
+        )
+    return data
+
+
+def default_native_ra_path() -> str:
+    for candidate in ("build/ra/redalert", "build/ra"):
+        if pathlib.Path(candidate).is_file():
+            return candidate
+    return "build/ra/redalert"
+
+
+def git_value(args: list[str]) -> str | None:
+    try:
+        r = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return None
+    if r.returncode != 0:
+        return None
+    return r.stdout.strip()
+
+
+def capture_environment_metadata(targets: list[str]) -> dict:
+    return {
+        "env": {key: os.environ.get(key) for key in CAPTURE_ENV_KEYS},
+        "git_commit": git_value(["rev-parse", "HEAD"]),
+        "git_dirty": bool(git_value(["status", "--porcelain"])),
+        "tools": {
+            "wine": file_metadata(os.environ.get("WINE_BIN") or shutil.which("wine")),
+            "native_ra": file_metadata(
+                os.environ.get("RA_BIN") or default_native_ra_path()
+            ),
+            "nix": file_metadata(os.environ.get("NIX_BIN") or shutil.which("nix")),
+        },
+        "targets": targets,
+    }
 
 
 def main():
@@ -56,7 +240,7 @@ def main():
     ap.add_argument(
         "--targets",
         default="wine,native",
-        help="comma-separated targets: wine,native,wasm,all",
+        help="comma-separated targets: wine,native,wasm,mingw,all",
     )
     ap.add_argument(
         "--output", default="/tmp/battlecontrol", help="output root directory"
@@ -67,21 +251,47 @@ def main():
         default=0.90,
         help="SSIM pass threshold (default: 0.90)",
     )
+    ap.add_argument(
+        "--keep",
+        type=int,
+        default=None,
+        help="capture sessions to keep under --output (default: RA_KEEP_CAPTURE_SESSIONS or 5)",
+    )
+    ap.add_argument(
+        "--state-only",
+        action="store_true",
+        help="for mission --targets wine, dump Wine state and exit without capture/comparison",
+    )
     args = ap.parse_args()
 
     try:
         return _run(args)
-    finally:
-        # Backstop cleanup: per-driver _cleanup handles the happy path, but
-        # an exception above (e.g. driver init failure) skips it. sweep_state
-        # is idempotent and only nukes per-run artefacts we know we own.
-        sweep_state(verbose=False)
+    except PreflightError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
 
 
 def _run(args):
     targets = args.targets.split(",")
     if "all" in targets:
         targets = ["wine", "native", "wasm"]
+    for target in targets:
+        if target not in ("wine", "native", "wasm", "mingw"):
+            raise ValueError(
+                f"unknown target: {target} (allowed: wine, native, wasm, mingw)"
+            )
+    if args.state_only:
+        if args.type != "mission":
+            raise ValueError("--state-only is only supported for mission captures")
+        if targets != ["wine"]:
+            raise ValueError("--state-only requires --targets wine")
+    if args.type == "mission" and ("wine" in targets or "native" in targets):
+        os.environ.setdefault("RA_CAPTURE_FPS", "10")
+    random_seed = apply_default_mission_seed(args.type)
+
+    sweep_state()
+    check_tmp_free_space("/tmp")
+    require_capture_tools(targets)
 
     output_root = pathlib.Path(args.output)
     manifest = {
@@ -89,12 +299,17 @@ def _run(args):
         "id": args.id,
         "frame": args.frame,
         "targets": targets,
+        "state_only": bool(args.state_only),
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "capture_environment": capture_environment_metadata(targets),
     }
+    if random_seed is not None:
+        manifest["random_seed"] = int(random_seed, 0)
 
     if args.type == "mission":
         scenario = resolve_scenario(args.id)
         manifest["scenario"] = f"{scenario}.INI"
+        manifest["data"] = {}
     else:
         scenario = None
         manifest["vqa_stem"] = args.id
@@ -124,26 +339,243 @@ def _run(args):
     with open(checkpoint_dir / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 
+    def write_manifest():
+        with open(checkpoint_dir / "manifest.json", "w") as f:
+            json.dump(manifest, f, indent=2)
+
+    def read_kv_file(path: pathlib.Path) -> dict:
+        values = {}
+        if not path.exists():
+            return values
+        for line in path.read_text().splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value
+        return values
+
+    def read_state_file(path: pathlib.Path) -> dict:
+        if not path.exists():
+            return {}
+        for line in path.read_text().splitlines():
+            values = parse_wine_state_line(line)
+            if values:
+                return values
+        return {}
+
+    def summarize_timeline(path: pathlib.Path) -> dict:
+        if not path.exists():
+            return {
+                "path": str(path),
+                "status": "missing",
+                "states": [],
+                "last_state": "unknown",
+                "ever_gameplay": None,
+            }
+        try:
+            timeline = json.loads(path.read_text())
+        except Exception as exc:
+            return {
+                "path": str(path),
+                "status": "malformed",
+                "states": [],
+                "last_state": "unknown",
+                "ever_gameplay": None,
+                "error": str(exc),
+            }
+        entries = timeline.get("entries", [])
+        states = [entry.get("state", "unknown") for entry in entries]
+        return {
+            "path": str(path),
+            "status": "ok",
+            "states": states,
+            "last_state": states[-1] if states else "unknown",
+            "ever_gameplay": "gameplay" in states,
+        }
+
+    def preserve_wine_retry_artifacts(retry: int) -> None:
+        retry_dir = checkpoint_dir / f"wine-invalid-{retry}-timeline"
+        timeline = checkpoint_dir / "wine-screen-timeline.json"
+        screenshots = sorted(checkpoint_dir.glob("wine-screen-*.png"))
+        if not timeline.exists() and not screenshots:
+            return
+        retry_dir.mkdir()
+        if timeline.exists():
+            timeline.rename(retry_dir / timeline.name)
+        for path in screenshots:
+            path.rename(retry_dir / path.name)
+
+    def record_failure(target: str, exc: Exception):
+        failure = {
+            "error": str(exc),
+            "log": str(checkpoint_dir / f"{target}-driver.log"),
+        }
+        frame_file = checkpoint_dir / f"{target}-frame.txt"
+        if frame_file.exists():
+            failure["frame"] = read_kv_file(frame_file)
+        state_file = checkpoint_dir / f"{target}-state.txt"
+        if state_file.exists():
+            failure["state"] = read_state_file(state_file)
+        screen_file = checkpoint_dir / f"{target}-screen.json"
+        if screen_file.exists():
+            failure["screen"] = json.loads(screen_file.read_text())
+        candidates_file = checkpoint_dir / f"{target}-frame-candidates.json"
+        if candidates_file.exists():
+            failure["frame_candidates"] = json.loads(candidates_file.read_text())
+        state_json = checkpoint_dir / f"{target}-state.json"
+        if state_json.exists():
+            failure["state_json"] = json.loads(state_json.read_text())
+        timeline = summarize_timeline(checkpoint_dir / f"{target}-screen-timeline.json")
+        failure["screen_timeline"] = timeline
+        manifest.setdefault("failures", {})[target] = failure
+        write_manifest()
+        print(f"  FAIL {target}: {exc}")
+        if "screen" in failure:
+            print(f"  Screen classified as: {failure['screen']['state']}")
+        if "state_json" in failure:
+            state_json = failure["state_json"]
+            if isinstance(state_json, dict) and state_json.get("status"):
+                detail = state_json.get("detail") or ""
+                print(f"  State classified as: {state_json['status']} {detail}")
+        if "screen_timeline" in failure:
+            timeline = failure["screen_timeline"]
+            states = " -> ".join(timeline["states"]) if timeline["states"] else "<none>"
+            print(
+                "  Screen timeline: "
+                f"{states} "
+                f"(status={timeline['status']}, "
+                f"ever_gameplay={timeline['ever_gameplay']}, "
+                f"path={timeline['path']})"
+            )
+        print(f"  Session dir: {checkpoint_dir}")
+
     captures = {}
+    effective_frames = {}
+    seed_file = checkpoint_dir / "RA_RANDOM_SEED.txt"
+    if args.state_only:
+        log_path = checkpoint_dir / "wine-driver.log"
+        with open(log_path, "w") as logfile:
+            try:
+                data_dir = mission_data_dir(scenario, "wine")
+                if data_dir:
+                    manifest["data"]["wine"] = data_dir
+                    write_manifest()
+                driver = WineCapture(data_dir=data_dir)
+                state = driver.capture_mission_state(scenario, checkpoint_dir, logfile)
+                manifest["wine_state"] = state
+                timeline = summarize_timeline(
+                    checkpoint_dir / "wine-screen-timeline.json"
+                )
+                if timeline["status"] != "missing":
+                    manifest.setdefault("screen_timelines", {})["wine"] = timeline
+                write_manifest()
+                print(f"  OK wine state: {checkpoint_dir / 'wine-state.txt'}")
+                print(f"  State: {state}")
+                print(f"\nSession dir: {checkpoint_dir}")
+                return 0
+            except Exception as exc:
+                record_failure("wine", exc)
+                return 1
     for target in targets:
-        if target not in ("wine", "native", "wasm"):
-            raise ValueError(f"unknown target: {target} (allowed: wine, native, wasm)")
         target_dir = checkpoint_dir
         log_path = checkpoint_dir / f"{target}-driver.log"
         logfile = open(log_path, "w")
         try:
             if target == "wine":
-                driver = WineCapture()
+                data_dir = mission_data_dir(scenario, "wine")
+                if data_dir:
+                    manifest["data"]["wine"] = data_dir
+                    write_manifest()
+                driver = WineCapture(data_dir=data_dir)
                 if args.type == "mission":
                     result = driver.capture_mission(
                         scenario, args.frame, target_dir, logfile
                     )
+                    min_tactical = float(
+                        os.environ.get("RA_MIN_TACTICAL_NONBLACK", "0.20")
+                    )
+                    max_retries = int(os.environ.get("WINE_GAMEPLAY_RETRIES", "4"), 0)
+                    retry = 0
+                    problem = wine_capture_problem(result, min_tactical)
+                    while problem and retry < max_retries:
+                        retry += 1
+                        invalid_path = checkpoint_dir / f"wine-invalid-{retry}.png"
+                        result.rename(invalid_path)
+                        preserve_wine_retry_artifacts(retry)
+                        print(
+                            f"  NOTE Wine capture was invalid ({problem}); "
+                            f"retrying gameplay capture ({retry}/{max_retries})"
+                        )
+                        result = driver.capture_mission(
+                            scenario, args.frame, target_dir, logfile
+                        )
+                        problem = wine_capture_problem(result, min_tactical)
+                    tactical_fill = tactical_nonblack_fraction(str(result))
+                    valid_screenshot = screenshot_ok(str(result))
+                    screen = classify_ra_screen(str(result))
+                    if problem:
+                        raise RuntimeError(
+                            "Wine capture did not enter gameplay "
+                            f"(tactical nonblack={tactical_fill:.3f}, "
+                            f"screenshot_ok={int(valid_screenshot)}, "
+                            f"screen={screen['state']})"
+                        )
+                    effective_frames[target] = args.frame
+                    wine_frame = checkpoint_dir / "wine-frame.txt"
+                    if wine_frame.exists():
+                        values = {}
+                        for line in wine_frame.read_text().splitlines():
+                            if "=" in line:
+                                key, value = line.split("=", 1)
+                                values[key] = value
+                        if "actual" in values:
+                            effective_frames[target] = int(values["actual"], 0)
                 else:
                     result = driver.capture_vqa(
                         args.id, args.frame, target_dir, logfile
                     )
             elif target == "native":
-                driver = NativeCapture()
+                capture_frame = args.frame
+                wine_frame = checkpoint_dir / "wine-frame.txt"
+                if (
+                    args.type == "mission"
+                    and wine_frame.exists()
+                    and os.environ.get("RA_SYNC_NATIVE_TO_WINE_FRAME", "0")
+                    not in ("", "0")
+                ):
+                    values = {}
+                    for line in wine_frame.read_text().splitlines():
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            values[key] = value
+                    reason = values.get("reason", "")
+                    actual = int(values.get("actual", args.frame), 0)
+                    if reason == "target" and actual > 0:
+                        capture_frame = actual
+                        print(
+                            f"  NOTE native frame synced to Wine actual={actual} "
+                            f"(requested {args.frame})"
+                        )
+                    elif reason:
+                        raise RuntimeError(
+                            "Wine frameprobe did not reach requested target "
+                            f"(requested={args.frame}, actual={actual}, reason={reason})"
+                        )
+                effective_frames[target] = capture_frame
+                data_dir = mission_data_dir(scenario, "native")
+                if data_dir:
+                    manifest["data"]["native"] = data_dir
+                    write_manifest()
+                driver = NativeCapture(data_dir=data_dir)
+                result = driver.capture_mission(
+                    scenario, capture_frame, target_dir, logfile
+                )
+            elif target == "mingw":
+                effective_frames[target] = args.frame
+                data_dir = mission_data_dir(scenario, "mingw")
+                if data_dir:
+                    manifest["data"]["mingw"] = data_dir
+                    write_manifest()
+                driver = MingwCapture(data_dir=data_dir)
                 result = driver.capture_mission(
                     scenario, args.frame, target_dir, logfile
                 )
@@ -152,7 +584,18 @@ def _run(args):
                 result = driver.capture_mission(
                     scenario, args.frame, target_dir, logfile
                 )
+                effective_frames[target] = args.frame
             captures[target] = str(result)
+            if target == "wine" and "RA_RANDOM_SEED" in os.environ:
+                seed_file.write_text(f"{os.environ['RA_RANDOM_SEED']}\n")
+                manifest["random_seed"] = int(os.environ["RA_RANDOM_SEED"], 0)
+            if target == "native" and seed_file.exists():
+                manifest["random_seed"] = int(seed_file.read_text().strip(), 0)
+            timeline = summarize_timeline(
+                checkpoint_dir / f"{target}-screen-timeline.json"
+            )
+            if timeline["status"] != "missing":
+                manifest.setdefault("screen_timelines", {})[target] = timeline
             sz = result.stat().st_size if result.exists() else 0
             if result and result.exists():
                 flat_path = checkpoint_dir / f"{target}.png"
@@ -160,30 +603,94 @@ def _run(args):
                 captures[target] = str(flat_path)
                 sz = flat_path.stat().st_size
             print(f"  OK {target}: {captures[target]} ({sz} bytes)")
+        except Exception as exc:
+            record_failure(target, exc)
+            raise
         finally:
             logfile.close()
 
-    if len(captures) >= 2:
-        report = full_report(captures, str(checkpoint_dir), args.threshold_ssim)
-        print(f"\n=== Comparison: {report['summary']} ===")
-        for r in report["pairs"]:
-            status = "PASS" if r["passed"] else "FAIL"
-            print(f"  {r['pair']}: SSIM={r['ssim']:.4f} p99={r['p99']:.1f} [{status}]")
-        # Promote diffs from diff/ subdir to session dir
+    def _remove_old_diffs():
+        for old in checkpoint_dir.glob("diff-*.png"):
+            old.unlink()
         diff_dir = checkpoint_dir / "diff"
         if diff_dir.exists():
             for f in diff_dir.iterdir():
-                f.rename(checkpoint_dir / f.name)
+                f.unlink()
             diff_dir.rmdir()
+
+    if len(captures) >= 2:
+        report = full_report(captures, str(checkpoint_dir), args.threshold_ssim)
+        if (
+            args.type == "mission"
+            and "wine" in captures
+            and "native" in captures
+            and effective_frames.get("wine") == 1
+            and effective_frames.get("native") == 1
+            and report["summary"] != "PASS"
+            and os.environ.get("RA_RETRY_NATIVE_FRAME2_ON_FAIL", "0") not in ("", "0")
+        ):
+            old_native = checkpoint_dir / "native.png"
+            if old_native.exists():
+                old_native.rename(checkpoint_dir / "native-frame1.png")
+            _remove_old_diffs()
+            log_path = checkpoint_dir / "native-frame2-driver.log"
+            with open(log_path, "w") as logfile:
+                print(
+                    "  NOTE retrying native at frame 2 after frame-1 comparison failed"
+                )
+                driver = NativeCapture()
+                result = driver.capture_mission(scenario, 2, checkpoint_dir, logfile)
+            flat_path = checkpoint_dir / "native.png"
+            result.rename(flat_path)
+            captures["native"] = str(flat_path)
+            effective_frames["native"] = 2
+            report = full_report(captures, str(checkpoint_dir), args.threshold_ssim)
+        print(f"\n=== Comparison: {report['summary']} ===")
+        for r in report["pairs"]:
+            status = "PASS" if r["passed"] else "FAIL"
+            p99 = r.get("p99")
+            p99_text = f"{p99:.1f}" if isinstance(p99, (int, float)) else str(p99)
+            print(f"  {r['pair']}: SSIM={r['ssim']:.4f} p99={p99_text} [{status}]")
+            worst = r.get("worst_regions") or []
+            if worst:
+                summary = ", ".join(
+                    f"{region['name']} SSIM={region['ssim']:.4f} p99={region['p99']}"
+                    for region in worst
+                )
+                print(f"    worst regions: {summary}")
+        # Promote diffs from diff/ subdir to session dir
+        diff_dir = checkpoint_dir / "diff"
+        if diff_dir.exists():
+            promoted = {}
+            for f in diff_dir.iterdir():
+                dest = checkpoint_dir / f.name
+                promoted[str(f)] = str(dest)
+                f.rename(dest)
+            diff_dir.rmdir()
+            if promoted:
+
+                def promote_paths(value):
+                    if isinstance(value, dict):
+                        return {key: promote_paths(item) for key, item in value.items()}
+                    if isinstance(value, list):
+                        return [promote_paths(item) for item in value]
+                    if isinstance(value, str):
+                        return promoted.get(value, value)
+                    return value
+
+                report = promote_paths(report)
+                with open(checkpoint_dir / "report.json", "w") as f:
+                    json.dump(report, f, indent=2)
     elif len(captures) == 1:
         print("\n(one target — no comparison)")
     else:
         print("\nFAIL: no captures produced")
         sys.exit(1)
 
-    with open(checkpoint_dir / "manifest.json", "w") as f:
-        manifest["captures"] = captures
-        json.dump(manifest, f, indent=2)
+    manifest["captures"] = captures
+    if effective_frames:
+        manifest["effective_frames"] = effective_frames
+    write_manifest()
 
     # Start HTTP server on port 1234, restarting it if an existing instance
     # is serving the wrong directory (so the index shows every session under
@@ -234,7 +741,15 @@ def _run(args):
         print(f"  HTTP server started at http://localhost:1234/ (serving {want})")
 
     print(f"\nSession dir: {checkpoint_dir}")
+    keep_sessions = (
+        args.keep
+        if args.keep is not None
+        else int(os.environ.get("RA_KEEP_CAPTURE_SESSIONS", "5"), 0)
+    )
+    removed = prune_old_sessions(output_root, keep_sessions, checkpoint_dir)
+    if removed:
+        print(f"  Pruned {removed} old capture session(s); kept newest {keep_sessions}")
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

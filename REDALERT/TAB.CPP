@@ -105,7 +105,7 @@ void TabClass::Draw_It(bool complete)
 
 		LogicPage->Fill_Rect(0, 0, rightx, tab_height-1, BLACK);
 
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 		/*
 		** Use the new sidebar art for 640x400
 		*/
@@ -115,7 +115,7 @@ void TabClass::Draw_It(bool complete)
 #endif
 		Draw_Credits_Tab();
 		LogicPage->Draw_Line(0, tab_height-(1* RESFACTOR), rightx, tab_height-(1 * RESFACTOR), BLACK);
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 		Fancy_Text_Print(TXT_TAB_BUTTON_CONTROLS, (EVA_WIDTH/2) * RESFACTOR, 0, &MetalScheme, TBLACK, TPF_METAL12 | TPF_CENTER | TPF_USE_GRAD_PAL);
 #else
 		Fancy_Text_Print(TXT_TAB_BUTTON_CONTROLS, (EVA_WIDTH/2) * RESFACTOR, 0, &ColorRemaps[PCOLOR_GREY], TBLACK, TPF_METAL12|TPF_NOSHADOW|TPF_CENTER|TPF_BRIGHT_COLOR);
@@ -138,7 +138,7 @@ void TabClass::Draw_It(bool complete)
 
 void TabClass::Draw_Credits_Tab(void)
 {
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 	/*
 	** Use the new sidebar art for 640x400
 	*/
@@ -149,7 +149,7 @@ void TabClass::Draw_Credits_Tab(void)
 
 	if (Scen.MissionTimer.Is_Active()) {
 		bool light = ((int)Scen.MissionTimer < TICKS_PER_MINUTE * Rule.TimerWarning) || Map.FlasherTimer > 0;
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 		CC_Draw_Shape(TabShape, light ? 4 : 2, 320, 0, WINDOW_MAIN, SHAPE_NORMAL);
 #else
 		CC_Draw_Shape(TabShape, light ? 6 : 5, EVA_WIDTH * RESFACTOR, 0, WINDOW_MAIN, SHAPE_NORMAL);
@@ -170,7 +170,7 @@ void TabClass::Hilite_Tab(int tab)
 		textx = (320-(EVA_WIDTH/2)) * RESFACTOR;
 	}
 
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 	/*
 	** Use the new sidebar art for 640x400
 	*/

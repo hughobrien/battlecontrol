@@ -213,18 +213,6 @@ void FactoryClass::AI(void)
 {
 	assert(Factories.ID(this) == ID);
 
-#ifndef _MSC_VER
-	{
-		static bool first_factory_ai = true;
-		if (first_factory_ai) {
-			extern long Frame;
-			fprintf(stderr, "[TIM-298] FactoryClass::AI() first call frame=%ld factories=%d\n",
-			        Frame, Factories.Count());
-			first_factory_ai = false;
-		}
-	}
-#endif
-
 	if (!IsSuspended && (Object != NULL || SpecialItem)) {
 		for (int index = 0; index < 1; index++) {
 			if (!Has_Completed() && Graphic_Logic() ) {
@@ -255,14 +243,6 @@ void FactoryClass::AI(void)
 					Set_Rate(0);
 					House->Spend_Money(Balance);
 					Balance = 0;
-#ifndef _MSC_VER
-					{
-						extern long Frame;
-						const char * name = (Object != NULL) ? Object->Class_Of().IniName : "special";
-						fprintf(stderr, "[TIM-298] factory_completed frame=%ld product=%s house=%s\n",
-						        Frame, name, House ? House->Class->IniName : "?");
-					}
-#endif
 				}
 			}
 		}

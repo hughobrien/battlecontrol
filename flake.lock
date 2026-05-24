@@ -48,7 +48,7 @@
         "type": "github"
       }
     },
-    "redalert-iso": {
+    "redalert-allied-iso": {
       "flake": false,
       "locked": {
         "narHash": "sha256-BVcuRCmDcllmkDYY/vqOFrW2MStgW0PqYx/raYYQihw=",
@@ -60,11 +60,24 @@
         "url": "https://archive.org/download/cnc-red-alert/redalert_allied.iso"
       }
     },
+    "redalert-soviet-iso": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-ALyYo33aoERgC1/lwuee29Nijt/m/ev3wD97hIK6jIw=",
+        "type": "file",
+        "url": "https://archive.org/download/cnc-red-alert/redalert_soviets.iso"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://archive.org/download/cnc-red-alert/redalert_soviets.iso"
+      }
+    },
     "root": {
       "inputs": {
         "cnc-ddraw": "cnc-ddraw",
         "nixpkgs": "nixpkgs",
-        "redalert-iso": "redalert-iso",
+        "redalert-allied-iso": "redalert-allied-iso",
+        "redalert-soviet-iso": "redalert-soviet-iso",
         "wine-input": "wine-input"
       }
     },

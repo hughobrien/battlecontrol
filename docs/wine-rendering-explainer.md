@@ -291,29 +291,30 @@ a real video card, real keyboard focus, and an attached user clicking menu
 items. Our capture pipeline has none of those. We patch the binary to
 work around each missing piece.
 
-Patches are applied in this order. The first three are baked into the
-`.#ra-patched-exe` nix derivation (`nocd + ddscl + cdlabel`); the rest are
-applied at runtime by `scripts/drivers/wine.py` for each capture session.
+Patches are applied by the unified `scripts/ra/patch_ra95.py` patcher. The base
+mode applies the durable Wine setup patches; mission mode applies the capture
+patches for one scenario. The old standalone RA patch scripts have been removed;
+new capture code must use patch ids through the unified patcher.
 
-| Patch | What it does | Why we need it |
+| Patch id | What it does | Why we need it |
 |---|---|---|
-| `ra-nocd-patch.py` | NOPs the `GetDriveType` CD-ROM check at game startup | We have no physical CD in the drive |
-| `ra-ddscl-patch.py` | Flips `DDSCL_EXCLUSIVE\|FULLSCREEN` to `DDSCL_NORMAL` at the two `SetCooperativeLevel` call sites | Forces a windowed surface so we get an X11 window we can capture from |
-| cdlabel (1-byte poke at file offset `0x1BFCB7`) | Zeros the first byte of the "CD1" volume-label string | Wine's empty-volume-label match against an empty CIFS mount only succeeds if the string we're matching against is also short |
-| `ra-focus-skip-patch.py` | NOPs three `while (!GameInFocus) {}` spinloops | Without a real WM session, `WM_ACTIVATEAPP(1)` is never delivered, so the spinloops run forever |
-| `ra-game-in-focus-patch.py` | Detour that pins the `GameInFocus` global to 1 at game-init entry | Same reason — belt-and-suspenders so anything else that consults that variable also sees "focused" |
-| `ra-vqa-skip-patch.py` | Replaces the first byte of `Play_Movie` with `RET` so it returns immediately | The VQA player blocks on audio-clock sync; with no real audio device under Wine, it hangs |
-| `ra-scenario-patch.py` | Replaces hardcoded scenario string (e.g. `SCG01EA` → `SCG02EA`) | Lets us pick which mission auto-launches without going through menus |
-| `ra-autostart-patch.py` | Four `Select_Game()` patches that skip the main-menu / difficulty / faction dialogs entirely | Zero-click boot directly into the chosen mission |
+| `nocd` | NOPs the `GetDriveType` CD-ROM check at game startup | We have no physical CD in the drive |
+| `ddscl-normal` | Flips `DDSCL_EXCLUSIVE\|FULLSCREEN` to `DDSCL_NORMAL` at the two `SetCooperativeLevel` call sites | Forces a windowed surface so we get an X11 window we can capture from |
+| `cd-label` | Selects the effective Allied/Soviet disc label bytes | Wine's empty-volume-label match against an empty CIFS mount only succeeds if the string we're matching against is also short |
+| `focus-wait-skip` | NOPs three focus wait branches | Without a real WM session, `WM_ACTIVATEAPP(1)` is never delivered, so the waits run forever |
+| `vqa-skip` | Replaces the first byte of `Play_Movie` with `RET` so it returns immediately | The VQA player blocks on audio-clock sync; with no real audio device under Wine, it hangs |
+| `briefing-skip` | NOPs the text briefing `Restate_Mission` call | Missions without briefing VQAs otherwise block on a dialog before gameplay capture |
+| `scenario` | Replaces hardcoded scenario strings (e.g. `SCG01EA` → `SCG02EA`) | Lets us pick which mission auto-launches without going through menus |
+| `autostart` | Applies the `Select_Game()` and related startup patches that skip the main-menu / difficulty / faction dialogs | Zero-click boot directly into the chosen mission |
+| `random-seed` | Replaces the startup random seed with a fixed value | Keeps Wine/native/WASM gameplay state deterministic for parity captures |
+| `game-in-focus` | Quarantined: old patch path for a write now known to behave as `Session.Type`, not `GameInFocus` | Must not be used for normal captures; the unified patch id is registered only for history/manifest clarity and is intentionally non-applicable |
 
-Each patch has SHA-256 input/output hashes hard-coded as a sanity guard.
-If you ever touch any patch in the chain, the downstream patches' accepted
-SHAs need to be updated — walk the chain with `sha256sum` after each step,
-update the next script's `ACCEPTED_SHA256` set.
+The unified patcher verifies each edit site before writing, records manifests,
+and marks diagnostic or quarantined patch ids behind explicit allow flags.
 
-### Why `ra-ddscl-patch.py` *only* touches the cooperative-level bytes
+### Why `ddscl-normal` *only* touches the cooperative-level bytes
 
-Earlier revisions of `ra-ddscl-patch.py` also stubbed
+Earlier revisions of the DirectDraw cooperative-level patch also stubbed
 `SetDisplayMode(640,480,8)` to fake-return DD_OK without calling through.
 That was correct for the wined3d path (Wine forwards `SetDisplayMode` to
 `NtUserChangeDisplaySettings`, which Xvfb refuses, which the game treats
@@ -353,9 +354,8 @@ Wine created the window via winex11.drv, but the game never drew into it.
   `ddraw=n` and that `ddraw.dll` is in the staging directory.
 - **Suspect 2:** The game crashed during init. Check `wine.log` for an
   "Application Error" or `unhandled exception`.
-- **Suspect 3:** A `while (!GameInFocus)` spinloop wasn't patched. Check
-  the focus-skip and game-in-focus patches both ran (script output, or
-  re-run with `--dry-run` against the staged EXE).
+- **Suspect 3:** A focus wait branch wasn't patched. Check that
+  `focus-wait-skip` ran in the patch manifest.
 
 ### "Window appears, half-width content, palette mangled"
 
@@ -368,8 +368,8 @@ look like green/magenta noise but with recognisable shapes.
   ends up reinterpreted under a wrong palette.
 - **Fix:** check the bytes at file offset `0x1a4a69` in the staged
   `RA95.EXE`. Should be `ff 53 54` (the original `call [ebx+0x54]`). If
-  they're `31 c0 90` (`xor eax,eax; nop`), an old version of
-  `ra-ddscl-patch.py` has been re-introduced.
+  they're `31 c0 90` (`xor eax,eax; nop`), an obsolete SetDisplayMode stub has
+  been re-introduced outside the unified `ddscl-normal` patch.
 
 ### "Window appears, content rendered, but every other row is black"
 

@@ -1,0 +1,242 @@
+diff -ruN -U0 a/inc/screenshot.h b/inc/screenshot.h
+--- a/inc/screenshot.h
++++ b/inc/screenshot.h
+@@ -8,0 +9 @@
++BOOL ss_take_screenshot_file(struct IDirectDrawSurfaceImpl* src, const char* filename);
+diff -ruN -U0 a/src/screenshot.c b/src/screenshot.c
+--- a/src/screenshot.c
++++ b/src/screenshot.c
+@@ -126,0 +127,37 @@
++BOOL ss_take_screenshot_file(IDirectDrawSurfaceImpl* src, const char* filename)
++{
++    if (!src || !dds_GetBuffer(src) || !src->width || !src->height)
++        return FALSE;
++
++    if (!filename || !filename[0])
++        return FALSE;
++
++    if (src->bpp == 8 && src->palette)
++    {
++        if (!ss_screenshot_8bit((char*)filename, src))
++        {
++            memcpy(&src->bmi->bmiColors[0], src->palette->data_rgb, 256 * sizeof(int));
++
++            return ss_screenshot_bmp((char*)filename, src);
++        }
++
++        return TRUE;
++    }
++    else if (src->bpp == 16)
++    {
++        if (!ss_screenshot_16bit((char*)filename, src))
++            return ss_screenshot_bmp((char*)filename, src);
++
++        return TRUE;
++    }
++    else if (src->bpp == 32)
++    {
++        if (!ss_screenshot_32bit((char*)filename, src))
++            return ss_screenshot_bmp((char*)filename, src);
++
++        return TRUE;
++    }
++
++    return FALSE;
++}
++
+diff -ruN -U0 a/src/render_gdi.c b/src/render_gdi.c
+--- a/src/render_gdi.c
++++ b/src/render_gdi.c
+@@ -11,0 +12 @@
++#include "screenshot.h"
+@@ -13,0 +15,185 @@
++static BOOL bc_capture_env_loaded = FALSE;
++static BOOL bc_capture_enabled = FALSE;
++static BOOL bc_capture_halt = FALSE;
++static BOOL bc_capture_sequence = FALSE;
++static BOOL bc_capture_use_ra_clock = FALSE;
++static LONG bc_capture_render_count = 0;
++static LONG bc_capture_start = 0;
++static LONG bc_capture_count = 1;
++static LONG bc_capture_last = 0;
++static LONG bc_capture_last_key = -1;
++static LONG bc_capture_written_count = 0;
++static LONG bc_capture_done = FALSE;
++static DWORD bc_capture_ra_frame_addr = 0;
++static BOOL bc_capture_log_candidates = FALSE;
++static char bc_capture_file[MAX_PATH * 4];
++static char bc_capture_dir[MAX_PATH * 4];
++
++static void bc_capture_load_env(void)
++{
++    char value[64];
++    DWORD len;
++
++    if (bc_capture_env_loaded)
++        return;
++
++    bc_capture_env_loaded = TRUE;
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_START", value, sizeof(value));
++    if (len > 0 && len < sizeof(value))
++        bc_capture_start = strtol(value, NULL, 10);
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_RA_START", value, sizeof(value));
++    if (len > 0 && len < sizeof(value))
++    {
++        bc_capture_start = strtol(value, NULL, 10);
++        bc_capture_use_ra_clock = TRUE;
++    }
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_FLIP", value, sizeof(value));
++    if (bc_capture_start <= 0 && len > 0 && len < sizeof(value))
++        bc_capture_start = strtol(value, NULL, 10);
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_COUNT", value, sizeof(value));
++    if (len > 0 && len < sizeof(value))
++        bc_capture_count = strtol(value, NULL, 10);
++    if (bc_capture_count <= 0)
++        bc_capture_count = 1;
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_FILE", bc_capture_file, sizeof(bc_capture_file));
++    if (len == 0 || len >= sizeof(bc_capture_file))
++        bc_capture_file[0] = '\0';
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_DIR", bc_capture_dir, sizeof(bc_capture_dir));
++    if (len == 0 || len >= sizeof(bc_capture_dir))
++        bc_capture_dir[0] = '\0';
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_HALT", value, sizeof(value));
++    if (len > 0 && len < sizeof(value) && strcmp(value, "0") != 0)
++        bc_capture_halt = TRUE;
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_RA_FRAME_ADDR", value, sizeof(value));
++    if (len > 0 && len < sizeof(value))
++        bc_capture_ra_frame_addr = strtoul(value, NULL, 0);
++
++    len = GetEnvironmentVariableA("BC_CAPTURE_LOG_CANDIDATES", value, sizeof(value));
++    if (len > 0 && len < sizeof(value) && strcmp(value, "0") != 0)
++        bc_capture_log_candidates = TRUE;
++
++    bc_capture_sequence = bc_capture_count > 1 && bc_capture_dir[0];
++    bc_capture_enabled =
++        bc_capture_start > 0 &&
++        ((bc_capture_sequence && bc_capture_dir[0]) || bc_capture_file[0]);
++    bc_capture_last = bc_capture_start + bc_capture_count - 1;
++
++    if (bc_capture_sequence)
++        CreateDirectoryA(bc_capture_dir, NULL);
++
++    if (bc_capture_enabled)
++    {
++        fprintf(
++            stderr,
++            "bc-capture: armed start=%ld count=%ld clock=%s file=%s dir=%s halt=%d ra_frame_addr=0x%08lx candidates=%d\n",
++            bc_capture_start,
++            bc_capture_count,
++            bc_capture_use_ra_clock ? "ra" : "render",
++            bc_capture_file,
++            bc_capture_dir,
++            bc_capture_halt,
++            bc_capture_ra_frame_addr,
++            bc_capture_log_candidates);
++        fflush(stderr);
++    }
++}
++
++static LONG bc_capture_ra_frame(void)
++{
++    if (!bc_capture_ra_frame_addr)
++        return -1;
++    return *(volatile LONG*)bc_capture_ra_frame_addr;
++}
++
++static void bc_capture_log_candidate_snapshot(LONG key)
++{
++    static const DWORD candidates[] = {
++        0x00642080, 0x0066B68C, 0x006544C8, 0x00655D18,
++        0x005EC258, 0x0068DEA0, 0x0069720C, 0x0069C41C,
++        0x0069C468, 0x0069C488, 0x005F166C, 0x006D7344
++    };
++    unsigned i;
++    if (!bc_capture_log_candidates)
++        return;
++    fprintf(stderr, "bc-capture-candidates: key=%ld", key);
++    for (i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i)
++    {
++        LONG value = *(volatile LONG*)candidates[i];
++        fprintf(stderr, " cand_%08lx=%ld", (unsigned long)candidates[i], value);
++    }
++    fprintf(stderr, "\n");
++    fflush(stderr);
++}
++
++static void bc_capture_path_for_frame(LONG frame, char* path, size_t path_size)
++{
++    if (bc_capture_sequence)
++    {
++        _snprintf(path, path_size - 1, "%s\\frame_%06ld.png", bc_capture_dir, frame);
++        path[path_size - 1] = '\0';
++        return;
++    }
++
++    strncpy(path, bc_capture_file, path_size - 1);
++    path[path_size - 1] = '\0';
++}
++
++static void bc_capture_render_frame(IDirectDrawSurfaceImpl* src)
++{
++    LONG frame;
++    LONG ra_frame;
++    LONG key;
++    BOOL ok;
++    DWORD tick;
++    char path[MAX_PATH * 4];
++
++    bc_capture_load_env();
++
++    if (!bc_capture_enabled || bc_capture_done)
++        return;
++
++    frame = InterlockedIncrement(&bc_capture_render_count);
++    ra_frame = bc_capture_ra_frame();
++    key = bc_capture_use_ra_clock ? ra_frame : frame;
++    if (key < bc_capture_start || key == bc_capture_last_key)
++        return;
++    if (!bc_capture_use_ra_clock && key > bc_capture_last)
++        return;
++    bc_capture_last_key = key;
++
++    bc_capture_path_for_frame(key, path, sizeof(path));
++    ok = ss_take_screenshot_file(src, path);
++    tick = GetTickCount();
++
++    fprintf(
++        stderr,
++        "bc-capture: render_frame=%ld ra_frame=%ld key=%ld tick=%lu file=%s result=%s\n",
++        frame,
++        ra_frame,
++        key,
++        (unsigned long)tick,
++        path,
++        ok ? "ok" : "failed");
++    fflush(stderr);
++    bc_capture_log_candidate_snapshot(key);
++    bc_capture_written_count++;
++
++    if (
++        (bc_capture_use_ra_clock && bc_capture_written_count >= bc_capture_count) ||
++        (!bc_capture_use_ra_clock && key >= bc_capture_last)
++    )
++    {
++        InterlockedExchange(&bc_capture_done, TRUE);
++        while (bc_capture_halt)
++            Sleep(100);
++    }
++}
++
+@@ -163,2 +322,4 @@
++            bc_capture_render_frame(g_ddraw.primary);
++
+             if (g_config.lock_surfaces)
+                 LeaveCriticalSection(&g_ddraw.primary->cs);

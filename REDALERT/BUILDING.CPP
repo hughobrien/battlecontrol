@@ -5550,15 +5550,6 @@ void BuildingClass::Factory_AI(void)
 		TechnoClass * product = Factory->Get_Object();
 //		FactoryClass * fact = Factory;
 
-#ifndef _MSC_VER
-		{
-			extern long Frame;
-			const char * pname = (product != NULL) ? product->Class_Of().IniName : "?";
-			fprintf(stderr, "[TIM-298] factory_exit frame=%ld bldg=%s product=%s\n",
-			        Frame, Class->IniName, pname);
-		}
-#endif
-
 		switch (Exit_Object(product)) {
 
 			/*
@@ -5662,13 +5653,6 @@ void BuildingClass::Factory_AI(void)
 					**	producing it now.
 					*/
 					if (techno != NULL) {
-#ifndef _MSC_VER
-						{
-							extern long Frame;
-							fprintf(stderr, "[TIM-298] factory_start frame=%ld bldg=%s house=%s product=%s\n",
-							        Frame, Class->IniName, House->Class->IniName, techno->IniName);
-						}
-#endif
 						Factory = new FactoryClass;
 						if (Factory.Is_Valid()) {
 							if (!Factory->Set(*techno, *House)) {

@@ -120,6 +120,474 @@ TcpipManagerClass	Winsock;
 #ifndef _MSC_VER
 #include "sdl_quit.h"
 #include <SDL2/SDL.h>  // TIM-531: SDL_PushEvent for in-game click injection
+extern "C" {
+extern int SDL_Cursor_X;
+extern int SDL_Cursor_Y;
+}
+#endif
+
+
+#ifndef _MSC_VER
+struct RA_Capture_Sequence_Config {
+	bool initialized;
+	bool enabled;
+	long start;
+	long count;
+	char dir[512];
+	char ready_path[512];
+};
+
+extern int DLLForceMouseX;
+extern int DLLForceMouseY;
+
+struct RA_Capture_Mouse_Config {
+	bool initialized;
+	bool enabled;
+	int x;
+	int y;
+};
+
+static RA_Capture_Mouse_Config & RA_Capture_Mouse(void)
+{
+	static RA_Capture_Mouse_Config config = { false, false, -1, -1 };
+
+	if (!config.initialized) {
+		const char * x_env = getenv("RA_CAPTURE_MOUSE_X");
+		const char * y_env = getenv("RA_CAPTURE_MOUSE_Y");
+		config.initialized = true;
+		config.enabled = x_env && x_env[0] && y_env && y_env[0];
+		if (config.enabled) {
+			config.x = (int)strtol(x_env, NULL, 0);
+			config.y = (int)strtol(y_env, NULL, 0);
+			fprintf(stderr, "[RA_CAPTURE_MOUSE] x=%d y=%d\n", config.x, config.y);
+			fflush(stderr);
+		}
+	}
+	return config;
+}
+
+static void RA_Apply_Capture_Mouse(void)
+{
+	RA_Capture_Mouse_Config & config = RA_Capture_Mouse();
+	if (!config.enabled) return;
+
+	DLLForceMouseX = config.x;
+	DLLForceMouseY = config.y;
+	SDL_Cursor_X = config.x;
+	SDL_Cursor_Y = config.y;
+	if (Keyboard != NULL) {
+		Keyboard->MouseQX = config.x;
+		Keyboard->MouseQY = config.y;
+	}
+}
+
+static RA_Capture_Sequence_Config & RA_Capture_Sequence(void)
+{
+	static RA_Capture_Sequence_Config config = { false, false, 0, 0, {0}, {0} };
+
+	if (!config.initialized) {
+		const char * dir = getenv("RA_CAPTURE_SEQUENCE_DIR");
+		const char * start = getenv("RA_CAPTURE_SEQUENCE_START");
+		const char * count = getenv("RA_CAPTURE_SEQUENCE_COUNT");
+		const char * ready = getenv("RA_CAPTURE_SEQUENCE_READY_FILE");
+
+		config.initialized = true;
+		config.start = (start && start[0]) ? strtol(start, NULL, 0) : -1;
+		config.count = (count && count[0]) ? strtol(count, NULL, 0) : 0;
+		config.enabled = dir && dir[0] && config.start >= 0 && config.count > 0;
+		if (config.enabled) {
+			strncpy(config.dir, dir, sizeof(config.dir) - 1);
+			config.dir[sizeof(config.dir) - 1] = '\0';
+			if (ready && ready[0]) {
+				strncpy(config.ready_path, ready, sizeof(config.ready_path) - 1);
+				config.ready_path[sizeof(config.ready_path) - 1] = '\0';
+			}
+			fprintf(stderr, "[RA_CAPTURE_SEQUENCE] dir=%s start=%ld count=%ld ready=%s\n",
+			        config.dir,
+			        config.start,
+			        config.count,
+			        config.ready_path[0] ? config.ready_path : "<none>");
+			fflush(stderr);
+		}
+	}
+	return config;
+}
+
+static bool RA_Capture_Sequence_Enabled(void)
+{
+	return RA_Capture_Sequence().enabled;
+}
+
+static void RA_Write_Capture_Ready(char const * env_name, long frame)
+{
+	const char * ready_path = getenv(env_name);
+	if (!ready_path || !ready_path[0]) return;
+
+	FILE * fp = fopen(ready_path, "w");
+	if (fp) {
+		fprintf(fp, "frame=%ld\n", frame);
+		fclose(fp);
+	}
+}
+
+static long RA_Capture_Target_Frame(void)
+{
+	static long target = -2;
+
+	if (target == -2) {
+		const char * frame_env = getenv("RA_CAPTURE_FRAME");
+		target = (frame_env && frame_env[0]) ? strtol(frame_env, NULL, 0) : -1;
+	}
+	return target;
+}
+
+static bool RA_Is_Capture_Frame(long frame)
+{
+	long target = RA_Capture_Target_Frame();
+	return target >= 0 && frame == target;
+}
+
+static void RA_Dump_Capture_Cell(FILE * fp, CELL cell)
+{
+	if (!fp) return;
+	if (cell < 0 || cell >= MAP_CELL_TOTAL) return;
+
+	CellClass const & c = Map[cell];
+	fprintf(fp,
+	        "cell id=%d x=%d y=%d mapped=%d visible=%d pmapped=%d pvisible=%d "
+	        "ttype=%d ticon=%u overlay=%d overlay_data=%u smudge=%d smudge_data=%u "
+	        "occupy=0x%02x land=%d\n",
+	        cell,
+	        Cell_X(cell),
+	        Cell_Y(cell),
+	        c.IsMapped ? 1 : 0,
+	        c.IsVisible ? 1 : 0,
+	        PlayerPtr ? (c.Is_Mapped(PlayerPtr) ? 1 : 0) : -1,
+	        PlayerPtr ? (c.Is_Visible(PlayerPtr) ? 1 : 0) : -1,
+	        (int)c.TType,
+	        (unsigned)c.TIcon,
+	        (int)c.Overlay,
+	        (unsigned)c.OverlayData,
+	        (int)c.Smudge,
+	        (unsigned)c.SmudgeData,
+	        (unsigned)c.Flag.Composite,
+	        (int)c.Land_Type());
+}
+
+static void RA_Dump_Capture_Foot(FILE * fp, char const * heap, int index, FootClass const * foot)
+{
+	if (!fp || !foot) return;
+
+	int x = -9999;
+	int y = -9999;
+	int in_view = Map.Coord_To_Pixel(foot->Center_Coord(), x, y) ? 1 : 0;
+	COORDINATE coord = foot->Center_Coord();
+	CELL cell = Coord_Cell(coord);
+	char const * name = foot->Class_Of().Name();
+	TeamClass * team = foot->Team;
+	int body_facing = (int)foot->PrimaryFacing.Current();
+	int desired_facing = (int)foot->PrimaryFacing.Desired();
+	int turret_facing = (int)foot->Turret_Facing();
+	int anim_stage = foot->Fetch_Stage();
+	int anim_rate = foot->Fetch_Rate();
+	int shape = -1;
+	if (foot->What_Am_I() == RTTI_INFANTRY) {
+		shape = ((InfantryClass const *)foot)->Shape_Number(WINDOW_MAIN);
+	} else if (foot->What_Am_I() == RTTI_UNIT) {
+		shape = ((UnitClass const *)foot)->Shape_Number();
+	}
+
+	fprintf(fp,
+	        "object heap=%s index=%d rtti=%d type=%s owner=%d mission=%d mission_name=%s "
+	        "coord=0x%08lx xlep=%d ylep=%d cell=%d cellxy=%d,%d screen=%d,%d in_view=%d "
+	        "nav=0x%08lx head=0x%08lx speed=%d team_raw=%ld team_id=%d group=%u "
+	        "path0=%d path1=%d path_threshold=%d body_facing=%d desired_facing=%d "
+	        "turret_facing=%d anim_stage=%d anim_rate=%d shape=%d\n",
+	        heap ? heap : "?",
+	        index,
+	        (int)foot->What_Am_I(),
+	        name ? name : "?",
+	        (int)foot->Owner(),
+	        (int)foot->Mission,
+	        MissionClass::Mission_Name(foot->Mission),
+	        (unsigned long)coord,
+	        (int)(short)Coord_X(coord),
+	        (int)(short)Coord_Y(coord),
+	        cell,
+	        Cell_X(cell),
+	        Cell_Y(cell),
+	        in_view ? Map.TacPixelX + x : -9999,
+	        in_view ? Map.TacPixelY + y : -9999,
+	        in_view,
+	        (unsigned long)foot->NavCom,
+	        (unsigned long)foot->Head_To_Coord(),
+	        foot->Speed,
+	        foot->Team.Raw(),
+	        team ? Teams.ID(team) : -1,
+	        (unsigned)foot->Group,
+	        (int)foot->Path[0],
+	        (int)foot->Path[1],
+	        (int)foot->PathThreshhold,
+	        body_facing,
+	        desired_facing,
+	        turret_facing,
+	        anim_stage,
+	        anim_rate,
+	        shape);
+}
+
+static void RA_Dump_Capture_Teams(FILE * fp)
+{
+	if (!fp) return;
+
+	for (int index = 0; index < Teams.Count(); index++) {
+		TeamClass const * team = Teams.Ptr(index);
+		if (!team) continue;
+
+		int mission_index = team->Debug_Current_Mission();
+		int mission_type = -9999;
+		int mission_data = -9999;
+		char const * mission_name = "?";
+		if (team->Class && mission_index >= 0 && mission_index < team->Class->MissionCount) {
+			TeamMissionClass const * mission = &team->Class->MissionList[mission_index];
+			mission_type = (int)mission->Mission;
+			mission_data = mission->Data.Value;
+			mission_name = TeamTypeClass::Name_From_Mission(mission->Mission);
+		}
+
+		fprintf(fp,
+		        "team index=%d id=%d type=%s house=%d active=%d forced=%d full=%d under=%d "
+		        "moving=%d reforming=%d lagging=%d next=%d total=%d formation=%d "
+		        "mission_index=%d mission_type=%d mission_name=%s mission_data=%d "
+		        "zone=0x%08lx zone_cell=%d closest=0x%08lx mission_target=0x%08lx target=0x%08lx "
+		        "member=0x%08lx\n",
+		        index,
+		        team->ID,
+		        (team->Class ? team->Class->IniName : "?"),
+		        team->House ? (int)team->House->Class->House : -1,
+		        team->IsActive ? 1 : 0,
+		        team->IsForcedActive ? 1 : 0,
+		        team->IsFullStrength ? 1 : 0,
+		        team->IsUnderStrength ? 1 : 0,
+		        team->IsMoving ? 1 : 0,
+		        team->IsReforming ? 1 : 0,
+		        team->IsLagging ? 1 : 0,
+		        team->IsNextMission ? 1 : 0,
+		        team->Total,
+		        (int)team->Formation,
+		        mission_index,
+		        mission_type,
+		        mission_name ? mission_name : "?",
+		        mission_data,
+		        (unsigned long)team->Zone,
+		        Target_Legal(team->Zone) ? As_Cell(team->Zone) : -1,
+		        (unsigned long)team->ClosestMember,
+		        (unsigned long)team->MissionTarget,
+		        (unsigned long)team->Target,
+		        team->Debug_First_Member() ? (unsigned long)team->Debug_First_Member()->As_Target() : 0UL);
+	}
+}
+
+static void RA_Dump_Capture_State(char const * mode, long frame)
+{
+	const char * path = getenv("RA_CAPTURE_STATE_FILE");
+	if (!path || !path[0]) return;
+
+	bool append = getenv("RA_CAPTURE_STATE_APPEND") != NULL;
+	FILE * fp = fopen(path, append ? "a" : "w");
+	if (!fp) return;
+
+	fprintf(fp,
+	        "state mode=%s frame=%ld tick=%lu game_speed=%u frame_timer=%lu "
+	        "tactical=0x%08lx tac_cell=%d tac_xy=%d,%d tac_pixel=%d,%d tac_lepton=%d,%d "
+	        "units=%d infantry=%d teams=%d\n",
+	        mode ? mode : "unknown",
+	        frame,
+	        (unsigned long)TickCount,
+	        Options.GameSpeed,
+	        (unsigned long)FrameTimer,
+	        (unsigned long)Map.TacticalCoord,
+	        Coord_Cell(Map.TacticalCoord),
+	        Coord_XCell(Map.TacticalCoord),
+	        Coord_YCell(Map.TacticalCoord),
+	        Map.TacPixelX,
+	        Map.TacPixelY,
+	        (int)Map.TacLeptonWidth,
+	        (int)Map.TacLeptonHeight,
+	        Units.Count(),
+	        Infantry.Count(),
+	        Teams.Count());
+
+	for (int index = 0; index < Units.Count(); index++) {
+		RA_Dump_Capture_Foot(fp, "units", index, Units.Ptr(index));
+	}
+	for (int index = 0; index < Infantry.Count(); index++) {
+		RA_Dump_Capture_Foot(fp, "infantry", index, Infantry.Ptr(index));
+	}
+	RA_Dump_Capture_Teams(fp);
+
+	static int const probes[][2] = {
+		{195, 40}, {203, 16}, {320, 200}, {337, 109}, {345, 120},
+		{357, 109}, {364, 79}, {384, 93}, {413, 67}, {414, 179},
+		{479, 199}
+	};
+	for (unsigned i = 0; i < sizeof(probes) / sizeof(probes[0]); i++) {
+		COORDINATE coord = Map.Pixel_To_Coord(probes[i][0], probes[i][1]);
+		CELL cell = coord ? Coord_Cell(coord) : -1;
+		fprintf(fp,
+		        "probe screen=%d,%d coord=0x%08lx cell=%d\n",
+		        probes[i][0],
+		        probes[i][1],
+		        (unsigned long)coord,
+		        cell);
+		RA_Dump_Capture_Cell(fp, cell);
+	}
+
+	fclose(fp);
+}
+
+static void RA_Log_Capture_State(char const * mode, long frame, char const * path)
+{
+	fprintf(stderr,
+	        "[RA_CAPTURE_STATE] mode=%s game_frame=%ld tick=%lu game_speed=%u frame_timer=%lu path=%s\n",
+	        mode ? mode : "unknown",
+	        frame,
+	        (unsigned long)TickCount,
+	        Options.GameSpeed,
+	        (unsigned long)FrameTimer,
+	        path ? path : "");
+	fflush(stderr);
+	RA_Dump_Capture_State(mode, frame);
+}
+
+static void RA_Capture_Sequence_Frame(long frame)
+{
+	static bool complete = false;
+	RA_Capture_Sequence_Config & config = RA_Capture_Sequence();
+
+	if (complete || !config.enabled) return;
+	if (frame < config.start || frame >= config.start + config.count) return;
+
+	char path[1024];
+	snprintf(path, sizeof(path), "%s/frame_%06ld.bmp", config.dir, frame);
+	RA_Save_Gameplay_BMP_Path((int)frame, path);
+	RA_Log_Capture_State("sequence", frame, path);
+
+	if (frame == config.start + config.count - 1) {
+		complete = true;
+		if (config.ready_path[0]) {
+			FILE * fp = fopen(config.ready_path, "w");
+			if (fp) {
+				fprintf(fp, "start=%ld\ncount=%ld\nlast=%ld\n", config.start, config.count, frame);
+				fclose(fp);
+			}
+		}
+		fprintf(stderr, "[RA_CAPTURE_SEQUENCE] complete start=%ld count=%ld last=%ld ready=%s\n",
+		        config.start,
+		        config.count,
+		        frame,
+		        config.ready_path[0] ? config.ready_path : "<none>");
+		fflush(stderr);
+	}
+}
+
+static int RA_Deterministic_Pulse_Value(long frame)
+{
+	static const int values[] = {
+		235, 215, 195, 175, 155, 135, 115, 95, 75, 55, 35, 32,
+		52, 72, 92, 112, 132, 150
+	};
+	long step = frame / (TIMER_SECOND / 6);
+	long period = (long)(sizeof(values) / sizeof(values[0]));
+	return values[step % period];
+}
+
+static void RA_Deterministic_Color_Cycle(void)
+{
+	static bool initialized = false;
+	static RGBClass cycle_base[CYCLE_COLOR_COUNT];
+
+	if (!Options.IsPaletteScroll) return;
+	if (!RA_Capture_Sequence_Enabled()) return;
+
+	if (!initialized) {
+		for (int index = 0; index < CYCLE_COLOR_COUNT; index++) {
+			cycle_base[index] = InGamePalette[CYCLE_COLOR_START + index];
+		}
+		initialized = true;
+	}
+
+	long frame = Frame < 0 ? 0 : Frame;
+	int val = RA_Deterministic_Pulse_Value(frame);
+	InGamePalette[CC_PULSE_COLOR] = GamePalette[WHITE];
+	InGamePalette[CC_PULSE_COLOR].Adjust(val, BlackColor);
+	InGamePalette[CC_EMBER_COLOR] = RGBClass(255, 80, 80);
+	InGamePalette[CC_EMBER_COLOR].Adjust(val, BlackColor);
+
+	int shift = (int)((frame / (TIMER_SECOND / 4) + 1) % CYCLE_COLOR_COUNT);
+	for (int index = 0; index < CYCLE_COLOR_COUNT; index++) {
+		int source = (index - shift + CYCLE_COLOR_COUNT) % CYCLE_COLOR_COUNT;
+		InGamePalette[CYCLE_COLOR_START + index] = cycle_base[source];
+	}
+	InGamePalette.Set();
+}
+#endif
+
+#ifndef _MSC_VER
+static bool RA_Trace_Outcomes_Enabled(void)
+{
+	static int enabled = -1;
+
+	if (enabled == -1) {
+		const char * env = getenv("RA_TRACE_OUTCOMES");
+		enabled = (env && env[0] && strcmp(env, "0") != 0) ? 1 : 0;
+	}
+	return enabled != 0;
+}
+
+static void RA_Trace_Outcome_Field(char const * field, bool from, bool to, char const * source)
+{
+	fprintf(stderr,
+	        "[RA_OUTCOME] frame=%ld scenario=%s field=%s from=%d to=%d source=%s "
+	        "PlayerWins=%d PlayerLoses=%d player_defeated=%d\n",
+	        (long)Frame,
+	        Scen.ScenarioName[0] ? Scen.ScenarioName : "<none>",
+	        field,
+	        from ? 1 : 0,
+	        to ? 1 : 0,
+	        source,
+	        PlayerWins ? 1 : 0,
+	        PlayerLoses ? 1 : 0,
+	        PlayerPtr && PlayerPtr->IsDefeated ? 1 : 0);
+	fflush(stderr);
+}
+
+static void RA_Trace_Outcome_Transitions(char const * source)
+{
+	if (!RA_Trace_Outcomes_Enabled()) return;
+
+	static bool last_wins = false;
+	static bool last_loses = false;
+	static bool last_defeated = false;
+
+	bool wins = PlayerWins;
+	bool loses = PlayerLoses;
+	bool defeated = PlayerPtr && PlayerPtr->IsDefeated;
+
+	if (last_wins != wins) {
+		RA_Trace_Outcome_Field("PlayerWins", last_wins, wins, source);
+	}
+	if (last_loses != loses) {
+		RA_Trace_Outcome_Field("PlayerLoses", last_loses, loses, source);
+	}
+	if (last_defeated != defeated) {
+		RA_Trace_Outcome_Field("PlayerPtr->IsDefeated", last_defeated, defeated, source);
+	}
+
+	last_wins = wins;
+	last_loses = loses;
+	last_defeated = defeated;
+}
 #endif
 
 #ifdef WOLAPI_INTEGRATION
@@ -1557,6 +2025,12 @@ void Color_Cycle(void)
 	bool changed = false;
 
 	if (Options.IsPaletteScroll) {
+#ifndef _MSC_VER
+		if (RA_Capture_Sequence_Enabled()) {
+			RA_Deterministic_Color_Cycle();
+			return;
+		}
+#endif
 		/*
 		**	Process the fading white color. It is used for the radar box and other glowing
 		**	game interface elements.
@@ -2139,6 +2613,9 @@ static void Sync_Delay(void)
 #endif	//WIN32
 			KeyNumType input = KN_NONE;
 			int x, y;
+#ifndef _MSC_VER
+			RA_Apply_Capture_Mouse();
+#endif
 			Map.Input(input, x, y);
 			if (input) {
 				Keyboard_Process(input);
@@ -2256,9 +2733,7 @@ Mono_Set_Cursor(0,0);
 		// TIM-489: include elapsed-since-frame-100 so FPS can be derived from the log.
 		long elapsed_ms = 0;
 		if (_ra_frame_count >= 100) {
-			struct timespec _ts;
-			clock_gettime(CLOCK_MONOTONIC, &_ts);
-			long now_ms = (long)(_ts.tv_sec * 1000L + _ts.tv_nsec / 1000000L);
+			long now_ms = (long)timeGetTime();
 			if (_ra_t100_ms == 0) _ra_t100_ms = now_ms;
 			elapsed_ms = now_ms - _ra_t100_ms;
 		}
@@ -2587,12 +3062,26 @@ Mono_Set_Cursor(0,0);
 #else
 		if (SpecialDialog == SDLG_NONE) {
 #endif
-			Map.Input(input, x, y);
-			if (input) {
-				Keyboard_Process(input);
+				RA_Apply_Capture_Mouse();
+				RA_Set_Capture_Game_Frame(Frame);
+				Map.Input(input, x, y);
+				if (input) {
+					Keyboard_Process(input);
+				}
+				Map.Render();
+#ifndef _MSC_VER
+				if (RA_Is_Capture_Frame(Frame)) {
+					RA_Save_Gameplay_BMP((int)Frame);
+					{
+						const char * capture_path = getenv("RA_CAPTURE_BMP_FILE");
+						RA_Log_Capture_State("single", Frame, capture_path);
+					}
+					RA_Write_Capture_Ready("RA_CAPTURE_READY_FILE", Frame);
+				}
+				RA_Capture_Sequence_Frame(Frame);
+				RA_Set_Capture_Game_Frame(-1);
+#endif
 			}
-			Map.Render();
-		}
 	}
 
 	/*
@@ -2688,6 +3177,10 @@ Mono_Set_Cursor(0,0);
 	}
 #endif
 
+#ifndef _MSC_VER
+	RA_Trace_Outcome_Transitions("pre-outcome-check");
+#endif
+
 	if (PlayerWins) {
 #ifndef _MSC_VER
 		if (getenv("RA_AUTOSTART")) fprintf(stderr, "[PLAYER-WINS] frame=%ld\n", (long)Frame);
@@ -2708,6 +3201,9 @@ Mono_Set_Cursor(0,0);
 		PlayerLoses = false;
 		PlayerWins = false;
 		PlayerRestarts = false;
+#ifndef _MSC_VER
+		RA_Trace_Outcome_Transitions("consume-win");
+#endif
 		Map.Help_Text(TXT_NONE);
 		Do_Win();
 		return(!GameActive);
@@ -2730,6 +3226,9 @@ Mono_Set_Cursor(0,0);
 		PlayerWins = false;
 		PlayerLoses = false;
 		PlayerRestarts = false;
+#ifndef _MSC_VER
+		RA_Trace_Outcome_Transitions("consume-loss");
+#endif
 		Map.Help_Text(TXT_NONE);
 		Do_Lose();
 		return(!GameActive);
@@ -2771,16 +3270,13 @@ Mono_Set_Cursor(0,0);
 #ifndef _MSC_VER
 	// TIM-316: FPS probe — only active under RA_AUTOSTART smoke tests (TIM-416).
 	if (getenv("RA_AUTOSTART")) {
-		static struct timespec _fps_t0 = {0, 0};
+		static long _fps_t0_ms = 0;
 		static long _fps_base_frame = 0;
-		if (_fps_t0.tv_sec == 0) {
-			clock_gettime(CLOCK_MONOTONIC, &_fps_t0);
+		if (_fps_t0_ms == 0) {
+			_fps_t0_ms = (long)timeGetTime();
 			_fps_base_frame = Frame;
 		} else if ((Frame - _fps_base_frame) % 500 == 0 && Frame > _fps_base_frame) {
-			struct timespec _fps_now;
-			clock_gettime(CLOCK_MONOTONIC, &_fps_now);
-			long elapsed_ms = (long)((_fps_now.tv_sec  - _fps_t0.tv_sec)  * 1000
-			                       + (_fps_now.tv_nsec - _fps_t0.tv_nsec) / 1000000);
+			long elapsed_ms = (long)timeGetTime() - _fps_t0_ms;
 			long frames_done = Frame - _fps_base_frame;
 			double fps = elapsed_ms > 0 ? frames_done * 1000.0 / elapsed_ms : 0.0;
 			fprintf(stderr, "[TIM-316] fps_probe frame=%ld elapsed_ms=%ld fps=%.2f\n",

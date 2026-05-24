@@ -1384,8 +1384,12 @@ void DriveClass::AI(void)
 					if (What_Am_I() == RTTI_INFANTRY || What_Am_I() == RTTI_UNIT) {
 						land = Map[Center_Coord()].Land_Type();
 					}
+					bool should_validate_destination_zone = true;
+#ifdef RA_REMASTER_BEHAVIOR
+					should_validate_destination_zone = !Team;
+#endif
 					if (IsLocked && Mission != MISSION_ENTER && Target_Legal(NavCom) && !Is_In_Same_Zone(As_Cell(NavCom)) &&
-						land != LAND_ROCK && land != LAND_WATER && land != LAND_RIVER && !Team) {
+						land != LAND_ROCK && land != LAND_WATER && land != LAND_RIVER && should_validate_destination_zone) {
 						Stop_Driver();
 						Assign_Destination(TARGET_NONE);
 					} else {
@@ -2346,6 +2350,5 @@ DriveClass::TurnTrackType const DriveClass::TrackControl[67] = {
 	{12,	12,	DIR_SW_X2,	F_},															// Drive back into refinery.
 	{13,	13,	DIR_SW,	F_}																// Drive out of weapons factory.
 };
-
 
 

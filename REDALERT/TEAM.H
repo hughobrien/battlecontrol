@@ -223,10 +223,12 @@ class TeamClass : public AbstractClass
 		bool Add(FootClass *);
 		bool Can_Add(FootClass * obj, int & typeindex) const;
 		void Assign_Mission_Target(TARGET new_target);
-		bool Is_Leaving_Map(void) const;
-		void Scan_Limit(void);
+			bool Is_Leaving_Map(void) const;
+			void Scan_Limit(void);
+			int Debug_Current_Mission(void) const {return CurrentMission;};
+			FootClass const * Debug_First_Member(void) const {return Member;};
 
-	private:
+		private:
 
 		/*
 		**	The current mission index into the mission list is recorded here.

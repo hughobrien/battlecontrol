@@ -54,7 +54,6 @@
 #include <climits>      // TIM-141 commit 2: Get_Free_Video_Memory uses INT_MAX
 #include <cstdint>      // TIM-908: uint32_t for palette LUT
 #include <cstring>       // TIM-908: memcmp/memcpy for palette dirty-check
-#include <ctime>         // TIM-908: clock_gettime for frame profiling
 #include "sdl_input.h"  // TIM-145 pass-43A: SDL_Process_Input_Events()
 #include "sdl_window.h" // TIM-152 pass-46B: SDL_Set_Main_Window registration
 static SDL_Window*   SDL_VideoWindow    = nullptr;
@@ -87,6 +86,7 @@ static int           SDL_CachedW        = 0;
 static int           SDL_CachedH        = 0;
 static bool          SDL_FirstPresentDone = false;
 static int           SDL_PresentCount     = 0;  // TIM-237: counts presents after game loop starts
+static long          RA_CaptureGameFrame  = -1;
 
 // TIM-619: set to 1 by vqa_player.cpp while a VQA cinematic is playing with
 // VQA_SCANLINES enabled. Wait_Vert_Blank reads this flag to apply the overlay.
@@ -112,12 +112,15 @@ int SDL_Get_Primary_Pitch(void)
     return SDL_PrimarySurface ? SDL_PrimarySurface->pitch : 0;
 }
 
-// TIM-490: save a BMP snapshot of the current rendered frame, keyed by game loop frame.
-void RA_Save_Gameplay_BMP(int game_frame)
+void RA_Set_Capture_Game_Frame(long game_frame)
+{
+    RA_CaptureGameFrame = game_frame;
+}
+
+void RA_Save_Gameplay_BMP_Path(int game_frame, char const * path)
 {
     if (SDL_PrimaryARGB == nullptr) return;
-    char path[64];
-    snprintf(path, sizeof(path), "/tmp/redalert-gameplay-f%03d.bmp", game_frame);
+    if (path == nullptr || path[0] == '\0') return;
     int rc = SDL_SaveBMP(SDL_PrimaryARGB, path);
     const uint32_t* px = (const uint32_t*)SDL_PrimaryARGB->pixels;
     int total = SDL_PrimaryARGB->w * SDL_PrimaryARGB->h;
@@ -127,6 +130,145 @@ void RA_Save_Gameplay_BMP(int game_frame)
     fprintf(stderr, "[RA] gameplay BMP frame=%d rc=%d nz_pixels=%d path=%s\n",
             game_frame, rc, nz, path);
     fflush(stderr);
+}
+
+// TIM-490: save a BMP snapshot of the current rendered frame, keyed by game loop frame.
+void RA_Save_Gameplay_BMP(int game_frame)
+{
+    char path[512];
+    const char* capture_path = getenv("RA_CAPTURE_BMP_FILE");
+    const char* capture_frame = getenv("RA_CAPTURE_FRAME");
+    int capture_target = (capture_frame && capture_frame[0]) ? atoi(capture_frame) : -1;
+    if (capture_path && capture_path[0] && capture_target == game_frame) {
+        snprintf(path, sizeof(path), "%s", capture_path);
+    } else {
+        snprintf(path, sizeof(path), "/tmp/redalert-gameplay-f%03d.bmp", game_frame);
+    }
+    RA_Save_Gameplay_BMP_Path(game_frame, path);
+}
+
+struct RA_Present_Capture_Sequence_Config {
+    bool initialized;
+    bool enabled;
+    long start;
+    long count;
+    char dir[512];
+    char ready_path[512];
+};
+
+static RA_Present_Capture_Sequence_Config & RA_Present_Capture_Sequence(void)
+{
+    static RA_Present_Capture_Sequence_Config config = {
+        false, false, 0, 0, {0}, {0}
+    };
+
+    if (!config.initialized) {
+        const char * dir = getenv("RA_CAPTURE_SEQUENCE_DIR");
+        const char * start = getenv("RA_CAPTURE_SEQUENCE_START");
+        const char * count = getenv("RA_CAPTURE_SEQUENCE_COUNT");
+        const char * ready = getenv("RA_CAPTURE_SEQUENCE_READY_FILE");
+
+        config.initialized = true;
+        config.start = (start && start[0]) ? strtol(start, NULL, 0) : -1;
+        config.count = (count && count[0]) ? strtol(count, NULL, 0) : 0;
+        config.enabled = dir && dir[0] && config.start >= 0 && config.count > 0;
+        if (config.enabled) {
+            strncpy(config.dir, dir, sizeof(config.dir) - 1);
+            config.dir[sizeof(config.dir) - 1] = '\0';
+            if (ready && ready[0]) {
+                strncpy(config.ready_path, ready, sizeof(config.ready_path) - 1);
+                config.ready_path[sizeof(config.ready_path) - 1] = '\0';
+            }
+            fprintf(stderr,
+                    "[RA_CAPTURE_PRESENT_SEQUENCE] dir=%s start=%ld count=%ld ready=%s\n",
+                    config.dir,
+                    config.start,
+                    config.count,
+                    config.ready_path[0] ? config.ready_path : "<none>");
+            fflush(stderr);
+        }
+    }
+    return config;
+}
+
+static void RA_Write_Capture_Ready(char const * env_name, long frame)
+{
+    const char * ready_path = getenv(env_name);
+    if (!ready_path || !ready_path[0]) return;
+
+    FILE * fp = fopen(ready_path, "w");
+    if (fp) {
+        fprintf(fp, "frame=%ld\n", frame);
+        fclose(fp);
+    }
+}
+
+static void RA_Write_Capture_Sequence_Ready(char const * path, long start, long count, long frame)
+{
+    if (!path || !path[0]) return;
+
+    FILE * fp = fopen(path, "w");
+    if (fp) {
+        fprintf(fp, "start=%ld\ncount=%ld\nlast=%ld\n", start, count, frame);
+        fclose(fp);
+    }
+}
+
+static void RA_Capture_Present_Frame(void)
+{
+    static long captured_single_frame = -1;
+    static bool sequence_complete = false;
+    long frame = RA_CaptureGameFrame;
+    if (frame < 0 || SDL_PrimaryARGB == nullptr) return;
+    int present_frame = SDL_FirstPresentDone ? SDL_PresentCount + 1 : 0;
+
+    const char * capture_path = getenv("RA_CAPTURE_BMP_FILE");
+    const char * capture_frame = getenv("RA_CAPTURE_FRAME");
+    long capture_target =
+        (capture_frame && capture_frame[0]) ? strtol(capture_frame, NULL, 0) : -1;
+    if (
+        capture_path && capture_path[0] &&
+        capture_target == frame &&
+        captured_single_frame != frame
+    ) {
+        captured_single_frame = frame;
+        RA_Save_Gameplay_BMP_Path((int)frame, capture_path);
+        fprintf(stderr,
+                "[RA_CAPTURE_PRESENT] mode=single game_frame=%ld present_before=%d present_frame=%d path=%s\n",
+                frame,
+                SDL_PresentCount,
+                present_frame,
+                capture_path);
+        fflush(stderr);
+        RA_Write_Capture_Ready("RA_CAPTURE_READY_FILE", frame);
+    }
+
+    RA_Present_Capture_Sequence_Config & config = RA_Present_Capture_Sequence();
+    if (sequence_complete || !config.enabled) return;
+    if (frame < config.start || frame >= config.start + config.count) return;
+
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/frame_%06ld.bmp", config.dir, frame);
+    RA_Save_Gameplay_BMP_Path((int)frame, path);
+    fprintf(stderr,
+            "[RA_CAPTURE_PRESENT] mode=sequence game_frame=%ld present_before=%d present_frame=%d path=%s\n",
+            frame,
+            SDL_PresentCount,
+            present_frame,
+            path);
+    fflush(stderr);
+
+    if (frame == config.start + config.count - 1) {
+        sequence_complete = true;
+        RA_Write_Capture_Sequence_Ready(config.ready_path, config.start, config.count, frame);
+        fprintf(stderr,
+                "[RA_CAPTURE_PRESENT_SEQUENCE] complete start=%ld count=%ld last=%ld ready=%s\n",
+                config.start,
+                config.count,
+                frame,
+                config.ready_path[0] ? config.ready_path : "<none>");
+        fflush(stderr);
+    }
 }
 
 // TIM-141 commit 6: window-class event pump. Drives
@@ -178,6 +320,12 @@ static void SDL_Process_Window_Events(void)
             fprintf(stderr, "[SDL] SDL_QUIT drained (count=%d)\n", drained); fflush(stderr);
         }
     } while (drained == 16);
+}
+
+extern "C" void SDL_Process_System_Events(void)
+{
+    SDL_Process_Window_Events();
+    SDL_Process_Input_Events();
 }
 
 extern "C" bool SDL_Quit_Requested(void)
@@ -1032,16 +1180,9 @@ void Wait_Vert_Blank(void)
 	// heartbeat. Must run before the early-out below — focus state
 	// needs to flip even on the first call, when the renderer is
 	// still being brought up.
-	SDL_Process_Window_Events();
+		SDL_Process_System_Events();
 
-	// TIM-145 pass-43A: drain SDL_KEYDOWN/SDL_KEYUP into the
-	// WWKeyboardClass ring. Producer is REDALERT/KEYBOARD.CPP. Order
-	// after the window pump so a quit or focus event in the same
-	// batch is observed first. Mouse buttons / motion stay queued
-	// for pass-43B.
-	SDL_Process_Input_Events();
-
-	// TIM-141 commit 5: present pump. Indexed primary surface ->
+		// TIM-141 commit 5: present pump. Indexed primary surface ->
 	// SDL_BlitSurface (palette-aware) -> ARGB intermediate ->
 	// SDL_UpdateTexture -> SDL_RenderCopy -> SDL_RenderPresent. The
 	// renderer was created with SDL_RENDERER_PRESENTVSYNC in
@@ -1108,9 +1249,9 @@ void Wait_Vert_Blank(void)
 		const uint32_t* lut     = SDL_PaletteLUT;
 
 		// TIM-908: profile conversion cost every 60 presents (~1s at 60fps)
-		struct timespec t0, t1;
+		Uint64 t0 = 0;
 		if (SDL_PresentCount % 60 == 0)
-			clock_gettime(CLOCK_MONOTONIC, &t0);
+			t0 = SDL_GetPerformanceCounter();
 
 		for (int y = 0; y < h; ++y) {
 			const uint8_t* srcRow = src + y * srcPitch;
@@ -1121,13 +1262,14 @@ void Wait_Vert_Blank(void)
 		}
 
 		if (SDL_PresentCount % 60 == 0) {
-			clock_gettime(CLOCK_MONOTONIC, &t1);
-			long ns = (t1.tv_sec - t0.tv_sec) * 1000000000L +
-			          (t1.tv_nsec - t0.tv_nsec);
+			Uint64 t1 = SDL_GetPerformanceCounter();
+			Uint64 freq = SDL_GetPerformanceFrequency();
+			long us = freq ? (long)(((t1 - t0) * 1000000ULL) / freq) : 0;
 			fprintf(stderr, "[RA] frame%4d indexed→ARGB conv: %7ld µs (%dx%d)\n",
-			        SDL_PresentCount, ns / 1000, w, h);
+			        SDL_PresentCount, us, w, h);
 		}
 	}
+	RA_Capture_Present_Frame();
 	SDL_UpdateTexture(SDL_PrimaryTexture, nullptr,
 	                  SDL_PrimaryARGB->pixels, SDL_PrimaryARGB->pitch);
 	SDL_RenderClear(SDL_VideoRenderer);
@@ -1223,30 +1365,31 @@ void Wait_Vert_Blank(void)
 	// play far too fast.  This limiter uses wall-clock timing to throttle
 	// to ~60 FPS regardless of renderer type.
 	{
-		static struct timespec _wv_prev = {0, 0};
+		static Uint64 _wv_prev = 0;
 		static bool _wv_initialized = false;
-		struct timespec _wv_now;
-		clock_gettime(CLOCK_MONOTONIC, &_wv_now);
+		Uint64 _wv_now = SDL_GetPerformanceCounter();
+		Uint64 _wv_freq = SDL_GetPerformanceFrequency();
 
 		if (!_wv_initialized) {
 			_wv_prev = _wv_now;
 			_wv_initialized = true;
 		} else {
 			// Compute elapsed ns since last frame.
-			long elapsed_ns = (_wv_now.tv_sec - _wv_prev.tv_sec) * 1000000000L
-			                + (_wv_now.tv_nsec - _wv_prev.tv_nsec);
+			Uint64 elapsed_ns = _wv_freq
+			                   ? ((_wv_now - _wv_prev) * 1000000000ULL) / _wv_freq
+			                   : 0;
 			// Target: 16.666 ms per frame (~60 FPS).  If we're running
 			// faster than that (e.g. software renderer with no vsync),
 			// delay for the remaining time.
-			const long TARGET_NS = 16666667L;  // 1/60 second in ns
+			const Uint64 TARGET_NS = 16666667ULL;  // 1/60 second in ns
 			if (elapsed_ns < TARGET_NS) {
-				long delay_ms = (TARGET_NS - elapsed_ns + 999999L) / 1000000L;
+				Uint64 delay_ms = (TARGET_NS - elapsed_ns + 999999ULL) / 1000000ULL;
 				if (delay_ms > 0) {
 					SDL_Delay((Uint32)delay_ms);
 				}
 			}
 			// After any delay, update reference for next frame.
-			clock_gettime(CLOCK_MONOTONIC, &_wv_now);
+			_wv_now = SDL_GetPerformanceCounter();
 			_wv_prev = _wv_now;
 		}
 	}

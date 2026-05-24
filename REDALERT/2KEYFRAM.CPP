@@ -64,6 +64,15 @@ typedef struct {
 #endif
 #define	UNCOMPRESS_MAGIC_NUMBER			56789
 
+static unsigned long Apply_Keyframe_Delta(void const *encoded, char frameflags, char *dest, unsigned long size)
+{
+	if (frameflags & KF_LCW) {
+		return LCW_Uncompress((void *)encoded, dest, size);
+	}
+	Apply_Delta(dest, encoded);
+	return size;
+}
+
 unsigned	BigShapeBufferLength = INITIAL_BIG_SHAPE_BUFFER_SIZE;
 unsigned	TheaterShapeBufferLength = THEATER_BIG_SHAPE_BUFFER_SIZE;
 extern "C"{
@@ -399,14 +408,9 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 
 		length = buffsize;
 		if (frameflags & KF_DELTA) {
-			/* TIM-206: In RA, KF_DELTA key-delta is LCW-encoded (often a 0x80 no-op).
-			 * Apply_XOR_Delta reads LCW bytes as huge XOR commands → heap corruption. */
-			LCW_Uncompress(Add_Long_To_Pointer(dataptr, offset[0] & 0x00FFFFFFL), effective_buffptr, buffsize);
+			length = Apply_Keyframe_Delta(Add_Long_To_Pointer(dataptr, offset[0] & 0x00FFFFFFL), frameflags, effective_buffptr, buffsize);
 		} else {
-			/* TIM-224: plain delta frames in RA also use LCW encoding, not XOR.
-			 * Same root cause as TIM-206 (KF_DELTA): 0x80... LCW bytes misread as
-			 * huge XOR skip commands, advancing `t` past the end of the buffer. */
-			LCW_Uncompress(Add_Long_To_Pointer(ptr, offdiff), effective_buffptr, buffsize);
+			length = Apply_Keyframe_Delta(Add_Long_To_Pointer(ptr, offdiff), frameflags, effective_buffptr, buffsize);
 		}
 
 		if ( (frameflags & KF_DELTA) ) {
@@ -430,9 +434,8 @@ unsigned long Build_Frame(void const *dataptr, unsigned short framenumber, void 
 #endif
 
 				length = buffsize;
-				/* TIM-206: KF_DELTA loop frames in RA use LCW-encoded deltas (not XOR).
-				 * LCW back-references into effective_buffptr recover prior-frame pixels. */
-				LCW_Uncompress(Add_Long_To_Pointer(dataptr, offset[subframe] & 0x00FFFFFFL), effective_buffptr, buffsize);
+				frameflags = (char)(offset[subframe] >> 24);
+				length = Apply_Keyframe_Delta(Add_Long_To_Pointer(ptr, offdiff), frameflags, effective_buffptr, buffsize);
 
 				currframe++;
 				subframe += 2;

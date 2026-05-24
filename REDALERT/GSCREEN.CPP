@@ -45,6 +45,10 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+
+#ifndef _MSC_VER
+extern "C" void Wait_Vert_Blank(void);
+#endif
 // TIM-54: pull WIN32LIB/MOUSE.H for the WWMouseClass full def (member
 // access on WWMouse->Draw_Mouse / Erase_Mouse at line 472). The case-
 // folding shim resolves "mouse.h" to REDALERT/MOUSE.H (MouseClass), so
@@ -486,7 +490,9 @@ void GScreenClass::Blit_Display(void)
 	#else
 		Shadow_Blit(0, 0, 320, 200, HidPage, SeenPage, ShadowPage->Get_Buffer());
 	#endif
+#ifndef _MSC_VER
+	Wait_Vert_Blank();
+#endif
 	BEnd(BENCH_BLIT_DISPLAY);
 }
-
 

@@ -57,6 +57,8 @@ class PowerClass : public RadarClass
 		unsigned IsToRedraw:1;
 
 	protected:
+		void Draw_Power_Bar_Clip(int x, int y, int width, int height);
+
 		/*
 		**	This gadget is used to capture mouse input on the power bar.
 		*/

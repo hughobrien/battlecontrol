@@ -14,6 +14,9 @@
 #ifndef LINUX_STUBS_IO_H_INCLUDED
 #define LINUX_STUBS_IO_H_INCLUDED
 
+#if defined(__MINGW32__)
+#include_next <io.h>
+#else
 /* TIM-339: Windows <io.h> provides unlink(); on Linux it comes from <unistd.h>. */
 #include <unistd.h>
 
@@ -28,6 +31,7 @@ template <typename... Args> long filelength(Args&&...) { return 0; }
  * fatal seek error, so an inert `0` return is safe (caller proceeds with
  * a position-zero file pointer). */
 template <typename... Args> long lseek(Args&&...) { return 0; }
+#endif
 #endif
 
 #endif

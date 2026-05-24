@@ -8,7 +8,7 @@
 #   frame 200 → Flag_To_Win fired (debrief sequence)
 #
 # Prerequisites:
-#   - build/cmake-td/td binary (run cmake + ninja td first)
+#   - build/td binary (run `bash scripts/build-native.sh td` first)
 #   - build/run-td/ data dir (run scripts/setup-run-td.sh first)
 #   - Xvfb, xdpyinfo
 #
@@ -17,10 +17,9 @@
 
 set -u
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="$REPO_ROOT/build/cmake-td"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN_DIR="$REPO_ROOT/build/run-td"
-TD_BIN="$BUILD_DIR/td"
+TD_BIN="$REPO_ROOT/build/td"
 DISPLAY_NUM="${TD_DISPLAY:-:99}"
 TIMEOUT_SECS=90
 LOG="$RUN_DIR/td-cheat-run.log"
@@ -28,23 +27,22 @@ LOG="$RUN_DIR/td-cheat-run.log"
 # ---- prerequisites ----
 if [ ! -x "$TD_BIN" ]; then
 	echo "ERROR: $TD_BIN not found. Build with:" >&2
-	echo "  mkdir -p build/cmake-td && cd build/cmake-td && cmake ../.. -G Ninja && ninja td" >&2
+	echo "  bash scripts/build-native.sh td" >&2
 	exit 1
 fi
 
 if [ ! -d "$RUN_DIR" ]; then
-	echo "ERROR: $RUN_DIR not found. Run scripts/setup-run-td.sh first." >&2
-	exit 1
+	echo "Setting up $RUN_DIR ..."
+	bash "$REPO_ROOT/scripts/td/setup-run-td.sh" || exit 1
 fi
 
 # ---- Xvfb ----
-DISP_NUM="${DISPLAY_NUM#:}"
-if [ ! -e "/tmp/.X${DISP_NUM}-lock" ]; then
+if ! xdpyinfo -display "$DISPLAY_NUM" >/dev/null 2>&1; then
 	echo "Starting Xvfb $DISPLAY_NUM ..."
-	Xvfb "$DISPLAY_NUM" -screen 0 640x480x24 &
+	Xvfb "$DISPLAY_NUM" -screen 0 640x480x24 -ac &
 	XVFB_PID=$!
 	sleep 1
-	if [ ! -e "/tmp/.X${DISP_NUM}-lock" ]; then
+	if ! xdpyinfo -display "$DISPLAY_NUM" >/dev/null 2>&1; then
 		echo "ERROR: Xvfb $DISPLAY_NUM did not start." >&2
 		exit 1
 	fi
@@ -56,7 +54,7 @@ fi
 # ---- run ----
 echo "Running TD cheat smoke test (timeout ${TIMEOUT_SECS}s) ..."
 cd "$RUN_DIR" || exit 1
-TD_AUTOSTART=1 TD_CHEAT=1 DISPLAY="$DISPLAY_NUM" \
+TD_AUTOSTART=1 TD_CHEAT=1 DISPLAY="$DISPLAY_NUM" SDL_AUDIODRIVER=dummy \
 	timeout -k 5 "$TIMEOUT_SECS" "$TD_BIN" >"$LOG" 2>&1 || true
 
 if [ -n "${XVFB_PID:-}" ]; then

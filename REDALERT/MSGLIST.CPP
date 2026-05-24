@@ -55,6 +55,11 @@
 
 /**************************** Globals **************************************/
 
+static unsigned long RA_Message_Timeout_Clock(void)
+{
+	return (unsigned long)TickCount;
+}
+
 
 /***************************************************************************
  * MessageListClass::MessageListClass -- constructor                       *
@@ -335,7 +340,7 @@ TextLabelClass * MessageListClass::Add_Message(char const * name, int id, char c
 		strcpy(message, txt);
 	}
 
-#if (0)
+#if !defined(_MSC_VER)
 
 	int i;
 	int found;
@@ -412,7 +417,7 @@ TextLabelClass * MessageListClass::Add_Message(char const * name, int id, char c
 		txtlabel->UserData1 = 0;
 	}
 	else {
-		txtlabel->UserData1 = TickCount + timeout;
+		txtlabel->UserData1 = RA_Message_Timeout_Clock() + timeout;
 	}
 	txtlabel->UserData2 = id;
 
@@ -441,7 +446,7 @@ TextLabelClass * MessageListClass::Add_Message(char const * name, int id, char c
 	On_Message(message, timeout * 60.0f / TICKS_PER_MINUTE, id);
 	//Sound_Effect(VOC_INCOMING_MESSAGE);
 
-#if (0)
+#if !defined(_MSC_VER)
 
 	//------------------------------------------------------------------------
 	//	Attach the message to our list
@@ -671,7 +676,7 @@ int MessageListClass::Concat_Message(char const * name, int id, char const * txt
 		tlabel->UserData1 = 0;
 	}
 	else {
-		tlabel->UserData1 = TickCount + timeout;
+		tlabel->UserData1 = RA_Message_Timeout_Clock() + timeout;
 	}
 
 	return (1);
@@ -934,7 +939,7 @@ int MessageListClass::Manage (void)
 		//.....................................................................
 		//	If this message's time is up, remove it from the list
 		//.....................................................................
-		if (txtlabel->UserData1 != 0 && TickCount > txtlabel->UserData1) {
+		if (txtlabel->UserData1 != 0 && RA_Message_Timeout_Clock() > txtlabel->UserData1) {
 
 			//..................................................................
 			//	Save the next ptr in the list; remove this entry

@@ -684,7 +684,7 @@ void Fill_In_Data(void)
 	Map.Zone_Reset(MZONEF_ALL);
 
 
-#ifdef WIN32
+#if defined(WIN32) || !defined(_MSC_VER)
 	/*
 	**	Since the sidebar starts up activated, adjust the home start position so that
 	**	the right edge of the map will still be visible.
@@ -2529,6 +2529,7 @@ bool Read_Scenario_INI(char * fname, bool )
 	}
 	PlayerPtr->IsHuman = true;
 	PlayerPtr->IsPlayerControl = true;
+	Map.Reload_Sidebar();
 
 //	if (NewINIFormat < 2 || !ini.Is_Present("MapPack")) {
 //		Map.Read_Binary(root, &ScenarioCRC);

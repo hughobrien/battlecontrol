@@ -1,0 +1,639 @@
+# Allied L2 Divergences
+
+Reference scene: `mission allied-l2 --frame 60`.
+
+Capture determinism: parity mission captures now default `RA_RANDOM_SEED` to
+`0x1eed5eed` unless the caller explicitly sets another seed. This keeps ore,
+unit stance animation, and any other RNG-consuming gameplay state from drifting
+between Wine and native while we debug rendering. The capture harness also
+defaults `RA_CAPTURE_FPS=10` so Wine's cnc-ddraw limiter and native's capture
+throttle run at the same low rate.
+
+Latest useful captures:
+
+- Wine/native after current real fixes: `/tmp/battlecontrol/2026-05-20T03-38-23-mission-allied-l2`
+- Native forced tactical redraw probe: `/tmp/battlecontrol/2026-05-20T03-39-49-mission-allied-l2`
+- Wine/native frame-60 after message timing + stamp-map fixes: `/tmp/battlecontrol/2026-05-20T04-33-52-mission-allied-l2`
+- Wine/native frame-60 after radar jam fix: `/tmp/battlecontrol/2026-05-20T04-47-45-mission-allied-l2` (`SSIM=0.9804`)
+- Wine/native exact gameplay frame-60 using RA95 process-memory frame probe:
+  `/tmp/battlecontrol/2026-05-20T07-54-30-mission-allied-l2` (`SSIM=0.9698`).
+  This pins Wine's gameplay `Frame` at address `0x006544c8` for Allied L2 and
+  proves the remaining shroud mismatch is not just wall-clock capture drift.
+- Wine exact gameplay frame-90: `/tmp/battlecontrol/2026-05-20T08-17-05-mission-allied-l2`.
+  The west-edge shroud pixels remain black at frame 90, so the mismatch is not
+  simply Wine reaching the initial reveal a few frames later.
+- Native after clipped-stamp window-origin fix:
+  `/tmp/battlecontrol/2026-05-20T09-08-42-mission-allied-l2`; compared against
+  the stable Wine exact frame at `/tmp/battlecontrol/2026-05-20T07-54-30-mission-allied-l2`,
+  `SSIM=0.9976`, `p99=12`.
+- Clean Wine/native rerun after the same fix:
+  `/tmp/battlecontrol/2026-05-20T09-09-30-mission-allied-l2`, `SSIM=0.9975`.
+- Clean Wine/native rerun after hiding mapped-but-not-visible overlays:
+  `/tmp/battlecontrol/2026-05-20T09-39-51-mission-allied-l2`, `SSIM=0.9977`.
+- Clean Wine/native rerun after restoring flag-driven keyframe delta decoding:
+  `/tmp/battlecontrol/2026-05-20T23-46-45-mission-allied-l2`, `SSIM=0.9979`
+  with Wine frameprobe enabled.
+- Soviet L3 native frame-2 after the same keyframe fix:
+  `/tmp/battlecontrol/2026-05-20T23-44-03-mission-soviet-l3`; the known
+  purple-pixel probes at `(63,42)`, `(67,40)`, `(77,40)`, `(132,264)`,
+  `(153,263)`, `(444,264)`, and `(465,263)` no longer contain palette index 1
+  / RGB `(168,0,164)`.
+- Allied L3 native frame-10 shroud trace: `/tmp/battlecontrol/2026-05-20T07-21-25-mission-allied-l3`
+- Allied L3 Wine FPS sweep:
+  - wall-clock frame 10, 5/15/30 FPS: `/tmp/battlecontrol/2026-05-20T07-30-47-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-31-28-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-32-09-mission-allied-l3`
+  - process-memory counter probe at `0x0068dea0` target 29/33: `/tmp/battlecontrol/2026-05-20T07-46-26-mission-allied-l3`, `/tmp/battlecontrol/2026-05-20T07-47-07-mission-allied-l3`
+- Allied L3/L5 top-scores capture root cause, 2026-05-21:
+  the Wine driver stopped its boot timeline when it first saw gameplay, but
+  then still slept the remainder of `WINE_BOOT_SETTLE` plus a one-second
+  gameplay settle before probing/capturing. For later missions that was enough
+  wall-clock time to drift into loading/top-scores screens. The driver now
+  skips the remaining boot-settle once gameplay has been observed and defaults
+  `WINE_GAMEPLAY_SETTLE=0`.
+- Mapped Allied matrix after that tooling fix:
+  `/tmp/battlecontrol/2026-05-21T05-30-18-matrix`.
+  `allied-l2`, `allied-l3`, and `allied-l5` all pass. The command used a
+  per-mission Wine frame-address map plus native sync only for Allied L2:
+  `allied-l2=0x006544c8`, `allied-l3=0x0069720c`,
+  `allied-l5=0x0069720c`, `--sync-native-to-wine allied-l2`.
+  The `0x0069720c` value behaves like a mission-ready/progress counter for
+  Allied L3/L5 rather than a gameplay frame counter, so native must not be
+  synced to it.
+- Follow-up validation after adding a per-mission settle policy:
+  `/tmp/battlecontrol/2026-05-21T05-41-43-matrix` passes `allied-l2` and
+  `allied-l3` together. Allied L2 needs `--settle-after-gameplay allied-l2`
+  so `0x006544c8` starts advancing before native sync; Allied L3 must skip
+  that settle and use `0x0069720c` without native sync.
+- The checkpoint validator now rejects Wine captures that fail the existing
+  `screenshot_ok()` quality gate, not just low tactical non-black fill. This
+  catches tiny all-white/invalid frames that previously looked "nonblack" and
+  could poison native frame sync.
+- D1 review capture, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-21-06-mission-allied-l2` confirms the
+  top-left mission text itself is clean: top message bar, timer/credit tab,
+  sidebar buttons, and radar panel all compare exactly (`SSIM=1.0`, `p99=0`).
+  The remaining visible diff is tactical-only: `tactical_viewport SSIM=0.9977`,
+  `p99=12`, with shroud-edge clusters around screen buckets near `(312,24)`,
+  `(360,216)`, `(408,48)`, `(384,216)`, and `(336,216)`. Units can be ignored;
+  the shroud-edge pattern is tracked as the residual D4 blending issue.
+- Wine cnc-ddraw root-of-trust probe, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T22-55-47-mission-allied-l1` and
+  `/tmp/battlecontrol/2026-05-21T22-56-34-mission-allied-l1` capture Allied L1
+  render-frame 50 directly inside cnc-ddraw's GDI render loop. The two Wine
+  PNGs are byte-identical (`sha256=f88994da...`), proving the previous Allied
+  L1 Wine drift was at least partly a screenshot/root-of-trust problem rather
+  than unavoidable RA95 nondeterminism.
+- Native repeatability probe, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T22-57-23-mission-allied-l1` and
+  `/tmp/battlecontrol/2026-05-21T22-57-40-mission-allied-l1` capture native
+  Allied L1 frame 50 and are also byte-identical (`sha256=b2f9f09e...`).
+- Wine render-frame to native frame alignment probe, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T23-08-46-mission-allied-l1` logs
+  `bc-capture: render_frame=50 ra_frame=91`. Comparing that stable Wine PNG
+  against native frames shows the first good match at native frame 93
+  (`/tmp/battlecontrol/native-align-raframe91-20260521T230940Z`,
+  `SSIM=0.9786`, `p99=112`). Native frames 88-92 remain around `SSIM=0.465`,
+  so the remaining timing issue is a present/counter boundary offset, not a
+  smooth one-or-two-frame animation drift.
+- Seeded D2 review capture, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-37-39-mission-allied-l2` was launched with
+  `RA_RANDOM_SEED` unset by the caller and confirms the harness defaulted it to
+  `0x1eed5eed` (`random_seed=518872813`). Wine and native both captured
+  effective frame `84`; comparison passes with `SSIM=0.9984`, `p99=4`, and the
+  remaining visible differences are still tactical shroud-edge clusters rather
+  than UI/timer/credit text drift.
+- D2 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-48-25-mission-allied-l2` confirms the
+  mission countdown timer remains visually aligned at a later synced frame
+  (`effective_frames=109`, `SSIM=0.9993`, `p99=0`). Any ore visual differences
+  are expected scenario/setup RNG (`GOLD01..GOLD04`) rather than D2 timer drift.
+- D3 review capture, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-56-03-mission-allied-l2` confirms the
+  top-right credit balance is exact against Wine. The credit-balance region
+  `(540,0)-(640,14)`, timer/credit tab `(480,0)-(640,14)`, and full top bar
+  `(0,0)-(640,16)` all have `changed_gt0=0`, `max=0`, `p99=0`.
+- D3 review accepted, 2026-05-21: human review confirms the top-right credit
+  balance looks good in the D3 review capture above.
+- D4/D17 merge, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T06-59-03-mission-allied-l2` confirms the old
+  D4 terrain/stamp offset is fixed, but human review still sees different
+  shroud/fog blending at the revealed-area boundary. This is the same residual
+  tactical shroud-edge issue formerly tracked as D17, so D17 is merged into D4
+  and D4 remains open for the blending/state difference.
+- D4 fixed capture, 2026-05-22:
+  `/tmp/battlecontrol/2026-05-22T07-11-52-mission-allied-l2` confirms the
+  residual shroud-edge blending is fixed. Wine and native both captured
+  effective frame `91`; comparison passes with full-frame `SSIM=0.9989`,
+  `p99=0`, tactical viewport `p99=0`, and exact pixels at the prior D4 probes
+  `(318,21)`, `(324,21)`, `(302,54)`, `(396,29)`, and `(417,214)`.
+- D5 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-02-21-mission-allied-l2` has exact top
+  message/top bar regions (`changed_gt0=0`, `p99=0`), and human review confirms
+  the stale one-pixel text/crosshair remnants look resolved.
+- D6 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-08-19-mission-allied-l2` confirms the
+  Wine/native tactical camera framing matches: same road segment, infantry
+  group location, snow/tree/cliff framing, with exact sidebar/top bar regions.
+- D7 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-10-44-mission-allied-l2` confirms the
+  capture harness syncs native to Wine's effective gameplay frame
+  (`wine=89`, `native=89`) with exact timer/credit, message, and sidebar
+  regions. Remaining tactical differences are not global simulation-time drift.
+- D8 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-13-57-mission-allied-l2` confirms the
+  credit balance and timer/credit tab are exact (`changed_gt0=0`, `p99=0`), with
+  no visible credit text smearing or overprint.
+- D9 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-19-27-mission-allied-l2` confirms the
+  mission/tutorial message remains visible and exact at a synced later frame
+  (`wine=85`, `native=85`, message crop `changed_gt0=0`, `p99=0`).
+- D10 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-26-05-mission-allied-l2` confirms the
+  road/ground template art no longer shows the old wrong-subtile or fragmented
+  road appearance; human review accepts the terrain tiles as good.
+- D11 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-32-24-mission-allied-l2` confirms the
+  inactive radar/Allied cover plate and full sidebar are exact
+  (`changed_gt0=0`, `p99=0`), with no native-only static/noise.
+- D12 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-39-28-mission-allied-l2` confirms the three
+  sidebar control buttons and adjacent shadow/art area are exact
+  (`changed_gt0=0`, `p99=0`).
+- D13 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-42-28-mission-allied-l2` confirms the shroud
+  fade grade count/tonal range is correct. Human review notes a slight lower
+  shroud difference, likely scene/unit movement related, and leaves any
+  remaining edge blending under open D4.
+- D14 review accepted, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T07-47-13-mission-allied-l2` confirms the
+  infantry cluster/nearby snow no longer has native-only saturated green,
+  purple, cyan, or corrupt pixels; remaining local differences are animation,
+  shroud, or object-state noise.
+- D15 review note, 2026-05-21:
+  `/tmp/battlecontrol/2026-05-21T15-08-46-mission-soviet-l1` captures both Wine
+  and native in real Soviet L1 gameplay after the earlier top-scores/invalid
+  capture path. Human review says rendering looks good apart from a
+  gamma/brightness difference and the captures being at different stages of the
+  scenario. Wine used `0x0069720c` and reported `1178` while native captured
+  frame `50`, so D15 remains a capture synchronization/gamma follow-up rather
+  than evidence of the old colored/noisy block renderer bug.
+- D15 gamma follow-up, 2026-05-21:
+  the brightness mismatch was a bad Wine reference state, not native gamma.
+  Repeated Wine-only Soviet L1 timeline sampling with the local
+  `ra-frameinfo-send-guard-patch.py` enabled showed gameplay fading/transitioning
+  to black/loading after roughly 3-4 seconds, with stable dim palette levels
+  such as snow `(208,200,208)` or `(196,184,196)` instead of the full-bright
+  `(228,216,228)`. Disabling that guard patch (`WINE_FRAMEINFO_GUARD=0`) keeps
+  Soviet L1 in gameplay through at least 5 seconds and the palette stays
+  full-bright: `/tmp/battlecontrol/2026-05-21T15-53-16-mission-soviet-l1`.
+  The capture driver now makes the frameinfo-send guard opt-in instead of
+  applying it by default.
+- Multi-level synchronized rerun after Wine actual-frame reporting:
+  - Allied L1: `/tmp/battlecontrol/2026-05-20T21-34-18-mission-allied-l1`, `SSIM=0.9969`
+  - Allied L2: `/tmp/battlecontrol/2026-05-20T21-35-15-mission-allied-l2`, `SSIM=0.9984`
+  - Allied L3: `/tmp/battlecontrol/2026-05-20T21-36-13-mission-allied-l3`, Wine actual frame `1`, `SSIM=0.9443`
+  - Allied L4: `/tmp/battlecontrol/2026-05-20T21-36-56-mission-allied-l4`, Wine actual frame `1`, `SSIM=0.9805`
+  - Allied L5: `/tmp/battlecontrol/2026-05-20T21-37-41-mission-allied-l5`, Wine actual frame `1`, `SSIM=0.9432`
+  - Soviet L1: `/tmp/battlecontrol/2026-05-20T21-38-25-mission-soviet-l1`, Wine actual frame `1`, `SSIM=0.9826`
+  - Soviet L2: `/tmp/battlecontrol/2026-05-20T21-39-08-mission-soviet-l2`, Wine actual frame `1`, `SSIM=0.9509`
+  - Soviet L4: `/tmp/battlecontrol/2026-05-20T21-40-36-mission-soviet-l4`, Wine actual frame `1`, `SSIM=0.9743`
+  - Soviet L5: `/tmp/battlecontrol/2026-05-20T21-41-20-mission-soviet-l5`, Wine actual frame `1`, `SSIM=0.9862`
+
+Soviet L3 is currently excluded from the passing set because the Wine capture
+path often enters the top-scores screen instead of gameplay. The harness now
+  rejects those captures by checking tactical-viewport fill, rather than allowing
+  a black Wine frame and black native frame to pass as a false positive.
+- D15/Soviet L1 Wine harness root cause, 2026-05-21:
+  the Wine `ra-game-in-focus-patch.py` had misidentified `0x0066b6b8` as
+  `GameInFocus`, but RA95's own queue dispatch uses that byte as
+  `Session.Type`. The patch was repeatedly writing `1` there, turning campaign
+  captures into `GAME_MODEM`; that explains the frameinfo crash at
+  `0x00534273`, the top-scores screen, and `Frame` sticking at `0/1`.
+  Default Wine mission capture now skips that corrupt focus pin and relies on
+  the existing focus-spin-loop skip plus the autostart hardening. Clean
+  validation: `/tmp/battlecontrol/2026-05-21T18-10-22-mission-soviet-l1`
+  (`frame=120`, `SSIM=0.9812`) and
+  `/tmp/battlecontrol/2026-05-21T18-15-56-mission-soviet-l1` (`frame=500`,
+  `SSIM=0.9777`).
+
+## Debug Execution Plan
+
+The next pass is assertion-led. Screenshots tell us that D4 and D9 remain, but
+they do not tell us whether the native port has the wrong simulation state or
+the right state being drawn through the wrong dirty/redraw path.
+
+- [x] Freeze randomness for mission parity captures with `RA_RANDOM_SEED`.
+- [x] Limit both Wine and native capture runs with `RA_CAPTURE_FPS=10`.
+- [x] Add a native internal frame trap so native screenshots are taken after a
+  target gameplay frame reaches the renderer.
+- [x] Add a capture-frame state dump for native:
+  - gameplay frame and global `Frame`;
+  - `TickCount` and mission countdown timer;
+  - visible message count;
+  - credit target/current values;
+  - hashes/counts for mapped cells, visible cells, shroud shape indices, and
+    redraw flags.
+- [x] Add message lifetime tracing around `MessageListClass::Add_Message()` and
+  `MessageListClass::Manage()` to prove whether D9 is message expiry,
+  draw-layer ordering, or capture placement.
+- [x] Compare native frame-60 state with native frame-1/frame-30 state to find
+  where the instruction text disappears.
+- [ ] Add a same-frame redraw probe for D4: save/check state after normal
+  incremental redraw and again after `Map.Flag_To_Redraw(true)`.
+- [ ] If the state hashes differ when screenshots should match, trace the source
+  of visibility/shroud changes. If hashes match but pixels differ, focus on
+  dirty-rectangle coverage, shadow template selection, and page/blit order.
+- [ ] Only after native state is understood, decide whether Wine needs an
+  equivalent frame trap or calibrated binary hook.
+- [x] Test the apparent one-cell terrain shift:
+  - source-cell offsets of `+128`/`-128` worsened or did not improve the image;
+  - template pixel offsets of `+24`/`-24` also did not beat the no-offset capture;
+  - tactical crop RMSE is best at `dy=0`, so the remaining terrain mismatch is
+    not a global one-cell layer displacement.
+- [x] Trace inactive radar panel draw:
+  - native `RadarAnim` SHP frames decode to distinct buffers, so the asset load
+    and keyframe decoder are not the cause;
+  - git history shows the porting change replaced disabled legacy
+    `IsRadarJammed` with `Get_Jammed(PlayerPtr)`;
+  - `Get_Jammed(PlayerPtr)` is true when the player has no radar building, so
+    native drew jam snow over the no-radar Allied cover plate.
+
+## Tracked Divergences
+
+| ID | Symptom | Status | Current read |
+| --- | --- | --- | --- |
+| D1 | Native misses mission instruction text: `Clear the way for the convoy` at top left. | Fixed | `MessageListClass::Add_Message()` was forwarding to the GlyphX callback while the in-engine label list was compiled out; native now keeps the callback and restores the label list for port builds. |
+| D2 | Native misses mission countdown timer in the top bar. | Fixed | Native/WASM port now uses the Win95 high-res tab path and re-enables timer text drawing in `CreditClass::Graphic_Logic()`. |
+| D3 | Native misses credit balance in the top right. | Fixed | Same high-res tab/credit draw restoration as D2; remaining credit-value mismatch was capture timing, not missing rendering. |
+| D4 | Native shroud/fog edge blending differs from Wine at revealed-area boundaries. | Fixed | This had two causes. The original blocky terrain/shroud offset was `Buffer_Draw_Stamp_Clip()` treating clipped stamp coordinates as full-page coordinates while shape drawing treated them as window-relative, drawing terrain stamps 16 pixels too high in the Allied L2 Win95 layout (`TacPixelY=16`). The remaining D4/D17 edge-blending mismatch was a porting regression in the portable RA `Build_Fading_Table()` replacement: it did not preserve the original x86 routine's signed 8-bit blend math, self-match skip, and last-match-wins tie behavior. Native now builds the same tactical shroud translucent table as RA95; fixed capture `/tmp/battlecontrol/2026-05-22T07-11-52-mission-allied-l2` has tactical `p99=0` and the prior D4 probe pixels are exact. |
+| D5 | Native had stale one-pixel text/crosshair remnants. | Fixed | `Buffer_Fill_Rect` used exclusive right/bottom; original callers pass inclusive coordinates. |
+| D6 | Native initially captured wrong viewport/camera. | Fixed | `Set_Tactical_Position()` ignored its requested coordinate; Linux also needed Win95 sidebar/start-view logic. |
+| D7 | Wine/native captures are at different simulation times. | Clear | Native traps after the target gameplay frame is presented, while Wine is captured from cnc-ddraw's render-loop/RA-clock boundary. The difference is now measured and accounted for by sequence alignment rather than treated as a renderer bug: fresh fixed-seed 60 FPS Allied L1 sequence comparison at `/tmp/battlecontrol/d7-sequence-align-20260522-155843` aligns best at native `wine+2` frames across 98 overlapping frames. D19 tracks the remaining ore/animation/palette-phase differences visible after applying that best measured offset. |
+| D8 | Native credit text smears/overprints during credit counter animation. | Fixed | `CreditClass::Graphic_Logic()` now redraws the credit/timer tab background before printing updated text; frame-60 native capture shows a clean `5666`. |
+| D9 | Native tutorial/message lifetime differs from Wine at later frames. | Fixed | `MessageListClass` now preserves the Win95 `TickCount` timeout basis for in-game messages. A short-lived port change had made native expiry frame-based, which kept `Clear the way for the convoy` visible at frames where RA95 had already expired it. Allied L2 frame 500 now agrees on the message state. |
+| D10 | Road/ground template art was fragmented or looked like the wrong subtile. | Fixed | The portable `Buffer_Draw_Stamp*` implementations skipped the original iconset logical-to-physical `Map` remap. Restoring that remap fixes Allied L1/L2 road fragmentation and the earlier “template rendering” issue. |
+| D11 | Native inactive radar panel shows static/noise where Wine shows the Allied cover plate. | Fixed | Porting regression from `84604ef`: `Get_Jammed(PlayerPtr)` was used as a replacement for disabled legacy `IsRadarJammed`, but it is true when no radar building exists. Native now only draws jam snow when a radar exists and is jammed; no-radar Allied L2 draws the cover plate like Wine. |
+| D12 | Wine has drop shadows to the right of the three control panel buttons (spanner, dollar, earth), native does not. | Fixed | The dark pixels are ordinary `SIDE1NA.SHP` sidebar art, not button shadow effects. Native drew those pixels correctly, then `RadarClass::AI()` unconditionally flagged an inactive no-radar cover redraw and `RadarClass::Draw_It()` repainted `RadarAnim` frame 0 over the sidebar. Native now advances/flags the jammed-radar animation only when a radar exists and is actually jammed. |
+| D13 | Wine shroud/fog appears to have four grades between revealed and hidden, native closer to three. | Fixed | Porting regression in the portable RA `Build_Fading_Table()` replacement. Earlier partial fixes handled the most obvious black-collapse cases, but the correct fix is to reproduce the original x86 routine's signed 8-bit fade arithmetic and nearest-color tie behavior. This produces the same shroud translucent table as RA95 for the observed D13/D4 samples. |
+| D14 | Native has native-only saturated green/purple/cyan/red pixels near the infantry cluster; Wine is clean. | Fixed | The saturated cluster was mapped ore (`OVERLAY_GOLD2`, `OverlayData=3`) in cell `5972`, which native drew even though the cell was mapped but not visible. The later shroud mask has transparent holes, so ore colors leaked through. Native now skips overlays for mapped-but-not-visible cells, matching Wine at the reported green/purple pixels. |
+| D16 | Soviet L3 shows native-only purple pixels in snow/overlay art. | Review pending | The underlying native decoder bug appears fixed: shape probes showed the source shape data itself contained palette index `1` because native decoded non-LCW keyframe deltas as LCW, and native now decodes XOR streams with the original command format. The remaining Wine blocker on 2026-05-22 was not Soviet L3 logic: RA95 was showing its low-disk modal before gameplay. After freeing root space, strict Wine frameprobe reached `SCU03EA` frame 60 and synced native to the same frame in `/tmp/battlecontrol/2026-05-22T16-09-49-mission-soviet-l3` (`SSIM=0.9857`, tactical `SSIM=0.9772`). Both full tactical scans and the historical probe pixels contain zero purple-like pixels and zero exact `(168,0,164)` pixels in Wine and native. Review pair: `/tmp/battlecontrol/review-d16-soviet-l3-purple/{wine,native,diff-wine-vs-native}.png`. |
+| D18 | Sidebar has a one-pixel vertical line difference immediately left of the leftmost build column. | Fixed | Stable aligned-sequence artifact at screen `x=499`, mostly `y=195..371`. Native exposed the sidebar bevel color `(68,68,60)` where Wine shows the darker overlapping `POWERBAR.SHP` edge. Native probes showed `SIDE2NA/SIDE3NA` write local `x=19` into `x=499`; Wine process-memory source scans found matching decoded source rows, ruling out asset load and sidebar decode provenance. A full late `PowerClass::Draw_It()` fixed the strip but wrongly overwrote radar/top/bottom pixels. The final fix keeps the normal power/radar order and redraws only the clipped retail-overlap strip of `POWERBAR.SHP` after the build-strip draw; the clip samples one source pixel to the right (`source_dx=-1`) and draws both powerbar SHP segments for the native high-res sidebar. Verification at Allied L2 frame 90: `/tmp/battlecontrol/2026-05-22T15-28-24-mission-allied-l2` has the D18 bar band `(496,160)-(502,390)` and sidebar button crop pixel-exact (`changed=0`, `max=0`). |
+| D19 | Residual ore, unit animation, and palette-cycle differences remain after best-offset frame alignment. | Mostly fixed | The largest unit/convoy phase difference was source-level gameplay drift, not capture timing: MinGW port under Wine matched Linux native exactly, while both differed from RA95. Team tracing on Allied L2 showed the drifting group is team `rnf2` (`JEEP` + `E1`), formation `none`, so the remaster-era formation-speed code was ruled out. Git history pointed to `fc5cd5a` adding `&& !Team` to `DriveClass::AI()` zone rejection, described as "Ignore movement destination checks if a unit is part of a mission-driven team." Retail behavior is now the default through `RA_BEHAVIOR=retail`; `RA_BEHAVIOR=remaster` keeps the 2020 behavior explicit. Restoring the retail zone check collapses Allied L2 frame 400 from `SSIM=0.9890 p99=24` to `SSIM=0.9953 p99=0`, and frame 500 to `SSIM=0.9950 p99=0`. A later native-only Allied L2 state divergence was traced to committed TIM-298 diagnostic code that forced every non-human house into `IsBaseBuilding=1` at frame 10, causing USSR barracks production that RA95 did not perform; that synthetic production path and its always-on logs have been removed. The remaining `rnf2` endpoint mismatch was then isolated to `Map.Nearby_Location()` selection phase: Wine and native had the same clear candidate cells `6487,6359,6361,6487`, but RA95 assigned `As_Target(6487)` when its frame counter reached 271 while the 2020 source selected index 2 at `Frame=270`. Retail/original builds now use `(Frame+locationmod+1) % count`; `RA_REMASTER_BEHAVIOR` preserves the 2020 expression. Clean frame-500 verification passes on Allied L2 (`/tmp/battlecontrol/2026-05-24T18-49-21-mission-allied-l2`, `SSIM=0.9965 p99=0`) and Allied L3 (`/tmp/battlecontrol/2026-05-24T18-50-43-mission-allied-l3`, `SSIM=0.9980 p99=0`). Allied L1 still passes but retains known tactical timing noise (`SSIM=0.9851 p99=60`). Soviet L1/L3 and Allied L5 are currently blocked by the Wine entry path stalling in loading with frame zero, so those are tooling coverage gaps rather than known gameplay regressions. |
+| D20 | Soviet L3 has a native-only horizontal dark bar across the bottom of the sidebar strip. | Fixed | The source decode was not at fault: `SIDE3US.SHP` row 123 matched Wine, and cnc-ddraw primary-surface capture proved the difference existed before the window screenshot path. Native traced the final writer to a late partial sidebar background repaint triggered by `Activate_Repair()` during the first gameplay ticks. That parent repaint did not mark the child strip columns dirty, so the frame art overwrote the strip buttons and the children were not redrawn. `SidebarClass::Draw_It()` now invalidates both strip columns whenever it redraws the sidebar background, preserving the intended parent-before-child draw order. Verification: `/tmp/battlecontrol/2026-05-22T18-01-03-mission-soviet-l3/native.png` against `/tmp/battlecontrol/review-d16-soviet-l3-frame456/wine.png` is pixel-exact for the full sidebar (`x=480..639, y=0..399`) and row 399. |
+
+| D15 | Multi-level Soviet captures showed large native-only colored/noisy blocks and over-revealed terrain. | Mostly capture artifact | The bad Soviet L1/L2/L4/L5 samples compared Wine actual gameplay frame `1` to native frame `60` because the RA95 process-memory counter at `0x006544c8` stalls at `1` for those missions. When native is synced to Wine's reported actual frame, those missions pass. The remaining Soviet L3 issue is Wine capture entry falling into top scores, not a renderer diff. |
+
+Remaining saturated samples at `(360..361,109..114)` are tracked by D19:
+native traces them to a 50x39 `SHAPE_FADING|SHAPE_GHOST` remapped object draw,
+consistent with unit/animation-state drift rather than the mapped-ore leak.
+
+## Ruled Out
+
+- Cursor edge scrolling: centering X pointer before capture barely changed SSIM.
+- MapPack layout: `SCG02EA.INI` reports `NewINIFormat=3`; split template/icon layout is fully valid, interleaved is invalid.
+- Treating template type `255` as a real template: worsened Allied L2 (`SSIM 0.5740`) and created black holes.
+- Linux `CC_Draw_Shape` Win95 branch switch: no material effect on Allied L2 capture.
+
+## Working Hypotheses
+
+1. A shared scenario/UI initialization issue may explain D1-D3 if native does not load or activate mission timer, house credits, or briefing/message triggers before capture.
+2. D4 may be separate rendering dirtiness: forced tactical redraw improves the map but does not restore the top-bar state.
+3. Remaining shroud parity should be investigated after D1-D3 prove whether native game state is aligned with Wine.
+4. The apparent one-cell terrain shift is not global: source-cell and pixel-offset probes failed to improve the tactical crop, and crop-offset scoring is best at zero vertical offset.
+5. The large SSIM loss was dominated by the inactive radar panel; after fixing the jam condition, Allied L2 frame 60 passes parity at `SSIM=0.9804`.
+6. The post-frameprobe Allied L2 mismatch initially looked concentrated at exact
+   sight-range boundaries, but RA95 process-memory probes and native stamp
+   probes changed the read: the cells and CLEAR1 icon bytes matched, while
+   native terrain stamps were being placed 16 pixels above the shadow/shape
+   layer. This was a clipped-stamp viewport-origin bug.
+
+## Multi-Level Sampling Notes
+
+### Frame-Probe Capture Artifact
+
+The biggest new lead from sampling Allied/Soviet L1-L5 is that many of the
+reported "rendering" failures were bad pairings. The Wine frame probe originally
+had a stable-nonzero escape for missions where `0x006544c8` never reached the
+requested target frame. That let the driver capture a Wine image at actual
+counter value `1`, while the native driver still captured frame `60`.
+
+This mismatch exactly explains the noisy native-only blocks seen in failed
+Soviet samples: native units, shroud, hover text, and remapped/ghosted object
+draws had advanced dozens of frames while Wine had not. Soviet L2 proves the
+point directly:
+
+- Bad pair: `/tmp/battlecontrol/2026-05-20T21-17-34-mission-soviet-l2`,
+  Wine actual `1` vs native `60`, `SSIM=0.5504`.
+- Same Wine image against native frame `1`: `SSIM=0.9656`.
+- Harness-synced rerun after actual-frame reporting:
+  `/tmp/battlecontrol/2026-05-20T21-22-31-mission-soviet-l2`, `SSIM=0.9516`.
+
+The capture harness now writes `wine-frame.txt`, records `effective_frames` in
+the manifest, and can sync native to Wine's actual frame with
+`RA_SYNC_NATIVE_TO_WINE_FRAME=1`, but only when Wine reports `reason=target`.
+The old stable-nonzero fallback is no longer enabled by default because it
+allowed requested frame 60 to become Wine actual frame 1; it can only be
+re-enabled explicitly with `WINE_FRAMEPROBE_ACCEPT_STABLE=1` plus
+`RA_FRAMEPROBE_STABLE_OK_POLLS=N`. Native frame-2 retry after a frame-1 failure
+is also opt-in (`RA_RETRY_NATIVE_FRAME2_ON_FAIL=1`) so the comparison cannot
+silently paper over a bad root of trust.
+
+The harness also rejects Wine captures whose tactical viewport is effectively
+blank; this catches the Soviet L3 top-scores/main-menu failure that previously
+looked like a black-but-passing screenshot.
+
+2026-05-20 follow-up: the Wine mission path is not actually zero-click. Allied
+captures depend on a single `Enter` to select Start New Game; the broader
+legacy `Enter`+`Space` sequence can race and select Top Scores. Soviet captures
+also require CD2 semantics: the Wine staging code now uses `.#ra-data-soviet`
+for `SCU*` missions and rewrites the staged RA95 volume-label table so Wine's
+blank volume label maps to `CD2` instead of `CD1`. Strict frameprobe still
+shows Soviet missions reaching the main menu/top-scores path rather than
+gameplay, so Soviet campaign parity remains blocked on a scenario-entry fix
+rather than a renderer comparison.
+
+As of the keyframe-delta fix, Allied L2 must be compared with
+`WINE_FRAMEPROBE=1 RA_SYNC_NATIVE_TO_WINE_FRAME=1`; otherwise Wine's timed wait
+can reach a later simulation state than native. A frameprobe Allied L2 rerun at
+`/tmp/battlecontrol/2026-05-20T23-46-45-mission-allied-l2` passes at
+`SSIM=0.9979`. Soviet L3 still needs a harness fix: RA95 reaches the top-scores
+screen before the frameprobe advances past `1`, so the current failure is
+scenario-entry/capture setup rather than the purple-pixel renderer bug.
+
+### Allied L2 Exact Frame
+
+Process-memory probing against RA95 under Wine identified `0x006544c8` as the
+gameplay `Frame` counter for Allied L2. In a clean run it started at 54 and
+advanced 55, 56, 57... while the faster candidate at `0x0069720c` advanced at
+roughly nine times that rate. Gating Wine at `Frame=60` and native at internal
+frame 60 produces a stable comparison in
+`/tmp/battlecontrol/2026-05-20T07-54-30-mission-allied-l2`.
+
+Before the clipped-stamp fix, that exact-frame comparison had a native-only pale
+shroud opening left of the island. Native cell tracing mapped the main offending
+cells at startup:
+
+- `6227` (`cx=83 cy=48`, screen about `252,108`), `mapped=1 visible=0 shadow=13`
+- `6356` (`cx=84 cy=49`, screen about `276,132`), `mapped=1 visible=0 shadow=8`
+- `6484` (`cx=84 cy=50`, screen about `276,156`), `mapped=1 visible=0 shadow=12`
+
+`RA_TRACE_SIGHT=1` showed these cells are revealed at `Frame=0` by Greece units:
+
+- center `6231` (`cx=87 cy=48`) maps `6227`, `6356`, and `6484` with range 4;
+- center `6360` (`cx=88 cy=49`) also maps `6356` with range 4.
+
+The SCG02EA scenario confirms matching infantry at those centers, including
+`25=Greece,E1,256,6231,4,Guard,192,None` and
+`28=Greece,E1,256,6360,1,Guard,128,None`. Cell `6227` is exactly four cells
+west of `6231`, so the next assertion is whether the native source includes a
+cardinal cell at exactly `sightrange * CELL_LEPTON_W` that RA95 excludes, or
+whether native's distance/radius calculation differs from the shipped binary.
+
+Follow-up probes:
+
+- Excluding every exact sight-radius boundary (`Distance >= range`) makes the
+  target black pixels match but hides far too much terrain (`SSIM=0.8671`), so
+  this is not a valid global fix.
+- Measuring sight from actual infantry subcell coordinates only reduces the
+  reveal slightly (`SSIM=0.9316`). It does not close the target hole because
+  SCG02EA has a second Greece E1 in cell `6231` at upper-left subposition 1;
+  with range 4 it still reaches `6227`.
+- Reducing all infantry sight ranges by one makes the target pixels black but
+  hides much too much of the visible island (`SSIM=0.7967`).
+- Drawing shadow shapes opaquely leaves the same top-left pixels uncovered.
+  At the time this suggested the open native block was not solely a
+  translucency table blend error. Later exact source/destination table probes
+  superseded this: the same visible symptom included both the earlier terrain
+  offset and the later portable fade-table mismatch.
+- Colorizing the native shroud pass with `RA_COLOR_SHADOW_CELLS=1` in
+  `/tmp/battlecontrol/2026-05-20T08-26-57-mission-allied-l2` proves the pale
+  top-left pixels are not terrain being drawn after the shroud. They are the
+  final `Redraw_Shadow()` pass painting mapped shadow cells with native
+  `Cell_Shadow()` values. This rules out draw-order repaint as the immediate
+  cause.
+- Suppressing all sight from cell `6231` makes `6227` unmapped and black, but it
+  also hides too much neighboring terrain (`SSIM=0.9435`). This proves the bad
+  block is caused by the sight contribution from the starting Greece infantry at
+  `6231`, but not that the production fix should remove that sight.
+- Wine frame 90 keeps the same target pixels black as Wine frame 60. The
+  mismatch is stable across at least 30 RA95 gameplay frames.
+- Applying global shadow-overlay Y offsets (`-24`, `-12`, `+12`, `+24` pixels)
+  does not improve the exact-frame comparison. `-12` fixes the top bad pixel
+  locally but lowers SSIM to `0.9436` and over-darkens nearby pixels; this is
+  not a global `Redraw_Shadow()` origin error.
+- Native asset tracing with `RA_TRACE_MIX_HITS=1` shows `SHADOW.SHP` and
+  `TRANS.ICN` are both loaded from `CONQUER.MIX`, and the top-bar fonts are
+  loaded from the expected `HIRES.MIX`/`LOCAL.MIX` sources. The remaining D4
+  artifact does not currently look like fallout from the `HIRES.MIX` before
+  `LORES.MIX` porting fix.
+- Using `Center_Coord()` / actual coordinates for the sight origin does not fix
+  the target block. `RA_SIGHT_CENTER_COORD=1` leaves the sampled pixels unchanged
+  and lowers SSIM to `0.9318`; `RA_SIGHT_ACTUAL_COORD=1` previously lowered SSIM
+  to `0.9316`.
+- Git history check: `MapClass::Sight_From()` and the coordinate-distance
+  predicate are original-source code; the native `Distance(COORDINATE,COORDINATE)`
+  implementation in `COORD.CPP` is also original C, not a ported asm replacement.
+  The candidate port-sensitive area is therefore object discovery/sight state,
+  not the radius loop itself.
+- `WINE_CELL_SCAN=1` against RA95 at exact frame 60 found the original `CellClass`
+  array at `0x03af0034` with legacy stride 58. The D4 neighborhood cells
+  `6098/6099/6100/6226/6227/6228/6229/6354/6355/6356/6357/6483/6484/6485`
+  all had `flags16=0x000c`, while far cells had `0x0000`. Under the original
+  bit ordering those are mapped and visible. This rules out a simple native-only
+  reveal state as the cause of the sampled black Wine pixels.
+- `RA_SKIP_D4_SHADOW_CELLS=1` did not change the suspect native pixels, even
+  though `RA_COLOR_SHADOW_CELLS=1` proved the native shadow pass visits the
+  cells. The light pixels are already present in the base terrain layer or are
+  written by a non-shadow terrain stamp path.
+- `RA_TRACE_TEMPLATE_HEADERS=1` and `WINE_TEMPLATE_SCAN=1` show `CLEAR1.SNO`
+  has the same expanded iconset header in native and RA95 memory:
+  `wh=24,24 count=20 alloc=0 mapwh=1,1`, with `new_icons=40`,
+  `new_trans=9276`, `new_cmap=9292`, `new_map=9256`. RA95 and native also agree
+  on the sampled icon bytes for clear icon 3. That makes a key/MIX/header-layout
+  mismatch unlikely for the D4 clear terrain cells.
+- `strings` on the patched RA95 binary confirms the public-key material is
+  embedded in the executable, including `PublicKey` and
+  `1=AihRvNoIbTn85FZRYNZRcT+i6KpU+maCsEqr3Q5q+LDB5tH7Tz2qQ38V`; this matches
+  `REDALERT/CONST.CPP`. The current evidence does not point at MIX key lookup.
+- The native terrain stamp probe showed cell `6227` writing `CLEAR1` logical
+  icon 3 at `stamp=240,96`, including probe pixels `(240,100)` and `(252,108)`.
+  The shadow/shape path draws through a `WINDOW_TACTICAL` viewport at
+  `TacPixelY=16`, so the native terrain layer was one top-tab offset above the
+  shadow layer. A window-origin correction in `Buffer_Draw_Stamp_Clip()` raises
+  the terrain layer into alignment and removes the D4 blocky fog artifact.
+- A later probe of the native-only saturated pixels found the writer is the
+  shroud shape path, not the infantry draw path. At `(279,79)`, native draws
+  `SHADOW.SHP` at `shape=264,72`, `flags=0x1040`, source pixel 16 over terrain
+  index 79, through translucent table index 0, producing palette index 137.
+  The same probe pattern covers the purple pixel at `(286,86)`, although the
+  exact final color varies between captures.
+- A Wine process-memory scan found a matching RA95 translucent-table candidate
+  at `0x00644a18`: `control[16]=0`, `control[15]=1`, and samples
+  `s16_d79=137`, `s15_d79=140`. That early sample was too narrow: later D4
+  samples involving `src14/dst116`, `src15/dst130`, and `src15/dst65` exposed
+  the portable fade-table mismatch.
+- Superseding D4 table probe, 2026-05-22: tracing the current D4 probe pixels
+  showed native using different translucent table outputs for the same live
+  source/destination pairs. Wine's table at `0x00644a18` maps
+  `src14/dst116 -> 12`, `src15/dst130 -> 140`, and `src15/dst65 -> 24`; the
+  native portable `Build_Fading_Table()` path produced `16`, `31`, and `23`.
+  Reimplementing RA's original x86 fade-table arithmetic makes the D4 shroud
+  probe pixels exact against Wine.
+
+### D12 Button-Shadow Probe
+
+The top-button shadow difference is not in the capture path. `WINE_SCREEN_SCAN=1`
+found two RA95 640-stride screen buffers at exact frame 60 where all nine sampled
+button-shadow pixels match Wine's dark palette indices:
+
+- `0x02a2ff00`, stride 640
+- `0x02a9ff00`, stride 640
+
+The early memory scan proved the final dark pixels were already present in RA95's
+8-bit screen buffers, but it did not identify a separate button-shadow primitive.
+The final native provenance trace showed the missing "button shadows" are not
+produced by the buttons at all. They are sidebar-top pixels from `SIDE1NA.SHP`.
+Native was drawing them correctly, then repeatedly overwriting them with the
+inactive radar cover:
+
+- `RadarClass::Draw_It` draws `RadarAnim` frame 0 at `(480,16)`,
+  `160x141`, producing the bright/native values.
+- `SidebarClass::Draw_It` then draws `SIDE1NA.SHP` at `(480,16)`,
+  `160x160`, producing the Wine-matching dark values.
+- Before the fix, `RadarClass::AI` unconditionally flagged the radar for redraw
+  even when `IsRadarActive=0` and `DoesRadarExist=0`, so the next render drew
+  `RadarAnim` frame 0 over the sidebar again.
+
+Gating that `RadarClass::AI` block to actual jammed-radar state
+(`DoesRadarExist && Get_Jammed(PlayerPtr)`) removes the repeated inactive-cover
+redraw. After the fix, all nine sampled D12 pixels match Wine exactly at frame
+60, and Allied L2 Wine-vs-native reports `SSIM=0.9974` for the local capture
+session `2026-05-20T18-55-32-mission-allied-l2`.
+
+### Allied L3
+
+The pale native rectangles north of the lower island are not stale pixels and
+not a global one-cell terrain shift. Native frame-1 and frame-10 traces show the
+same cells already marked as `mapped=1 visible=0` before the first captured
+gameplay render; later redraws make them visible. Targeted `Sight_From()` trace
+shows the cells are revealed at `Frame=0` from the Greece unit centered at cell
+`7738` (`cx=58 cy=60`) with sight range 3:
+
+- `7354` (`cx=58 cy=57`, screen `168,228`)
+- `7480` (`cx=56 cy=58`, screen `120,252`)
+- `7481` (`cx=57 cy=58`, screen `144,252`)
+- `7482` (`cx=58 cy=58`, screen `168,252`)
+- `7608` (`cx=56 cy=59`, screen `120,276`)
+- `7735` (`cx=55 cy=60`, screen `96,300`)
+
+Two probes did not move the artifact:
+
+- returning legacy global `IsMapped` / `IsVisible` from the `CellClass` query
+  functions in `GAME_NORMAL`;
+- returning legacy global `IsDiscoveredByPlayer` from
+  `TechnoClass::Is_Discovered_By_Player()` in `GAME_NORMAL`.
+
+An opaque-shadow diagnostic also leaves the rectangles open. That means the
+selected `SHADOW.SHP` frames leave those pixels uncovered; the immediate cause
+is not the ghost/translucency table. The remaining question is whether RA95 has
+the same edge-of-sight cells mapped at the same internal state.
+
+Wine Allied L3 is not yet a trustworthy frame reference:
+
+- wall-clock frame 10 can produce clean gameplay, but it lacks the top-left
+  mission message that native has, so it is not state-aligned;
+- wall-clock frames 11+ often hit the RA95 `0x00534273` crash dialog;
+- a process-memory scan found `0x0068dea0` advancing `10 -> 20/29/33`, but it
+  caps at 33 and appears to be a transition/fade counter, not the gameplay
+  `Frame`;
+- candidate addresses `0x00642080`, `0x006544c8`, and `0x00655d18` remained
+  at zero during the same probe; `0x0066b68c` only advanced to 2.
+
+Next assertion: find the real RA95 gameplay `Frame` or another post-briefing
+state variable, then gate Wine screenshots from process memory before judging
+the Allied L3 shroud cells against native.
+
+### Soviet Campaign
+
+The flake now exposes both Allied and Soviet data sets. The Wine scenario patch
+was extended to replace both `SCG01EA.INI` and `SCU01EA.INI`, and the autostart
+patch gained a `--side` switch so Soviet missions can take the Soviet scenario
+string path. That fixes the earlier wrong-level harness issue where Soviet
+captures loaded an Allied mission.
+
+New user observations to preserve while debugging:
+
+- `2026-05-20T21-49-06-mission-soviet-l3/wine-invalid-1.png` is the mission
+  over / top-scores screen, not a blank gameplay frame. That implies the Wine
+  path has entered an endgame presentation path, probably with non-normal
+  session state, rather than rendering a valid campaign mission.
+- `2026-05-20T21-45-41-mission-soviet-l3/wine-invalid-3.png` has a fully black
+  gameplay area. This might still be a mission feature rather than a bad
+  capture, so later-frame captures should be used before rejecting it.
+- Later timed Wine captures for Soviet L3 were sampled with frame-probing off:
+  - frame 20: `/tmp/battlecontrol/2026-05-20T22-13-52-mission-soviet-l3`,
+    `tactical_nonblack=0.2051`, mostly black samples.
+  - frame 30: `/tmp/battlecontrol/2026-05-20T22-14-34-mission-soviet-l3`,
+    `tactical_nonblack=0.2051`, mostly black samples.
+  - frame 60: `/tmp/battlecontrol/2026-05-20T22-15-16-mission-soviet-l3`,
+    `tactical_nonblack=0.1449`, looks like the top-scores/endgame path.
+  - frame 100: `/tmp/battlecontrol/2026-05-20T22-15-59-mission-soviet-l3`,
+    `tactical_nonblack=0.1496`, also consistent with top-scores/endgame.
+- Purple pixels are present in
+  `/tmp/battlecontrol/2026-05-20T21-44-22-mission-soviet-l3/native.png`.
+  A pixel scan found 572 purple/magenta tactical pixels, mostly exact RGB
+  `(168,0,164)`, clustered around buckets `(4,2..13)`, `(8..9,16..17)`, and
+  `(28..29,16..17)`. This should be traced as a native rendering/provenance
+  issue independent of the invalid Wine reference.
+- `/tmp/battlecontrol/2026-05-20T21-41-20-mission-soviet-l5/{wine,native}.png`
+  are near-identical spatially but appear to have a gamma or palette-level
+  difference. Quick paired nonblack analysis shows native is usually brighter:
+  median luminance delta about `+5.33`, median ratio about `1.10`, and common
+  mappings like `(36,44,40)->(40,48,44)`, `(48,56,36)->(52,64,40)`, and
+  `(112,112,112)->(124,124,124)`. This looks more like palette/gamma/remap
+  intensity drift than geometry or draw-order drift.
+
+Soviet visual sampling remains partly blocked by Wine entry stability: some
+captures reach an apparently black initial mission view, while others fall into
+top-scores/endgame. The next useful assertion is to identify whether SCU03EA
+legitimately starts with a black tactical area and why the Wine autostart path
+can reach `Multi_Score_Presentation()` so early.
+
+### 2026-05-21 Soviet L1 Sidebar/Radar Follow-up
+
+Fresh Soviet L1 review exposed two right-panel divergences after the gamma
+capture issue was ruled out:
+
+- the construction/sidebar decal behind the build window was blue in native
+  but red in Wine;
+- the radar panel did not line up visually, especially around the active/static
+  radar view.
+
+Root cause for the blue decal is now identified. Native `Read_Scenario_INI()`
+calls `Map.Read_INI()`, which runs `DisplayClass::Init()` ->
+`SidebarClass::Init_Theater()` -> `Reload_Sidebar()` before `[Basic] Player`
+has assigned `PlayerPtr` from the scenario INI. That early load uses the default
+Allied/NATO player state and caches `SIDE?NA.SHP`. A later diagnostic proved
+the scenario data itself is correct:
+
+- early sidebar load: `SIDE?NA.SHP`;
+- then `[Basic] Player` assigns `house=2 actlike=2 name=USSR`;
+- reloading after `PlayerPtr` selection loads `SIDE?US.SHP`;
+- sampled pixel `(530,178)` changes from native blue `(24,40,84)` to Soviet red
+  `(76,0,0)`, matching Wine.
+
+This bug was introduced by the native autostart/porting path exposing an
+initialization order that the original RA95 autostart patch avoids by following
+the install/side-selection path. The correct native fix is to reload the
+player-side sidebar assets after `PlayerPtr` is assigned, not to force Soviet
+art from the renderer.
+
+The radar mismatch is still open and should be tracked separately. In the
+current captures the full frame can pass (`SSIM=0.9737` at
+`2026-05-21T16-56-07-mission-soviet-l1`), but `radar_panel` remains poor
+(`SSIM=0.3834`). Wine frame-10 visually matches native closer around native
+frame-20, confirming that Wine's reported `effective_frame` is not a true
+internal gameplay frame. Even when phases are closer, the radar viewport marker
+differs: Wine draws the tactical viewport line in yellowish pixels
+`(252,248,84)`, while native draws the same `LTGREEN` path as green
+`(84,252,84)`. Continue radar work with a trustworthy Wine frame counter before
+changing radar drawing code.

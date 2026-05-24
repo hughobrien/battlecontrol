@@ -76,8 +76,9 @@ int SDL_Cursor_X = 0;
 int SDL_Cursor_Y = 0;
 }
 
-// TIM-172: forward decl so Fill_Buffer_From_System can drive SDL_RenderPresent.
-extern "C" void Wait_Vert_Blank(void);
+// Pump queued SDL events without presenting; input polling must not advance
+// the render clock.
+extern "C" void SDL_Process_System_Events(void);
 #endif
 
 //void Message_Loop(void);
@@ -698,12 +699,7 @@ bool WWKeyboardClass::Is_Buffer_Empty(void) const
 void WWKeyboardClass::Fill_Buffer_From_System(void)
 {
 #ifndef _MSC_VER
-	// TIM-172: Wait_Vert_Blank pumps SDL window+input events AND calls
-	// SDL_RenderPresent, so every input poll also presents the framebuffer.
-	// On Win32, DirectDraw's implicit surface flip made this unnecessary;
-	// on Linux/SDL, this is the only site that drives screen updates from
-	// non-rendering loops like Main_Menu().
-	Wait_Vert_Blank();
+	SDL_Process_System_Events();
 #else
 	if (!Is_Buffer_Full()) {
 		MSG	msg;

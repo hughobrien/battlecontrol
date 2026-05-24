@@ -1795,7 +1795,12 @@ CELL MapClass::Nearby_Location(CELL cell, SpeedType speed, int zone, MZoneType c
 	}
 
 	if (count > 0) {
+#ifdef RA_REMASTER_BEHAVIOR
 		return(topten[(Frame+locationmod) % count]);
+#else
+		// Retail RA95 observes this selection one frame later than the 2020 source.
+		return(topten[(Frame+locationmod+1) % count]);
+#endif
 	}
 	return(0);
 }

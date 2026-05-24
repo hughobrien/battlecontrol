@@ -360,8 +360,8 @@ bool DLLExportClass::GameOver = false;
 ** 
 ** 
 */
-int DLLForceMouseX = 0;
-int DLLForceMouseY = 0;
+int DLLForceMouseX = -1;
+int DLLForceMouseY = -1;
 
 CNC_Event_Callback_Type DLLExportClass::EventCallback = NULL;
 

@@ -34,6 +34,7 @@
 #include "gbuffer.h"
 #include "MISC.H"
 #include "WSA.H"
+#include <cstdint>
 
 IconCacheClass::IconCacheClass (void)
 {
@@ -713,18 +714,19 @@ void __cdecl Buffer_Fill_Rect(void *thisptr, int sx, int sy, int dx, int dy, uns
 	(void)VPwidth; (void)VPheight; (void)VPxadd; (void)VPbpr; (void)local_ebp;
 
 #ifndef _MSC_VER
-	// TIM-160: fill rectangle (x1_pixel,y1_pixel)..(x2_pixel,y2_pixel) with color
+	// Original callers pass inclusive right/bottom coordinates.
 	{
 		GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
 		int stride = vp->Get_Width() + vp->Get_XAdd() + vp->Get_Pitch();
 		unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
 		int w = vp->Get_Width(), h = vp->Get_Height();
 		int r0 = y1_pixel < 0 ? 0 : y1_pixel;
-		int r1 = y2_pixel > h ? h : y2_pixel;
+		int r1 = y2_pixel >= h ? h - 1 : y2_pixel;
 		int c0 = x1_pixel < 0 ? 0 : x1_pixel;
-		int c1 = x2_pixel > w ? w : x2_pixel;
-		for (int r = r0; r < r1; r++)
-			memset(buf + r * stride + c0, color, c1 > c0 ? c1 - c0 : 0);
+		int c1 = x2_pixel >= w ? w - 1 : x2_pixel;
+		if (r1 < r0 || c1 < c0) return;
+		for (int r = r0; r <= r1; r++)
+			memset(buf + r * stride + c0, color, c1 - c0 + 1);
 	}
 #else
 	{ /* TIM-164: replaced */ }
@@ -1023,6 +1025,99 @@ unsigned int IconHeight = 0;	//	DD	0	; Height of icon in pixels.
 unsigned int IconSize = 0;		//	DD	0	; Number of bytes for each icon data.
 unsigned int IconCount = 0;	//	DD	0	; Number of icons in the set.
 
+#pragma pack(push, 1)
+struct IControlDiskType {
+	int16_t Width;
+	int16_t Height;
+	int16_t Count;
+	int16_t Allocated;
+	int16_t MapWidth;
+	int16_t MapHeight;
+	int32_t Size;
+	int32_t Icons;
+	int32_t Palettes;
+	int32_t Remaps;
+	int32_t TransFlag;
+	int32_t ColorMap;
+	int32_t Map;
+};
+#pragma pack(pop)
+static_assert(sizeof(IControlDiskType) == 40, "RA iconset header must match STAMP.INC");
+
+static bool Iconset_Resolve_Icon(void const *icondata, int logical_icon, int &physical_icon)
+{
+	if (!icondata) return false;
+	IControlDiskType const *control = (IControlDiskType const *)icondata;
+	if (control->Width <= 0 || control->Height <= 0 || control->Count <= 0) return false;
+	if (control->Icons <= 0 || control->Size <= control->Icons) return false;
+	if (logical_icon < 0 || logical_icon >= control->Count) return false;
+
+	physical_icon = logical_icon;
+	if (control->Map != 0) {
+		if (control->Map < 0 || control->Map + logical_icon >= control->Size) return false;
+		unsigned char const *base = (unsigned char const *)icondata;
+		physical_icon = base[control->Map + logical_icon];
+	}
+	if (physical_icon < 0 || physical_icon >= control->Count) return false;
+
+	long long const icon_size = (long long)control->Width * (long long)control->Height;
+	long long const icon_end = (long long)control->Icons + ((long long)physical_icon + 1) * icon_size;
+	return icon_size > 0 && icon_end <= control->Size;
+}
+
+static void Buffer_Draw_Stamp_Common(
+	GraphicViewPortClass *vp,
+	void const *icondata,
+	int icon,
+	int x_pixel,
+	int y_pixel,
+	void const *remap,
+	int clip_x0,
+	int clip_y0,
+	int clip_x1,
+	int clip_y1)
+{
+	int physical_icon = 0;
+	if (!vp || !Iconset_Resolve_Icon(icondata, icon, physical_icon)) return;
+
+	IControlDiskType const *control = (IControlDiskType const *)icondata;
+	unsigned char const *base = (unsigned char const *)icondata;
+	int const icon_w = control->Width;
+	int const icon_h = control->Height;
+	int const icon_size = icon_w * icon_h;
+	unsigned char const *icon_src = base + control->Icons + physical_icon * icon_size;
+
+	unsigned char trans_flag = 0;
+	if (control->TransFlag != 0) {
+		if (control->TransFlag < 0 || control->TransFlag + physical_icon >= control->Size) return;
+		trans_flag = base[control->TransFlag + physical_icon];
+	}
+	bool const transparent = remap != NULL || trans_flag != 0;
+
+	int const vw = vp->Get_Width();
+	int const vh = vp->Get_Height();
+	int const stride = vw + vp->Get_XAdd() + (int)vp->Get_Pitch();
+	unsigned char *buf = (unsigned char *)(uintptr_t)vp->Get_Offset();
+
+	if (clip_x0 < 0) clip_x0 = 0;
+	if (clip_y0 < 0) clip_y0 = 0;
+	if (clip_x1 > vw) clip_x1 = vw;
+	if (clip_y1 > vh) clip_y1 = vh;
+	if (clip_x1 <= clip_x0 || clip_y1 <= clip_y0) return;
+
+	for (int row = 0; row < icon_h; row++) {
+		int const py = y_pixel + row;
+		if (py < clip_y0 || py >= clip_y1) continue;
+		for (int col = 0; col < icon_w; col++) {
+			int const px = x_pixel + col;
+			if (px < clip_x0 || px >= clip_x1) continue;
+			unsigned char pixel = icon_src[row * icon_w + col];
+			if (remap) pixel = ((unsigned char const *)remap)[pixel];
+			if (!transparent || pixel) buf[py * stride + px] = pixel;
+		}
+	}
+}
+
 
 
 #if (0)
@@ -1058,24 +1153,19 @@ GLOBAL C	Buffer_Draw_Stamp_Clip:near
 */ 
 extern "C" void __cdecl Init_Stamps(unsigned int icondata)
 {
-	// TIM-164: populate globals from IControl_Type binary layout (Win32 DW/DD offsets).
-	// Offsets: Width@0(2), Height@2(2), Count@4(2), Size@12(4), Icons@16(4), TransFlag@28(4), Map@36(4)
+	IControlDiskType const *control = (IControlDiskType const *)(uintptr_t)icondata;
 	LastIconset = icondata;
-	if (!icondata) return;
-	unsigned char *b = (unsigned char*)(uintptr_t)icondata;
-	short iw, ih, ic; int isz, iicons, itrans, imap;
-	memcpy(&iw, b+0, 2); memcpy(&ih, b+2, 2); memcpy(&ic, b+4, 2);
-	memcpy(&isz, b+12, 4); memcpy(&iicons, b+16, 4);
-	memcpy(&itrans, b+28, 4); memcpy(&imap, b+36, 4);
-	IconWidth  = (unsigned int)(unsigned short)iw;
-	IconHeight = (unsigned int)(unsigned short)ih;
-	IconCount  = (unsigned int)(unsigned short)ic;
-	// TIM-423: per-icon stride is icon_w*icon_h, not Size (total iconset block size).
-	IconSize   = IconWidth * IconHeight;
-	// TIM-423: Icons field now stores an offset from buffer start (fixed in ICONSET.CPP).
-	StampPtr   = icondata + (unsigned int)iicons;
-	IsTrans    = icondata + (unsigned int)itrans;
-	MapPtr     = icondata + (unsigned int)imap;
+	if (!control) {
+		StampPtr = IsTrans = MapPtr = IconWidth = IconHeight = IconSize = IconCount = 0;
+		return;
+	}
+	IconWidth = (unsigned int)control->Width;
+	IconHeight = (unsigned int)control->Height;
+	IconCount = (unsigned int)control->Count;
+	IconSize = IconWidth * IconHeight;
+	StampPtr = icondata + (unsigned int)control->Icons;
+	IsTrans = control->TransFlag ? icondata + (unsigned int)control->TransFlag : 0;
+	MapPtr = control->Map ? icondata + (unsigned int)control->Map : 0;
 }
 
 
@@ -1117,33 +1207,10 @@ void __cdecl Buffer_Draw_Stamp(void const *this_object, void const *icondata, in
 		LOCAL	iwidth:DWORD		; Icon width (here for speedy access).
 		LOCAL	doremap:BYTE		; Should remapping occur?
 */
-	// TIM-164: render icon from IControl_Type iconset, honouring per-icon transparency flag.
-	// TIM-423: icon_sz = icon_w*icon_h (per-icon stride); iicons is offset from base (LP64 fix).
 	(void)modulo; (void)iwidth; (void)doremap;
-	if (!icondata) return;
-	unsigned char *base = (unsigned char*)(uintptr_t)icondata;
-	short iw, ih; int iicons, itrans;
-	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2);
-	memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
-	int icon_w = (int)(unsigned short)iw, icon_h = (int)(unsigned short)ih;
-	int icon_sz = icon_w * icon_h;
 	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
-	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
-	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
-	int vw = vp->Get_Width(), vh = vp->Get_Height();
-	unsigned char *icon_src = base + (unsigned int)iicons + icon * icon_sz;
-	unsigned char tf = (itrans != 0) ? base[(unsigned int)itrans + icon] : 0;
-	for (int row = 0; row < icon_h; row++) {
-		int py = y_pixel + row;
-		if (py < 0 || py >= vh) continue;
-		for (int col = 0; col < icon_w; col++) {
-			int px = x_pixel + col;
-			if (px < 0 || px >= vw) continue;
-			unsigned char pixel = icon_src[row * icon_w + col];
-			if (remap) pixel = ((const unsigned char*)remap)[pixel];
-			if (!tf || pixel) buf[py * stride + px] = pixel;
-		}
-	}
+	if (!vp) return;
+	Buffer_Draw_Stamp_Common(vp, icondata, icon, x_pixel, y_pixel, remap, 0, 0, vp->Get_Width(), vp->Get_Height());
 }
 
 
@@ -1190,39 +1257,17 @@ void __cdecl Buffer_Draw_Stamp_Clip(void const *this_object, void const *icondat
 	LOCAL	skip:DWORD		; amount to skip per row of icon data
 	LOCAL	doremap:BYTE		; Should remapping occur?
 */
-	// TIM-164: render icon clipped to [min_x,max_x) x [min_y,max_y) bounds.
-	// TIM-423: icon_sz = icon_w*icon_h (per-icon stride); iicons is offset from base (LP64 fix).
 	(void)modulo; (void)iwidth; (void)skip; (void)doremap;
-	if (!icondata) return;
-	unsigned char *base = (unsigned char*)(uintptr_t)icondata;
-	short iw, ih; int iicons, itrans;
-	memcpy(&iw, base+0, 2); memcpy(&ih, base+2, 2);
-	memcpy(&iicons, base+16, 4); memcpy(&itrans, base+28, 4);
-	int icon_w = (int)(unsigned short)iw, icon_h = (int)(unsigned short)ih;
-	int icon_sz = icon_w * icon_h;
 	GraphicViewPortClass *vp = (GraphicViewPortClass*)this_object;
-	int stride = vp->Get_Width() + vp->Get_XAdd() + (int)vp->Get_Pitch();
-	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
-	unsigned char *icon_src = base + (unsigned int)iicons + icon * icon_sz;
-	unsigned char tf = (itrans != 0) ? base[(unsigned int)itrans + icon] : 0;
-	// TIM-255: WINDOWHEIGHT = MapCellHeight * ICON_PIXEL_H can exceed vp height
-	// when RESFACTOR=2 and the map has >10 visible rows (each 48px). Clamp so no
-	// write escapes the pixel buffer.
-	if (min_y < 0) min_y = 0;
-	if (min_x < 0) min_x = 0;
-	if (max_y > (int)vp->Get_Height()) max_y = (int)vp->Get_Height();
-	if (max_x > (int)vp->Get_Width())  max_x = (int)vp->Get_Width();
-	for (int row = 0; row < icon_h; row++) {
-		int py = y_pixel + row;
-		if (py < min_y || py >= max_y) continue;
-		for (int col = 0; col < icon_w; col++) {
-			int px = x_pixel + col;
-			if (px < min_x || px >= max_x) continue;
-			unsigned char pixel = icon_src[row * icon_w + col];
-			if (remap) pixel = ((const unsigned char*)remap)[pixel];
-			if (!tf || pixel) buf[py * stride + px] = pixel;
-		}
-	}
+	if (!vp) return;
+	// The clipped stamp entry point receives a window origin plus width/height.
+	// Match the shape path by drawing window-relative coordinates into the
+	// destination window's origin.
+	x_pixel += min_x;
+	y_pixel += min_y;
+	max_x += min_x;
+	max_y += min_y;
+	Buffer_Draw_Stamp_Common(vp, icondata, icon, x_pixel, y_pixel, remap, min_x, min_y, max_x, max_y);
 }
 
 
@@ -1424,16 +1469,42 @@ PROC	Apply_XOR_Delta C near
 	ARG	delta:DWORD		; pointers.
 */
 #ifndef _MSC_VER
-	// TIM-160: Westwood XOR-delta decoder (16-bit commands, 8-bit data bytes).
-	// +cmd: skip cmd target bytes unchanged; -cmd: XOR next |cmd| delta bytes into target.
 	unsigned char *t = (unsigned char*)target;
 	const unsigned char *d = (const unsigned char*)delta;
 	while (true) {
-		short cmd = (short)((unsigned short)d[0] | ((unsigned short)d[1] << 8));
-		d += 2;
-		if (cmd == 0) break;
-		if (cmd > 0) { t += cmd; }
-		else { int n = -cmd; while (n--) *t++ ^= *d++; }
+		unsigned int opcode = *d++;
+		if (opcode == 0) {
+			unsigned int count = *d++;
+			unsigned char value = *d++;
+			while (count--) *t++ ^= value;
+		} else if (opcode < 0x80) {
+			unsigned int count = opcode;
+			while (count--) *t++ ^= *d++;
+		} else {
+			unsigned int count = opcode - 0x80;
+			if (count != 0) {
+				t += count;
+				continue;
+			}
+
+			unsigned int code = (unsigned int)d[0] | ((unsigned int)d[1] << 8);
+			d += 2;
+			if (code == 0) break;
+			if ((code & 0x8000) == 0) {
+				t += code;
+				continue;
+			}
+
+			code -= 0x8000;
+			if (code & 0x4000) {
+				count = code - 0x4000;
+				unsigned char value = *d++;
+				while (count--) *t++ ^= value;
+			} else {
+				count = code;
+				while (count--) *t++ ^= *d++;
+			}
+		}
 	}
 	return (unsigned int)(uintptr_t)t;
 #else
@@ -1480,30 +1551,63 @@ void __cdecl Apply_XOR_Delta_To_Page_Or_Viewport(void *target, void *delta, int 
 	ARG	copy:DWORD		; should it be copied or xor'd?
 	*/
 #ifndef _MSC_VER
-	// TIM-160: row-aware XOR/copy delta decoder for viewport-bounded animations.
-	// 'nextrow' = buffer_stride - width (extra bytes to advance at each row wrap).
 	unsigned char *t = (unsigned char*)target;
 	const unsigned char *d = (const unsigned char*)delta;
 	int col = 0;
-	while (true) {
-		short cmd = (short)((unsigned short)d[0] | ((unsigned short)d[1] << 8));
-		d += 2;
-		if (cmd == 0) break;
-		if (cmd > 0) {
-			// skip cmd pixels, advancing past row boundaries
-			int remain = cmd;
-			while (remain > 0) {
-				int space = width - col;
-				int adv = remain < space ? remain : space;
-				t += adv; col += adv; remain -= adv;
-				if (col >= width) { col = 0; t += nextrow; }
+	auto advance = [&](unsigned int count) {
+		while (count > 0) {
+			int space = width - col;
+			unsigned int adv = count < (unsigned int)space ? count : (unsigned int)space;
+			t += adv;
+			col += (int)adv;
+			count -= adv;
+			if (col >= width) {
+				col = 0;
+				t += nextrow;
 			}
+		}
+	};
+	auto write_value = [&](unsigned char value) {
+		if (copy == DO_XOR) *t++ ^= value;
+		else                *t++ = value;
+		if (++col >= width) {
+			col = 0;
+			t += nextrow;
+		}
+	};
+
+	while (true) {
+		unsigned int opcode = *d++;
+		if (opcode == 0) {
+			unsigned int count = *d++;
+			unsigned char value = *d++;
+			while (count--) write_value(value);
+		} else if (opcode < 0x80) {
+			unsigned int count = opcode;
+			while (count--) write_value(*d++);
 		} else {
-			int n = -cmd;
-			while (n--) {
-				if (copy == DO_XOR) *t++ ^= *d++;
-				else                *t++ = *d++;
-				if (++col >= width) { col = 0; t += nextrow; }
+			unsigned int count = opcode - 0x80;
+			if (count != 0) {
+				advance(count);
+				continue;
+			}
+
+			unsigned int code = (unsigned int)d[0] | ((unsigned int)d[1] << 8);
+			d += 2;
+			if (code == 0) break;
+			if ((code & 0x8000) == 0) {
+				advance(code);
+				continue;
+			}
+
+			code -= 0x8000;
+			if (code & 0x4000) {
+				count = code - 0x4000;
+				unsigned char value = *d++;
+				while (count--) write_value(value);
+			} else {
+				count = code;
+				while (count--) write_value(*d++);
 			}
 		}
 	}
@@ -1664,23 +1768,53 @@ void * __cdecl Build_Fading_Table(void const *palette, void const *dest, long in
 	unsigned char matchcolor = 0;		//:BYTE		; Tentative match color.
 
 #ifndef _MSC_VER
-	// TIM-160: blend each palette entry toward 'color' by frac/256,
-	// find nearest match across the full 256-entry palette.
 	{
-		const unsigned char *pal = (const unsigned char*)palette;
-		unsigned char *out = const_cast<unsigned char*>((const unsigned char*)dest);
-		int tred = pal[color*3], tgrn = pal[color*3+1], tblu = pal[color*3+2];
-		for (int i = 0; i < 256; i++) {
-			int ired = pal[i*3]   + ((tred - pal[i*3])   * (int)frac >> 8);
-			int igrn = pal[i*3+1] + ((tgrn - pal[i*3+1]) * (int)frac >> 8);
-			int iblu = pal[i*3+2] + ((tblu - pal[i*3+2]) * (int)frac >> 8);
-			int best = 0x7FFFFFFF; matchcolor = (unsigned char)i;
-			for (int j = 0; j < 256; j++) {
-				int dr = pal[j*3]-ired, dg = pal[j*3+1]-igrn, db = pal[j*3+2]-iblu;
-				int d = dr*dr + dg*dg + db*db;
-				if (d < best) { best = d; matchcolor = (unsigned char)j; if (!d) break; }
+		if (!palette || !dest) return (void*)dest;
+
+		unsigned char const *pal = (unsigned char const *)palette;
+		unsigned char *out = const_cast<unsigned char *>((unsigned char const *)dest);
+		if (frac >= 0x100) frac = 0xff;
+
+		targetred = pal[color * 3 + 0];
+		targetgreen = pal[color * 3 + 1];
+		targetblue = pal[color * 3 + 2];
+
+		out[0] = 0;
+		for (int source = 1; source < 256; source++) {
+			auto fade_channel = [frac](unsigned char original, unsigned char target) -> unsigned char {
+				int diff = (signed char)(original - target);
+				int product = diff * (int)(frac >> 1);
+				unsigned short product_word = (unsigned short)(short)product;
+				product_word <<= 1;
+				unsigned char high = (unsigned char)(product_word >> 8);
+				return (unsigned char)(original - high);
+			};
+
+			idealred = fade_channel(pal[source * 3 + 0], targetred);
+			idealgreen = fade_channel(pal[source * 3 + 1], targetgreen);
+			idealblue = fade_channel(pal[source * 3 + 2], targetblue);
+
+			matchcolor = (unsigned char)color;
+			matchvalue = -1;
+
+			for (int candidate = 1; candidate < 256; candidate++) {
+				if (candidate == source) continue;
+
+				int red_diff = (signed char)(pal[candidate * 3 + 0] - idealred);
+				int green_diff = (signed char)(pal[candidate * 3 + 1] - idealgreen);
+				int blue_diff = (signed char)(pal[candidate * 3 + 2] - idealblue);
+				int value = red_diff * red_diff + green_diff * green_diff + blue_diff * blue_diff;
+
+				if (value == 0) {
+					matchcolor = (unsigned char)candidate;
+					break;
+				}
+				if ((unsigned int)value <= (unsigned int)matchvalue) {
+					matchvalue = value;
+					matchcolor = (unsigned char)candidate;
+				}
 			}
-			out[i] = matchcolor;
+			out[source] = matchcolor;
 		}
 		return (void*)dest;
 	}
@@ -2534,5 +2668,3 @@ extern "C" int __cdecl Buffer_Get_Pixel(void * this_object, int x_pixel, int y_p
 	unsigned char *buf = (unsigned char*)(uintptr_t)vp->Get_Offset();
 	return buf[y_pixel * stride + x_pixel];
 }
-
-

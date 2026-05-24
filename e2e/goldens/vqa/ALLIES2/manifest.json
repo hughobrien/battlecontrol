@@ -1,0 +1,30 @@
+{
+  "file": "ALLIES2.vqa",
+  "total_frames": 170,
+  "width": 320,
+  "height": 156,
+  "fps": 15,
+  "engine": "ffmpeg",
+  "extracted": [
+    {
+      "index": 0,
+      "frame_num": 1,
+      "path": "frame_0001.png"
+    },
+    {
+      "index": 1,
+      "frame_num": 57,
+      "path": "frame_0002.png"
+    },
+    {
+      "index": 2,
+      "frame_num": 114,
+      "path": "frame_0003.png"
+    },
+    {
+      "index": 3,
+      "frame_num": 170,
+      "path": "frame_0004.png"
+    }
+  ]
+}
