@@ -564,6 +564,10 @@
           exec bash scripts/parity.sh "$@"
         '';
 
+        cleanup = mkApp "cleanup" ''
+          exec python3 scripts/cleanup.py "$@"
+        '';
+
         # ── CI Job Apps ────────────────────────────────────────────────────
         # The GitHub Actions workflows in .github/workflows/ call these same
         # apps, making CI identical to local and trivially reproducible.
