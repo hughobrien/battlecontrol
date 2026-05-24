@@ -659,8 +659,10 @@ void TeamClass::AI(void)
 	/*
 	**	Try to recruit members if there is room to do so for this team.
 	**	Only try to recruit members for a non player controlled team.
+	**	Retail RA95 only recruits map units for prebuilt teams; triggered
+	**	non-prebuilt teams keep their explicitly assigned members.
 	*/
-	if ((!IsMoving || (!IsFullStrength && Class->IsReinforcable)) && ((!House->IsHuman || !IsHasBeen) && Session.Type == GAME_NORMAL)) {
+	if (Class->IsPrebuilt && (!IsMoving || (!IsFullStrength && Class->IsReinforcable)) && ((!House->IsHuman || !IsHasBeen) && Session.Type == GAME_NORMAL)) {
 //	if ((!IsMoving || (!IsFullStrength && Class->IsReinforcable)) && ((/*!House->IsHuman ||*/ !IsHasBeen) && Session.Type == GAME_NORMAL)) {
 		for (int index = 0; index < Class->ClassCount; index++) {
 			if (Quantity[index] < Class->Members[index].Quantity) {
